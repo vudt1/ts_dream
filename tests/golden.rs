@@ -1,4 +1,4 @@
-//! Golden runner — reads a golden file, runs it against a live Rust server,
+//! Golden runner — reads golden files, runs them against a live Rust server,
 //! and diffs byte-exact. Skipped automatically when the server isn't running
 //! (no `GOLDEN_ADDR`); set `GOLDEN_ADDR=127.0.0.1:6414` to enable.
 
@@ -35,6 +35,18 @@ async fn golden_parse_and_validate_format() {
     assert!(g.c2s[0].starts_with("F444"));
 }
 
+/// Load golden scenarios from the `golden/` directory.
+#[tokio::test]
+async fn golden_load_directory() {
+    init();
+    let goldens = ts_dream::harness::Golden::load_dir("golden").expect("load_dir ok");
+    assert!(!goldens.is_empty(), "expected at least 1 placeholder golden scenario in golden/");
+    for g in goldens {
+        assert!(!g.name.is_empty());
+        assert!(!g.c2s.is_empty());
+    }
+}
+
 /// Run against a live server if `GOLDEN_ADDR` is set. This is the CI/parity
 /// gate once captures exist; otherwise skipped.
 #[tokio::test]
@@ -44,13 +56,12 @@ async fn golden_driven_scenarios_gate() {
         eprintln!("GOLDEN_ADDR unset — skipping golden gate");
         return;
     };
-    // Only run the login-scaffold golden that ships with the harness; the
-    // full suite (tickets 23) is a separate gate.
-    let text = "\
-<<F444010000
->>F4440300010901
-";
-    let g = ts_dream::harness::Golden::parse(text, "login-hello").unwrap();
-    let received = ts_dream::harness::run_golden(&g, &addr).await;
-    assert!(received.is_ok(), "golden failed: {:?}", received);
+
+    let goldens = ts_dream::harness::Golden::load_dir("golden").unwrap();
+    assert!(!goldens.is_empty(), "no golden files found in golden/");
+
+    for g in &goldens {
+        let received = ts_dream::harness::run_golden(g, &addr).await;
+        assert!(received.is_ok(), "golden `{}` failed: {:?}", g.name, received);
+    }
 }

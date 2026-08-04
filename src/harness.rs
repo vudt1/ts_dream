@@ -7,12 +7,17 @@
 
 use crate::error::{Result, TsError};
 use crate::protocol::frame;
+use std::path::Path;
 
-/// Protocol constants for the harness (Chapter 9 §9.7).
+/// Protocol constants for the harness (Chapter 9 §9.7 / Chapter 8 §8.2).
 pub const XOR_KEY: u8 = 0xAD;
+pub const FRAME_MAGIC: &[u8] = &[0xF4, 0x44];
+pub const ID_PREFIX: &str = "vn";
+pub const MIN_VERSION: u16 = 186;
+pub const SERVER_NAME: &str = "TSVN";
 
 /// One golden scenario: directed frames parsed from a `.golden` text file.
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Golden {
     pub name: String,
     pub c2s: Vec<String>,
@@ -48,52 +53,344 @@ impl Golden {
         }
         Ok(g)
     }
+
+    /// Load a golden scenario from a `.golden` file path.
+    pub fn from_file(path: impl AsRef<Path>) -> Result<Self> {
+        let path_ref = path.as_ref();
+        let name = path_ref
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("unknown");
+        let content = std::fs::read_to_string(path_ref).map_err(TsError::Io)?;
+        Self::parse(&content, name)
+    }
+
+    /// Serialize the golden scenario into formatted text.
+    pub fn to_text(&self) -> String {
+        let mut out = String::new();
+        out.push_str("// Golden scenario: ");
+        out.push_str(&self.name);
+        out.push('\n');
+        for c in &self.c2s {
+            out.push_str("<<");
+            out.push_str(c);
+            out.push('\n');
+        }
+        if !self.c2s.is_empty() && !self.s2c.is_empty() {
+            out.push('\n');
+        }
+        for s in &self.s2c {
+            out.push_str(">>");
+            out.push_str(s);
+            out.push('\n');
+        }
+        out
+    }
+
+    /// Save the golden scenario to a file.
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
+        std::fs::write(path, self.to_text()).map_err(TsError::Io)
+    }
+
+    /// Load all `.golden` files from a directory, sorted by name.
+    pub fn load_dir(dir_path: impl AsRef<Path>) -> Result<Vec<Self>> {
+        let mut goldens = Vec::new();
+        let entries = match std::fs::read_dir(dir_path) {
+            Ok(entries) => entries,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(goldens),
+            Err(e) => return Err(TsError::Io(e)),
+        };
+
+        for entry in entries {
+            let entry = entry.map_err(TsError::Io)?;
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(ext) = path.extension() {
+                    if ext == "golden" {
+                        let g = Self::from_file(&path)?;
+                        goldens.push(g);
+                    }
+                }
+            }
+        }
+        goldens.sort_by(|a, b| a.name.cmp(&b.name));
+        Ok(goldens)
+    }
 }
 
 /// The runner: feed every C2S frame to the server socket, collect S2C frames,
 /// and compare against the golden S2C stream frame-by-frame byte-exact.
 ///
-/// Returns the sorted S2C received, or the first mismatch.
+/// Returns the S2C received on success, or the first mismatch error.
 pub async fn run_golden(
     golden: &Golden,
     addr: &str,
 ) -> Result<Vec<String>> {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpStream;
+    use tokio::time::{timeout, Duration};
 
     let mut sock = TcpStream::connect(addr)
         .await
-        .map_err(|e| TsError::Io(e))?;
+        .map_err(TsError::Io)?;
 
     // Send each C2S frame (hex → xor → write).
     for c2s in &golden.c2s {
         let wire = frame::encode_to_wire(c2s)?;
         sock.write_all(&wire)
             .await
-            .map_err(|e| TsError::Io(e))?;
+            .map_err(TsError::Io)?;
     }
 
-    // Read back until close; collect S2C frames.
+    // Read back until expected S2C count is met or timeout/EOF.
     let mut decoder = frame::Decoder::new();
     let mut buffer = vec![0u8; 8192];
     let mut s2c: Vec<String> = Vec::new();
-    loop {
-        let n = sock.read(&mut buffer).await.map_err(|e| TsError::Io(e))?;
-        if n == 0 {
-            break;
+    let expected_count = golden.s2c.len();
+
+    while s2c.len() < expected_count {
+        let read_res = timeout(Duration::from_millis(500), sock.read(&mut buffer)).await;
+        match read_res {
+            Ok(Ok(0)) => break,
+            Ok(Ok(n)) => {
+                s2c.extend(decoder.feed(&buffer[..n]));
+            }
+            Ok(Err(e)) => return Err(TsError::Io(e)),
+            Err(_) => break, // Timeout waiting for further frames
         }
-        // NOTE: buffer here is raw wire bytes → decoder.feed XORs it back.
-        s2c.extend(decoder.feed(&buffer[..n]));
     }
 
     if s2c == golden.s2c {
         Ok(s2c)
     } else {
         Err(TsError::Other(format!(
-            "golden `{}`: S2C mismatch (expected {} frames, got {})",
+            "golden `{}`: S2C mismatch (expected {} frames: {:?}, got {} frames: {:?})",
             golden.name,
             golden.s2c.len(),
-            s2c.len()
+            golden.s2c,
+            s2c.len(),
+            s2c
         )))
+    }
+}
+
+/// Capture proxy module (Chapter 9 §9.2).
+pub mod proxy {
+    use super::*;
+    use std::sync::{Arc, Mutex};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::{TcpListener, TcpStream};
+
+    /// Direction of a captured frame.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum Direction {
+        C2S,
+        S2C,
+    }
+
+    /// Capture proxy TCP listener that forwards traffic between game client and server,
+    /// logging all frames in XOR-decoded hex format.
+    pub struct CaptureProxy {
+        listen_addr: String,
+        target_addr: String,
+        log: Arc<Mutex<Vec<String>>>,
+    }
+
+    impl CaptureProxy {
+        pub fn new(listen_addr: impl Into<String>, target_addr: impl Into<String>) -> Self {
+            Self {
+                listen_addr: listen_addr.into(),
+                target_addr: target_addr.into(),
+                log: Arc::new(Mutex::new(Vec::new())),
+            }
+        }
+
+        pub fn log_buffer(&self) -> Arc<Mutex<Vec<String>>> {
+            Arc::clone(&self.log)
+        }
+
+        pub fn captured_lines(&self) -> Vec<String> {
+            self.log.lock().unwrap().clone()
+        }
+
+        pub fn to_golden_text(&self, comment: &str) -> String {
+            let mut out = String::new();
+            if !comment.is_empty() {
+                out.push_str("// ");
+                out.push_str(comment);
+                out.push('\n');
+            }
+            for line in self.captured_lines() {
+                out.push_str(&line);
+                out.push('\n');
+            }
+            out
+        }
+
+        /// Run the proxy accept loop.
+        pub async fn run(&self, mut shutdown_rx: tokio::sync::watch::Receiver<bool>) -> Result<()> {
+            let listener = TcpListener::bind(&self.listen_addr)
+                .await
+                .map_err(TsError::Io)?;
+
+            loop {
+                tokio::select! {
+                    res = listener.accept() => {
+                        let (client_stream, _) = res.map_err(TsError::Io)?;
+                        let target_addr = self.target_addr.clone();
+                        let log = Arc::clone(&self.log);
+                        tokio::spawn(async move {
+                            if let Err(e) = handle_connection(client_stream, &target_addr, log).await {
+                                tracing::debug!("Proxy session ended: {:?}", e);
+                            }
+                        });
+                    }
+                    _ = shutdown_rx.changed() => {
+                        if *shutdown_rx.borrow() {
+                            break;
+                        }
+                    }
+                }
+            }
+            Ok(())
+        }
+    }
+
+    async fn handle_connection(
+        client: TcpStream,
+        target_addr: &str,
+        log: Arc<Mutex<Vec<String>>>,
+    ) -> Result<()> {
+        let target = TcpStream::connect(target_addr).await.map_err(TsError::Io)?;
+        let (mut c_read, mut c_write) = client.into_split();
+        let (mut t_read, mut t_write) = target.into_split();
+
+        let log_c2s = Arc::clone(&log);
+        let log_s2c = Arc::clone(&log);
+
+        let c2s_task = tokio::spawn(async move {
+            let mut decoder = frame::Decoder::new();
+            let mut buf = vec![0u8; 8192];
+            loop {
+                let n = c_read.read(&mut buf).await?;
+                if n == 0 {
+                    break;
+                }
+                let raw = &buf[..n];
+                let frames = decoder.feed(raw);
+                {
+                    let mut guard = log_c2s.lock().unwrap();
+                    for f in frames {
+                        guard.push(format!("<<{f}"));
+                    }
+                }
+                t_write.write_all(raw).await?;
+            }
+            Ok::<(), std::io::Error>(())
+        });
+
+        let s2c_task = tokio::spawn(async move {
+            let mut decoder = frame::Decoder::new();
+            let mut buf = vec![0u8; 8192];
+            loop {
+                let n = t_read.read(&mut buf).await?;
+                if n == 0 {
+                    break;
+                }
+                let raw = &buf[..n];
+                let frames = decoder.feed(raw);
+                {
+                    let mut guard = log_s2c.lock().unwrap();
+                    for f in frames {
+                        guard.push(format!(">>{f}"));
+                    }
+                }
+                c_write.write_all(raw).await?;
+            }
+            Ok::<(), std::io::Error>(())
+        });
+
+        let _ = tokio::try_join!(c2s_task, s2c_task);
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+    use tokio::sync::watch;
+
+    #[tokio::test]
+    async fn test_golden_serialization() -> Result<()> {
+        let text = "// Sample scenario\n<<F444010000\n>>F4440300010901\n";
+        let g = Golden::parse(text, "sample")?;
+        assert_eq!(g.c2s, vec!["F444010000"]);
+        assert_eq!(g.s2c, vec!["F4440300010901"]);
+        let serialized = g.to_text();
+        assert!(serialized.contains("<<F444010000"));
+        assert!(serialized.contains(">>F4440300010901"));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_capture_proxy_forwarding() -> Result<()> {
+        // 1. Start a mock server
+        let mock_listener = TcpListener::bind("127.0.0.1:0").await.map_err(TsError::Io)?;
+        let server_addr = mock_listener.local_addr().map_err(TsError::Io)?;
+
+        tokio::spawn(async move {
+            if let Ok((mut socket, _)) = mock_listener.accept().await {
+                let mut buf = vec![0u8; 1024];
+                if let Ok(n) = socket.read(&mut buf).await {
+                    let req_wire = &buf[..n];
+                    // Verify received C2S wire packet (XOR of F444010000)
+                    let decoded = req_wire.iter().map(|b| b ^ XOR_KEY).collect::<Vec<_>>();
+                    assert_eq!(decoded, vec![0xF4, 0x44, 0x01, 0x00, 0x00]);
+
+                    // Send response S2C wire packet for F4440300010901
+                    let resp_hex = "F4440300010901";
+                    let resp_wire = frame::encode_to_wire(resp_hex).unwrap();
+                    let _ = socket.write_all(&resp_wire).await;
+                }
+            }
+        });
+
+        // 2. Start proxy
+        let proxy_listener = TcpListener::bind("127.0.0.1:0").await.map_err(TsError::Io)?;
+        let proxy_addr = proxy_listener.local_addr().map_err(TsError::Io)?;
+        drop(proxy_listener); // release port for CaptureProxy
+
+        let proxy = Arc::new(proxy::CaptureProxy::new(proxy_addr.to_string(), server_addr.to_string()));
+        let (tx, rx) = watch::channel(false);
+        let proxy_clone = Arc::clone(&proxy);
+        let proxy_task = tokio::spawn(async move {
+            let _ = proxy_clone.run(rx).await;
+        });
+
+        // Wait a tiny bit for proxy to start listening
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        // 3. Client connects to proxy and sends F444010000 wire bytes
+        let mut client = tokio::net::TcpStream::connect(proxy_addr).await.map_err(TsError::Io)?;
+        let req_wire = frame::encode_to_wire("F444010000")?;
+        client.write_all(&req_wire).await.map_err(TsError::Io)?;
+
+        let mut resp_buf = vec![0u8; 1024];
+        let n = client.read(&mut resp_buf).await.map_err(TsError::Io)?;
+        let resp_decoded = resp_buf[..n].iter().map(|b| b ^ XOR_KEY).collect::<Vec<_>>();
+        assert_eq!(resp_decoded, vec![0xF4, 0x44, 0x03, 0x00, 0x01, 0x09, 0x01]);
+
+        let _ = tx.send(true);
+        let _ = proxy_task.await;
+
+        // 4. Verify captured lines in proxy
+        let lines = proxy.captured_lines();
+        assert!(lines.contains(&"<<F444010000".to_string()));
+        assert!(lines.contains(&">>F4440300010901".to_string()));
+
+        Ok(())
     }
 }
