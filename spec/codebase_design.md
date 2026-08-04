@@ -10,7 +10,9 @@ Dưới đây là đề xuất chi tiết về tech stack, kiến trúc tổng t
 *   **Frontend Web Admin:** **Askama + HTMX**. Theo nguồn dữ liệu, kết hợp Askama (template engine biên dịch thẳng vào mã máy) và HTMX (xử lý tương tác giao diện không cần viết nhiều JS) là "điểm ngọt" cho admin dashboard. Kiến trúc này giúp bạn không cần cài đặt Node.js hay tách rời frontend/backend, toàn bộ UI sẽ được nhúng vào một file binary duy nhất để dễ dàng deploy lên máy chủ Linux headless.
 *   **Xử lý Gói tin (Packet):** Các thao tác bit/byte thuần túy của Rust. Giao thức TS yêu cầu giải mã XOR với key `0xAD` và phân tách frame dựa trên header `F4 44` cùng 2 byte chiều dài.
 
-* **Tech Stack bổ sung (Cargo.toml):** Bạn sẽ cần thêm sqlx cho SQLite và bytes để xử lý mảng byte của giao thức:
+*   **Database:** **MySQL 8** (lưu trữ chính thức — thay SQLite). Kết nối qua **sqlx** (`MySqlPool`), schema tự khởi tạo bằng migration chạy lúc boot. MySQL là dịch vụ ngoài binary (chạy local tại `localhost:3306`), nên "single binary" của server được giữ nguyên.
+
+* **Tech Stack bổ sung (Cargo.toml):** Bạn sẽ cần sqlx (driver MySQL) và bytes để xử lý mảng byte của giao thức:
 
 ```toml
 [dependencies]
@@ -18,7 +20,7 @@ tokio = { version = "1.0", features = ["full"] }
 axum = "0.7"
 askama = "0.12"
 bytes = "1.5"        # Xử lý Little-Endian, bóc tách frame mạng cực nhanh
-sqlx = { version = "0.7", features = ["sqlite", "runtime-tokio-rustls"] }
+sqlx = { version = "0.8", features = ["mysql", "runtime-tokio-rustls", "migrate"] }
 ```
 
 ### 2. Kiến trúc tổng thể (Architecture)
@@ -36,14 +38,16 @@ Kiến trúc của bạn sẽ xoay quanh một **Shared State (Trạng thái chi
             ▼
  ┌──────────────────────┐
  │  Shared AppState     │ ◄─── (Danh sách user online, configs, metrics)
- └──────────▲───────────┘
-            │ Đọc & Điều khiển
- ┌──────────┴───────────┐
- │   Web Server (Axum)  │ ◄─── (HTTP API & HTML Templates)
- └──────────▲───────────┘
-            │ (HTTP Port 8090/3000)
-            ▼
-   [Web Admin Dashboard] (HTMX + Askama)
+ └───┬──────────────────┘
+     │ Đọc/Ghi player state (MySqlPool)
+     ▼
+ ┌──────────────┐       ┌──────────────────────┐
+ │   MySQL 8    │       │  Web Server (Axum)   │ ◄─── (HTTP API & HTML Templates)
+ │  (ts_dream)  │       └──────────▲───────────┘
+ └──────────────┘                  │ Đọc & Điều khiển
+                                   │ (HTTP Port 8090/3000)
+                                   ▼
+                    [Web Admin Dashboard] (HTMX + Askama)
 ```
 
 ### 3. Cấu trúc Project (Project Structure)
@@ -57,8 +61,8 @@ ts_dream/
 │   ├── base.html
 │   └── dashboard.html
 └── src/
-    ├── main.rs                 # Entry point: Khởi tạo AppState, chạy song song TCP và Web, Chạy Tokio, Axum (Web Admin), kết nối SQLite
-    ├── db.rs                   # Cấu hình sqlx kết nối file SQLite (vd: ts_data.db)
+    ├── main.rs                 # Entry point: Khởi tạo AppState + MySqlPool (migrate), chạy song song TCP và Web, Chạy Tokio, Axum (Web Admin)
+    ├── db.rs                   # Cấu hình MySqlPool từ database_url (mysql://user:pass@localhost:3306/ts_dream), chạy sqlx migrate lúc khởi động
     ├── config.rs               # Xử lý file cấu hình (port, db URL...)
     ├── state.rs                # Chứa `AppState` chia sẻ dữ liệu giữa Web và TCP hay AppState (Arc<RwLock<...>>) chứa danh sách online
     ├── network/                
