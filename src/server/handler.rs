@@ -11,7 +11,10 @@
 use crate::data::loader::GameData;
 use crate::error::Result;
 use crate::protocol::encoder;
-use crate::server::handlers::{character, chat, expressions, inventory, login, movement, shops, skills, stats};
+use crate::server::handlers::{
+    character, chat, expressions, inventory, login, movement, pet_actions, shops, skills, stats,
+    system, trade_storage,
+};
 use crate::server::session::Conn;
 
 /// Result of handling one decoded frame.
@@ -66,6 +69,15 @@ fn handle(
         // Op 0x09 — Character creation & name check
         0x09 => character::handle_character(conn, sub, payload, out),
 
+        // Op 0x0C — Teleport confirm
+        0x0C => system::handle_teleport_confirm(conn, sub, payload, out),
+
+        // Op 0x0F — Pet actions (release, store, mount, rename, take, swap)
+        0x0F => pet_actions::handle_pet_actions(conn, sub, payload, out),
+
+        // Op 0x13 — Pet summon / recall
+        0x13 => pet_actions::handle_pet_summon(conn, sub, payload, out),
+
         // Op 0x17 — Inventory base, use item, player shop, reborn
         0x17 => {
             if (30..=33).contains(&sub) {
@@ -75,20 +87,47 @@ fn handle(
             }
         }
 
+        // Op 0x19 — Trade
+        0x19 => trade_storage::handle_trade(conn, sub, payload, out),
+
         // Op 0x1B — NPC shop buy/sell
         0x1B => shops::handle_npc_shop(conn, sub, payload, out),
 
         // Op 0x1C — Learn / upgrade skills
         0x1C => skills::handle_skills(conn, sub, payload, out),
 
+        // Op 0x1D — Bank gold
+        0x1D => trade_storage::handle_bank_gold(conn, sub, payload, out),
+
+        // Op 0x1E — Storage transfer (TienTrang)
+        0x1E => trade_storage::handle_storage_transfer(conn, sub, payload, out),
+
+        // Op 0x1F — Pet stable menu
+        0x1F => pet_actions::handle_pet_stable(conn, sub, payload, out),
+
         // Op 0x20 — Expressions
         0x20 => expressions::handle_expressions(conn, sub, payload, out),
+
+        // Op 0x21 — PK / War mode
+        0x21 => system::handle_pk_war(conn, sub, payload, out),
+
+        // Op 0x22 — Game points / God panel
+        0x22 => system::handle_game_points(conn, sub, payload, out),
+
+        // Op 0x23 — Account management
+        0x23 => system::handle_account_mgmt(conn, sub, payload, out),
 
         // Op 0x28 — Hotkey / skill bar
         0x28 => stats::handle_hotkey(conn, sub, payload, out),
 
         // Op 0x2C — Pet reborn
         0x2C => skills::handle_pet_reborn(conn, sub, payload, out),
+
+        // Op 0x41 — Rank system
+        0x41 => system::handle_rank(conn, sub, payload, out),
+
+        // Op 0x42 — GM / Mall shop
+        0x42 => system::handle_gm_shop(conn, sub, payload, out),
 
         _ => {
             // Not yet ported / unknown: silently ignored.
@@ -240,5 +279,26 @@ mod tests {
         assert_eq!(conn.session.skill_point, 4);
         assert_eq!(out_skill.outgoing.len(), 2);
     }
+
+    #[test]
+    fn dispatch_trade_bank_pk_and_pets() {
+        let mut conn = Conn::new();
+        conn.session.gold = 5000;
+        conn.session.bank_gold = 2000;
+
+        // Op 0x1D sub 1: withdraw 1000 gold -> F444 0400 1D01 E803
+        let bank_decoded = encoder::bytes("F44404001D01E803").unwrap();
+        let out_bank = dispatch(&mut conn, &bank_decoded, &dummy_data());
+        assert_eq!(conn.session.gold, 6000);
+        assert_eq!(conn.session.bank_gold, 1000);
+        assert_eq!(out_bank.outgoing.len(), 3);
+
+        // Op 0x21 sub 1: set PK = 1 -> F444 0300 2101 01
+        let pk_decoded = encoder::bytes("F4440300210101").unwrap();
+        let out_pk = dispatch(&mut conn, &pk_decoded, &dummy_data());
+        assert_eq!(conn.session.pk, 1);
+        assert_eq!(out_pk.outgoing[0], "F444040021020100");
+    }
 }
+
 

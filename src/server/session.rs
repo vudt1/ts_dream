@@ -139,6 +139,22 @@ pub struct Session {
     pub active_pet_stt: u8,
 
     pub shop: PlayerShopState,
+
+    pub bank_gold: u32,
+    pub shop_point: u32,
+    pub horse_pet_id: u16,
+    pub gift_code_redeemed: bool,
+    pub trade: TradeState,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct TradeState {
+    pub active: bool,
+    pub partner_id: u32,
+    pub accepted: bool,
+    pub gold: u32,
+    pub items: Vec<InventoryItem>,
+    pub pets: Vec<u8>,
 }
 
 impl Default for Session {
@@ -208,6 +224,12 @@ impl Default for Session {
             active_pet_stt: 0,
 
             shop: PlayerShopState::default(),
+
+            bank_gold: 0,
+            shop_point: 1000,
+            horse_pet_id: 0,
+            gift_code_redeemed: false,
+            trade: TradeState::default(),
         }
     }
 }
