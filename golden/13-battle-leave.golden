@@ -1,0 +1,4 @@
+// Golden scenario: battle — leave battle confirm (op 0x0B sub 1) (ticket 23, Ch9 §9.6)
+// Deterministic synchronous gate; the async win replay is golden/03-battle-win.
+<<F44404000B0103
+>>F44408000B00E19304000000

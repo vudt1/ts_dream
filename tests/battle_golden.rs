@@ -4,7 +4,6 @@
 //! `BattleService`, feeding the op 0x32 skill command, and diffs the exact
 //! server→client frame stream against `golden/03-battle-win.golden`.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 

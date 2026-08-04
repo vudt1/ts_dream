@@ -315,6 +315,115 @@ pub mod proxy {
     }
 }
 
+/// Deterministic, in-process golden scenario (Ch9 §9.4/§9.5).
+///
+/// A scenario is the replayable unit the golden files lock: it seeds a fresh
+/// `Conn` via `setup`, feeds the ordered `c2s` frames through the opcode
+/// dispatcher (the same path a live connection takes), and yields the ordered
+/// server→client frame stream. Because every input is a pure function of the
+/// seeded session + `GameData`, the replay is byte-deterministic and needs no
+/// socket, DB, or wall clock.
+pub mod scenario {
+    use super::*;
+    use crate::battle::service::BattleService;
+    use crate::data::loader::GameData;
+    use crate::protocol::encoder;
+    use crate::server::handler;
+    use crate::server::session::Conn;
+    use std::path::Path;
+
+    /// One replayable golden scenario.
+    pub struct Scenario<'a> {
+        pub name: String,
+        /// Seeds the fresh connection's session state before replay.
+        pub setup: Box<dyn Fn(&mut Conn) + Send + Sync + 'a>,
+        /// Static data tables the dispatcher reads.
+        pub data: GameData,
+        /// Ordered client→server frames (uppercase hex, `F444…`).
+        pub c2s: Vec<String>,
+        /// Fixed unix seconds for the `Thoi gian` banner (deterministic replay,
+        /// Ch9 §9.2). `None` = real wall clock.
+        pub now_override: Option<i64>,
+    }
+
+    impl<'a> Scenario<'a> {
+        pub fn new(
+            name: impl Into<String>,
+            data: GameData,
+            c2s: Vec<String>,
+            setup: impl Fn(&mut Conn) + Send + Sync + 'a,
+        ) -> Self {
+            Self {
+                name: name.into(),
+                setup: Box::new(setup),
+                data,
+                c2s,
+                now_override: None,
+            }
+        }
+
+        /// Pin the time banner to a fixed instant so the replay is
+        /// wall-clock independent.
+        pub fn with_now(mut self, unix_secs: i64) -> Self {
+            self.now_override = Some(unix_secs);
+            self
+        }
+
+        /// Replay the scenario in-process and return the ordered S2C frames.
+        pub fn replay(&self) -> Vec<String> {
+            if let Some(t) = self.now_override {
+                crate::server::spawn::override_now(t);
+            }
+            let mut conn = Conn::new();
+            (self.setup)(&mut conn);
+            let service = BattleService::new(std::sync::Arc::new(self.data.clone()));
+            let mut s2c: Vec<String> = Vec::new();
+            for c2s in &self.c2s {
+                let Some(decoded) = encoder::bytes(c2s) else {
+                    panic!("scenario `{}`: bad c2s hex `{c2s}`", self.name);
+                };
+                let out = handler::dispatch(&mut conn, &decoded, &self.data, &service);
+                for frame in out.outgoing {
+                    s2c.push(frame);
+                }
+            }
+            if self.now_override.is_some() {
+                crate::server::spawn::reset_now();
+            }
+            s2c
+        }
+
+        /// Serialize the replayed scenario into golden-file text.
+        pub fn to_golden_text(&self, comment: &str) -> String {
+            let mut out = String::new();
+            out.push_str("// ");
+            out.push_str(comment);
+            out.push('\n');
+            for c in &self.c2s {
+                out.push_str("<<");
+                out.push_str(c);
+                out.push('\n');
+            }
+            if !self.c2s.is_empty() {
+                out.push('\n');
+            }
+            let s2c = self.replay();
+            for s in s2c {
+                out.push_str(">>");
+                out.push_str(&s);
+                out.push('\n');
+            }
+            out
+        }
+
+        /// Save the replayed golden text to `golden/<name>.golden`.
+        pub fn save(&self, dir: impl AsRef<Path>, comment: &str) -> Result<()> {
+            let path = dir.as_ref().join(format!("{}.golden", self.name));
+            std::fs::write(&path, self.to_golden_text(comment)).map_err(TsError::Io)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

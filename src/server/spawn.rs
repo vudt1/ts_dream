@@ -5,6 +5,37 @@
 
 use crate::protocol::encoder;
 use crate::server::handler::HandleOutcome;
+use std::sync::atomic::{AtomicI64, Ordering};
+
+/// Wall-clock override (unix seconds) for the deterministic golden replay of
+/// the `Thoi gian` banner (Ch9 §9.2 — timing-dependent frames are not locked).
+/// `0` = real clock; a fixed value makes Logined1 byte-deterministic.
+static FIXED_NOW: AtomicI64 = AtomicI64::new(0);
+
+/// Pin the time banner to a fixed unix timestamp (deterministic golden replay).
+pub fn override_now(unix_secs: i64) {
+    FIXED_NOW.store(unix_secs, Ordering::SeqCst);
+}
+
+/// Restore the real wall clock for the time banner.
+pub fn reset_now() {
+    FIXED_NOW.store(0, Ordering::SeqCst);
+}
+
+fn now_banner() -> String {
+    match FIXED_NOW.load(Ordering::SeqCst) {
+        0 => chrono::Local::now()
+            .format("Thoi gian: %Y-%m-%d %H:%M:%S")
+            .to_string(),
+        // Deterministic golden replay (Ch9 §9.2): fixed instant, UTC, so the
+        // banner never depends on the machine's wall clock or timezone.
+        t => chrono::DateTime::from_timestamp(t, 0)
+            .expect("valid fixed timestamp")
+            .with_timezone(&chrono::Utc)
+            .format("Thoi gian: %Y-%m-%d %H:%M:%S")
+            .to_string(),
+    }
+}
 
 /// Login failure responses (op 0x01).
 pub const LOGIN_WRONG_PASS: &str = "F44402000106";
@@ -278,8 +309,7 @@ pub fn build_logined_sequence(
     // 17. Step 17: Empty send (omitted)
 
     // 18. Step 18: Time banner
-    let now_str = chrono::Local::now().format("Thoi gian: %Y-%m-%d %H:%M:%S").to_string();
-    frames.push(sys_msg_frame(&now_str));
+    frames.push(sys_msg_frame(&now_banner()));
 
     // 19. Step 19: Welcome banner
     frames.push(sys_msg_frame(

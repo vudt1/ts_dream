@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 /// The complete loaded static dataset (mirrors the C# `Data` statics).
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct GameData {
     pub npcs: HashMap<i64, Npc>,
     pub items: HashMap<i64, Item>,
