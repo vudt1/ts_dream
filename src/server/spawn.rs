@@ -182,6 +182,14 @@ pub fn sys_msg_frame(msg: &str) -> String {
     format!("F444{}020B{}", encoder::le16(total_len as u16), body)
 }
 
+/// Build announcement packet (op 0x02 sub 0x0C).
+pub fn announce_frame(msg: &str) -> String {
+    let mut body = String::from("00000000");
+    body.push_str(&encoder::strhex(msg.as_bytes()));
+    let total_len = 2 + body.len() / 2;
+    format!("F444{}020C{}", encoder::le16(total_len as u16), body)
+}
+
 /// Build server name packet (op 0x27 sub 0x09).
 pub fn server_name_frame(id: u32, server_name: &str) -> String {
     let name_hex = encoder::strhex(server_name.as_bytes());

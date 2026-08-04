@@ -30,6 +30,7 @@ pub mod server {
 
 pub mod web {
     pub mod app;
+    pub mod server_control;
 }
 
 pub mod battle {
