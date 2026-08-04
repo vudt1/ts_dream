@@ -23,6 +23,7 @@ pub mod db {
 
 pub mod server {
     pub mod handler;
+    pub mod handlers;
     pub mod session;
     pub mod spawn;
 }
