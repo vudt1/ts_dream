@@ -11,6 +11,8 @@ pub mod shops;
 pub mod skills;
 pub mod stats;
 pub mod system;
+pub mod talk;
 pub mod trade_storage;
+
 
 

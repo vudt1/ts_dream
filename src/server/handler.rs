@@ -13,9 +13,10 @@ use crate::error::Result;
 use crate::protocol::encoder;
 use crate::server::handlers::{
     character, chat, expressions, inventory, login, movement, pet_actions, shops, skills, stats,
-    system, trade_storage,
+    system, talk, trade_storage,
 };
 use crate::server::session::Conn;
+
 
 /// Result of handling one decoded frame.
 #[derive(Debug, Default, Clone)]
@@ -78,7 +79,11 @@ fn handle(
         // Op 0x13 — Pet summon / recall
         0x13 => pet_actions::handle_pet_summon(conn, sub, payload, out),
 
+        // Op 0x14 — Action / Talk
+        0x14 => talk::handle_talk(conn, sub, payload, data, out),
+
         // Op 0x17 — Inventory base, use item, player shop, reborn
+
         0x17 => {
             if (30..=33).contains(&sub) {
                 shops::handle_player_shop(conn, sub, payload, out);
@@ -298,7 +303,14 @@ mod tests {
         let out_pk = dispatch(&mut conn, &pk_decoded, &dummy_data());
         assert_eq!(conn.session.pk, 1);
         assert_eq!(out_pk.outgoing[0], "F444040021020100");
+
+        // Op 0x14 sub 1: talk start banker 16080 (0x3ED0) -> F444 0400 1401 D03E
+        let talk_decoded = encoder::bytes("F44404001401D03E").unwrap();
+        let out_talk = dispatch(&mut conn, &talk_decoded, &dummy_data());
+        assert_eq!(conn.session.idtalking, 16080);
+        assert_eq!(out_talk.outgoing.len(), 2);
     }
 }
+
 
 
