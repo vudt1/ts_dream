@@ -40,6 +40,7 @@ pub mod battle {
     pub mod packets;
     pub mod rng;
     pub mod runner;
+    pub mod service;
     pub mod targeting;
 }
 

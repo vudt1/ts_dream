@@ -2,14 +2,16 @@
 //! pet-reborn exceptions, quest requirement checking, TEAMDEF battle trigger,
 //! and quest result processing (OnWin/OnLose rewards).
 
+use crate::battle::packets;
 use crate::battle::rng::DotNetRandom;
 use crate::data::loader::GameData;
-use crate::data::tables::QuestResult;
 use crate::protocol::encoder;
 use crate::server::handler::HandleOutcome;
 use crate::server::handlers::stats::build_stat_update;
 use crate::server::handlers::talk::{end_talk, talk_messages};
-use crate::server::session::{Conn, InventoryItem};
+use crate::server::session::{Conn, InventoryItem, Session};
+use crate::server::spawn::sys_msg_frame;
+use std::sync::Arc;
 
 /// Attempt the data-driven quest path for H6 continue.
 ///
@@ -80,43 +82,303 @@ pub fn try_quest_h6(conn: &mut Conn, data: &GameData, out: &mut HandleOutcome) -
     true
 }
 
-/// Process quest win rewards (§6.7 / BattleQuestWin).
+/// Full ordered `BattleQuestWin` side effects (Data.cs:5812-5998, spec §6.7).
 ///
-/// Called after a battle ends with player win when `talking_battle > 0`.
-pub fn process_quest_win(conn: &mut Conn, data: &GameData, out: &mut HandleOutcome) {
-    let idtalking = conn.session.talking_battle;
+/// Runs when a quest/TeamDef battle ends with a player win and the leader has
+/// a pending `talking_battle`. `member` resolves a party member's shared
+/// session (for `shareToParty` grants and member warps); return `None` for
+/// offline/unregistered members. All emitted server→client frames are appended
+/// to `frames`. Returns `true` if the talk existed and was processed.
+pub fn battle_quest_win(
+    session: &mut Session,
+    data: &GameData,
+    frames: &mut Vec<String>,
+    member: &mut dyn FnMut(i64) -> Option<Arc<tokio::sync::RwLock<Session>>>,
+) -> bool {
+    let idtalking = session.talking_battle;
     if idtalking <= 0 {
-        return;
+        return false;
     }
-
-    let key = format!("{}:NPC:{}:0", conn.session.map_id, idtalking);
+    let key = format!("{}:NPC:{}:0", session.map_id, idtalking);
     let quest = match data.talks.get(&key) {
         Some(q) => q,
-        None => {
-            conn.session.talking_battle = 0;
-            return;
-        }
+        None => return false,
     };
+    let result = &quest.on_win;
 
-    // Send OnWin dialogs if present
-    if !quest.on_win.dialogs.is_empty() {
-        talk_messages(conn, &quest.on_win.dialogs, out);
+    // Win dialogs take precedence over the reward pipeline (TheBattle.cs:4742).
+    if !result.dialogs.is_empty() {
+        for part in result.dialogs.split("F444") {
+            if !part.is_empty() {
+                frames.push(format!("F444{part}"));
+            }
+        }
+        frames.push("F44402001408".to_string()); // EndTalk after dialogs
+        clear_quest_talk(session);
+        return true;
     }
 
-    // Apply quest result rewards
-    apply_quest_result(conn, &quest.on_win, out);
+    // 1. Consume required items (`_RequireItems`).
+    for &(item_id, count, remove) in &result.require_items {
+        if remove <= 0 {
+            continue;
+        }
+        let have: u32 = session
+            .homdo
+            .iter()
+            .filter(|i| i.id == item_id as u16)
+            .map(|i| u32::from(i.count))
+            .sum();
+        if have >= count.max(0) as u32 {
+            session.remove_homdo_item(item_id as u16, remove.max(0) as u32);
+        }
+    }
 
-    // Warp if specified
-    if quest.on_win.warp_to.len() >= 3 {
-        let map = quest.on_win.warp_to[0] as u16;
-        let x = quest.on_win.warp_to[1] as u16;
-        let y = quest.on_win.warp_to[2] as u16;
-        warp_player(conn, map, x, y, out);
+    // 2. Red message (`_Message`).
+    if !result.message.is_empty() {
+        frames.push(crate::server::spawn::sys_msg_frame(&result.message));
+    }
+
+    // 3 + 4. Guaranteed `WinRewards` + one random `WinRandomRewards` via a
+    // fresh independent time-seeded RNG (NOT the battle streams).
+    let mut list: Vec<(i64, i64, i64)> = result.rewards.clone();
+    if !result.random_rewards.is_empty() {
+        let mut rng = DotNetRandom::time_seeded();
+        let idx = rng.next_range(0, result.random_rewards.len() as i32) as usize;
+        list.push(result.random_rewards[idx]);
+    }
+
+    // 5. Grant {item, count} to leader + (shareToParty) each member.
+    for &(item_id, count, share) in &list {
+        if item_id <= 0 || count <= 0 {
+            continue;
+        }
+        let _ = session.add_homdo_item(InventoryItem {
+            id: item_id as u16,
+            count: count.min(255) as u8,
+            doben: 100,
+            loai: 1,
+            ..Default::default()
+        });
+        if share > 0 {
+            for mem in session.id_mem.iter().filter(|m| **m > 0) {
+                if let Some(m) = member(i64::from(*mem)) {
+                    if let Ok(mut s) = m.try_write() {
+                        let _ = s.add_homdo_item(InventoryItem {
+                            id: item_id as u16,
+                            count: count.min(255) as u8,
+                            doben: 100,
+                            loai: 1,
+                            ..Default::default()
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    // 6. Use items (`_WinUseItems`): self → equip packet + consume + recompute;
+    // else the active-pet path.
+    for &(item_id, target) in &result.use_items {
+        if item_id <= 0 {
+            continue;
+        }
+        let slot = session
+            .homdo
+            .iter()
+            .find(|i| i.id == item_id as u16 && i.count > 0)
+            .map(|i| i.slot);
+        let Some(slot) = slot else { continue };
+        if target == 0 {
+            // Self: `F44403001711`+slot, equip broadcast, consume, recompute.
+            frames.push(format!("F44403001711{:02X}", slot));
+            frames.push(format!(
+                "F44408000502{}{}",
+                encoder::le32(session.id),
+                encoder::le16(item_id as u16)
+            ));
+            session.remove_homdo_item(item_id as u16, 1);
+            session.recompute_stats();
+        } else {
+            // Pet path: `F44404001717`+stt+slot, consume, apply item to pet.
+            let stt = session.active_pet_stt;
+            if stt > 0 && session.pets.iter().any(|p| p.stt == stt) {
+                frames.push(format!("F44404001717{:02X}{:02X}", stt, slot));
+                session.remove_homdo_item(item_id as u16, 1);
+                if let Some(item) = data.items.get(&item_id) {
+                    if let Some(pet) = session.pets.iter_mut().find(|p| p.stt == stt) {
+                        pet.atk = pet.atk.saturating_add(item.atk1.max(0) as u16);
+                        pet.def = pet.def.saturating_add(item.def1.max(0) as u16);
+                        pet.int1 = pet.int1.saturating_add(item.int1.max(0) as u16);
+                        pet.hpx = pet.hpx.saturating_add(item.hpx1.max(0) as u16);
+                        pet.spx = pet.spx.saturating_add(item.spx1.max(0) as u16);
+                        pet.agi = pet.agi.saturating_add(item.agi1.max(0) as u16);
+                        pet.fai = pet.fai.saturating_add(item.fai1.max(0) as u16);
+                    }
+                }
+            }
+        }
+    }
+
+    // 7. Save leader quests (`_WinSaveLeaderQuests`).
+    for &(npc, npc_val, warp_val, plus) in &result.save_leader_quests {
+        if npc_val > 0 {
+            session.quest_steps.push((npc, npc_val));
+        }
+        if warp_val > 0 {
+            session.warp_steps.push((npc, warp_val));
+        }
+        let _ = plus;
+    }
+
+    // 8. Player enhance delta (`_WinPlayerEnhanceData`).
+    for (stat, delta) in &result.player_enhance_data {
+        match stat.as_str() {
+            "Point" => {
+                session.point = (i64::from(session.point) + delta).clamp(0, 0xFFFF) as u16;
+                frames.push(build_stat_update(0x26, i32::from(session.point)));
+            }
+            "SkillPoint" => {
+                session.skill_point =
+                    (i64::from(session.skill_point) + delta).clamp(0, 0xFFFF) as u16;
+                frames.push(build_stat_update(0x25, i32::from(session.skill_point)));
+            }
+            _ => {}
+        }
+    }
+
+    // 9. Add skill (`_WinAddSkill`) — learn packet + skillpoint + red message.
+    for &(skill_id, lv) in &result.add_skill {
+        let known = session
+            .skills
+            .iter()
+            .any(|&(sid, _)| sid == skill_id as u16);
+        if data.skills.contains_key(&skill_id) && skill_id > 0 && !known {
+            session.skills.push((skill_id as u16, lv.min(255) as u8));
+            let skill_name = &data.skills[&skill_id].name;
+            frames.push(sys_msg_frame(&format!("Hoc duoc ky nang {}", skill_name)));
+            frames.push(format!(
+                "F4440C0008016E01{}{}",
+                encoder::le32(lv.clamp(0, u32::MAX as i64) as u32),
+                encoder::le32(skill_id.clamp(0, u32::MAX as i64) as u32)
+            ));
+            frames.push(format!(
+                "F4440C0008012501{}00000000",
+                encoder::le32(u32::from(session.skill_point))
+            ));
+        }
+    }
+
+    // 10. Add pet (`_WinAddPet`).
+    for &pet_id in &result.add_pet {
+        if pet_id > 0 {
+            add_pet_to_quest(session, pet_id as u16);
+        }
+    }
+
+    // 11. Warp/end (`_WinWarpTo` → Warped leader + members; else EndTalk).
+    session.click_npc_id = result.click_npc_id as i32;
+    let warp = &result.warp_to;
+    if warp.first().copied().unwrap_or(0) > 0 {
+        let map = warp.first().copied().unwrap_or(0) as u16;
+        let x = warp.get(1).copied().unwrap_or(0) as u16;
+        let y = warp.get(2).copied().unwrap_or(0) as u16;
+        warp_leader(session, map, x, y, frames);
+        for mem in session.id_mem.iter().filter(|m| **m > 0) {
+            if let Some(m) = member(i64::from(*mem)) {
+                if let Ok(mut s) = m.try_write() {
+                    warp_member(&mut s, map, x, y, i64::from(session.id), frames);
+                }
+            }
+        }
     } else {
-        end_talk(conn, out);
+        frames.push("F44402001408".to_string());
     }
 
-    conn.session.talking_battle = 0;
+    clear_quest_talk(session);
+    true
+}
+
+fn add_pet_to_quest(session: &mut Session, pet_id: u16) {
+    if session.pets.iter().any(|p| p.id == pet_id) {
+        return;
+    }
+    let stt = (session.pets.len() as u8 + 1).max(1);
+    let hp_max = crate::battle::engine::get_hp_max(0, 0, 1, 0) as u16;
+    session.pets.push(crate::server::session::PetState {
+        stt,
+        id: pet_id,
+        level: 1,
+        thuoctinh: 1,
+        hp: hp_max,
+        hp_max,
+        ..Default::default()
+    });
+}
+
+fn warp_leader(session: &mut Session, map: u16, x: u16, y: u16, frames: &mut Vec<String>) {
+    let old_id = session.id;
+    session.map_id = map;
+    session.map_x = x;
+    session.map_y = y;
+    // Warp start + the 0x0C goto-map frame + hide on the old map.
+    frames.push("F44402001407".to_string());
+    frames.push(format!(
+        "F4440D000C{}{}{}{}0000",
+        encoder::le32(old_id),
+        encoder::le16(map),
+        encoder::le16(x),
+        encoder::le16(y)
+    ));
+    frames.push(packets::hide_from_map(old_id));
+    frames.push("F44402000504".to_string());
+}
+
+fn warp_member(
+    session: &mut Session,
+    map: u16,
+    x: u16,
+    y: u16,
+    leader: i64,
+    frames: &mut Vec<String>,
+) {
+    let id = session.id;
+    session.map_id = map;
+    session.map_x = x;
+    session.map_y = y;
+    frames.push(format!(
+        "F4440700142C{}01",
+        encoder::le32(leader as u32)
+    ));
+    frames.push(format!(
+        "F4440D000C{}{}{}{}0000",
+        encoder::le32(id),
+        encoder::le16(map),
+        encoder::le16(x),
+        encoder::le16(y)
+    ));
+    frames.push(packets::hide_from_map(id));
+    frames.push("F44402000504".to_string());
+}
+
+fn clear_quest_talk(session: &mut Session) {
+    session.talking_battle = 0;
+    session.idtalking = 0;
+    session.select_menu = 0;
+}
+
+/// Compat wrapper: the pre-ticket win processing (see `battle_quest_win`).
+pub fn process_quest_win(conn: &mut Conn, data: &GameData, out: &mut HandleOutcome) {
+    let mut frames = Vec::new();
+    battle_quest_win(
+        &mut conn.session,
+        data,
+        &mut frames,
+        &mut |_| None,
+    );
+    for f in frames {
+        out.send(f);
+    }
 }
 
 /// Process quest lose rewards.
@@ -136,112 +398,6 @@ pub fn process_quest_lose(conn: &mut Conn, data: &GameData, out: &mut HandleOutc
 
     end_talk(conn, out);
     conn.session.talking_battle = 0;
-}
-
-/// Apply a QuestResult's rewards/effects to the session.
-fn apply_quest_result(conn: &mut Conn, result: &QuestResult, out: &mut HandleOutcome) {
-    // 1. Guaranteed rewards
-    for &(item_id, count) in &result.rewards {
-        let item = InventoryItem {
-            id: item_id as u16,
-            count: count as u8,
-            doben: 100,
-            loai: 1,
-            ..Default::default()
-        };
-        let _ = conn.session.add_homdo_item(item);
-    }
-
-    // 2. Random reward (one pick, fresh independent RNG)
-    if !result.random_rewards.is_empty() {
-        let mut rng = DotNetRandom::time_seeded();
-        let idx = rng.next_range(0, result.random_rewards.len() as i32) as usize;
-        let (item_id, count) = result.random_rewards[idx];
-        let item = InventoryItem {
-            id: item_id as u16,
-            count: count as u8,
-            doben: 100,
-            loai: 1,
-            ..Default::default()
-        };
-        let _ = conn.session.add_homdo_item(item);
-    }
-
-    // 3. Player enhance data
-    for (stat, delta) in &result.player_enhance_data {
-        match stat.as_str() {
-            "Point" => {
-                conn.session.point = (conn.session.point as i64 + delta) as u16;
-                out.send(build_stat_update(0x26, conn.session.point as i32));
-            }
-            "SkillPoint" => {
-                conn.session.skill_point = (conn.session.skill_point as i64 + delta) as u16;
-                out.send(build_stat_update(0x25, conn.session.skill_point as i32));
-            }
-            _ => {}
-        }
-    }
-
-    // 4. Add skill
-    for &(skill_id, lv) in &result.add_skill {
-        if skill_id > 0 {
-            // Check if skill already exists
-            let exists = conn
-                .session
-                .skills
-                .iter()
-                .any(|&(sid, _)| sid == skill_id as u16);
-            if !exists {
-                conn.session.skills.push((skill_id as u16, lv as u8));
-                // Skill learn packet
-                out.send(format!(
-                    "F4440C0008016E01{}{}",
-                    encoder::le32(lv as u32),
-                    encoder::le32(skill_id as u32)
-                ));
-            }
-        }
-    }
-
-    // 5. Save leader quests (bookkeeping — stored in session quest state)
-    for &quest_id in &result.save_leader_quests {
-        if !conn.session.completed_quests.contains(&quest_id) {
-            conn.session.completed_quests.push(quest_id);
-        }
-    }
-
-    // 6. Use items (target 0 = self, else active pet) — consume the item.
-    for &(item_id, _target) in &result.use_items {
-        conn.session.remove_homdo_item(item_id as u16, 1);
-    }
-
-    // 7. Add pet
-    for &pet_id in &result.add_pet {
-        if pet_id > 0 && !conn.session.pets.iter().any(|p| p.id == pet_id as u16) {
-            conn.session.pets.push(crate::server::session::PetState {
-                stt: (conn.session.pets.len() + 1) as u8,
-                id: pet_id as u16,
-                level: 1,
-                ..Default::default()
-            });
-        }
-    }
-
-    // 8. Click NPC id — follow-up dialog NPC after quest win.
-    if result.click_npc_id > 0 {
-        conn.session.click_npc_id = result.click_npc_id as i32;
-    }
-}
-
-/// Warp player to a new map position.
-fn warp_player(conn: &mut Conn, map: u16, x: u16, y: u16, out: &mut HandleOutcome) {
-    conn.session.map_id = map;
-    conn.session.map_x = x;
-    conn.session.map_y = y;
-    // Send warp confirmation and hide from old map
-    out.send(crate::battle::packets::hide_from_map(conn.session.id));
-    out.send("F44402000504");
-    out.send("F44402001408");
 }
 
 /// Daily quest generator (map 12711, 21 RNG draws — §2.6.2 / research 06 §(6)).
@@ -395,8 +551,13 @@ pub fn handle_warp_confirm(conn: &mut Conn, data: &GameData, out: &mut HandleOut
         // OnWin with no TEAMDEF → apply rewards + end.
         if !quest.on_win.dialogs.is_empty() {
             talk_messages(conn, &quest.on_win.dialogs, out);
+        } else {
+            let mut frames = Vec::new();
+            battle_quest_win(&mut conn.session, data, &mut frames, &mut |_| None);
+            for f in frames {
+                out.send(f);
+            }
         }
-        apply_quest_result(conn, &quest.on_win, out);
         end_talk(conn, out);
         return;
     }
@@ -433,7 +594,7 @@ pub fn handle_warp_confirm(conn: &mut Conn, data: &GameData, out: &mut HandleOut
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::data::tables::QuestDef;
+    use crate::data::tables::{QuestDef, QuestResult, Skill};
 
     #[test]
     fn daily_quest_21_draws() {
@@ -444,36 +605,49 @@ mod tests {
         // No crash = all 21 draws succeeded
     }
 
+    /// Run `battle_quest_win` against a fresh session with the given OnWin
+    /// result (talk key `10916:NPC:1:0`), returning the emitted frames.
+    fn run_quest_win(result: QuestResult, mut data: GameData) -> (Session, Vec<String>) {
+        let mut session = Session::new();
+        session.id = 300001;
+        session.map_id = 10916;
+        session.talking_battle = 1;
+        data.talks.insert(
+            "10916:NPC:1:0".to_string(),
+            QuestDef {
+                map_id: 10916,
+                id: 1,
+                on_win: result,
+                ..Default::default()
+            },
+        );
+        let mut frames = Vec::new();
+        battle_quest_win(&mut session, &data, &mut frames, &mut |_| None);
+        (session, frames)
+    }
+
     #[test]
     fn quest_win_rewards() {
-        let mut conn = Conn::new();
-        let mut out = HandleOutcome::default();
-
         let result = QuestResult {
-            rewards: vec![(46001, 5)],
+            rewards: vec![(46001, 5, 0)],
             ..Default::default()
         };
-
-        apply_quest_result(&mut conn, &result, &mut out);
-        assert_eq!(conn.session.homdo.len(), 1);
-        assert_eq!(conn.session.homdo[0].id, 46001);
-        assert_eq!(conn.session.homdo[0].count, 5);
+        let (session, _) = run_quest_win(result, GameData::default());
+        assert_eq!(session.homdo.len(), 1);
+        assert_eq!(session.homdo[0].id, 46001);
+        assert_eq!(session.homdo[0].count, 5);
     }
 
     #[test]
     fn quest_win_random_reward() {
-        let mut conn = Conn::new();
-        let mut out = HandleOutcome::default();
-
         let result = QuestResult {
-            random_rewards: vec![(46001, 1), (46002, 2), (46003, 3)],
+            random_rewards: vec![(46001, 1, 0), (46002, 2, 0), (46003, 3, 0)],
             ..Default::default()
         };
-
-        apply_quest_result(&mut conn, &result, &mut out);
-        assert_eq!(conn.session.homdo.len(), 1);
+        let (session, _) = run_quest_win(result, GameData::default());
+        assert_eq!(session.homdo.len(), 1);
         // Should be one of the three items
-        let item_id = conn.session.homdo[0].id;
+        let item_id = session.homdo[0].id;
         assert!(
             item_id == 46001 || item_id == 46002 || item_id == 46003,
             "unexpected item: {}",
@@ -483,17 +657,24 @@ mod tests {
 
     #[test]
     fn quest_win_add_skill() {
-        let mut conn = Conn::new();
-        let mut out = HandleOutcome::default();
-
+        let mut data = GameData::default();
+        data.skills.insert(
+            10001,
+            Skill {
+                id: 10001,
+                name: "Kiem".to_string(),
+                ..Default::default()
+            },
+        );
         let result = QuestResult {
             add_skill: vec![(10001, 1)],
             ..Default::default()
         };
-
-        apply_quest_result(&mut conn, &result, &mut out);
-        assert_eq!(conn.session.skills.len(), 1);
-        assert_eq!(conn.session.skills[0], (10001, 1));
+        let (session, frames) = run_quest_win(result, data);
+        assert_eq!(session.skills.len(), 1);
+        assert_eq!(session.skills[0], (10001, 1));
+        // Learn packet present.
+        assert!(frames.iter().any(|f| f.contains("6E01")));
     }
 
     #[test]
@@ -546,69 +727,106 @@ mod tests {
 
     #[test]
     fn quest_save_leader_quests() {
-        let mut conn = Conn::new();
-        let mut out = HandleOutcome::default();
-
         let result = QuestResult {
-            save_leader_quests: vec![100, 200],
+            save_leader_quests: vec![(100, 1, 0, 1)],
             ..Default::default()
         };
-
-        apply_quest_result(&mut conn, &result, &mut out);
-        assert_eq!(conn.session.completed_quests, vec![100, 200]);
+        let (session, _) = run_quest_win(result, GameData::default());
+        assert_eq!(session.quest_steps, vec![(100, 1)]);
     }
 
     #[test]
     fn quest_win_use_items_consumed() {
-        let mut conn = Conn::new();
-        let mut out = HandleOutcome::default();
+        let mut session = Session::new();
+        session.id = 300001;
+        session.map_id = 10916;
+        session.talking_battle = 1;
         // Seed a use-item requirement into inventory
-        conn.session.add_homdo_item(InventoryItem {
+        session.add_homdo_item(InventoryItem {
             id: 19001,
             count: 3,
             loai: 1,
             doben: 100,
             ..Default::default()
         });
-
-        let result = QuestResult {
-            use_items: vec![(19001, 0)],
-            ..Default::default()
-        };
-
-        apply_quest_result(&mut conn, &result, &mut out);
+        let mut data = GameData::default();
+        data.talks.insert(
+            "10916:NPC:1:0".to_string(),
+            QuestDef {
+                map_id: 10916,
+                id: 1,
+                on_win: QuestResult {
+                    use_items: vec![(19001, 0)],
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        );
+        let mut frames = Vec::new();
+        battle_quest_win(&mut session, &data, &mut frames, &mut |_| None);
         // 3 - 1 = 2 remaining
-        let left = conn.session.homdo.iter().map(|i| i.count).sum::<u8>();
+        let left = session.homdo.iter().map(|i| i.count).sum::<u8>();
         assert_eq!(left, 2);
+        // Self use-item frame `F44403001711`+slot present.
+        assert!(frames.iter().any(|f| f.starts_with("F44403001711")));
     }
 
     #[test]
     fn quest_win_add_pet() {
-        let mut conn = Conn::new();
-        let mut out = HandleOutcome::default();
-
         let result = QuestResult {
             add_pet: vec![18017],
             ..Default::default()
         };
-
-        apply_quest_result(&mut conn, &result, &mut out);
-        assert_eq!(conn.session.pets.len(), 1);
-        assert_eq!(conn.session.pets[0].id, 18017);
+        let (session, _) = run_quest_win(result, GameData::default());
+        assert_eq!(session.pets.len(), 1);
+        assert_eq!(session.pets[0].id, 18017);
     }
 
     #[test]
     fn quest_win_click_npc_id() {
-        let mut conn = Conn::new();
-        let mut out = HandleOutcome::default();
-
         let result = QuestResult {
             click_npc_id: 59011,
             ..Default::default()
         };
+        let (session, _) = run_quest_win(result, GameData::default());
+        assert_eq!(session.click_npc_id, 59011);
+    }
 
-        apply_quest_result(&mut conn, &result, &mut out);
-        assert_eq!(conn.session.click_npc_id, 59011);
+    #[test]
+    fn quest_win_warp_leader() {
+        let result = QuestResult {
+            warp_to: vec![12001, 400, 500],
+            ..Default::default()
+        };
+        let (session, frames) = run_quest_win(result, GameData::default());
+        assert_eq!(session.map_id, 12001);
+        assert_eq!(session.map_x, 400);
+        assert_eq!(session.map_y, 500);
+        assert!(frames.iter().any(|f| f.starts_with("F4440D000C")));
+    }
+
+    #[test]
+    fn quest_win_end_talk_without_warp() {
+        let result = QuestResult::default();
+        let (session, frames) = run_quest_win(result, GameData::default());
+        assert!(frames.iter().any(|f| f == "F44402001408"));
+        assert_eq!(session.talking_battle, 0);
+    }
+
+    #[test]
+    fn quest_win_dialogs_take_precedence() {
+        // Non-empty dialogs skip the reward pipeline entirely (TheBattle.cs:4742).
+        let result = QuestResult {
+            dialogs: "F44411001401000000010103010000000000009E28".to_string(),
+            rewards: vec![(46001, 5, 0)],
+            ..Default::default()
+        };
+        let (session, frames) = run_quest_win(result, GameData::default());
+        assert!(frames
+            .iter()
+            .any(|f| f.starts_with("F44411001401000000010103")));
+        assert!(frames.iter().any(|f| f == "F44402001408"));
+        assert!(session.homdo.is_empty(), "no rewards when dialogs present");
     }
 
     #[test]

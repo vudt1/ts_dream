@@ -13,23 +13,31 @@ use crate::battle::packets;
 use crate::battle::packets::{attack_status, miss_status, troi_byte, troi_end_byte};
 use crate::battle::rng::DotNetRandom;
 use crate::battle::targeting::{self, CellInfo, GridPos};
-use crate::data::tables::{Npc, NpcOnMap, Skill};
+use crate::data::tables::{Item, Npc, NpcOnMap, Skill};
 use crate::protocol::encoder;
 use std::collections::HashMap;
 
-/// One player-submitted battle command (op 0x32 sub 1).
+/// One player-submitted battle command (op 0x32 sub 1 / sub 2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BattleCommand {
+    /// The grid cell being commanded (player's own cell or their pet cell).
+    pub row: u8,
+    pub col: u8,
     pub skill_id: i64,
     pub skill_lv: i64,
     pub row_attack: u8,
     pub col_attack: u8,
+    /// Op 0x32 sub 2: use-an-item command. `0` = normal skill command; a
+    /// potion id in `26001..=27165` heals the target cell + the owner's pet.
+    pub use_item: i64,
 }
 
 /// Read tables the battle engine needs (mirrors the C# `Data` statics).
 pub struct BattleData<'a> {
     pub npcs: &'a HashMap<i64, Npc>,
     pub skills: &'a HashMap<i64, Skill>,
+    /// Item records — used by in-battle use-item (op 0x32 sub 2) heals.
+    pub items: &'a HashMap<i64, Item>,
     /// Per-player pet slot ids `[stt1..stt4]` (0 = empty), used by catch.
     pub pet_slots: &'a HashMap<i64, [i64; 4]>,
     /// Map NPC instance for post-flee respawn coordinates (optional).
@@ -58,6 +66,7 @@ impl<'a> BattleData<'a> {
     pub fn new(
         npcs: &'a HashMap<i64, Npc>,
         skills: &'a HashMap<i64, Skill>,
+        items: &'a HashMap<i64, Item>,
         pet_slots: &'a HashMap<i64, [i64; 4]>,
         players: &'a HashMap<i64, PlayerSnapshot>,
         texps: &'a [crate::data::tables::TexpRow],
@@ -67,6 +76,7 @@ impl<'a> BattleData<'a> {
         BattleData {
             npcs,
             skills,
+            items,
             pet_slots,
             npc_on_map,
             talking_battle,
@@ -206,7 +216,7 @@ impl Battle {
 
         let mut ts = TurnState::default();
         self.turn_phase1(data, &mut ts, out);
-        self.turn_phase2(data, commands);
+        self.turn_phase2(data, commands, out);
         let outcome = self.turn_phase4(data, &mut ts, out);
         if outcome != Outcome::Running {
             return outcome;
@@ -382,7 +392,7 @@ impl Battle {
 
     // ---- Phase 2: input / auto actions -----------------------------------
 
-    fn turn_phase2(&mut self, data: &BattleData, commands: &HashMap<i64, BattleCommand>) {
+    fn turn_phase2(&mut self, data: &BattleData, commands: &HashMap<i64, BattleCommand>, out: &mut Vec<Out>) {
         for key in self.keys.clone() {
             let cell = self.list_war[&key].clone();
             if cell.id <= 0 {
@@ -398,14 +408,18 @@ impl Battle {
                     c.attacked = true;
                 }
 
-                // Apply a submitted player command (op 0x32 sub 1 equivalent).
+                // Apply a submitted player command (op 0x32 sub 1 / sub 2).
                 let owner = if c.typ == 4 { c.id_char } else { c.id };
                 if let Some(cmd) = commands.get(&owner) {
-                    if !c.attacked {
-                        c.id_skill = cmd.skill_id;
-                        c.lv_skill = cmd.skill_lv;
-                        c.row_attack = cmd.row_attack;
-                        c.col_attack = cmd.col_attack;
+                    if !c.attacked && c.row == cmd.row && c.col == cmd.col {
+                        if cmd.use_item > 0 {
+                            self.apply_use_item(data, &mut c, cmd.use_item, out);
+                        } else {
+                            c.id_skill = cmd.skill_id;
+                            c.lv_skill = cmd.skill_lv;
+                            c.row_attack = cmd.row_attack;
+                            c.col_attack = cmd.col_attack;
+                        }
                         c.attacked = true;
                     }
                 }
@@ -413,6 +427,42 @@ impl Battle {
                 c.attacked = true;
             }
             self.list_war.insert(key, c);
+        }
+    }
+
+    /// Op 0x32 sub 2 — use a potion in battle (`Client.cs:7775-7846`).
+    ///
+    /// Heals the target cell's `_Hp`/`_Sp` (capped to its max) plus the active
+    /// pet of the owner, both via the item record's `_Hp`/`_Sp`. Inventory
+    /// removal happens synchronously in the op 0x32 handler.
+    fn apply_use_item(&self, data: &BattleData, c: &mut WarInfo, item_id: i64, out: &mut Vec<Out>) {
+        let (hp, sp) = data
+            .items
+            .get(&item_id)
+            .map(|i| (i.hp, i.sp))
+            .unwrap_or((0, 0));
+        if hp <= 0 && sp <= 0 {
+            return;
+        }
+        c.hp = (c.hp + hp).min(c.hp_max);
+        c.sp = (c.sp + sp).min(c.sp_max);
+        self.write_hp(c, c.hp, out);
+        self.write_sp(c, c.sp, out);
+
+        // Active pet heal (C# DB writes for the active pet Stt — the leader's
+        // lowest-stt pet cell, which is the first one loaded in `AddToBattle`).
+        let owner = if c.id_char != 0 { c.id_char } else { c.id };
+        if let Some(pet) = self
+            .list_war
+            .values()
+            .filter(|p| p.typ == 4 && p.id_char == owner && p.hp > 0)
+            .min_by_key(|p| p.id_npc_on_map)
+        {
+            let mut pet = pet.clone();
+            pet.hp = (pet.hp + hp).min(pet.hp_max);
+            pet.sp = (pet.sp + sp).min(pet.sp_max);
+            self.write_hp(&pet, pet.hp, out);
+            self.write_sp(&pet, pet.sp, out);
         }
     }
 
@@ -2215,13 +2265,15 @@ mod tests {
         let mut npcs: HashMap<i64, Npc> = HashMap::new();
         npcs.insert(9001, npc(9001, 10, 500, 20, 10, 10));
         let npcs = Box::leak(Box::new(npcs));
+        let items: HashMap<i64, Item> = HashMap::new();
+        let items = Box::leak(Box::new(items));
         let pets: HashMap<i64, [i64; 4]> = HashMap::new();
         let pets = Box::leak(Box::new(pets));
         let players: HashMap<i64, PlayerSnapshot> = HashMap::new();
         let players = Box::leak(Box::new(players));
         let texps = crate::data::texps::compute_texps();
         let texps = Box::leak(Box::new(texps));
-        let data = BattleData::new(npcs, skills, pets, players, texps, None, 0);
+        let data = BattleData::new(npcs, skills, items, pets, players, texps, None, 0);
         let battle = Battle::with_seeds(1, 112, 1, 2, 3);
         (battle, data)
     }
@@ -2254,10 +2306,13 @@ mod tests {
         cmds.insert(
             300001,
             BattleCommand {
+                row: 3,
+                col: 2,
                 skill_id: 10000,
                 skill_lv: 1,
                 row_attack: 0,
                 col_attack: 2,
+                use_item: 0,
             },
         );
         cmds
@@ -2345,10 +2400,13 @@ mod tests {
         cmds.insert(
             300001,
             BattleCommand {
+                row: 3,
+                col: 2,
                 skill_id: 11007,
                 skill_lv: 3,
                 row_attack: 3,
                 col_attack: 2,
+                use_item: 0,
             },
         );
 
@@ -2376,24 +2434,102 @@ mod tests {
         skills.insert(14002, skill(14002, 12, 0, 1, 0));
         let mut npcs = HashMap::new();
         npcs.insert(9001, npc(9001, 10, 500, 20, 10, 10));
+        let items = HashMap::new();
         let pets = HashMap::new();
         let players = HashMap::new();
         let texps = crate::data::texps::compute_texps();
-        let data = BattleData::new(&npcs, &skills, &pets, &players, &texps, None, 0);
+        let data = BattleData::new(&npcs, &skills, &items, &pets, &players, &texps, None, 0);
 
         let mut cmds = HashMap::new();
         cmds.insert(
             300001,
             BattleCommand {
+                row: 3,
+                col: 2,
                 skill_id: 14002,
                 skill_lv: 1,
                 row_attack: 0,
                 col_attack: 2,
+                use_item: 0,
             },
         );
         let mut out = Vec::new();
         let outcome = battle.run_battle(&data, &cmds, &mut out);
         assert_eq!(outcome, Outcome::PlayerFled);
+    }
+
+    #[test]
+    fn use_item_heals_cell_and_pet() {
+        let (mut battle, mut data_with_items) = scenario();
+        // Add a potion to the item table.
+        let items: HashMap<i64, Item> = {
+            let mut m = HashMap::new();
+            m.insert(26001, Item { id: 26001, hp: 500, sp: 200, ..Default::default() });
+            m
+        };
+        let items = Box::leak(Box::new(items));
+        let npcs = Box::leak(Box::new(data_with_items.npcs.clone()));
+        let skills = Box::leak(Box::new(data_with_items.skills.clone()));
+        let pets = Box::leak(Box::new(data_with_items.pet_slots.clone()));
+        let players = Box::leak(Box::new(data_with_items.players.clone()));
+        let texps = Box::leak(Box::new(crate::data::texps::compute_texps()));
+        data_with_items = BattleData::new(npcs, skills, items, pets, players, texps, None, 0);
+
+        let mut session = crate::server::session::Session::new();
+        session.id = 300001;
+        session.level = 10;
+        session.hp = 1000;
+        session.hp_max = 1000;
+        session.sp = 100;
+        session.sp_max = 100;
+        session.atk = 100;
+        session.def = 20;
+        session.agi = 50;
+        session.int1 = 30;
+        battle.add_player(&session, session.id as i64, 3, 2);
+        // Attach a pet at (2,1).
+        let mut pet = crate::server::session::PetState::default();
+        pet.stt = 1;
+        pet.id = 9001;
+        pet.hp = 200;
+        pet.hp_max = 500;
+        pet.sp = 100;
+        pet.sp_max = 500;
+        battle.add_pet(&pet, session.id as i64, session.id as i64, 3, 2, 1);
+
+        let add_npc = {
+            let n = data_with_items.npcs.get(&9001).unwrap();
+            battle.add_npc(n, 1, 0, 2, 3);
+        };
+        let _ = add_npc;
+
+        // Damage the player then use potion 26001 on the player cell.
+        battle.cell_mut(3, 2).unwrap().hp = 700;
+        battle.cell_mut(3, 2).unwrap().sp = 40;
+        let mut cmds = HashMap::new();
+        cmds.insert(
+            300001,
+            BattleCommand {
+                row: 3,
+                col: 2,
+                skill_id: 0,
+                skill_lv: 0,
+                row_attack: 0,
+                col_attack: 2,
+                use_item: 26001,
+            },
+        );
+        let mut out = Vec::new();
+        let _ = battle.run_turn(&data_with_items, &cmds, &mut out);
+        let cell = battle.cell(3, 2).unwrap();
+        // 700 + 500 capped to 1000; 40 + 200 capped to 100.
+        assert_eq!(cell.hp, 1000);
+        assert_eq!(cell.sp, 100);
+        // Pet DB write fired (heal the owner's active pet).
+        assert!(out.iter().any(|o| matches!(
+            o,
+            Out::Db(DbUpdate { target: DbTarget::Pet { owner: 300001, .. }, stat: Stat::Hp, .. })
+        )));
     }
 
     #[test]

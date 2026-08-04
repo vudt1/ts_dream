@@ -8,12 +8,13 @@
 //! - `character.rs`: Opcode 0x09 (character creation & name check)
 //! - `expressions.rs`: Opcode 0x20 (actions & expressions)
 
+use crate::battle::service::BattleService;
 use crate::data::loader::GameData;
 use crate::error::Result;
 use crate::protocol::encoder;
 use crate::server::handlers::{
-    character, chat, expressions, inventory, login, movement, pet_actions, shops, skills, stats,
-    system, talk, trade_storage,
+    battle, character, chat, expressions, inventory, login, movement, pet_actions, shops, skills,
+    stats, system, talk, trade_storage,
 };
 use crate::server::session::Conn;
 
@@ -33,14 +34,26 @@ impl HandleOutcome {
 }
 
 /// Dispatch one full decoded frame (its bytes). `conn` carries session state,
-/// `data` gives read tables. Handlers run inside a silent catch.
-pub fn dispatch(conn: &mut Conn, decoded: &[u8], data: &GameData) -> HandleOutcome {
+/// `data` gives read tables, `service` drives the battle engine. Handlers run
+/// inside a silent catch. A `battle_trigger` produced by a talk is processed
+/// here (the TeamDef battle is spawned after the talk's own frames).
+pub fn dispatch(
+    conn: &mut Conn,
+    decoded: &[u8],
+    data: &GameData,
+    service: &BattleService,
+) -> HandleOutcome {
     let mut out = HandleOutcome::default();
     let opcode = decoded.get(4).copied().unwrap_or(0);
     let sub = decoded.get(5).copied().unwrap_or(0);
     let payload = decoded.get(6..).unwrap_or(&[]);
     // C# swallows handler exceptions: never propagate.
-    let _ = handle(conn, opcode, sub, payload, decoded, data, &mut out);
+    let _ = handle(conn, opcode, sub, payload, decoded, data, service, &mut out);
+    if let Some(trigger) = out.battle_trigger.take() {
+        if service.start_teamdef_battle(&mut conn.session, &trigger) > 0 {
+            // The open-board frames were pushed through the service channels.
+        }
+    }
     out
 }
 
@@ -51,6 +64,7 @@ fn handle(
     payload: &[u8],
     decoded: &[u8],
     data: &GameData,
+    service: &BattleService,
     out: &mut HandleOutcome,
 ) -> Result<()> {
     match opcode {
@@ -70,6 +84,9 @@ fn handle(
 
         // Op 0x09 — Character creation & name check
         0x09 => character::handle_character(conn, sub, payload, out),
+
+        // Op 0x0B — Battle control (ticket 21)
+        0x0B => battle::handle_battle(conn, sub, payload, data, service, out),
 
         // Op 0x0C — Teleport confirm
         0x0C => system::handle_teleport_confirm(conn, sub, payload, out),
@@ -128,6 +145,9 @@ fn handle(
         // Op 0x2C — Pet reborn
         0x2C => skills::handle_pet_reborn(conn, sub, payload, out),
 
+        // Op 0x32 — Battle commands (ticket 21)
+        0x32 => battle::handle_battle_command(conn, sub, payload, data, service, out),
+
         // Op 0x41 — Rank system
         0x41 => system::handle_rank(conn, sub, payload, out),
 
@@ -136,7 +156,7 @@ fn handle(
 
         _ => {
             // Not yet ported / unknown: silently ignored.
-            let _ = (sub, payload, data);
+            let _ = (sub, payload, data, service);
         }
     }
     Ok(())
@@ -156,12 +176,16 @@ mod tests {
         GameData::default()
     }
 
+    fn dummy_service() -> BattleService {
+        BattleService::new(std::sync::Arc::new(GameData::default()))
+    }
+
     #[test]
     fn hello_replies() {
         let mut conn = Conn::new();
         // frame: F4 44 01 00 00 (opcode 0x00, length 1, no sub byte).
         let decoded = encoder::bytes("F444010000").unwrap();
-        let out = dispatch(&mut conn, &decoded, &dummy_data());
+        let out = dispatch(&mut conn, &decoded, &dummy_data(), &dummy_service());
         assert_eq!(out.outgoing, vec!["F4440300010901"]);
     }
 
@@ -170,7 +194,7 @@ mod tests {
         let mut conn = Conn::new();
         // Login payload with version 100 (< 186): opcode 0x01 sub 0x01 id=1 prefix="vn" ver=100 pass="123"
         let decoded = encoder::bytes("F4440B00010101000000766E6400313233").unwrap();
-        let out = dispatch(&mut conn, &decoded, &dummy_data());
+        let out = dispatch(&mut conn, &decoded, &dummy_data(), &dummy_service());
         assert!(out.shutdown);
     }
 
@@ -179,7 +203,7 @@ mod tests {
         let mut conn = Conn::new();
         // ver=186 (0xBA), pass="WRONG"
         let decoded = encoder::bytes("F4440D00010101000000766EBA0057524F4E47").unwrap();
-        let out = dispatch(&mut conn, &decoded, &dummy_data());
+        let out = dispatch(&mut conn, &decoded, &dummy_data(), &dummy_service());
         assert_eq!(out.outgoing, vec!["F44402000106"]);
         assert!(!out.shutdown);
     }
@@ -190,7 +214,7 @@ mod tests {
 
         // 1. Name check free: opcode 0x09 sub 2 name "TESTNAME"
         let name_check_decoded = encoder::bytes("F4440A000902544553544E414D45").unwrap();
-        let out1 = dispatch(&mut conn, &name_check_decoded, &dummy_data());
+        let out1 = dispatch(&mut conn, &name_check_decoded, &dummy_data(), &dummy_service());
         assert_eq!(out1.outgoing, vec!["F4440300090300"]);
         assert_eq!(conn.session.pending_new_char_name, b"TESTNAME");
 
@@ -203,7 +227,7 @@ mod tests {
         let mut frame_bytes = vec![0xF4, 0x44, 28, 0x00, 0x09, 0x01];
         frame_bytes.extend(payload);
 
-        let out2 = dispatch(&mut conn, &frame_bytes, &dummy_data());
+        let out2 = dispatch(&mut conn, &frame_bytes, &dummy_data(), &dummy_service());
         assert_eq!(out2.outgoing, vec!["F44402000901"]);
     }
 
@@ -213,7 +237,7 @@ mod tests {
         conn.session.id = 300001;
         // Move opcode 0x06 sub 1: dir=2, x=100 (0x0064), y=200 (0x00C8)
         let move_decoded = encoder::bytes("F44407000601026400C800").unwrap();
-        let out = dispatch(&mut conn, &move_decoded, &dummy_data());
+        let out = dispatch(&mut conn, &move_decoded, &dummy_data(), &dummy_service());
         assert_eq!(conn.session.map_x, 100);
         assert_eq!(conn.session.map_y, 200);
         assert_eq!(conn.session.gocnhin, 2);
@@ -227,7 +251,7 @@ mod tests {
         conn.session.id = 300001;
         // Expression sub 2 action=5
         let expr_decoded = encoder::bytes("F4440300200205").unwrap();
-        let out = dispatch(&mut conn, &expr_decoded, &dummy_data());
+        let out = dispatch(&mut conn, &expr_decoded, &dummy_data(), &dummy_service());
         assert_eq!(conn.session.dongtac, 5);
         assert_eq!(out.outgoing, vec!["F44407002002E193040005"]);
     }
@@ -241,7 +265,7 @@ mod tests {
         conn.session.map_y = 500;
         // Chat "/where": op 0x02 sub 2 msg="/where"
         let chat_decoded = encoder::bytes("F4440C0002022F7768657265").unwrap();
-        let out = dispatch(&mut conn, &chat_decoded, &dummy_data());
+        let out = dispatch(&mut conn, &chat_decoded, &dummy_data(), &dummy_service());
         assert_eq!(out.outgoing.len(), 1);
         assert!(out.outgoing[0].contains("020B")); // sys msg frame
     }
@@ -252,14 +276,14 @@ mod tests {
         conn.session.point = 10;
         // Op 0x08 sub 1: stat_id 27 (Int), points 3 -> hex: F444 0400 0801 1B03
         let decoded = encoder::bytes("F444040008011B03").unwrap();
-        let out = dispatch(&mut conn, &decoded, &dummy_data());
+        let out = dispatch(&mut conn, &decoded, &dummy_data(), &dummy_service());
         assert_eq!(conn.session.point, 7);
         assert_eq!(conn.session.int1, 3);
         assert_eq!(out.outgoing.len(), 2);
 
         // Op 0x28 sub 1: skill 10001 (0x2711), slot 5 -> hex: F444 0400 2801 1127 05
         let decoded_hotkey = encoder::bytes("F4440500280100112705").unwrap();
-        let out_hk = dispatch(&mut conn, &decoded_hotkey, &dummy_data());
+        let out_hk = dispatch(&mut conn, &decoded_hotkey, &dummy_data(), &dummy_service());
         assert_eq!(conn.session.hotkeys[5], 10001);
         assert!(out_hk.outgoing.is_empty());
     }
@@ -272,14 +296,14 @@ mod tests {
 
         // NPC Shop buy item 10001 (0x2711), count 2 -> price = 100*2 = 200 -> gold = 800
         let shop_decoded = encoder::bytes("F44405001B01112702").unwrap();
-        let out_shop = dispatch(&mut conn, &shop_decoded, &dummy_data());
+        let out_shop = dispatch(&mut conn, &shop_decoded, &dummy_data(), &dummy_service());
         assert_eq!(conn.session.gold, 800);
         assert_eq!(conn.session.homdo.len(), 1);
         assert_eq!(out_shop.outgoing.len(), 2);
 
         // Skill learn skill 10001 (0x2711) lv 1 -> F444 0500 1C01 1127 01
         let skill_decoded = encoder::bytes("F44405001C01112701").unwrap();
-        let out_skill = dispatch(&mut conn, &skill_decoded, &dummy_data());
+        let out_skill = dispatch(&mut conn, &skill_decoded, &dummy_data(), &dummy_service());
         assert_eq!(conn.session.skills.len(), 1);
         assert_eq!(conn.session.skill_point, 4);
         assert_eq!(out_skill.outgoing.len(), 2);
@@ -293,20 +317,20 @@ mod tests {
 
         // Op 0x1D sub 1: withdraw 1000 gold -> F444 0400 1D01 E803
         let bank_decoded = encoder::bytes("F44404001D01E803").unwrap();
-        let out_bank = dispatch(&mut conn, &bank_decoded, &dummy_data());
+        let out_bank = dispatch(&mut conn, &bank_decoded, &dummy_data(), &dummy_service());
         assert_eq!(conn.session.gold, 6000);
         assert_eq!(conn.session.bank_gold, 1000);
         assert_eq!(out_bank.outgoing.len(), 3);
 
         // Op 0x21 sub 1: set PK = 1 -> F444 0300 2101 01
         let pk_decoded = encoder::bytes("F4440300210101").unwrap();
-        let out_pk = dispatch(&mut conn, &pk_decoded, &dummy_data());
+        let out_pk = dispatch(&mut conn, &pk_decoded, &dummy_data(), &dummy_service());
         assert_eq!(conn.session.pk, 1);
         assert_eq!(out_pk.outgoing[0], "F444040021020100");
 
         // Op 0x14 sub 1: talk start banker 16080 (0x3ED0) -> F444 0400 1401 D03E
         let talk_decoded = encoder::bytes("F44404001401D03E").unwrap();
-        let out_talk = dispatch(&mut conn, &talk_decoded, &dummy_data());
+        let out_talk = dispatch(&mut conn, &talk_decoded, &dummy_data(), &dummy_service());
         assert_eq!(conn.session.idtalking, 16080);
         assert_eq!(out_talk.outgoing.len(), 2);
     }

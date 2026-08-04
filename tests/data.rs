@@ -93,3 +93,41 @@ fn quests_parse_teamdef() {
     assert_eq!(q.teamdef[0], 121);
     assert_eq!(q.teamdef[2], 17177);
 }
+
+#[test]
+fn quests_parse_reward_share_and_auto_save() {
+    let dir = data_dir();
+    if !dir.join("Quests").is_dir() {
+        eprintln!("Quests dir not present — skipping");
+        return;
+    }
+    let d = GameData::load(&dir).expect("load real data");
+    // "10916 NPC 1 step 0.ini" Rewards=10001-1-0 → (10001, 1, 0), and
+    // SaveLeaderQuests=AUTO → resolved to the talk's map/id/step+1.
+    let q = d
+        .talks
+        .get("10916:NPC:1:0")
+        .expect("10916 NPC 1 step 0 quest");
+    assert_eq!(q.on_win.rewards, vec![(10001, 1, 0)]);
+    assert_eq!(
+        q.on_win.save_leader_quests,
+        vec![(10916, 1, 0, 1)],
+        "AUTO expands to (mapId, id, 0, step+1)"
+    );
+}
+
+#[test]
+fn quests_parse_random_rewards_triples() {
+    let dir = data_dir();
+    if !dir.join("Quests").is_dir() {
+        eprintln!("Quests dir not present — skipping");
+        return;
+    }
+    let d = GameData::load(&dir).expect("load real data");
+    // Find any quest with RandomRewards and assert 3-tuple shape.
+    let found = d.talks.values().find(|q| !q.on_win.random_rewards.is_empty());
+    if let Some(q) = found {
+        assert!(q.on_win.random_rewards.iter().all(|t| t.2 >= 0));
+        assert!(!q.on_win.random_rewards.is_empty());
+    }
+}

@@ -127,11 +127,20 @@ pub struct QuestResult {
     pub dialogs: String,
     /// WarpTo — tab-separated `map x y` (Chapter 3 §3.6/§6.7 Warped(...)).
     pub warp_to: Vec<i64>,
-    pub rewards: Vec<(i64, i64)>,        // item, count
-    pub random_rewards: Vec<(i64, i64)>, // item, count
+    /// Red banner shown on win (`_Message`).
+    pub message: String,
+    /// Guaranteed rewards: `(itemId, count, shareToParty)`.
+    pub rewards: Vec<(i64, i64, i64)>,
+    /// Random rewards: `(itemId, count, shareToParty)` — one fresh-RNG pick.
+    pub random_rewards: Vec<(i64, i64, i64)>,
+    /// UseItems: `(itemId, target)` target 0 = self, else active pet path.
     pub use_items: Vec<(i64, i64)>,
-    pub save_leader_quests: Vec<i64>,
-    pub save_member_quests: Vec<i64>,
+    /// SaveLeaderQuests: `(npcId, npcVal, warpVal, plus)`.
+    pub save_leader_quests: Vec<(i64, i64, i64, i64)>,
+    /// SaveMemberQuests: `(npcId, npcVal, warpVal, plus)`.
+    pub save_member_quests: Vec<(i64, i64, i64, i64)>,
+    /// RequireItems consumed on win: `(itemId, count, remove)`.
+    pub require_items: Vec<(i64, i64, i64)>,
     /// PlayerEnhanceData — tab-separated `Stat-Δ` boosts (Point, SkillPoint).
     pub player_enhance_data: Vec<(String, i64)>,
     /// AddSkill — skill id + target level (tabs). Vec for safety.

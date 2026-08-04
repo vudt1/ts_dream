@@ -10,7 +10,7 @@ use crate::battle::construction::Battle;
 use crate::battle::runner::{
     BattleCommand, BattleData, DbUpdate, Out, Outcome, PlayerSnapshot,
 };
-use crate::data::tables::{Npc, Skill, TexpRow};
+use crate::data::tables::{Item, Npc, Skill, TexpRow};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Arc;
@@ -34,6 +34,8 @@ pub trait BattleSink: Send + Sync + 'static {
     fn apply_fled(&self, player: i64);
     fn apply_respawn(&self, npc_id: i64, x: i64, y: i64);
     fn apply_pet_exp(&self, owner: i64, stt: i64, exp: i64);
+    /// The battle task finished (`PlayerWin`/`PlayerLose`/`PlayerFled`).
+    fn battle_ended(&self, id: i32, outcome: Outcome);
 }
 
 /// A live battle handle (used to send commands and join/leave).
@@ -98,13 +100,14 @@ impl BattleManager {
         battle: Battle,
         npcs: Arc<HashMap<i64, Npc>>,
         skills: Arc<HashMap<i64, Skill>>,
+        items: Arc<HashMap<i64, Item>>,
         pet_slots: Arc<HashMap<i64, [i64; 4]>>,
         players: Arc<HashMap<i64, PlayerSnapshot>>,
         texps: Arc<Vec<TexpRow>>,
         per_exp: i64,
         sink: Arc<dyn BattleSink>,
     ) -> BattleHandle {
-        self.spawn_timeout(battle, npcs, skills, pet_slots, players, texps, per_exp, self.default_timeout, sink)
+        self.spawn_timeout(battle, npcs, skills, items, pet_slots, players, texps, per_exp, self.default_timeout, sink)
     }
 
     /// Spawn with a custom per-turn input timeout (shorter makes tests fast).
@@ -114,6 +117,7 @@ impl BattleManager {
         battle: Battle,
         npcs: Arc<HashMap<i64, Npc>>,
         skills: Arc<HashMap<i64, Skill>>,
+        items: Arc<HashMap<i64, Item>>,
         pet_slots: Arc<HashMap<i64, [i64; 4]>>,
         players: Arc<HashMap<i64, PlayerSnapshot>>,
         texps: Arc<Vec<TexpRow>>,
@@ -133,6 +137,7 @@ impl BattleManager {
             let data = BattleData::new(
                 &npcs,
                 &skills,
+                &items,
                 &pet_slots,
                 &players,
                 &texps,
@@ -151,6 +156,7 @@ impl BattleManager {
                     out.clear();
                     battle.finish(&data, per_exp, fled, &mut out);
                     dispatch(&out, sink.as_ref());
+                    sink.battle_ended(id, outcome);
                     break;
                 }
             }
@@ -248,6 +254,7 @@ mod tests {
         fn apply_fled(&self, _p: i64) {}
         fn apply_respawn(&self, _n: i64, _x: i64, _y: i64) {}
         fn apply_pet_exp(&self, _o: i64, _s: i64, _e: i64) {}
+        fn battle_ended(&self, _id: i32, _outcome: Outcome) {}
     }
 
     fn skill(id: i64) -> Skill {
@@ -308,6 +315,7 @@ mod tests {
             m.insert(9001, npc(9001));
             m
         };
+        let items = HashMap::new();
         let pets = HashMap::new();
         let players = HashMap::new();
         let texps = crate::data::texps::compute_texps();
@@ -318,6 +326,7 @@ mod tests {
             build_battle(),
             Arc::new(npcs),
             Arc::new(skills),
+            Arc::new(items),
             Arc::new(pets),
             Arc::new(players),
             Arc::new(texps),
@@ -329,10 +338,13 @@ mod tests {
         handle.command(PlayerInput {
             player: 300001,
             cmd: BattleCommand {
+                row: 3,
+                col: 2,
                 skill_id: 10000,
                 skill_lv: 1,
                 row_attack: 0,
                 col_attack: 2,
+                use_item: 0,
             },
         });
 

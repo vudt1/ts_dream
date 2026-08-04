@@ -1,0 +1,22 @@
+// Golden scenario: battle win — seeded replay (ticket 21, Ch9 §9.6)
+//
+// C2S: attack NPC 9001 (op 0x0B sub2 sub3, npcOnMap 11), then the op 0x32
+// sub1 skill command (leader cell 3,2 → basic attack 10000 on 0,2).
+<<F444010000
+<<F44409000B0203292300000B00
+<<F444080032010300021027
+//
+// S2C (deterministic with RNG seeds 12345/67890/1111): the battle open board,
+// enemy entity, your-turn prompt, the SP cost write, the turn action frame,
+// end-of-battle hide/reposition, exit UI, then BattleQuestWin (red message +
+// EndTalk).
+>>F4441C000BFA70000302E19304000000000000000302BD008D00BD008D003201F44403000B0A01
+>>F4441A000B050303292300000B000000000000021E001E001E001E000101
+>>F44402003401
+>>F4440C0008011A018800000000000000
+>>F444130032010F00030210270101000201000119180601
+>>F44408000B00E19304000000F44405000B01030200
+>>F44402000504
+>>F44402001408
+>>F4440900020B0000000057696E
+>>F44402001408

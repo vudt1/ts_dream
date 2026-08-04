@@ -1,5 +1,6 @@
 //! Handlers package for opcode business logic.
 
+pub mod battle;
 pub mod character;
 pub mod chat;
 pub mod expressions;

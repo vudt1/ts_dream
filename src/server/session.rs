@@ -149,6 +149,12 @@ pub struct Session {
     pub completed_quests: Vec<i64>,
     /// `[OnWin] ClickNpcId` — NPC that opens a follow-up dialog after quest win.
     pub click_npc_id: i32,
+    /// Party members (`_My_IdMem1..4`), 0 = empty.
+    pub id_mem: [u32; 4],
+    /// Quest step updates recorded by `BattleQuestWin` (`npcId, npcVal`).
+    pub quest_steps: Vec<(i64, i64)>,
+    /// Warp-step updates recorded by `BattleQuestWin` (`npcId, warpVal`).
+    pub warp_steps: Vec<(i64, i64)>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -237,6 +243,9 @@ impl Default for Session {
             talking_battle: 0,
             completed_quests: Vec::new(),
             click_npc_id: 0,
+            id_mem: [0; 4],
+            quest_steps: Vec::new(),
+            warp_steps: Vec::new(),
         }
     }
 }

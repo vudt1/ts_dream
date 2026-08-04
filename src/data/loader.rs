@@ -404,9 +404,22 @@ impl GameData {
             } else {
                 num(&rm, &file)?
             };
+            // Items consumed on win (`_RequireItems`): itemId-count-remove.
+            q.on_win.require_items = parse_tuples(&ini.get("REQUIRES", "Items"), &file)?;
         }
 
         q.on_win = self.parse_result(&ini, "OnWin", &file)?;
+        // SaveLeaderQuests / SaveMemberQuests need map_id/type/id/step for AUTO.
+        let win_qs = ini.get("ONWIN", "SaveLeaderQuests");
+        if win_qs != NOTHING {
+            q.on_win.save_leader_quests =
+                parse_save_quest(&win_qs, &file, q.map_id, &q.talk_type, q.id, q.step);
+        }
+        let win_ms = ini.get("ONWIN", "SaveMemberQuests");
+        if win_ms != NOTHING {
+            q.on_win.save_member_quests =
+                parse_save_quest(&win_ms, &file, q.map_id, &q.talk_type, q.id, q.step);
+        }
         // [OnLose].WarpTo is read from ONWIN (C# copy-paste bug).
         let mut on_lose = self.parse_result(&ini, "OnLose", &file)?;
         let win_warp = ini.get("ONWIN", "WarpTo");
@@ -424,11 +437,13 @@ impl GameData {
         if warp != NOTHING {
             r.warp_to = parse_warp(&warp, file)?;
         }
+        let msg = ini.get(section, "Message");
+        if msg != NOTHING {
+            r.message = msg;
+        }
         r.rewards = parse_tuples(&ini.get(section, "Rewards"), file)?;
         r.random_rewards = parse_tuples(&ini.get(section, "RandomRewards"), file)?;
-        r.use_items = parse_tuples(&ini.get(section, "UseItems"), file)?;
-        r.save_leader_quests = parse_int_list(&ini.get(section, "SaveLeaderQuests"));
-        r.save_member_quests = parse_int_list(&ini.get(section, "SaveMemberQuests"));
+        r.use_items = parse_use_items(&ini.get(section, "UseItems"), file)?;
         r.player_enhance_data = parse_enhance(&ini.get(section, "PlayerEnhanceData"), file)?;
         r.add_skill = parse_add_skill(&ini.get(section, "AddSkill"), file)?;
         r.add_pet = parse_add_pet(&ini.get(section, "AddPet"), file)?;
@@ -437,35 +452,102 @@ impl GameData {
     }
 }
 
-fn parse_tuples(s: &str, file: &str) -> Result<Vec<(i64, i64)>> {
+fn parse_tuples(s: &str, file: &str) -> Result<Vec<(i64, i64, i64)>> {
     let mut out = Vec::new();
-    if s == NOTHING {
+    if s == NOTHING || s.trim().is_empty() {
         return Ok(out);
     }
-    for tok in s.split(',') {
-        let mut it = tok.trim().split('-');
-        let a = it.next().map(str::trim);
-        let b = it.next().map(str::trim);
-        if let (Some(a), Some(b)) = (a, b) {
-            if !a.is_empty() && !b.is_empty() {
-                out.push((
-                    a.parse::<i64>()
-                        .map_err(|_| TsError::Data(format!("bad tuple `{tok}` in {file}")))?,
-                    b.parse::<i64>()
-                        .map_err(|_| TsError::Data(format!("bad tuple `{tok}` in {file}")))?,
-                ));
-            }
+    // listSplit = '\t'; each tuple is `a-b-c` or `a-b`.
+    for tok in s.split('\t') {
+        let t = tok.trim();
+        if t.is_empty() {
+            continue;
         }
+        let parts: Vec<&str> = t.split('-').map(str::trim).collect();
+        if parts.is_empty() || parts[0].is_empty() {
+            continue;
+        }
+        let a = parts[0]
+            .parse::<i64>()
+            .map_err(|_| TsError::Data(format!("bad tuple `{tok}` in {file}")))?;
+        let b = parts.get(1).copied().unwrap_or("0")
+            .parse::<i64>()
+            .map_err(|_| TsError::Data(format!("bad tuple `{tok}` in {file}")))?;
+        let c = match parts.get(2) {
+            Some(x) if !x.trim().is_empty() => x
+                .trim()
+                .parse::<i64>()
+                .map_err(|_| TsError::Data(format!("bad tuple `{tok}` in {file}")))?,
+            _ => 0,
+        };
+        out.push((a, b, c));
     }
     Ok(out)
 }
 
-fn parse_int_list(s: &str) -> Vec<i64> {
-    s.split(',')
-        .map(str::trim)
-        .filter(|t| !t.is_empty() && *t != NOTHING)
-        .filter_map(|t| t.parse::<i64>().ok())
-        .collect()
+/// UseItems — `itemId-target-?` tuples (listSplit `\t`, intSplit `-`).
+fn parse_use_items(s: &str, file: &str) -> Result<Vec<(i64, i64)>> {
+    let mut out = Vec::new();
+    if s == NOTHING || s.trim().is_empty() {
+        return Ok(out);
+    }
+    for tok in s.split('\t') {
+        let t = tok.trim();
+        if t.is_empty() {
+            continue;
+        }
+        let parts: Vec<&str> = t.split('-').map(str::trim).collect();
+        if parts.is_empty() || parts[0].is_empty() {
+            continue;
+        }
+        let item_id = parts[0]
+            .parse::<i64>()
+            .map_err(|_| TsError::Data(format!("bad UseItems `{tok}` in {file}")))?;
+        let target = parts.get(1).copied().unwrap_or("0")
+            .parse::<i64>()
+            .map_err(|_| TsError::Data(format!("bad UseItems `{tok}` in {file}")))?;
+        out.push((item_id, target));
+    }
+    Ok(out)
+}
+
+/// SaveLeaderQuests/SaveMemberQuests — `npcId-npcVal-warpVal-plus` tuples,
+/// with the `AUTO` token expanded to `mapId-id-step+1` (id goes in the npc
+/// column for `Type=NPC`, in the warp column for `Type=WARP`).
+fn parse_save_quest(
+    s: &str,
+    _file: &str,
+    map_id: i64,
+    talk_type: &str,
+    id: i64,
+    step: i64,
+) -> Vec<(i64, i64, i64, i64)> {
+    let mut out = Vec::new();
+    if s == NOTHING || s.trim().is_empty() {
+        return out;
+    }
+    for tok in s.split('\t') {
+        let t = tok.trim();
+        if t.is_empty() {
+            continue;
+        }
+        if t == "AUTO" {
+            let (npc_val, warp_val) = if talk_type == "WARP" {
+                (0, id)
+            } else {
+                (id, 0)
+            };
+            out.push((map_id, npc_val, warp_val, step + 1));
+            continue;
+        }
+        let parts: Vec<i64> = t.split('-').filter_map(|p| p.trim().parse().ok()).collect();
+        let mut v = [0i64; 4];
+        for (i, p) in parts.iter().take(4).enumerate() {
+            v[i] = *p;
+        }
+        out.push((v[0], v[1], v[2], v[3]));
+    }
+    out
 }
 
 /// WarpTo is tab-separated `map x y` (sometimes the `-` tuple form).
