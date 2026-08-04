@@ -81,7 +81,11 @@ impl GameData {
     fn load_npcs(&mut self, path: &Path) -> Result<()> {
         let bytes = std::fs::read(path)
             .map_err(|e| TsError::Data(format!("read {}: {}", path.display(), e)))?;
-        let offset = if bytes.starts_with(&[0xFF, 0xFE]) { 2 } else { 0 };
+        let offset = if bytes.starts_with(&[0xFF, 0xFE]) {
+            2
+        } else {
+            0
+        };
         let u16s: Vec<u16> = bytes[offset..]
             .chunks_exact(2)
             .map(|c| u16::from_le_bytes([c[0], c[1]]))
@@ -392,6 +396,16 @@ impl GameData {
             q.teamdef = v;
         }
 
+        // [REQUIRES] SelectMenu — entry condition (0 if absent).
+        if ini.has_section("REQUIRES") {
+            let rm = ini.get("REQUIRES", "SelectMenu");
+            q.require_select_menu = if rm == NOTHING || rm.trim().is_empty() {
+                0
+            } else {
+                num(&rm, &file)?
+            };
+        }
+
         q.on_win = self.parse_result(&ini, "OnWin", &file)?;
         // [OnLose].WarpTo is read from ONWIN (C# copy-paste bug).
         let mut on_lose = self.parse_result(&ini, "OnLose", &file)?;
@@ -483,9 +497,9 @@ fn num_or(s: &str, file: &str) -> Result<i64> {
     if s == NOTHING || s.trim().is_empty() {
         return Ok(0);
     }
-    s.trim().parse::<i64>().map_err(|_| {
-        TsError::Data(format!("non-numeric field `{s}` in {file}"))
-    })
+    s.trim()
+        .parse::<i64>()
+        .map_err(|_| TsError::Data(format!("non-numeric field `{s}` in {file}")))
 }
 
 /// PlayerEnhanceData — tab-separated `Stat-Δ` pairs.

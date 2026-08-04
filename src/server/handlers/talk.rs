@@ -43,19 +43,14 @@ pub fn handle_talk(
         // Sub 6: Menu / Continue engine (H6)
         6 => handle_talk_continue(conn, payload, data, out),
         // Sub 8: Warp talk (H8)
-        8 => handle_talk_warp(conn, out),
+        8 => handle_talk_warp(conn, payload, data, out),
         // Sub 9: Set SelectMenu (H9)
         9 => handle_talk_select_menu(conn, payload),
         _ => end_talk(conn, out),
     }
 }
 
-fn handle_talk_start(
-    conn: &mut Conn,
-    payload: &[u8],
-    data: &GameData,
-    out: &mut HandleOutcome,
-) {
+fn handle_talk_start(conn: &mut Conn, payload: &[u8], data: &GameData, out: &mut HandleOutcome) {
     if payload.len() < 2 {
         end_talk(conn, out);
         return;
@@ -96,25 +91,38 @@ fn handle_talk_start(
                 ));
             }
         }
-
     }
 }
 
 fn handle_talk_continue(
     conn: &mut Conn,
     _payload: &[u8],
-    _data: &GameData,
+    data: &GameData,
     out: &mut HandleOutcome,
 ) {
     let idtalking = conn.session.idtalking;
     let select_menu = conn.session.select_menu;
+
+    // Pet-reborn NPC exceptions (55002/59102/59011)
+    if crate::server::handlers::quest::handle_pet_reborn_npc(conn, idtalking, out) {
+        return;
+    }
+
+    // Daily quest (map 12711)
+    if conn.session.map_id == 12711 {
+        crate::server::handlers::quest::generate_daily_quest(conn, out);
+        return;
+    }
 
     match idtalking {
         // Banker / Store NPCs
         16080 | 16004 | 16011 | 16023 => match select_menu {
             30 => {
                 out.send("F44403001D0900");
-                out.send(format!("F44406001D04{}", encoder::le32(conn.session.bank_gold)));
+                out.send(format!(
+                    "F44406001D04{}",
+                    encoder::le32(conn.session.bank_gold)
+                ));
                 out.send("F44402001D05");
                 out.send("F44402001409");
             }
@@ -187,14 +195,21 @@ fn handle_talk_continue(
         // Silent NPC
         16012 => {}
 
-        // Generic NPC continuation
-        _ => end_talk(conn, out),
+        // Generic NPC continuation — try data-driven quest path
+        _ => {
+            if !crate::server::handlers::quest::try_quest_h6(conn, data, out) {
+                end_talk(conn, out);
+            }
+        }
     }
 }
 
-fn handle_talk_warp(_conn: &mut Conn, out: &mut HandleOutcome) {
-    out.send("F44402000504");
-    out.send("F44402001408");
+fn handle_talk_warp(conn: &mut Conn, payload: &[u8], data: &GameData, out: &mut HandleOutcome) {
+    // C# H8 reads the warp id directly from the packet (bytes 6-7).
+    if payload.len() >= 2 {
+        conn.session.idtalking = encoder::u16_le(payload[0], payload[1]) as i32;
+    }
+    crate::server::handlers::quest::handle_warp_confirm(conn, data, out);
 }
 
 fn handle_talk_select_menu(conn: &mut Conn, payload: &[u8]) {

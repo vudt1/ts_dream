@@ -118,6 +118,8 @@ pub struct QuestDef {
     pub teamdef: Vec<i64>, // int[11] {diahinh, n1..n10}
     pub on_win: QuestResult,
     pub on_lose: QuestResult,
+    /// `[REQUIRES] SelectMenu` — the menu choice that must be set (0 if absent).
+    pub require_select_menu: i64,
 }
 
 #[derive(Debug, Clone, Default)]

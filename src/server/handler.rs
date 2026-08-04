@@ -17,12 +17,13 @@ use crate::server::handlers::{
 };
 use crate::server::session::Conn;
 
-
 /// Result of handling one decoded frame.
 #[derive(Debug, Default, Clone)]
 pub struct HandleOutcome {
     pub outgoing: Vec<String>,
     pub shutdown: bool,
+    /// If set, a TEAMDEF battle should be triggered after processing.
+    pub battle_trigger: Option<crate::server::handlers::quest::BattleTrigger>,
 }
 
 impl HandleOutcome {
@@ -83,7 +84,6 @@ fn handle(
         0x14 => talk::handle_talk(conn, sub, payload, data, out),
 
         // Op 0x17 — Inventory base, use item, player shop, reborn
-
         0x17 => {
             if (30..=33).contains(&sub) {
                 shops::handle_player_shop(conn, sub, payload, out);
@@ -311,6 +311,3 @@ mod tests {
         assert_eq!(out_talk.outgoing.len(), 2);
     }
 }
-
-
-

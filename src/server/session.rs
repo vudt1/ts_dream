@@ -145,6 +145,10 @@ pub struct Session {
     pub horse_pet_id: u16,
     pub gift_code_redeemed: bool,
     pub trade: TradeState,
+    pub talking_battle: i32,
+    pub completed_quests: Vec<i64>,
+    /// `[OnWin] ClickNpcId` — NPC that opens a follow-up dialog after quest win.
+    pub click_npc_id: i32,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -230,6 +234,9 @@ impl Default for Session {
             horse_pet_id: 0,
             gift_code_redeemed: false,
             trade: TradeState::default(),
+            talking_battle: 0,
+            completed_quests: Vec::new(),
+            click_npc_id: 0,
         }
     }
 }
@@ -266,8 +273,20 @@ impl Session {
         self.spx2 = spx2;
         self.agi2 = agi2;
 
-        let computed_hp = get_hp_max(self.reborn as i64, self.job as i64, self.level as i64, self.hpx as i64) as u16 + hpx2 as u16;
-        let computed_sp = get_sp_max(self.reborn as i64, self.job as i64, self.level as i64, self.spx as i64) as u16 + spx2 as u16;
+        let computed_hp = get_hp_max(
+            self.reborn as i64,
+            self.job as i64,
+            self.level as i64,
+            self.hpx as i64,
+        ) as u16
+            + hpx2 as u16;
+        let computed_sp = get_sp_max(
+            self.reborn as i64,
+            self.job as i64,
+            self.level as i64,
+            self.spx as i64,
+        ) as u16
+            + spx2 as u16;
 
         self.hp_max = computed_hp;
         self.sp_max = computed_sp;
@@ -363,6 +382,24 @@ impl Session {
             }
         }
         None
+    }
+
+    /// Remove up to `count` of `item_id` from inventory; returns the removed count.
+    pub fn remove_homdo_item(&mut self, item_id: u16, count: u32) -> u32 {
+        let mut removed = 0u32;
+        for item in &mut self.homdo {
+            if item.id != item_id || item.count == 0 {
+                continue;
+            }
+            let take = (count - removed).min(item.count as u32) as u8;
+            item.count -= take;
+            removed += take as u32;
+            if removed >= count {
+                break;
+            }
+        }
+        self.homdo.retain(|i| i.count > 0 || i.id == 0);
+        removed
     }
 }
 

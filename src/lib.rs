@@ -33,7 +33,12 @@ pub mod web {
 }
 
 pub mod battle {
+    pub mod construction;
+    pub mod damage;
     pub mod engine;
+    pub mod packets;
+    pub mod rng;
+    pub mod targeting;
 }
 
 pub mod harness;

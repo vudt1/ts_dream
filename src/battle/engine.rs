@@ -6,12 +6,7 @@ use crate::data::texps::texp_get_lv_up;
 use crate::protocol::encoder;
 
 /// EXP level-ups from a battle reward, via the Texps array (§6.6).
-pub fn exp_lv_up(
-    texps: &[crate::data::tables::TexpRow],
-    lv: i64,
-    reborn: usize,
-    texp: i64,
-) -> i64 {
+pub fn exp_lv_up(texps: &[crate::data::tables::TexpRow], lv: i64, reborn: usize, texp: i64) -> i64 {
     texp_get_lv_up(texps, lv, reborn, texp)
 }
 
@@ -37,6 +32,7 @@ pub struct WarInfo {
     pub thuoctinh: i64,
     pub leader_id: i64,
     pub id_skill: i64,
+    pub lv_skill: i64,
     pub row_attack: u8,
     pub col_attack: u8,
     pub int1: i64,
@@ -48,6 +44,20 @@ pub struct WarInfo {
     pub attacked: bool,
     pub random: i64,
     pub exp: i64,
+
+    // Buff/debuff triplets (id, level, remaining turns)
+    pub type3_id: i64,
+    pub type3_lv: i64,
+    pub type3_turn: i64,
+    pub type4_id: i64,
+    pub type4_lv: i64,
+    pub type4_turn: i64,
+    pub type15_id: i64,
+    pub type15_lv: i64,
+    pub type15_turn: i64,
+    pub type19_id: i64,
+    pub type19_lv: i64,
+    pub type19_turn: i64,
 }
 
 impl WarInfo {

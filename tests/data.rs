@@ -59,3 +59,37 @@ fn npc_name_roundtrip() {
     assert!(!npc.name.is_empty());
     let _ = ts_dream::data::tables::name_to_string(&npc.name);
 }
+
+#[test]
+fn quests_parse_requires_select_menu() {
+    let dir = data_dir();
+    if !dir.join("Quests").is_dir() {
+        eprintln!("Quests dir not present — skipping");
+        return;
+    }
+    let d = GameData::load(&dir).expect("load real data");
+    // "10916 NPC 1 step 0.ini" has [REQUIRES] SelectMenu=30.
+    let q = d
+        .talks
+        .get("10916:NPC:1:0")
+        .expect("10916 NPC 1 step 0 quest");
+    assert_eq!(q.require_select_menu, 30);
+}
+
+#[test]
+fn quests_parse_teamdef() {
+    let dir = data_dir();
+    if !dir.join("Quests").is_dir() {
+        eprintln!("Quests dir not present — skipping");
+        return;
+    }
+    let d = GameData::load(&dir).expect("load real data");
+    // "11011 Võ An Quốc Warp 3 step 0.ini" has [TEAMDEF] Diahinh=121 + 10 npcs.
+    let q = d
+        .talks
+        .get("11011:WARP:3:0")
+        .expect("11011 WARP 3 step 0 quest");
+    assert_eq!(q.teamdef.len(), 11);
+    assert_eq!(q.teamdef[0], 121);
+    assert_eq!(q.teamdef[2], 17177);
+}
