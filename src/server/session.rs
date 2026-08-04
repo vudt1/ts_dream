@@ -23,6 +23,18 @@ pub struct Session {
     pub pending_pass: Vec<u8>,
     /// Pending character name from name-check.
     pub pending_new_char_name: Vec<u8>,
+    /// Character name once loaded or created.
+    pub name: Vec<u8>,
+    /// Map position fields (`_My_MapId`, `_My_MapX`, `_My_MapY`, `_My_Gocnhin`).
+    pub map_id: u16,
+    pub map_x: u16,
+    pub map_y: u16,
+    pub gocnhin: u8,
+    /// Expression / action (`_My_Dongtac`).
+    pub dongtac: u8,
+    /// PK and tham chiến state.
+    pub pk: u8,
+    pub tham_chien: u8,
 }
 
 impl Session {

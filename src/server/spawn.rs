@@ -143,6 +143,153 @@ pub fn skill_list(skills: &[(u16, u8)]) -> String {
     s
 }
 
+/// Build the move broadcast frame (op 0x06 sub 0x01).
+pub fn move_broadcast(id: u32, dir: u8, x: u16, y: u16) -> String {
+    format!(
+        "F4440B000601{}{}{:02X}{}{}",
+        encoder::le32(id),
+        "",
+        dir,
+        encoder::le16(x),
+        encoder::le16(y)
+    )
+}
+
+/// Build expression/action frame (op 0x20 sub 0x01 / 0x02).
+pub fn expression_frame(id: u32, sub: u8, action: u8) -> String {
+    format!(
+        "F444070020{:02X}{}{:02X}",
+        sub,
+        encoder::le32(id),
+        action
+    )
+}
+
+/// Build chat packet frame (op 0x02 sub 0x01 / 0x02 / 0x03 / 0x05).
+pub fn chat_frame(sub: u8, id: u32, chat_raw: &[u8]) -> String {
+    let mut body = String::new();
+    body.push_str(&encoder::le32(id));
+    body.push_str(&encoder::hex(chat_raw));
+    let total_len = 2 + body.len() / 2;
+    format!("F444{}02{:02X}{}", encoder::le16(total_len as u16), sub, body)
+}
+
+/// Build system message banner packet (op 0x02 sub 0x0B).
+pub fn sys_msg_frame(msg: &str) -> String {
+    let mut body = String::from("00000000");
+    body.push_str(&encoder::strhex(msg.as_bytes()));
+    let total_len = 2 + body.len() / 2;
+    format!("F444{}020B{}", encoder::le16(total_len as u16), body)
+}
+
+/// Build server name packet (op 0x27 sub 0x09).
+pub fn server_name_frame(id: u32, server_name: &str) -> String {
+    let name_hex = encoder::strhex(server_name.as_bytes());
+    let name_len = server_name.len() as u8;
+    let mut body = String::new();
+    body.push_str(&encoder::le32(id));
+    body.push_str("C4000000");
+    body.push_str(&format!("{:02X}", name_len));
+    body.push_str(&name_hex);
+    let total_len = 2 + body.len() / 2;
+    format!("F444{}2709{}", encoder::le16(total_len as u16), body)
+}
+
+/// Build full 22-step Logined1 sequence frames for a logged-in character.
+pub fn build_logined_sequence(
+    id: u32,
+    name: &[u8],
+    sex: u8,
+    hair: u16,
+    color: &str,
+    thuoctinh: u8,
+    map_id: u16,
+    map_x: u16,
+    map_y: u16,
+    gocnhin: u8,
+    pk: u8,
+    tham_chien: u8,
+) -> Vec<String> {
+    let mut frames = Vec::new();
+
+    // 1. Step 1: end-talk + marker
+    frames.extend(login_start());
+
+    // 2. Step 2: player self-appear (op 0x03 sub 0x03)
+    frames.push(player_appear(
+        id, sex, 0, 0, map_id, map_x, map_y, gocnhin, hair, color, &[], 0, 0, name,
+    ));
+
+    // 3. Step 3: stats (op 0x05 sub 0x03)
+    let hp_max = crate::battle::engine::get_hp_max(0, 0, 1, 0) as u16;
+    let sp_max = crate::battle::engine::get_sp_max(0, 0, 1, 0) as u16;
+    frames.push(stats(
+        thuoctinh, hp_max, sp_max, 0, 0, 0, 0, 0, 0, 1, 6, 0, 0, 1, hp_max, sp_max, 0, 0, 0, 1, 0, 0, "",
+    ));
+
+    // 4. Step 4: SendPlayerOnline (self-appear for online pool, handled by broadcast)
+
+    // 5. Step 5: Pet summary
+    frames.push("F44402000F08".to_string());
+    frames.push("F44402000F14".to_string());
+    frames.push("F44402000F0A".to_string());
+
+    // 6. Step 6: Party frames (none for new login)
+
+    // 7. Step 7: Pet summon (none active)
+
+    // 8. Step 8: Pet stat recompute (no packet)
+
+    // 9. Step 9: PK / war state
+    frames.push(format!("F44404002102{:02X}{:02X}", pk, tham_chien));
+
+    // 10. Step 10: Inventory dumps (Homdo, TienTrang, Tuideo, LuuLang)
+    frames.push("F44402001705".to_string());
+    frames.push("F44402001E01".to_string());
+    frames.push("F4440200172F".to_string());
+    frames.push("F44402001766".to_string());
+
+    // 11. Step 11: Equipped
+    frames.push("F4440200170B".to_string());
+
+    // 12. Step 12: Gold
+    frames.push("F4440A001A04000000000000".to_string());
+
+    // 13. Step 13: Server name ("TSVN")
+    frames.push(server_name_frame(id, "TSVN"));
+
+    // 14. Step 14: Terminator
+    frames.push("F44402000504F44402000F0A".to_string());
+
+    // 15. Step 15: Literal
+    frames.push("F4440A000B0B0000000000002040".to_string());
+
+    // 16. Step 16: Stable close
+    frames.push("F44402001F0F".to_string());
+
+    // 17. Step 17: Empty send (omitted)
+
+    // 18. Step 18: Time banner
+    let now_str = chrono::Local::now().format("Thoi gian: %Y-%m-%d %H:%M:%S").to_string();
+    frames.push(sys_msg_frame(&now_str));
+
+    // 19. Step 19: Welcome banner
+    frames.push(sys_msg_frame(
+        "TS offline RebuildVN Thanks: Duong Van Truong && Somchai choosawai",
+    ));
+
+    // 20. Step 20: Hotbar
+    frames.push("F4440300280102".to_string());
+
+    // 21. Step 21: God / HP store / SP store (3x F44412002304...)
+    let store_frame = format!("F444120023041027{}", "00".repeat(24));
+    frames.push(store_frame.clone());
+    frames.push(store_frame.clone());
+    frames.push(store_frame);
+
+    frames
+}
+
 /// Assemble a Logined1 sequence wrapper. `ok_all` carries the ordered frames
 /// already built (self-appear, stats, pet summary, dumps, gold, name, banners,
 /// hotbar, stores…); `ok` is returned as the outcome.
