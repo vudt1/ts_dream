@@ -3,5 +3,10 @@
 pub mod character;
 pub mod chat;
 pub mod expressions;
+pub mod inventory;
 pub mod login;
 pub mod movement;
+pub mod shops;
+pub mod skills;
+pub mod stats;
+

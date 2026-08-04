@@ -11,7 +11,7 @@
 use crate::data::loader::GameData;
 use crate::error::Result;
 use crate::protocol::encoder;
-use crate::server::handlers::{character, chat, expressions, login, movement};
+use crate::server::handlers::{character, chat, expressions, inventory, login, movement, shops, skills, stats};
 use crate::server::session::Conn;
 
 /// Result of handling one decoded frame.
@@ -35,7 +35,7 @@ pub fn dispatch(conn: &mut Conn, decoded: &[u8], data: &GameData) -> HandleOutco
     let sub = decoded.get(5).copied().unwrap_or(0);
     let payload = decoded.get(6..).unwrap_or(&[]);
     // C# swallows handler exceptions: never propagate.
-    let _ = handle(conn, opcode, sub, payload, data, &mut out);
+    let _ = handle(conn, opcode, sub, payload, decoded, data, &mut out);
     out
 }
 
@@ -44,6 +44,7 @@ fn handle(
     opcode: u8,
     sub: u8,
     payload: &[u8],
+    decoded: &[u8],
     data: &GameData,
     out: &mut HandleOutcome,
 ) -> Result<()> {
@@ -59,11 +60,35 @@ fn handle(
         // Op 0x05, 0x06 — Move
         0x05 | 0x06 => movement::handle_move(conn, sub, payload, out),
 
+        // Op 0x08 — Stat allocation
+        0x08 => stats::handle_stat_allocation(conn, sub, payload, out),
+
         // Op 0x09 — Character creation & name check
         0x09 => character::handle_character(conn, sub, payload, out),
 
+        // Op 0x17 — Inventory base, use item, player shop, reborn
+        0x17 => {
+            if (30..=33).contains(&sub) {
+                shops::handle_player_shop(conn, sub, payload, out);
+            } else {
+                inventory::handle_inventory(conn, sub, payload, decoded, out);
+            }
+        }
+
+        // Op 0x1B — NPC shop buy/sell
+        0x1B => shops::handle_npc_shop(conn, sub, payload, out),
+
+        // Op 0x1C — Learn / upgrade skills
+        0x1C => skills::handle_skills(conn, sub, payload, out),
+
         // Op 0x20 — Expressions
         0x20 => expressions::handle_expressions(conn, sub, payload, out),
+
+        // Op 0x28 — Hotkey / skill bar
+        0x28 => stats::handle_hotkey(conn, sub, payload, out),
+
+        // Op 0x2C — Pet reborn
+        0x2C => skills::handle_pet_reborn(conn, sub, payload, out),
 
         _ => {
             // Not yet ported / unknown: silently ignored.
@@ -176,4 +201,44 @@ mod tests {
         assert_eq!(out.outgoing.len(), 1);
         assert!(out.outgoing[0].contains("020B")); // sys msg frame
     }
+
+    #[test]
+    fn dispatch_stat_allocation_and_hotkey() {
+        let mut conn = Conn::new();
+        conn.session.point = 10;
+        // Op 0x08 sub 1: stat_id 27 (Int), points 3 -> hex: F444 0400 0801 1B03
+        let decoded = encoder::bytes("F444040008011B03").unwrap();
+        let out = dispatch(&mut conn, &decoded, &dummy_data());
+        assert_eq!(conn.session.point, 7);
+        assert_eq!(conn.session.int1, 3);
+        assert_eq!(out.outgoing.len(), 2);
+
+        // Op 0x28 sub 1: skill 10001 (0x2711), slot 5 -> hex: F444 0400 2801 1127 05
+        let decoded_hotkey = encoder::bytes("F4440500280100112705").unwrap();
+        let out_hk = dispatch(&mut conn, &decoded_hotkey, &dummy_data());
+        assert_eq!(conn.session.hotkeys[5], 10001);
+        assert!(out_hk.outgoing.is_empty());
+    }
+
+    #[test]
+    fn dispatch_npc_shop_and_skill_learn() {
+        let mut conn = Conn::new();
+        conn.session.gold = 1000;
+        conn.session.skill_point = 5;
+
+        // NPC Shop buy item 10001 (0x2711), count 2 -> price = 100*2 = 200 -> gold = 800
+        let shop_decoded = encoder::bytes("F44405001B01112702").unwrap();
+        let out_shop = dispatch(&mut conn, &shop_decoded, &dummy_data());
+        assert_eq!(conn.session.gold, 800);
+        assert_eq!(conn.session.homdo.len(), 1);
+        assert_eq!(out_shop.outgoing.len(), 2);
+
+        // Skill learn skill 10001 (0x2711) lv 1 -> F444 0500 1C01 1127 01
+        let skill_decoded = encoder::bytes("F44405001C01112701").unwrap();
+        let out_skill = dispatch(&mut conn, &skill_decoded, &dummy_data());
+        assert_eq!(conn.session.skills.len(), 1);
+        assert_eq!(conn.session.skill_point, 4);
+        assert_eq!(out_skill.outgoing.len(), 2);
+    }
 }
+
