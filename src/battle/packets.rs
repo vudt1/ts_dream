@@ -187,6 +187,74 @@ pub fn skilling_int(
     )
 }
 
+/// Full `Skilling` effect (17 bytes) — `TheBattle.cs:9318-9321`:
+/// `0F00` + row + col + LE16(skillId) + SLdanh + skillType + rowAttack + colAttack +
+/// miss + adl + count + troi + LE16(damage) + buff.
+///
+/// Used for the flee (type-12) and berserk full-effect frames broadcast as
+/// `F44413003201` + this payload.
+#[allow(clippy::too_many_arguments)]
+pub fn skilling_full(
+    row: u8,
+    col: u8,
+    skill_id: u16,
+    sl_danh: u8,
+    skill_type: u8,
+    row_attack: u8,
+    col_attack: u8,
+    miss_attack: u8,
+    adl: u8,
+    count: u8,
+    troi: u8,
+    damage: u16,
+    buff: u8,
+) -> String {
+    format!(
+        "0F00{:02X}{:02X}{}{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}{}{:02X}",
+        row,
+        col,
+        encoder::le16(skill_id),
+        sl_danh,
+        skill_type,
+        row_attack,
+        col_attack,
+        miss_attack,
+        adl,
+        count,
+        troi,
+        encoder::le16(damage),
+        buff
+    )
+}
+
+/// Short `Skilling` (4 bytes) — row + col + miss + adl (`TheBattle.cs:9328-9331`).
+pub fn skilling_short(row: u8, col: u8, miss_attack: u8, adl: u8) -> String {
+    format!("{:02X}{:02X}{:02X}{:02X}", row, col, miss_attack, adl)
+}
+
+/// `SkillingHieuUng` (3 bytes) — troi + LE16(damage) + buff (`TheBattle.cs:9333-9336`).
+pub fn skilling_effect(troi: u8, damage: u16, buff: u8) -> String {
+    format!("{:02X}{}{:02X}", troi, encoder::le16(damage), buff)
+}
+
+/// Skill-20007 combo footer sent after a combo turn flush
+/// (`TheBattle.cs:3921`): `F444130032010F00` + row + col + LE16(20007) + `0101` + row + col + `01030119000000`.
+pub fn combo_footer_20007(row: u8, col: u8) -> String {
+    format!(
+        "F444130032010F00{:02X}{:02X}{}0101{:02X}{:02X}01030119000000",
+        row,
+        col,
+        encoder::le16(20007),
+        row,
+        col
+    )
+}
+
+/// Berserk / flee miss frame — `F44413003201` + a full Skilling payload.
+pub fn skilling_full_frame(payload: &str) -> String {
+    format!("F44413003201{payload}")
+}
+
 /// TroiBuffHpSp byte constants (DataStructure.cs:1481-1509).
 pub mod troi_byte {
     pub const MISS: u8 = 0x00;
@@ -288,5 +356,20 @@ mod tests {
     fn skilling_int_format() {
         let eff = skilling_int(0, 2, 1, 0, 1, troi_byte::HP, 50, 1);
         assert_eq!(eff.len(), 18); // 9 bytes = 18 hex chars (row col miss adl count troi LE16 buff)
+    }
+
+    #[test]
+    fn skilling_full_is_17_bytes() {
+        let eff = skilling_full(0, 2, 10000, 1, 1, 0, 2, 1, 0, 1, troi_byte::HP, 50, 1);
+        assert_eq!(eff.len(), 34); // 17 bytes
+        assert!(eff.starts_with("0F00"));
+    }
+
+    #[test]
+    fn combo_footer_20007_format() {
+        let f = combo_footer_20007(2, 3);
+        assert!(f.starts_with("F444130032010F00"));
+        assert!(f.contains("274E")); // LE16(20007) = 0x4E27 -> "274E"
+        assert!(f.ends_with("01030119000000"));
     }
 }

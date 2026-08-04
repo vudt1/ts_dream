@@ -145,19 +145,6 @@ impl BattleRng {
     }
 }
 
-/// `RandomizeArrayWithPercent(v1, v2, percent)` — §5.2 / §5.8.
-/// Uses the given RNG stream. Returns v1 if the roll passes, v2 otherwise.
-/// `percent` is clamped to [0, 100].
-pub fn randomize_with_percent(rng: &mut DotNetRandom, v1: i32, v2: i32, percent: i32) -> i32 {
-    let p = percent.clamp(0, 100);
-    let roll = rng.next_range(1, 1000);
-    if roll <= p * 10 {
-        v1
-    } else {
-        v2
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -186,22 +173,6 @@ mod tests {
         for _ in 0..1000 {
             let v = r.next_max(7);
             assert!(v >= 0 && v < 7, "value {} out of [0,7)", v);
-        }
-    }
-
-    #[test]
-    fn randomize_with_percent_always_passes_at_100() {
-        let mut r = DotNetRandom::new(789);
-        for _ in 0..100 {
-            assert_eq!(randomize_with_percent(&mut r, 1, 0, 100), 1);
-        }
-    }
-
-    #[test]
-    fn randomize_with_percent_never_passes_at_0() {
-        let mut r = DotNetRandom::new(321);
-        for _ in 0..100 {
-            assert_eq!(randomize_with_percent(&mut r, 1, 0, 0), 0);
         }
     }
 
