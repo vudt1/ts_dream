@@ -34,7 +34,7 @@ pub async fn handle_inventory(ctx: &mut OpcodeCtx<'_>) {
         // Sub 15: Use item
         15 => handle_use_item(conn, payload, out, pool, ctx.data).await,
         // Sub 46: Player reborn
-        46 => handle_reborn(conn, out),
+        46 => handle_reborn(conn, payload, out, pool).await,
         _ => {}
     }
 }
@@ -348,15 +348,87 @@ async fn handle_use_item(
     super::use_item::use_item(conn, payload, out, pool, data).await;
 }
 
-fn handle_reborn(conn: &mut Conn, out: &mut HandleOutcome) {
+pub fn is_reborn_special_skill(id: u16) -> bool {
+    matches!(id, 10016..=10019 | 11016..=11019 | 12016..=12019 | 13015..=13018)
+}
+
+async fn handle_reborn(
+    conn: &mut Conn,
+    payload: &[u8],
+    out: &mut HandleOutcome,
+    pool: Option<&sqlx::MySqlPool>,
+) {
     // Requires no equipment in trangbi slots 1..6
-    if !conn.session.trangbi.is_empty() {
+    if conn
+        .session
+        .trangbi
+        .iter()
+        .any(|i| (1..=6).contains(&i.slot) && i.id > 0)
+    {
+        let npc_id = encoder::le16(conn.session.idtalking as u16);
+        out.send(format!("F44411001401000000010103{}00000000002451", npc_id));
+        conn.session.select_menu = 40;
         return;
     }
-    conn.session.reborn += 1;
+
+    if !payload.is_empty() {
+        conn.session.hair = u16::from(payload[0]);
+    }
+    if payload.len() >= 9 {
+        conn.session.color = crate::server::handler::hex_of(&payload[1..9]);
+    }
+
+    let (point_base, skill_point_base, new_reborn, new_job) = if conn.session.reborn == 0 {
+        (0u32, 24u32, 1u8, conn.session.job)
+    } else {
+        let job = if conn.session.select_menu >= 30 {
+            (conn.session.select_menu - 30 + 1) as u8
+        } else {
+            conn.session.job.max(1)
+        };
+        (24u32, 118u32, 2u8, job)
+    };
+
+    let extra_levels = (u32::from(conn.session.level).saturating_sub(120)) / 5;
     conn.session.level = 1;
-    conn.session.skills.clear();
+    conn.session.reborn = new_reborn;
+    conn.session.job = new_job;
+    conn.session.point = (point_base + extra_levels) as u16;
+    conn.session.skill_point = (skill_point_base + extra_levels) as u16;
+    conn.session.hp_max = 181;
+    conn.session.hp = 181;
+    conn.session.sp_max = 181;
+    conn.session.sp = 181;
+    conn.session.int1 = 0;
+    conn.session.atk = 0;
+    conn.session.def = 0;
+    conn.session.hpx = 0;
+    conn.session.spx = 0;
+    conn.session.agi = 0;
+    conn.session.texp = 13;
+
+    // Retain only special reborn/passive skills
+    conn.session
+        .skills
+        .retain(|(id, _)| is_reborn_special_skill(*id));
+
     conn.session.recompute_stats();
+
+    persist::update_player(pool, conn.session.id, "Lv", 1).await;
+    persist::update_player(pool, conn.session.id, "Point", i64::from(conn.session.point)).await;
+    persist::update_player(pool, conn.session.id, "SkillPoint", i64::from(conn.session.skill_point)).await;
+    persist::update_player(pool, conn.session.id, "Hp", 181).await;
+    persist::update_player(pool, conn.session.id, "HpMax", 181).await;
+    persist::update_player(pool, conn.session.id, "Sp", 181).await;
+    persist::update_player(pool, conn.session.id, "SpMax", 181).await;
+    persist::update_player(pool, conn.session.id, "Int", 0).await;
+    persist::update_player(pool, conn.session.id, "Atk", 0).await;
+    persist::update_player(pool, conn.session.id, "Def", 0).await;
+    persist::update_player(pool, conn.session.id, "Hpx", 0).await;
+    persist::update_player(pool, conn.session.id, "Spx", 0).await;
+    persist::update_player(pool, conn.session.id, "Agi", 0).await;
+    persist::update_player(pool, conn.session.id, "Texp", 13).await;
+    persist::delete_reborn_skills(pool, conn.session.id).await;
 
     out.send("F44402002C01");
 }
@@ -542,4 +614,38 @@ mod tests {
         assert!(out.outgoing.iter().any(|f| f.contains("17090303")));
         crate::server::map_drops::clear_all();
     }
+
+    #[tokio::test]
+    async fn reborn_rejected_if_equipped() {
+        let mut conn = Conn::new();
+        conn.session.trangbi.push(InventoryItem {
+            slot: 1,
+            id: 12001,
+            count: 1,
+            lv: 1,
+            loai: 1,
+            ..Default::default()
+        });
+        let out = run(&mut conn, 46, &[]).await;
+        assert_eq!(conn.session.reborn, 0);
+        assert!(out.outgoing.iter().any(|f| f.contains("1401")));
+    }
+
+    #[tokio::test]
+    async fn reborn_resets_stats_retains_special_skills() {
+        let mut conn = Conn::new();
+        conn.session.level = 125;
+        conn.session.reborn = 0;
+        conn.session.skills = vec![(10001, 10), (10016, 10)]; // 10001 normal, 10016 special
+        let out = run(&mut conn, 46, &[10, 0, 0, 0, 0, 0, 0, 0, 0]).await;
+
+        assert_eq!(conn.session.reborn, 1);
+        assert_eq!(conn.session.level, 1);
+        assert_eq!(conn.session.point, 1); // 0 + (125-120)/5 = 1
+        assert_eq!(conn.session.skill_point, 25); // 24 + (125-120)/5 = 25
+        assert_eq!(conn.session.skills.len(), 1);
+        assert_eq!(conn.session.skills[0], (10016, 10)); // special skill retained
+        assert!(out.outgoing.contains(&"F44402002C01".to_string()));
+    }
 }
+

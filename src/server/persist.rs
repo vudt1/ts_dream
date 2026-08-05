@@ -157,3 +157,93 @@ pub async fn upsert_item(
         tracing::warn!("upsert_item({table}, slot {}) failed: {e}", item.slot);
     }
 }
+
+/// Upserts a player skill entry into MySQL `skill` table.
+pub async fn upsert_skill(
+    pool: Option<&MySqlPool>,
+    player_id: u32,
+    skill_id: u16,
+    lv: u8,
+    sp: u8,
+    save: u8,
+) {
+    let Some(pool) = pool else { return };
+    let q = "INSERT INTO skill (player_id, Id, Lv, Sp, Save) VALUES (?, ?, ?, ?, ?) \
+             ON DUPLICATE KEY UPDATE Lv = VALUES(Lv), Sp = VALUES(Sp), Save = VALUES(Save)";
+    if let Err(e) = sqlx::query(q)
+        .bind(i64::from(player_id))
+        .bind(i64::from(skill_id))
+        .bind(i64::from(lv))
+        .bind(i64::from(sp))
+        .bind(i64::from(save))
+        .execute(pool)
+        .await
+    {
+        tracing::warn!("upsert_skill(skill {skill_id}) failed: {e}");
+    }
+}
+
+/// Scope-deletes active player skills on rebirth while retaining special reborn/passive skills.
+pub async fn delete_reborn_skills(pool: Option<&MySqlPool>, player_id: u32) {
+    let Some(pool) = pool else { return };
+    let q = "DELETE FROM skill WHERE player_id = ? AND Id >= 10001 AND Id <= 13033 \
+             AND Id NOT IN (10016, 10017, 10018, 10019, 11016, 11017, 11018, 11019, 12016, 12017, 12018, 12019, 13015, 13016, 13017, 13018)";
+    if let Err(e) = sqlx::query(q)
+        .bind(i64::from(player_id))
+        .execute(pool)
+        .await
+    {
+        tracing::warn!("delete_reborn_skills(player {player_id}) failed: {e}");
+    }
+}
+
+/// Upserts a pet entry in MySQL `pet` table.
+pub async fn upsert_pet(pool: Option<&MySqlPool>, player_id: u32, pet: &crate::server::session::PetState) {
+    let Some(pool) = pool else { return };
+    let name_str = String::from_utf8_lossy(&pet.name);
+    let q = "INSERT INTO pet (player_id, Stt, Id, Name, Lv, Thuoctinh, Reborn, Hp, HpMax, Sp, SpMax, \
+             `Int`, Atk, Def, Hpx, Spx, Agi, Fai, Texp, Int2, Atk2, Def2, Hpx2, Spx2, Agi2, Thd, \
+             SkillPoint, Quest, Idskill1, LvSkill1, IdSkill2, LvSkill2, IdSkill3, LvSkill3, IdSkill4, LvSkill4) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?) \
+             ON DUPLICATE KEY UPDATE Id = VALUES(Id), Name = VALUES(Name), Lv = VALUES(Lv), \
+             Thuoctinh = VALUES(Thuoctinh), Reborn = VALUES(Reborn), Hp = VALUES(Hp), HpMax = VALUES(HpMax), \
+             Sp = VALUES(Sp), SpMax = VALUES(SpMax), `Int` = VALUES(`Int`), Atk = VALUES(Atk), Def = VALUES(Def), \
+             Hpx = VALUES(Hpx), Spx = VALUES(Spx), Agi = VALUES(Agi), Fai = VALUES(Fai), Texp = VALUES(Texp), \
+             SkillPoint = VALUES(SkillPoint), Idskill1 = VALUES(Idskill1), LvSkill1 = VALUES(LvSkill1), \
+             IdSkill2 = VALUES(IdSkill2), LvSkill2 = VALUES(LvSkill2), IdSkill3 = VALUES(IdSkill3), \
+             LvSkill3 = VALUES(LvSkill3), IdSkill4 = VALUES(IdSkill4), LvSkill4 = VALUES(LvSkill4)";
+    if let Err(e) = sqlx::query(q)
+        .bind(i64::from(player_id))
+        .bind(i64::from(pet.stt))
+        .bind(i64::from(pet.id))
+        .bind(name_str.as_ref())
+        .bind(i64::from(pet.level))
+        .bind(i64::from(pet.thuoctinh))
+        .bind(i64::from(pet.reborn))
+        .bind(i64::from(pet.hp))
+        .bind(i64::from(pet.hp_max))
+        .bind(i64::from(pet.sp))
+        .bind(i64::from(pet.sp_max))
+        .bind(i64::from(pet.int1))
+        .bind(i64::from(pet.atk))
+        .bind(i64::from(pet.def))
+        .bind(i64::from(pet.hpx))
+        .bind(i64::from(pet.spx))
+        .bind(i64::from(pet.agi))
+        .bind(i64::from(pet.fai))
+        .bind(i64::from(pet.texp))
+        .bind(i64::from(pet.skill_point))
+        .bind(i64::from(pet.skills[0].0))
+        .bind(i64::from(pet.skills[0].1))
+        .bind(i64::from(pet.skills[1].0))
+        .bind(i64::from(pet.skills[1].1))
+        .bind(i64::from(pet.skills[2].0))
+        .bind(i64::from(pet.skills[2].1))
+        .bind(i64::from(pet.skills[3].0))
+        .bind(i64::from(pet.skills[3].1))
+        .execute(pool)
+        .await
+    {
+        tracing::warn!("upsert_pet(stt {}) failed: {e}", pet.stt);
+    }
+}

@@ -159,7 +159,7 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         0x1B => shops::handle_npc_shop(ctx),
 
         // Op 0x1C — Learn / upgrade skills
-        0x1C => skills::handle_skills(ctx),
+        0x1C => skills::handle_skills(ctx).await,
 
         // Op 0x1D — Bank gold
         0x1D => trade_storage::handle_bank_gold(ctx),
@@ -186,7 +186,7 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         0x28 => stats::handle_hotkey(ctx).await,
 
         // Op 0x2C — Pet reborn
-        0x2C => skills::handle_pet_reborn(ctx),
+        0x2C => skills::handle_pet_reborn(ctx).await,
 
         // Op 0x32 — Battle commands (ticket 21)
         0x32 => battle::handle_battle_command(ctx),
@@ -238,7 +238,17 @@ mod tests {
     use super::*;
 
     fn dummy_data() -> GameData {
-        GameData::default()
+        let mut data = GameData::default();
+        data.skills.insert(
+            10001,
+            crate::data::tables::Skill {
+                id: 10001,
+                point: 1,
+                lv_max: 10,
+                ..Default::default()
+            },
+        );
+        data
     }
 
     fn dummy_service() -> BattleService {
