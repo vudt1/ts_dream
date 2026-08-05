@@ -60,19 +60,7 @@ impl Config {
     pub fn load() -> Result<Self> {
         let path = PathBuf::from("ts_dream.toml");
         let mut cfg = if path.exists() {
-            let raw = std::fs::read_to_string(&path)
-                .map_err(|e| TsError::Config(format!("read {}: {}", path.display(), e)))?;
-            // Reject the removed SQLite keys if present.
-            for key in ["account_db_path", "template_db_path", "member_dir"] {
-                if raw.contains(key) {
-                    return Err(TsError::Config(format!(
-                        "{} present in ts_dream.toml — SQLite era key is removed; use `database_url`",
-                        key
-                    )));
-                }
-            }
-            toml::from_str(&raw)
-                .map_err(|e| TsError::Config(format!("parse {}: {}", path.display(), e)))?
+            from_file(&path)?
         } else {
             Config::default()
         };
@@ -97,6 +85,24 @@ impl Config {
     }
 }
 
+/// Read + validate + parse a TOML file (no env overrides). Rejects the removed
+/// SQLite-era keys. Extracted from [`Config::load`] so rejection is testable
+/// against a single file without touching `TS_*` env vars.
+fn from_file(path: &std::path::Path) -> Result<Config> {
+    let raw = std::fs::read_to_string(path)
+        .map_err(|e| TsError::Config(format!("read {}: {}", path.display(), e)))?;
+    // Reject the removed SQLite keys if present.
+    for key in ["account_db_path", "template_db_path", "member_dir"] {
+        if raw.contains(key) {
+            return Err(TsError::Config(format!(
+                "{} present in ts_dream.toml — SQLite era key is removed; use `database_url`",
+                key
+            )));
+        }
+    }
+    toml::from_str(&raw).map_err(|e| TsError::Config(format!("parse {}: {}", path.display(), e)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -114,5 +120,29 @@ mod tests {
     fn parse_u16_rejects_bad() {
         assert_eq!(parse_u16("6414").unwrap(), 6414);
         assert!(parse_u16("abc").is_err());
+    }
+
+    #[test]
+    fn from_file_rejects_sqlite_era_keys() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("ts_dream.toml");
+        for key in ["account_db_path", "template_db_path", "member_dir"] {
+            std::fs::write(&path, format!("{key} = \"/old/path\"\n")).unwrap();
+            let err = from_file(&path).unwrap_err();
+            assert!(
+                err.to_string().contains("removed"),
+                "rejection message must flag the removed key; got: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn from_file_parses_valid_toml() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("ts_dream.toml");
+        std::fs::write(&path, "game_port = 7000\nweb_port = 8100\n").unwrap();
+        let cfg = from_file(&path).unwrap();
+        assert_eq!(cfg.game_port, 7000);
+        assert_eq!(cfg.web_port, 8100);
     }
 }

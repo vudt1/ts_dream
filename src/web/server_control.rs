@@ -65,10 +65,20 @@ impl ServerControl {
     }
 
     /// Start the game server listener on `game_port`.
+    ///
+    /// Gated on `AppState.data_loaded`: clients must never be accepted with
+    /// empty/partial static data, so `start` refuses (and pushes a log) until
+    /// the data load has fully finished.
     pub async fn start(&self) -> Result<bool, String> {
         let mut app = self.app.write().await;
         if app.running {
             return Ok(true);
+        }
+        if !app.data_loaded {
+            let err_msg = "Game server cannot start: static data not loaded (DataLoaded=false)"
+                .to_string();
+            app.push_log("error", err_msg.clone());
+            return Err(err_msg);
         }
 
         let (shutdown_sender, _) = broadcast::channel::<()>(1);
@@ -343,6 +353,32 @@ mod tests {
     fn control() -> ServerControl {
         let app = Arc::new(RwLock::new(AppState::new(100)));
         ServerControl::new(6414, app, None, None)
+    }
+
+    #[tokio::test]
+    async fn start_refuses_when_data_not_loaded() {
+        let c = control(); // AppState::new() leaves data_loaded = false
+        let r = c.start().await;
+        assert!(r.is_err(), "must refuse to start when static data not loaded");
+        assert!(!c.app.read().await.running, "must not flip running on a refused start");
+    }
+
+    #[tokio::test]
+    async fn start_accepts_when_data_loaded() {
+        let app = Arc::new(RwLock::new(AppState::new(100)));
+        app.write().await.data_loaded = true;
+        // Port 0 binds an ephemeral port, avoiding collisions with other tests.
+        let c = ServerControl::new(0, app.clone(), None, None);
+
+        let r = c.start().await;
+        assert!(r.unwrap_or(false), "must start once static data is loaded");
+        assert!(c.app.read().await.running, "running flag flips once started");
+
+        // Stop the accept loop cleanly (no 5s countdown in tests).
+        if let Some(tx) = c.shutdown_tx.lock().await.take() {
+            let _ = tx.send(());
+        }
+        c.app.write().await.running = false;
     }
 
     #[tokio::test]

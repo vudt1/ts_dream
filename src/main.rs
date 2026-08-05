@@ -71,12 +71,18 @@ async fn main() -> anyhow::Result<()> {
     let web_router = ts_dream::web::app::router(web_state);
     let web_addr = std::net::SocketAddr::from(([0, 0, 0, 0], cfg.web_port));
     tokio::spawn(async move {
-        let listener = tokio::net::TcpListener::bind(web_addr).await;
-        if let Ok(listener) = listener {
-            let _ = axum::serve(listener, web_router).await;
+        match tokio::net::TcpListener::bind(web_addr).await {
+            Ok(listener) => {
+                tracing::info!("web dashboard running on {web_addr}");
+                if let Err(e) = axum::serve(listener, web_router).await {
+                    tracing::error!("web dashboard serve error on {web_addr}: {e}");
+                }
+            }
+            Err(e) => {
+                tracing::error!("web dashboard failed to bind {web_addr}: {e}");
+            }
         }
     });
-    tracing::info!("web dashboard running on http://0.0.0.0:{}", cfg.web_port);
 
     // 7. Start initial Game TCP Server listener
     if let Err(e) = server_control.start().await {

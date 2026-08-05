@@ -6,6 +6,7 @@
 //! (golden replay) the handlers run in-memory over the seeded session.
 
 use crate::protocol::encoder;
+use crate::protocol::{ID_PREFIX, MIN_VERSION};
 use crate::server::handler::{HandleOutcome, OpcodeCtx};
 use crate::server::session::{Conn, InventoryItem, PetState, Session};
 use crate::server::spawn;
@@ -31,11 +32,11 @@ pub async fn handle_login(ctx: &mut OpcodeCtx<'_>) {
     }
     let acc_id = encoder::u32_le(payload[0], payload[1], payload[2], payload[3]);
     let prefix = &payload[4..6];
-    if prefix != b"vn" && prefix != b"VN" {
+    if !prefix.eq_ignore_ascii_case(ID_PREFIX.as_bytes()) {
         return; // Prefix mismatch -> silent return
     }
     let version = encoder::u16_le(payload[6], payload[7]);
-    if version < 186 {
+    if version < MIN_VERSION {
         out.shutdown = true; // Version gate < 186 -> disconnect
         return;
     }

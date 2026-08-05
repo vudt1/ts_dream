@@ -11,8 +11,11 @@ use ts_dream::state::AppState;
 use ts_dream::web::app::{router, WebState};
 use ts_dream::web::server_control::ServerControl;
 
-fn mock_web_state() -> WebState {
+async fn mock_web_state() -> WebState {
     let app_state = Arc::new(RwLock::new(AppState::new(0)));
+    // Mirror production boot (main.rs): data is loaded before the game server
+    // can start, so the start gate (`DataLoaded`) is satisfied.
+    app_state.write().await.data_loaded = true;
     let data = Arc::new(GameData::default());
     let server_control = Arc::new(ServerControl::new(6414, app_state.clone(), Some(data.clone()), None));
 
@@ -26,7 +29,7 @@ fn mock_web_state() -> WebState {
 
 #[tokio::test]
 async fn test_index_page_and_static_htmx() {
-    let app = router(mock_web_state());
+    let app = router(mock_web_state().await);
 
     // 1. GET /
     let response = app
@@ -61,7 +64,7 @@ async fn test_index_page_and_static_htmx() {
 
 #[tokio::test]
 async fn test_server_status_and_lifecycle() {
-    let state = mock_web_state();
+    let state = mock_web_state().await;
     let app = router(state.clone());
 
     // Initial status -> false
@@ -154,7 +157,7 @@ async fn test_server_status_and_lifecycle() {
 
 #[tokio::test]
 async fn test_perexp_configuration() {
-    let state = mock_web_state();
+    let state = mock_web_state().await;
     let app = router(state.clone());
 
     // GET /api/config/perexp -> initial 0
@@ -193,7 +196,7 @@ async fn test_perexp_configuration() {
 
 #[tokio::test]
 async fn test_npcs_and_online_endpoints() {
-    let state = mock_web_state();
+    let state = mock_web_state().await;
     state.app.write().await.online.push(ts_dream::state::OnlineEntry {
         id: 300001,
         name: "TestPlayer".to_string(),

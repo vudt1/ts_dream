@@ -52,14 +52,6 @@ impl Packet {
     }
 }
 
-/// Convenience: `F444` + len + raw hex (a complete packet pre-framed).
-pub fn frame(body_hex: &str) -> String {
-    let mut o = String::from("F444");
-    o.push_str(&encoder::le16((body_hex.len() / 2) as u16));
-    o.push_str(body_hex);
-    o
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
