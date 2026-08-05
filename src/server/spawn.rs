@@ -193,13 +193,11 @@ pub fn chat_frame(sub: u8, id: u32, chat_raw: &[u8]) -> String {
 
 /// Shared banner builder for server-authored text (op 0x02 sub 0x0B/0x0C).
 ///
-/// Routes the message through `to_viscii` so the wire always carries
-/// single-byte VISCII/Latin-1 rather than raw multi-byte UTF-8 (§4.2). ASCII
-/// text is identity; a proper-Unicode codepoint >0xFF not in the reverse map
-/// (e.g. Đ) collapses to `'?'` 0x3F — full Unicode→VISCII (smethod_17, §4.4
-/// item 3) is ticket 03, so the current contract is "never leak UTF-8".
+/// Routes the message through `smethod_17` (§4.4 item 3) so proper-Unicode
+/// Vietnamese becomes single-byte VISCII on the wire (Đ→0xD0, not `'?'`), the
+/// same path the C# server uses for banners and `/where` (Class5.smethod_17).
 fn text_banner(op: &str, msg: &str) -> String {
-    let visc = crate::encoding::to_viscii(msg);
+    let visc = crate::encoding::smethod_17(msg);
     let mut body = String::from("00000000");
     body.push_str(&encoder::strhex(&visc));
     crate::protocol::frame(op, &body)
@@ -217,7 +215,7 @@ pub fn announce_frame(msg: &str) -> String {
 
 /// Build server name packet (op 0x27 sub 0x09).
 pub fn server_name_frame(id: u32, server_name: &str) -> String {
-    let visc = crate::encoding::to_viscii(server_name);
+    let visc = crate::encoding::smethod_17(server_name);
     let name_len = visc.len() as u8;
     let mut body = String::new();
     body.push_str(&encoder::le32(id));
@@ -381,10 +379,10 @@ mod tests {
         let f = sys_msg_frame("café");
         assert!(f.ends_with("636166E9"), "got {f}"); // 63 61 66 E9
         assert!(!f.contains("C3A9"), "got {f}");
-        // Unmapped proper-Unicode (Đ U+0110 > 0xFF) currently collapses to
-        // '?' (0x3F): full Unicode→VISCII (smethod_17, ticket 03) is pending.
-        // The wire must still never carry raw UTF-8 bytes.
+        // Proper-Unicode Đ (U+0110) maps through smethod_17 to VISCII 0xD0;
+        // ậ (U+1EAD) is 0xA7 in the positional table.
         let cfg = sys_msg_frame("Đậu2");
+        assert!(cfg.ends_with("D0A77532"), "got {cfg}"); // Đ ậ u 2
         assert!(!cfg.contains("C490"), "got {cfg}");
     }
 

@@ -12,10 +12,11 @@ fn gold_frame(gold: u32) -> String {
 }
 
 /// VISCII-encoded red message frame (`F444 + len + 020B + 00000000 + msg`),
-/// mirroring C# `SendRedMessage` (Client.cs:9854). Text is stored in UTF-8
-/// and converted to VISCII 1.1 bytes for the wire, bug-compatible with §4.6.
+/// mirroring C# `SendRedMessage` (Client.cs:9854). Proper-Unicode Vietnamese
+/// text is mapped through `smethod_17` (§4.4 item 3) so ư/ờ/đ survive as
+/// single-byte VISCII instead of collapsing to `'?'`.
 fn red_message(msg: &str) -> String {
-    let visc = crate::encoding::to_viscii(msg);
+    let visc = crate::encoding::smethod_17(msg);
     let body = format!("00000000{}", encoder::strhex(&visc));
     crate::protocol::frame("020B", &body)
 }

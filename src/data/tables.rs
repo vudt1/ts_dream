@@ -21,6 +21,16 @@ pub struct Npc {
     pub item: [i64; 6],
     pub bat: i64,
     pub reborn: i64,
+    /// Bug-for-bug garble override (Chapter 4 §4.3/§4.6) — 23 NPC names.
+    pub garble: Option<crate::encoding::GarbleSpec>,
+}
+
+impl Npc {
+    /// Wire-name hex: `None` aborts the packet (3-digit garble); `Some` is the
+    /// exact hex the C# emits (garble override, else clean VISCII bytes).
+    pub fn wire_name_hex(&self) -> Option<String> {
+        crate::encoding::name_wire_hex(&self.name, &self.garble)
+    }
 }
 
 /// An item record (`Data_Items`), from Items.txt.
@@ -51,6 +61,16 @@ pub struct Item {
     pub rb_pet_from: i64,
     pub rb_pet_to: i64,
     pub add_pet: i64,
+    /// Bug-for-bug garble override (Chapter 4 §4.3/§4.6) — 99 item names.
+    pub garble: Option<crate::encoding::GarbleSpec>,
+}
+
+impl Item {
+    /// Wire-name hex: `None` aborts the packet (3-digit garble, e.g. item 48101);
+    /// `Some` is the exact hex the C# emits (garble override, else clean bytes).
+    pub fn wire_name_hex(&self) -> Option<String> {
+        crate::encoding::name_wire_hex(&self.name, &self.garble)
+    }
 }
 
 /// A skill record (`Data_Skills`), from Skills.txt (UTF-8, GUI-only names).
@@ -120,6 +140,18 @@ pub struct QuestDef {
     pub on_lose: QuestResult,
     /// `[REQUIRES] SelectMenu` — the menu choice that must be set (0 if absent).
     pub require_select_menu: i64,
+    /// `[REQUIRES] Level` — `(value, opIndex)`; op 0 `=` 1 `>=` 2 `>` 3 `<=` 4 `<` 5 `!=`.
+    pub require_level: (i64, i64),
+    /// `[REQUIRES] Reborn` — `(value, opIndex)`.
+    pub require_reborn: (i64, i64),
+    /// `[REQUIRES] Thuoctinh` — element 1..4 (0 if absent).
+    pub require_thuoctinh: i64,
+    /// `[REQUIRES] Quests` — `(mapId, npcId, warpId, step)` tuples.
+    pub require_quests: Vec<(i64, i64, i64, i64)>,
+    /// `[REQUIRES] Wears` — `(itemId, playerOrPet)` tuples.
+    pub require_wears: Vec<(i64, i64)>,
+    /// `[DESCRIPTION] Title` — server-GUI requirement message only.
+    pub desc_title: String,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -178,6 +210,34 @@ pub struct ItemOnMap {
     pub x: i64,
     pub y: i64,
     pub delay: i64,
+}
+
+/// A spawned static drop (`Data.ItemDropOnMap`), created by `CreatMapItem`.
+///
+/// Pre-filled as empty slots 1..255 per map; each ItemOnMap.txt row spawns one
+/// with a full copy of the item's stats (C# `SystemDropItem`) and `_Delay =
+/// 999999` (never auto-removed). Keyed `(map_id, slot)`.
+#[derive(Debug, Clone, Default)]
+pub struct ItemDropOnMap {
+    pub map_id: i64,
+    pub slot: i64,
+    pub item_id: i64,
+    pub map_x: i64,
+    pub map_y: i64,
+    pub delay: i64,
+    /// The spawned item carries a copy of `Data_Items` stats (C# `_ItemDropOnMap`).
+    pub lv: i64,
+    pub int1: i64,
+    pub atk1: i64,
+    pub def1: i64,
+    pub hpx1: i64,
+    pub spx1: i64,
+    pub agi1: i64,
+    pub fai1: i64,
+    pub hp: i64,
+    pub sp: i64,
+    pub thuoctinh: i64,
+    pub loai: i64,
 }
 
 pub fn name_to_string(name: &[u8]) -> String {

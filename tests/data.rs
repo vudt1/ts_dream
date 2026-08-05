@@ -131,3 +131,116 @@ fn quests_parse_random_rewards_triples() {
         assert!(!q.on_win.random_rewards.is_empty());
     }
 }
+
+#[test]
+fn npcs_parse_drop_bat_reborn_columns() {
+    // Regression: Drop1-6 were never parsed and _Bat/_Reborn read Drop1/Drop2
+    // (issue 03#1). NPC 10005: skill 10001/10003/10006/0, drops
+    // 26156/26158/27038/0/49001/0, NotPet=0, Reborn=0.
+    let dir = data_dir();
+    if !dir.join("Npcs.txt").exists() {
+        eprintln!("data dir not present — skipping");
+        return;
+    }
+    let d = GameData::load(&dir).expect("load real data");
+    let npc = d.npcs.get(&10005).expect("npc 10005");
+    assert_eq!(npc.skill, [10001, 10003, 10006, 0]);
+    assert_eq!(npc.item, [26156, 26158, 27038, 0, 49001, 0]);
+    assert_eq!(npc.bat, 0);
+    assert_eq!(npc.reborn, 0);
+}
+
+#[test]
+fn items_garble_replicated() {
+    let dir = data_dir();
+    if !dir.join("Items.txt").exists() {
+        eprintln!("data dir not present — skipping");
+        return;
+    }
+    let d = GameData::load(&dir).expect("load real data");
+    // §4.6 item 18973 "Thái „t binh pháp" — 2 garbage bytes on the wire.
+    let item = d.items.get(&18973).expect("item 18973");
+    assert_eq!(
+        item.wire_name_hex().as_deref(),
+        Some("5468E16920201E742062696E68207068E170")
+    );
+    // §4.6 item 48101 "BB Thái Văn C½ 3" — ă U+0103 aborts the packet.
+    let aborted = d.items.get(&48101).expect("item 48101");
+    assert!(aborted.garble.as_ref().map(|g| g.abort).unwrap_or(false));
+    assert_eq!(aborted.wire_name_hex(), None);
+    // Clean name (item 10000) still has no override.
+    let clean = d.items.get(&10000).expect("item 10000");
+    assert_eq!(clean.garble, None);
+}
+
+#[test]
+fn item_drops_prefill_and_spawn() {
+    let dir = data_dir();
+    if !dir.join("ItemOnMap.txt").exists() {
+        eprintln!("data dir not present — skipping");
+        return;
+    }
+    let d = GameData::load(&dir).expect("load real data");
+    // Map 10965 slot 1 -> item 31099 at (2228, 126), spawned with _Delay=999999.
+    let spawned = d.item_drop_on_map.get(&(10965, 1)).expect("spawned drop");
+    assert_eq!(spawned.item_id, 31099);
+    assert_eq!(spawned.map_x, 2228);
+    assert_eq!(spawned.map_y, 126);
+    assert_eq!(spawned.delay, 999_999);
+    // Pre-filled empty slots 1..255 for every ItemOnMap map.
+    assert_eq!(d.item_drop_on_map.get(&(10965, 255)).expect("slot 255").item_id, 0);
+    // The static drop frame is the C# `F44408001703` + le16 id + x + y.
+    assert_eq!(
+        GameData::static_drop_frame(31099, 2228, 126),
+        "F444080017037B79B4087E00"
+    );
+}
+
+#[test]
+fn quests_parse_requires_conditions() {
+    let dir = data_dir();
+    if !dir.join("Quests").is_dir() {
+        eprintln!("Quests dir not present — skipping");
+        return;
+    }
+    let d = GameData::load(&dir).expect("load real data");
+    // "12021 triệu quảng 7 step 0.ini": Level=20 >=, Reborn=1 >=, SelectMenu=30,
+    // TEAMDEF Diahinh=5479 + 10 npcs.
+    let q = d.talks.get("12041:NPC:7:0").expect("12041 NPC 7 step 0");
+    assert_eq!(q.require_level, (20, 1));
+    assert_eq!(q.require_reborn, (1, 1));
+    assert_eq!(q.require_select_menu, 30);
+    assert_eq!(
+        q.teamdef,
+        vec![5479, 42213, 27149, 42215, 27149, 42214, 27149, 27149, 27149, 27149, 27149]
+    );
+}
+
+#[test]
+fn quests_on_lose_warpto_reads_onwin() {
+    let dir = data_dir();
+    if !dir.join("Quests").is_dir() {
+        eprintln!("Quests dir not present — skipping");
+        return;
+    }
+    let d = GameData::load(&dir).expect("load real data");
+    // "11021-Van Du dao Si.ini": [OnWin] WarpTo=11901\t210\t1230 — the C#
+    // copy-paste bug (Data.cs:4649) means _LoseWarpTo == _WinWarpTo.
+    let q = d.talks.get("11021:NPC:9:0").expect("11021 NPC 9 step 0");
+    assert_eq!(q.on_win.warp_to, vec![11901, 210, 1230]);
+    assert_eq!(q.on_lose.warp_to, q.on_win.warp_to);
+}
+
+#[test]
+fn quests_add_skill_is_single_pair() {
+    let dir = data_dir();
+    if !dir.join("Quests").is_dir() {
+        eprintln!("Quests dir not present — skipping");
+        return;
+    }
+    let d = GameData::load(&dir).expect("load real data");
+    // C# `_WinAddSkill = int[] {skillId, level}` — "14001\t1" is ONE pair, not
+    // two (regression: the loader used to split into (14001,1) and (1,1)).
+    let q = d.talks.get("12136:NPC:1:3").expect("12136 NPC 1 step 3");
+    assert_eq!(q.on_win.add_skill, vec![(14001, 1)]);
+}

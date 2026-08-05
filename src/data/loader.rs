@@ -23,6 +23,10 @@ pub struct GameData {
     pub texps: Vec<TexpRow>,
     pub npc_on_map: Vec<NpcOnMap>,
     pub item_on_map: Vec<ItemOnMap>,
+    /// Spawned static drops (C# `Data.ItemDropOnMap`), keyed by
+    /// `(map_id, slot)`. Pre-filled empty slots 1..255 per map, then each
+    /// ItemOnMap.txt row spawns a `_Delay=999999` static drop.
+    pub item_drop_on_map: HashMap<(i64, i64), ItemDropOnMap>,
     pub loaded: bool,
 }
 
@@ -42,11 +46,14 @@ fn num(field: &str, file: &str) -> Result<i64> {
         .map_err(|_| TsError::Data(format!("non-numeric field `{field}` in {file}")))
 }
 
-fn num_or_default(idx: usize, f: &[&str], dflt: i64, file: &str) -> Result<i64> {
-    match f.get(idx) {
-        Some(s) if !s.trim().is_empty() => num(s, file),
-        _ => Ok(dflt),
-    }
+/// Strict column read (spec §3.1 "no defaults"): a missing or empty numeric
+/// column is a load failure, exactly like the C# `Conversions.ToInteger`
+/// throwing `IndexOutOfRangeException`/`FormatException`.
+fn num_at(idx: usize, f: &[&str], file: &str) -> Result<i64> {
+    let field = f
+        .get(idx)
+        .ok_or_else(|| TsError::Data(format!("missing column {idx} in {file}")))?;
+    num(field, file)
 }
 
 impl GameData {
@@ -78,6 +85,8 @@ impl GameData {
     }
 
     /// Npcs.txt — UTF-16LE+BOM, LF. Mojibake decoded back to VISCII names.
+    /// Column map (Data.cs:4060-4083): 0-11 id..agi, 12-15 Skill1-4, 16-21
+    /// Drop1-6, 22 NotPet(_Bat), 23 Reborn.
     fn load_npcs(&mut self, path: &Path) -> Result<()> {
         let bytes = std::fs::read(path)
             .map_err(|e| TsError::Data(format!("read {}: {}", path.display(), e)))?;
@@ -97,31 +106,37 @@ impl GameData {
                 continue;
             }
             let f: Vec<&str> = line.split('\t').collect();
-            if f.len() < 14 {
-                continue;
-            }
+            let name = f.get(1).copied().unwrap_or("");
             let npc = Npc {
-                id: num(f[0], "Npcs.txt")?,
-                name: encoding::to_viscii(f[1]),
-                lv: num(f[2], "Npcs.txt")?,
-                thuoctinh: num(f[3], "Npcs.txt")?,
-                hp: num(f[4], "Npcs.txt")?,
-                sp: num(f[5], "Npcs.txt")?,
-                hpx: num(f[6], "Npcs.txt")?,
-                spx: num(f[7], "Npcs.txt")?,
-                int1: num(f[8], "Npcs.txt")?,
-                atk: num(f[9], "Npcs.txt")?,
-                def: num(f[10], "Npcs.txt")?,
-                agi: num(f[11], "Npcs.txt")?,
+                id: num_at(0, &f, "Npcs.txt")?,
+                name: encoding::to_viscii(name),
+                lv: num_at(2, &f, "Npcs.txt")?,
+                thuoctinh: num_at(3, &f, "Npcs.txt")?,
+                hp: num_at(4, &f, "Npcs.txt")?,
+                sp: num_at(5, &f, "Npcs.txt")?,
+                hpx: num_at(6, &f, "Npcs.txt")?,
+                spx: num_at(7, &f, "Npcs.txt")?,
+                int1: num_at(8, &f, "Npcs.txt")?,
+                atk: num_at(9, &f, "Npcs.txt")?,
+                def: num_at(10, &f, "Npcs.txt")?,
+                agi: num_at(11, &f, "Npcs.txt")?,
                 skill: [
-                    num(f[12], "Npcs.txt")?,
-                    num_or_default(13, &f, 0, "Npcs.txt")?,
-                    num_or_default(14, &f, 0, "Npcs.txt")?,
-                    num_or_default(15, &f, 0, "Npcs.txt")?,
+                    num_at(12, &f, "Npcs.txt")?,
+                    num_at(13, &f, "Npcs.txt")?,
+                    num_at(14, &f, "Npcs.txt")?,
+                    num_at(15, &f, "Npcs.txt")?,
                 ],
-                item: [0; 6],
-                bat: num_or_default(16, &f, 0, "Npcs.txt")?,
-                reborn: num_or_default(17, &f, 0, "Npcs.txt")?,
+                item: [
+                    num_at(16, &f, "Npcs.txt")?,
+                    num_at(17, &f, "Npcs.txt")?,
+                    num_at(18, &f, "Npcs.txt")?,
+                    num_at(19, &f, "Npcs.txt")?,
+                    num_at(20, &f, "Npcs.txt")?,
+                    num_at(21, &f, "Npcs.txt")?,
+                ],
+                bat: num_at(22, &f, "Npcs.txt")?,
+                reborn: num_at(23, &f, "Npcs.txt")?,
+                garble: encoding::compute_garble(name),
             };
             self.npcs.insert(npc.id, npc);
         }
@@ -138,35 +153,34 @@ impl GameData {
                 continue;
             }
             let f: Vec<&str> = line.split('\t').collect();
-            if f.len() < 19 {
-                continue;
-            }
+            let name = f.get(1).copied().unwrap_or("");
             let item = Item {
-                id: num(f[0], "Items.txt")?,
-                name: encoding::to_viscii(f[1]),
-                level: num(f[2], "Items.txt")?,
-                hp: num(f[3], "Items.txt")?,
-                sp: num(f[4], "Items.txt")?,
-                int1: num(f[5], "Items.txt")?,
-                atk1: num(f[6], "Items.txt")?,
-                def1: num(f[7], "Items.txt")?,
-                hpx1: num(f[8], "Items.txt")?,
-                spx1: num(f[9], "Items.txt")?,
-                agi1: num(f[10], "Items.txt")?,
-                fai1: num(f[11], "Items.txt")?,
-                int2: num(f[12], "Items.txt")?,
-                atk2: num(f[13], "Items.txt")?,
-                def2: num(f[14], "Items.txt")?,
-                hpx2: num(f[15], "Items.txt")?,
-                spx2: num(f[16], "Items.txt")?,
-                agi2: num(f[17], "Items.txt")?,
-                fai2: num(f[18], "Items.txt")?,
-                thuoctinh: num_or_default(19, &f, 0, "Items.txt")?,
-                value: num_or_default(20, &f, 0, "Items.txt")?,
-                loai: num_or_default(21, &f, 0, "Items.txt")?,
-                rb_pet_from: num_or_default(22, &f, 0, "Items.txt")?,
-                rb_pet_to: num_or_default(23, &f, 0, "Items.txt")?,
-                add_pet: num_or_default(24, &f, 0, "Items.txt")?,
+                id: num_at(0, &f, "Items.txt")?,
+                name: encoding::to_viscii(name),
+                level: num_at(2, &f, "Items.txt")?,
+                hp: num_at(3, &f, "Items.txt")?,
+                sp: num_at(4, &f, "Items.txt")?,
+                int1: num_at(5, &f, "Items.txt")?,
+                atk1: num_at(6, &f, "Items.txt")?,
+                def1: num_at(7, &f, "Items.txt")?,
+                hpx1: num_at(8, &f, "Items.txt")?,
+                spx1: num_at(9, &f, "Items.txt")?,
+                agi1: num_at(10, &f, "Items.txt")?,
+                fai1: num_at(11, &f, "Items.txt")?,
+                int2: num_at(12, &f, "Items.txt")?,
+                atk2: num_at(13, &f, "Items.txt")?,
+                def2: num_at(14, &f, "Items.txt")?,
+                hpx2: num_at(15, &f, "Items.txt")?,
+                spx2: num_at(16, &f, "Items.txt")?,
+                agi2: num_at(17, &f, "Items.txt")?,
+                fai2: num_at(18, &f, "Items.txt")?,
+                thuoctinh: num_at(19, &f, "Items.txt")?,
+                value: num_at(20, &f, "Items.txt")?,
+                loai: num_at(21, &f, "Items.txt")?,
+                rb_pet_from: num_at(22, &f, "Items.txt")?,
+                rb_pet_to: num_at(23, &f, "Items.txt")?,
+                add_pet: num_at(24, &f, "Items.txt")?,
+                garble: encoding::compute_garble(name),
             };
             self.items.insert(item.id, item);
         }
@@ -183,38 +197,36 @@ impl GameData {
                 continue;
             }
             let f: Vec<&str> = line.split('\t').collect();
-            if f.len() < 5 {
-                continue;
-            }
             let skill = Skill {
-                id: num(f[0], "Skills.txt")?,
-                name: f[1].to_string(),
-                sp: num(f[2], "Skills.txt")?,
-                point: num(f[3], "Skills.txt")?,
-                thuoctinh: num(f[4], "Skills.txt")?,
+                id: num_at(0, &f, "Skills.txt")?,
+                name: f.get(1).copied().unwrap_or("").to_string(),
+                sp: num_at(2, &f, "Skills.txt")?,
+                point: num_at(3, &f, "Skills.txt")?,
+                thuoctinh: num_at(4, &f, "Skills.txt")?,
                 id_dk: [
-                    num_or_default(5, &f, 0, "Skills.txt")?,
-                    num_or_default(6, &f, 0, "Skills.txt")?,
-                    num_or_default(7, &f, 0, "Skills.txt")?,
-                    num_or_default(8, &f, 0, "Skills.txt")?,
-                    num_or_default(9, &f, 0, "Skills.txt")?,
-                    num_or_default(10, &f, 0, "Skills.txt")?,
+                    num_at(5, &f, "Skills.txt")?,
+                    num_at(6, &f, "Skills.txt")?,
+                    num_at(7, &f, "Skills.txt")?,
+                    num_at(8, &f, "Skills.txt")?,
+                    num_at(9, &f, "Skills.txt")?,
+                    num_at(10, &f, "Skills.txt")?,
                 ],
-                lv_max: num_or_default(11, &f, 0, "Skills.txt")?,
-                skill_type: num_or_default(12, &f, 0, "Skills.txt")?,
-                do_manh: num_or_default(13, &f, 0, "Skills.txt")?,
-                sl_danh: num_or_default(14, &f, 0, "Skills.txt")?,
-                reborn: num_or_default(15, &f, 0, "Skills.txt")?,
-                combo: num_or_default(16, &f, 0, "Skills.txt")?,
-                delay: num_or_default(17, &f, 0, "Skills.txt")?,
-                troi_buff: num_or_default(18, &f, 0, "Skills.txt")?,
+                lv_max: num_at(11, &f, "Skills.txt")?,
+                skill_type: num_at(12, &f, "Skills.txt")?,
+                do_manh: num_at(13, &f, "Skills.txt")?,
+                sl_danh: num_at(14, &f, "Skills.txt")?,
+                reborn: num_at(15, &f, "Skills.txt")?,
+                combo: num_at(16, &f, "Skills.txt")?,
+                delay: num_at(17, &f, "Skills.txt")?,
+                troi_buff: num_at(18, &f, "Skills.txt")?,
             };
             self.skills.insert(skill.id, skill);
         }
         Ok(())
     }
 
-    /// Warps.txt — ASCII, terminator `text.Length < 5`.
+    /// Warps.txt — ASCII, terminator `text.Length < 5`, skip empty destination
+    /// column (`array2[2].Length <= 0`, Data.cs:4514).
     fn load_warps(&mut self, path: &Path) -> Result<()> {
         let text = std::fs::read_to_string(path)
             .map_err(|e| TsError::Data(format!("read {}: {}", path.display(), e)))?;
@@ -227,15 +239,15 @@ impl GameData {
                 break;
             }
             let f: Vec<&str> = line.split('\t').collect();
-            if f.len() < 5 {
-                continue;
+            if f.get(2).map(|v| v.is_empty()).unwrap_or(true) {
+                continue; // destination map column empty -> silently dropped
             }
             let warp = Warp {
-                map1: num(f[0], "Warps.txt")?,
-                warpid: num(f[1], "Warps.txt")?,
-                map2: num(f[2], "Warps.txt")?,
-                x: num(f[3], "Warps.txt")?,
-                y: num(f[4], "Warps.txt")?,
+                map1: num_at(0, &f, "Warps.txt")?,
+                warpid: num_at(1, &f, "Warps.txt")?,
+                map2: num_at(2, &f, "Warps.txt")?,
+                x: num_at(3, &f, "Warps.txt")?,
+                y: num_at(4, &f, "Warps.txt")?,
             };
             self.warps.insert((warp.map1, warp.warpid), warp);
         }
@@ -255,17 +267,14 @@ impl GameData {
                 break;
             }
             let f: Vec<&str> = line.split('\t').collect();
-            if f.len() < 3 {
-                continue;
-            }
             let mut defenders = [0i64; 10];
             for i in 0..10 {
-                defenders[i] = num_or_default(3 + i, &f, 0, "BattleGate.txt")?;
+                defenders[i] = num_at(3 + i, &f, "BattleGate.txt")?;
             }
             let gate = BattleGate {
-                mapid1: num(f[0], "BattleGate.txt")?,
-                warpid: num(f[1], "BattleGate.txt")?,
-                diahinh: num(f[2], "BattleGate.txt")?,
+                mapid1: num_at(0, &f, "BattleGate.txt")?,
+                warpid: num_at(1, &f, "BattleGate.txt")?,
+                diahinh: num_at(2, &f, "BattleGate.txt")?,
                 defenders,
             };
             self.battle_gates.insert((gate.mapid1, gate.warpid), gate);
@@ -283,12 +292,9 @@ impl GameData {
                 continue;
             }
             let f: Vec<&str> = line.split('\t').collect();
-            if f.len() < 2 {
-                continue;
-            }
             let doll = Doll {
-                doll_id: num(f[0], "Dolls.txt")?,
-                npc_id: num(f[1], "Dolls.txt")?,
+                doll_id: num_at(0, &f, "Dolls.txt")?,
+                npc_id: num_at(1, &f, "Dolls.txt")?,
             };
             self.dolls.insert(doll.doll_id, doll);
         }
@@ -305,45 +311,101 @@ impl GameData {
                 continue;
             }
             let f: Vec<&str> = line.split('\t').collect();
-            if f.len() < 7 {
-                continue;
-            }
             self.npc_on_map.push(NpcOnMap {
-                map_id: num(f[0], "NpcOnMap.txt")?,
-                id: num(f[1], "NpcOnMap.txt")?,
-                npc_id: num(f[2], "NpcOnMap.txt")?,
-                x: num(f[3], "NpcOnMap.txt")?,
-                y: num(f[4], "NpcOnMap.txt")?,
-                coord: num(f[5], "NpcOnMap.txt")?,
-                so_luong: num(f[6], "NpcOnMap.txt")?,
+                map_id: num_at(0, &f, "NpcOnMap.txt")?,
+                id: num_at(1, &f, "NpcOnMap.txt")?,
+                npc_id: num_at(2, &f, "NpcOnMap.txt")?,
+                x: num_at(3, &f, "NpcOnMap.txt")?,
+                y: num_at(4, &f, "NpcOnMap.txt")?,
+                coord: num_at(5, &f, "NpcOnMap.txt")?,
+                so_luong: num_at(6, &f, "NpcOnMap.txt")?,
             });
         }
         Ok(())
     }
 
-    /// ItemOnMap.txt — ASCII.
+    /// ItemOnMap.txt — ASCII. First appearance of a MapId pre-fills empty
+    /// slots 1..255 in `ItemDropOnMap`; each row spawns a static drop with
+    /// `_Delay=999999` (C# `CreatMapItem` Data.cs:5347-5412 + `SystemDropItem`
+    /// 5278-5345). The C# broadcast `F44408001703` fires with no clients at
+    /// load time (no-op); `static_drop_frame` exposes the same frame for maps
+    /// with live clients.
     fn load_item_on_map(&mut self, path: &Path) -> Result<()> {
         let text = std::fs::read_to_string(path)
             .map_err(|e| TsError::Data(format!("read {}: {}", path.display(), e)))?;
+        let mut seen_maps: std::collections::HashSet<i64> = Default::default();
         for line in text.lines() {
             let line = line.trim_end_matches('\r');
             if line.trim().is_empty() || line.starts_with("//") {
                 continue;
             }
             let f: Vec<&str> = line.split('\t').collect();
-            if f.len() < 6 {
-                continue;
+            let map_id = num_at(0, &f, "ItemOnMap.txt")?;
+            if seen_maps.insert(map_id) {
+                for slot in 1..=255 {
+                    self.item_drop_on_map.insert(
+                        (map_id, slot),
+                        ItemDropOnMap {
+                            map_id,
+                            slot,
+                            ..Default::default()
+                        },
+                    );
+                }
             }
+            let slot = num_at(1, &f, "ItemOnMap.txt")?;
+            let item_id = num_at(2, &f, "ItemOnMap.txt")?;
+            let x = num_at(3, &f, "ItemOnMap.txt")?;
+            let y = num_at(4, &f, "ItemOnMap.txt")?;
+            let delay = num_at(5, &f, "ItemOnMap.txt")?;
             self.item_on_map.push(ItemOnMap {
-                map_id: num(f[0], "ItemOnMap.txt")?,
-                id: num(f[1], "ItemOnMap.txt")?,
-                item_id: num(f[2], "ItemOnMap.txt")?,
-                x: num(f[3], "ItemOnMap.txt")?,
-                y: num(f[4], "ItemOnMap.txt")?,
-                delay: num(f[5], "ItemOnMap.txt")?,
+                map_id,
+                id: slot,
+                item_id,
+                x,
+                y,
+                delay,
             });
+            // Spawn the static drop (C# `SystemDropItem(mapid, slot, x, y,
+            // itemId, 999999)`): copies the item's stats, `_Delay=999999`.
+            let item = self
+                .items
+                .get(&item_id)
+                .ok_or_else(|| TsError::Data(format!("ItemOnMap references unknown item {item_id}")))?;
+            let drop = ItemDropOnMap {
+                map_id,
+                slot,
+                item_id,
+                map_x: x,
+                map_y: y,
+                delay: 999_999,
+                lv: item.level,
+                int1: item.int1,
+                atk1: item.atk1,
+                def1: item.def1,
+                hpx1: item.hpx1,
+                spx1: item.spx1,
+                agi1: item.agi1,
+                fai1: item.fai1,
+                hp: item.hp,
+                sp: item.sp,
+                thuoctinh: item.thuoctinh,
+                loai: item.loai,
+            };
+            self.item_drop_on_map.insert((map_id, slot), drop);
         }
         Ok(())
+    }
+
+    /// Broadcast frame for a spawned static drop (C# `SystemDropItem`):
+    /// `F44408001703` + le16(itemId) + le16(x) + le16(y).
+    pub fn static_drop_frame(item_id: i64, x: i64, y: i64) -> String {
+        format!(
+            "F44408001703{}{}{}",
+            crate::protocol::encoder::le16(item_id as u16),
+            crate::protocol::encoder::le16(x as u16),
+            crate::protocol::encoder::le16(y as u16)
+        )
     }
 
     /// Quests/*.ini — 813 files, Win32 INI semantics.
@@ -382,21 +444,30 @@ impl GameData {
 
         if ini.has_section("TEAMDEF") {
             let mut v = Vec::with_capacity(11);
-            v.push(num(&ini.get("TEAMDEF", "Diahinh"), &file)?);
+            // C# `genTalkInfoTeamDefDiahinh`: absent -> 0.
+            let diahinh = ini.get("TEAMDEF", "Diahinh");
+            v.push(if diahinh == NOTHING || diahinh.trim().is_empty() {
+                0
+            } else {
+                num(&diahinh, &file)?
+            });
+            // C# `genTalkInfoTeamDefNpcs(text, '\t')`: absent or not exactly 10
+            // elements -> int[10] zeros; else the 10 parsed ids.
             let npcs = ini.get("TEAMDEF", "Npcs");
-            // Npcs are separated by tabs (sometimes commas like tuples).
+            let mut npc_ids = [0i64; 10];
             if npcs != NOTHING {
-                for tok in npcs.split(['\t', ',']) {
-                    let t = tok.trim();
-                    if !t.is_empty() {
-                        v.push(num(t, &file)?);
+                let toks: Vec<&str> = npcs.split('\t').map(str::trim).collect();
+                if toks.len() == 10 && toks.iter().all(|t| !t.is_empty()) {
+                    for (i, t) in toks.iter().enumerate() {
+                        npc_ids[i] = num(t, &file)?;
                     }
                 }
             }
+            v.extend_from_slice(&npc_ids);
             q.teamdef = v;
         }
 
-        // [REQUIRES] SelectMenu — entry condition (0 if absent).
+        // [REQUIRES] — entry conditions (C# Data.cs:4612-4619).
         if ini.has_section("REQUIRES") {
             let rm = ini.get("REQUIRES", "SelectMenu");
             q.require_select_menu = if rm == NOTHING || rm.trim().is_empty() {
@@ -404,6 +475,16 @@ impl GameData {
             } else {
                 num(&rm, &file)?
             };
+            q.require_level = parse_condition(&ini.get("REQUIRES", "Level"), &file)?;
+            q.require_reborn = parse_condition(&ini.get("REQUIRES", "Reborn"), &file)?;
+            let thuoctinh = ini.get("REQUIRES", "Thuoctinh");
+            q.require_thuoctinh = if thuoctinh == NOTHING || thuoctinh.trim().is_empty() {
+                0
+            } else {
+                num(&thuoctinh, &file)?
+            };
+            q.require_quests = parse_quest_tuples(&ini.get("REQUIRES", "Quests"), &file)?;
+            q.require_wears = parse_wear_tuples(&ini.get("REQUIRES", "Wears"), &file)?;
             // Items consumed on win (`_RequireItems`): itemId-count-remove.
             q.on_win.require_items = parse_tuples(&ini.get("REQUIRES", "Items"), &file)?;
         }
@@ -420,13 +501,16 @@ impl GameData {
             q.on_win.save_member_quests =
                 parse_save_quest(&win_ms, &file, q.map_id, &q.talk_type, q.id, q.step);
         }
-        // [OnLose].WarpTo is read from ONWIN (C# copy-paste bug).
+        // [OnLose].WarpTo is read from ONWIN (C# copy-paste bug, Data.cs:4649):
+        // `_LoseWarpTo` always equals `_WinWarpTo`.
         let mut on_lose = self.parse_result(&ini, "OnLose", &file)?;
-        let win_warp = ini.get("ONWIN", "WarpTo");
-        if on_lose.warp_to.is_empty() && win_warp != NOTHING {
-            on_lose.warp_to = parse_warp(&win_warp, &file)?;
-        }
+        on_lose.warp_to = q.on_win.warp_to.clone();
         q.on_lose = on_lose;
+        // [DESCRIPTION] Title — server-GUI requirement messages (Data.cs:4650).
+        let title = ini.get("DESCRIPTION", "Title");
+        if title != NOTHING {
+            q.desc_title = title;
+        }
         Ok(q)
     }
 
@@ -481,6 +565,81 @@ fn parse_tuples(s: &str, file: &str) -> Result<Vec<(i64, i64, i64)>> {
             _ => 0,
         };
         out.push((a, b, c));
+    }
+    Ok(out)
+}
+
+/// `[REQUIRES] Level/Reborn` — `value\top`; operator index per C#
+/// `genTalkInfoCondition` (Data.cs:6054-6067): `["=",">=",">","<=","<","!="]`
+/// → 0..5. Absent → `(0, 0)`.
+fn parse_condition(s: &str, file: &str) -> Result<(i64, i64)> {
+    if s == NOTHING || s.trim().is_empty() {
+        return Ok((0, 0));
+    }
+    let mut it = s.split('\t');
+    let value = it.next().unwrap_or("").trim().parse::<i64>().map_err(|_| {
+        TsError::Data(format!("bad condition `{s}` in {file}"))
+    })?;
+    let op = it.next().unwrap_or("").trim();
+    let ops = ["=", ">=", ">", "<=", "<", "!="];
+    let op_index = ops.iter().position(|&o| o == op).map(|i| i as i64).unwrap_or(-1);
+    Ok((value, op_index))
+}
+
+/// `[REQUIRES] Quests` — tab-separated `mapId-npcId-warpId-step` tuples
+/// (C# `genTalkInfoListInt` with intSplit `-`).
+fn parse_quest_tuples(s: &str, file: &str) -> Result<Vec<(i64, i64, i64, i64)>> {
+    let mut out = Vec::new();
+    if s == NOTHING || s.trim().is_empty() {
+        return Ok(out);
+    }
+    for tok in s.split('\t') {
+        let t = tok.trim();
+        if t.is_empty() {
+            continue;
+        }
+        let parts: Vec<i64> = t
+            .split('-')
+            .map(|p| {
+                p.trim()
+                    .parse::<i64>()
+                    .map_err(|_| TsError::Data(format!("bad quest tuple `{tok}` in {file}")))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        if parts.is_empty() {
+            continue;
+        }
+        let mut v = [0i64; 4];
+        for (i, p) in parts.iter().take(4).enumerate() {
+            v[i] = *p;
+        }
+        out.push((v[0], v[1], v[2], v[3]));
+    }
+    Ok(out)
+}
+
+/// `[REQUIRES] Wears` — tab-separated `itemId-playerOrPet` tuples.
+fn parse_wear_tuples(s: &str, file: &str) -> Result<Vec<(i64, i64)>> {
+    let mut out = Vec::new();
+    if s == NOTHING || s.trim().is_empty() {
+        return Ok(out);
+    }
+    for tok in s.split('\t') {
+        let t = tok.trim();
+        if t.is_empty() {
+            continue;
+        }
+        let parts: Vec<&str> = t.split('-').map(str::trim).collect();
+        if parts.is_empty() || parts[0].is_empty() {
+            continue;
+        }
+        let a = parts[0]
+            .parse::<i64>()
+            .map_err(|_| TsError::Data(format!("bad wears tuple `{tok}` in {file}")))?;
+        let b = parts.get(1).copied().unwrap_or("0")
+            .parse::<i64>()
+            .map_err(|_| TsError::Data(format!("bad wears tuple `{tok}` in {file}")))?;
+        out.push((a, b));
     }
     Ok(out)
 }
@@ -607,29 +766,25 @@ fn parse_enhance(s: &str, file: &str) -> Result<Vec<(String, i64)>> {
     Ok(out)
 }
 
-/// AddSkill — `skillId\tlevel` (tabs; comma form also tolerated).
+/// AddSkill — `skillId\tlevel` (C# `_WinAddSkill =
+/// Array.ConvertAll(genTalkInfoDialog(..., '\t'), int.Parse)` — a flat int
+/// array; the first two elements are the skill id and its level).
 fn parse_add_skill(s: &str, file: &str) -> Result<Vec<(i64, i64)>> {
     let mut out = Vec::new();
-    if s == NOTHING {
+    if s == NOTHING || s.trim().is_empty() {
         return Ok(out);
     }
-    for tok in s.split(['\t', ',']) {
-        let t = tok.trim();
-        if t.is_empty() {
-            continue;
-        }
-        let mut parts = t.split('-');
-        let a = parts.next().unwrap_or("").trim();
-        let b = parts.next().unwrap_or("1").trim();
-        if a.is_empty() {
-            continue;
-        }
-        out.push((
-            a.parse::<i64>()
-                .map_err(|_| TsError::Data(format!("bad AddSkill `{t}` in {file}")))?,
-            b.parse::<i64>()
-                .map_err(|_| TsError::Data(format!("bad AddSkill `{t}` in {file}")))?,
-        ));
+    let ints: Vec<i64> = s
+        .split(['\t', ','])
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+        .map(|t| {
+            t.parse::<i64>()
+                .map_err(|_| TsError::Data(format!("bad AddSkill `{s}` in {file}")))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    if ints.len() >= 2 {
+        out.push((ints[0], ints[1]));
     }
     Ok(out)
 }
@@ -649,4 +804,86 @@ fn parse_add_pet(s: &str, _file: &str) -> Result<Vec<i64>> {
         }
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Minimal but structurally valid `.txt` dataset for loader unit tests.
+    /// 25-col Items row, 24-col Npcs row, 19-col Skills row.
+    fn write_dataset(dir: &std::path::Path) {
+        std::fs::create_dir_all(dir.join("Quests")).unwrap();
+        std::fs::write(dir.join("Items.txt"), b"//Id\tName\t...\n1\tA\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\n").unwrap();
+        std::fs::write(dir.join("Skills.txt"), b"//Id\tName\t...\n1\tA\t1\t1\t1\t0\t0\t0\t0\t0\t0\t1\t1\t1\t1\t0\t0\t0\t0\n").unwrap();
+        std::fs::write(dir.join("BattleGate.txt"), b"//Mapid1\tWarpId\tDiahinh\n1\t2\t3\t4\t5\t6\t7\t8\t9\t10\t11\t12\t13\n").unwrap();
+        std::fs::write(dir.join("Dolls.txt"), b"//DollId\tNpcId\n1\t2\n").unwrap();
+        std::fs::write(dir.join("NpcOnMap.txt"), b"//MapId\tId\tNpcId\tX\tY\tCoord\tSoLuong\n1\t1\t2\t3\t4\t5\t0\n").unwrap();
+        std::fs::write(dir.join("ItemOnMap.txt"), b"//MapId\tId\tItemId\tX\tY\tDelay\n").unwrap();
+        // Npcs.txt is UTF-16LE with BOM (24-col row: id..agi, skills, drops, NotPet, Reborn).
+        let npc = "1\tA\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0";
+        let mut bytes = vec![0xFF, 0xFE];
+        for u in npc.encode_utf16() {
+            bytes.extend_from_slice(&u.to_le_bytes());
+        }
+        std::fs::write(dir.join("Npcs.txt"), bytes).unwrap();
+    }
+
+    #[test]
+    fn warps_skip_empty_destination_column() {
+        let dir = tempfile::tempdir().unwrap();
+        write_dataset(dir.path());
+        std::fs::write(
+            dir.path().join("Warps.txt"),
+            b"//map1\twarpid\tmap2\tx\ty\n1\t2\t\t3\t4\n5\t6\t7\t8\t9\n",
+        )
+        .unwrap();
+        let d = GameData::load(dir.path()).expect("load");
+        // The row with an empty map2 column is silently dropped (C# Data.cs:4514).
+        assert_eq!(d.warps.len(), 1);
+        assert!(d.warps.contains_key(&(5, 6)));
+        assert!(!d.warps.contains_key(&(1, 2)));
+    }
+
+    #[test]
+    fn npcs_missing_reborn_column_is_load_failure() {
+        let dir = tempfile::tempdir().unwrap();
+        write_dataset(dir.path());
+        // 23-col row (no Reborn col 23) — C# `Conversions.ToInteger(array2[23])`
+        // throws IndexOutOfRangeException → load failure, not a default.
+        let npc = "2\tB\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0";
+        let mut bytes = vec![0xFF, 0xFE];
+        for u in npc.encode_utf16() {
+            bytes.extend_from_slice(&u.to_le_bytes());
+        }
+        std::fs::write(dir.path().join("Npcs.txt"), bytes).unwrap();
+        assert!(GameData::load(dir.path()).is_err());
+    }
+
+    #[test]
+    fn item_drop_prefill_does_not_repeat_per_map() {
+        let mut d = GameData::default();
+        d.items.insert(
+            31099,
+            Item {
+                id: 31099,
+                level: 1,
+                ..Default::default()
+            },
+        );
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("ItemOnMap.txt");
+        std::fs::write(
+            &path,
+            b"//MapId\tId\tItemId\tX\tY\tDelay\n10965\t1\t31099\t2228\t126\t1\n10965\t2\t31099\t10\t20\t1\n",
+        )
+        .unwrap();
+        d.load_item_on_map(&path).expect("load item on map");
+        // Pre-fill 255 slots happens once per map; both spawns land.
+        assert_eq!(d.item_drop_on_map.len(), 255);
+        assert_eq!(d.item_drop_on_map[&(10965, 1)].item_id, 31099);
+        assert_eq!(d.item_drop_on_map[&(10965, 1)].delay, 999_999);
+        assert_eq!(d.item_drop_on_map[&(10965, 2)].map_x, 10);
+        assert_eq!(d.item_drop_on_map[&(10965, 255)].item_id, 0);
+    }
 }
