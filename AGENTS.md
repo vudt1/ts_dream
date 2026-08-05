@@ -23,7 +23,7 @@ Single-context layout — one [`CONTEXT.md`](CONTEXT.md) + `docs/adr/` at the re
 - **Template Engine**: Askama 0.12 (Biên dịch HTML thẳng vào binary, kết hợp HTMX).
 - **Database & Migration**: MySQL 8 (InnoDB, kết nối qua SQLx 0.8 với `mysql`, `runtime-tokio-rustls`, `migrate`).
 - **Mã hóa & Định dạng Wire**: Giao thức TS Online (Header `F4 44`, XOR key `0xAD`, VISCII 1.1 text encoding).
-- **Thư viện bổ sung**: Serde, Serde JSON, TOML 0.8, Tracing, Anyhow, Thiserror, Hex, Chrono, Futures.
+- **Thư viện bổ sung**: Serde, Serde JSON, TOML 0.8, Tracing + tracing-subscriber (env-filter), Anyhow, Thiserror 2, Hex, Chrono, Futures. Dev: Tempfile, Tower.
 
 ---
 
@@ -34,26 +34,74 @@ ts_dream/
 ├── Cargo.toml                  # Khai báo crate & phụ thuộc
 ├── CONTEXT.md                  # Từ vựng miền (Domain Glossary & Ubiquitous Language)
 ├── AGENTS.md                   # Hướng dẫn Agent, Tech Stack & Cấu trúc Codebase
-├── templates/                  # Template HTML cho Web Dashboard (Askama)
-├── docs/                       # Tài liệu đặc tả & cấu hình Agent
+├── LICENSE & README.md         # Giấy phép & hướng dẫn dựng dự án
+├── Huong_Dan_Cai_Dat_MySQL_ZIP.md  # Hướng dẫn cài đặt MySQL
+├── TS_Server_OP_Code_basic.md  # Đặc tả opcode giao thức TS Online tham khảo
+├── templates/
+│   └── dashboard.html          # Template HTML duy nhất cho Web Dashboard (Askama + HTMX)
+├── docs/
 │   ├── rust_porting_spec.md    # Đặc tả chi tiết porting server (29 opcodes, battle engine, VISCII)
 │   └── agents/                 # Quy chuẩn kỹ năng Agent (domain, issue-tracker, triage)
 ├── spec/
 │   └── codebase_design.md      # Thiết kế kiến trúc ban đầu
+├── migrations/
+│   └── 0001_init.sql           # SQLx migration khởi tạo schema
+├── golden/                     # Dữ liệu vàng (golden packets) để diffing khi test
+├── tests/                      # Integration tests (golden diffing, data, web dashboard)
 └── src/
     ├── main.rs                 # Entry point: Khởi tạo Config, MySQL Pool, AppState, Web Admin (8090) & Game TCP Server (6414)
     ├── lib.rs                  # Module root cho thư viện ts_dream
     ├── config.rs               # Xử lý file cấu hình (port, db URL, data_dir)
     ├── state.rs                # AppState chia sẻ dữ liệu qua Arc<RwLock<AppState>>
-    ├── error.rs & encoding.rs  # Định nghĩa lỗi & Xử lý mã hóa VISCII 1.1
+    ├── error.rs                # Định nghĩa lỗi
+    ├── encoding.rs             # Xử lý mã hóa VISCII 1.1
     ├── harness.rs              # Test harness hỗ trợ kiểm thử packet capture diffing
     ├── db/
     │   └── pool.rs             # Kết nối MySQL Pool & Chạy SQLx migration khi boot
-    ├── protocol/               # Bộ mã hóa/giải mã XOR 0xAD, phân tách khung tin (Frame F4 44, Opcode/Subcode)
+    ├── protocol/               # Bộ mã hóa/giải mã XOR 0xAD, phân tách khung tin
+    │   ├── frame.rs            # Phân tách khung tin (Frame F4 44)
+    │   ├── codec.rs            # Codec XOR 0xAD & opcode/subcode
+    │   └── encoder.rs          # Đóng gói/buffer packet đi
     ├── server/                 # TCP Server listener (Port 6414), Session management & Spawner
     │   ├── handler.rs          # Phân luồng opcode chính
-    │   └── handlers/           # Handler chi tiết từng nhóm Opcode (login, chat, move, battle, quest, inventory, shops,...)
-    ├── web/                    # Web Admin Server (Axum), ServerControl & Router Dashboard
-    ├── battle/                 # Battle Engine: Turn-based combat, RNG, damage math, targeting, battle runner & manager
-    └── data/                   # Loader dữ liệu tĩnh (INI files, tables, talks, NPC data)
+    │   ├── session.rs          # Quản lý phiên kết nối
+    │   ├── spawn.rs            # Spawner quản lý đối tượng/entity trong map
+    │   ├── character_sheet.rs  # Bảng chỉ số nhân vật
+    │   ├── inventory.rs        # Quản lý túi đồ nhân vật
+    │   ├── pet_box.rs          # Quản lý hộp thú nuôi
+    │   └── handlers/           # Handler chi tiết từng nhóm Opcode
+    │       ├── login.rs        # Đăng nhập/xác thực
+    │       ├── character.rs    # Tạo/xóa nhân vật
+    │       ├── movement.rs     # Di chuyển (move)
+    │       ├── chat.rs         # Chat
+    │       ├── skills.rs       # Kỹ năng
+    │       ├── stats.rs        # Chỉ số/điểm
+    │       ├── battle.rs       # Battle handler
+    │       ├── quest.rs        # Nhiệm vụ (quest)
+    │       ├── inventory.rs    # Túi đồ / sử dụng vật phẩm
+    │       ├── shops.rs        # Cửa hàng (shop/mall buy)
+    │       ├── trade_storage.rs# Giao dịch & kho (storage)
+    │       ├── pet_actions.rs  # Hành động thú nuôi
+    │       ├── expressions.rs  # Biểu cảm
+    │       ├── talk.rs         # Hội thoại NPC
+    │       └── system.rs       # Hệ thống/ping/time
+    ├── web/                    # Web Admin Server (Axum)
+    │   ├── app.rs              # Router Dashboard
+    │   ├── server_control.rs   # Điều khiển server
+    │   └── static/             # Asset tĩnh (htmx.min.js)
+    ├── battle/                 # Battle Engine: Turn-based combat, RNG, damage math, targeting
+    │   ├── engine.rs           # Core battle engine
+    │   ├── manager.rs          # Battle manager
+    │   ├── runner.rs           # Battle runner
+    │   ├── service.rs          # Service layer
+    │   ├── damage.rs           # Damage math
+    │   ├── targeting.rs        # Chọn mục tiêu
+    │   ├── rng.rs              # Random number generation
+    │   ├── construction.rs     # Khởi tạo battle instances
+    │   └── packets.rs          # Packet battle đi/đến client
+    └── data/                   # Loader dữ liệu tĩnh
+        ├── loader.rs           # Loader chính
+        ├── ini.rs              # Đọc INI files
+        ├── tables.rs           # Load bảng dữ liệu
+        └── texps.rs            # Load công thức tăng điểm kinh nghiệm (TEXP)
 ```
