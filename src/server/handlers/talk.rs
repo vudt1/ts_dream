@@ -55,6 +55,14 @@ fn handle_talk_start(conn: &mut Conn, payload: &[u8], data: &GameData, out: &mut
     }
     let idtalking = encoder::u16_le(payload[0], payload[1]) as i32;
     conn.session.idtalking = idtalking;
+    // Resolve the real NPC id from the on-map index (C# FTalk.H1:19) — the
+    // NPC-shop sell path keys on it.
+    conn.session.idnpctalking = data
+        .npc_on_map
+        .iter()
+        .find(|n| n.map_id == i64::from(conn.session.map_id) && n.id == i64::from(idtalking))
+        .map(|n| n.npc_id as i32)
+        .unwrap_or(0);
 
     // Special NPC IDs
     match idtalking {

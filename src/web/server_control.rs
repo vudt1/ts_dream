@@ -8,7 +8,7 @@ use crate::data::loader::GameData;
 use crate::protocol::encoder;
 use crate::protocol::frame;
 use crate::server::handler::{self, ServerEnv};
-use crate::server::session::Conn;
+use crate::server::session::{online_sessions, Conn};
 use crate::server::spawn::announce_frame;
 use crate::state::AppState;
 use axum::http::StatusCode;
@@ -278,8 +278,20 @@ async fn handle_client_connection(
                                 hub: Some(&control),
                                 sender: Some(&tx),
                             };
+                            // Pull the authoritative snapshot (a buyer may have
+                            // mutated us through the player shop registry).
+                            if logined_id > 0 {
+                                if let Some(snapshot) =
+                                    online_sessions().lock().unwrap().get(&logined_id).cloned()
+                                {
+                                    conn.session = snapshot;
+                                }
+                            }
                             let out = handler::dispatch(&mut conn, &decoded, &data, &service, &env).await;
                             let id = conn.session.id;
+                            if logined_id > 0 {
+                                online_sessions().lock().unwrap().insert(logined_id, conn.session.clone());
+                            }
                             for f in &out.outgoing {
                                 let _ = tx.send(f.clone());
                             }
@@ -315,6 +327,7 @@ async fn handle_client_connection(
 
     if logined_id > 0 {
         control.unregister_client(logined_id).await;
+        online_sessions().lock().unwrap().remove(&logined_id);
     }
     app.write().await.push_log(
         "system",

@@ -146,7 +146,7 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         // Op 0x17 — Inventory base, use item, player shop, reborn
         0x17 => {
             if (30..=33).contains(&ctx.sub) {
-                shops::handle_player_shop(ctx);
+                shops::handle_player_shop(ctx).await;
             } else {
                 inventory::handle_inventory(ctx).await;
             }
@@ -156,7 +156,7 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         0x19 => trade_storage::handle_trade(ctx),
 
         // Op 0x1B — NPC shop buy/sell
-        0x1B => shops::handle_npc_shop(ctx),
+        0x1B => shops::handle_npc_shop(ctx).await,
 
         // Op 0x1C — Learn / upgrade skills
         0x1C => skills::handle_skills(ctx).await,
@@ -398,17 +398,34 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn dispatch_npc_shop_and_skill_learn() {
+    async fn dispatch_npc_shop_player_shop_and_skill_learn() {
         let mut conn = Conn::new();
-        conn.session.gold = 1000;
+        conn.session.id = 300001;
+        conn.session.idtalking = 16;
+        conn.session.map_id = 12002;
+        conn.session.gold = 100000;
         conn.session.skill_point = 5;
 
-        // NPC Shop buy item 10001 (0x2711), count 2 -> price = 100*2 = 200 -> gold = 800
-        let shop_decoded = encoder::bytes("F44405001B01112702").unwrap();
+        // NPC Shop buy (op 0x1B): menu 0 at map 12002 → item 20023 @ 58800 → gold 41200
+        let shop_decoded = encoder::bytes("F44404001B010000").unwrap();
         let out_shop = dispatch(&mut conn, &shop_decoded, &dummy_data(), &dummy_service(), &ServerEnv::none()).await;
-        assert_eq!(conn.session.gold, 800);
-        assert_eq!(conn.session.homdo.len(), 1);
-        assert_eq!(out_shop.outgoing.len(), 2);
+        assert_eq!(conn.session.gold, 41200);
+        assert!(conn.session.homdo.iter().any(|i| i.id == 20023));
+        assert!(out_shop.outgoing.iter().any(|f| f.contains("1A04")));
+
+        // Player shop open (op 0x17 sub 30): name "TEST" + one listing.
+        let open_hex = crate::protocol::frame("171E", "045445535400");
+        let open_decoded = encoder::bytes(&open_hex).unwrap();
+        let out_open = dispatch(&mut conn, &open_decoded, &dummy_data(), &dummy_service(), &ServerEnv::none()).await;
+        assert!(conn.session.shop.active);
+        assert!(out_open.outgoing.iter().any(|f| f.contains("171E")));
+
+        // Player shop close (op 0x17 sub 31 / wire 171F): reply 1720 + player id.
+        let close_hex = crate::protocol::frame("171F", "");
+        let close_decoded = encoder::bytes(&close_hex).unwrap();
+        let out_close = dispatch(&mut conn, &close_decoded, &dummy_data(), &dummy_service(), &ServerEnv::none()).await;
+        assert!(!conn.session.shop.active);
+        assert!(out_close.outgoing.iter().any(|f| f.contains("1720")));
 
         // Skill learn skill 10001 (0x2711) lv 1 -> F444 0500 1C01 1127 01
         let skill_decoded = encoder::bytes("F44405001C01112701").unwrap();

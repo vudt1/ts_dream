@@ -78,6 +78,8 @@ pub struct Session {
     pub logined: bool,
     pub authed: bool,
     pub idtalking: i32,
+    /// Real NPC database id resolved from the on-map index (`idnpctalking`).
+    pub idnpctalking: i32,
     pub select_menu: i32,
     pub battle_id: i32,
     pub pending_pass: Vec<u8>,
@@ -144,6 +146,8 @@ pub struct Session {
     pub active_pet_stt: u8,
 
     pub shop: PlayerShopState,
+    /// Player whose shop we are viewing (`_Open_Shop_Id`, C# case 32/33).
+    pub open_shop_id: u32,
 
     pub bank_gold: u32,
     pub shop_point: u32,
@@ -183,6 +187,7 @@ impl Default for Session {
             logined: false,
             authed: false,
             idtalking: 0,
+            idnpctalking: 0,
             select_menu: 0,
             battle_id: 0,
             pending_pass: Vec::new(),
@@ -243,6 +248,7 @@ impl Default for Session {
             active_pet_stt: 0,
 
             shop: PlayerShopState::default(),
+            open_shop_id: 0,
 
             bank_gold: 0,
             shop_point: 1000,
@@ -377,6 +383,16 @@ impl Session {
 pub struct Conn {
     pub decoder: Decoder,
     pub session: Session,
+}
+
+/// Online session registry (C# `Server.Clients`): authoritative per-player
+/// session snapshots, synced by the connection loop on every frame. Cross-player
+/// flows (player shop op 0x17 sub 32/33) read and mutate it.
+pub fn online_sessions() -> &'static std::sync::Mutex<std::collections::HashMap<u32, Session>> {
+    static ONLINE: std::sync::OnceLock<
+        std::sync::Mutex<std::collections::HashMap<u32, Session>>,
+    > = std::sync::OnceLock::new();
+    ONLINE.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
 }
 
 impl Conn {

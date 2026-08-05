@@ -180,6 +180,17 @@ pub fn all_scenarios() -> Vec<Scenario<'static>> {
                 });
             },
         ),
+        Scenario::new(
+            "15-npc-shop-buy",
+            game_data(),
+            vec!["F44404001B010000".to_string()],
+            |c| {
+                c.session.id = 300001;
+                c.session.idtalking = 16;
+                c.session.map_id = 12002;
+                c.session.gold = 100000;
+            },
+        ),
     ]
 }
 
