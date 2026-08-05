@@ -46,6 +46,21 @@ pub fn quest_data() -> GameData {
     data
 }
 
+/// Data fixture with a real potion (hp 100 / sp 50) for the use-item golden.
+pub fn use_item_data() -> GameData {
+    let mut data = GameData::default();
+    data.items.insert(
+        30001,
+        ts_dream::data::tables::Item {
+            id: 30001,
+            hp: 100,
+            sp: 50,
+            ..Default::default()
+        },
+    );
+    data
+}
+
 fn create_char_frame() -> String {
     let mut payload = vec![0u8; 26];
     payload[0] = 1; // sex
@@ -106,15 +121,17 @@ pub fn all_scenarios() -> Vec<Scenario<'static>> {
         ),
         Scenario::new(
             "10-use-item",
-            game_data(),
-            vec!["F4440300170F01".to_string()],
+            use_item_data(),
+            vec!["F4440400170F0102".to_string()],
             |c| {
                 c.session.hp_max = 200;
                 c.session.hp = 50;
+                c.session.sp_max = 200;
+                c.session.sp = 30;
                 c.session.homdo.push(InventoryItem {
                     slot: 1,
-                    id: 10001,
-                    count: 2,
+                    id: 30001,
+                    count: 5,
                     ..Default::default()
                 });
             },

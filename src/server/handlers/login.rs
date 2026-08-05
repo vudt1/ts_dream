@@ -285,18 +285,19 @@ async fn load_player_data(pool: &MySqlPool, s: &mut Session) -> Result<(), sqlx:
 async fn load_items(pool: &MySqlPool, player_id: i64, table: &str) -> Result<Vec<InventoryItem>, sqlx::Error> {
     // Tables share the same item columns (verified against 0001_init.sql).
     let sql = format!(
-        "SELECT Slot AS slot, Id AS id, `Count` AS cnt, DoBen AS doben, `Long` AS longv, \
-         GiatriLong AS glong, Khang AS khang, Texp AS texp FROM {table} WHERE player_id = ?"
+        "SELECT Slot AS slot, Id AS id, `Count` AS cnt, Lv AS lv, DoBen AS doben, \
+         `Long` AS longv, GiatriLong AS glong, Khang AS khang, Texp AS texp FROM {table} WHERE player_id = ?"
     );
-    Ok(sqlx::query_as::<_, (i64, i64, i64, i64, i64, i64, i64, i64)>(&sql)
+    Ok(sqlx::query_as::<_, (i64, i64, i64, i64, i64, i64, i64, i64, i64)>(&sql)
         .bind(player_id)
         .fetch_all(pool)
         .await?
         .into_iter()
-        .map(|(slot, id, count, doben, longv, glong, khang, texp)| InventoryItem {
+        .map(|(slot, id, count, lv, doben, longv, glong, khang, texp)| InventoryItem {
             slot: slot as u8,
             id: id as u16,
             count: count as u8,
+            lv: lv as u8,
             doben: doben as u8,
             long_val: longv as u8,
             giatri_long: glong as u8,

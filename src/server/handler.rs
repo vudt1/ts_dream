@@ -117,13 +117,13 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         0x03 => login::handle_enter_game(ctx).await,
 
         // Op 0x02 — Chat & slash commands
-        0x02 => chat::handle_chat(ctx),
+        0x02 => chat::handle_chat(ctx).await,
 
         // Op 0x05, 0x06 — Move
         0x05 | 0x06 => movement::handle_move(ctx),
 
         // Op 0x08 — Stat allocation
-        0x08 => stats::handle_stat_allocation(ctx),
+        0x08 => stats::handle_stat_allocation(ctx).await,
 
         // Op 0x09 — Character creation & name check
         0x09 => character::handle_character(ctx).await,
@@ -148,7 +148,7 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
             if (30..=33).contains(&ctx.sub) {
                 shops::handle_player_shop(ctx);
             } else {
-                inventory::handle_inventory(ctx);
+                inventory::handle_inventory(ctx).await;
             }
         }
 
@@ -183,7 +183,7 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         0x23 => system::handle_account_mgmt(ctx),
 
         // Op 0x28 — Hotkey / skill bar
-        0x28 => stats::handle_hotkey(ctx),
+        0x28 => stats::handle_hotkey(ctx).await,
 
         // Op 0x2C — Pet reborn
         0x2C => skills::handle_pet_reborn(ctx),

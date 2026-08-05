@@ -213,6 +213,17 @@ impl ServerControl {
             }
         }
     }
+
+    /// Send `hex_frame` to one registered client. No-op when the player is
+    /// offline (whisper/party/gold-item routing; C# `Server.SendToClient`).
+    pub async fn send_to(&self, player_id: u32, hex_frame: &str) {
+        let clients = self.clients.lock().await;
+        if let Some(tx) = clients.get(&player_id) {
+            if tx.send(hex_frame.to_string()).is_err() {
+                tracing::debug!("Failed to send to player {player_id}");
+            }
+        }
+    }
 }
 
 /// True when a decoded frame must be fanned out to other players on the same

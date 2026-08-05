@@ -1,64 +1,160 @@
-//! Inventory base (Op 0x17 subs 2, 3, 10, 11, 12) & Use items (Op 0x17 sub 15) & Reborn (sub 46).
+//! Inventory base (Op 0x17 subs 2, 3, 10, 11, 12) & Use items (Op 0x17 sub 15)
+//! & Reborn (sub 46). Live-server path persists homdo/trangbi mutations through
+//! `persist`; golden replay keeps everything in-memory over the seeded session.
 
 use crate::protocol::encoder;
 use crate::server::handler::{hex_of, HandleOutcome, OpcodeCtx};
 use crate::server::handlers::stats::build_stat_update;
+use crate::server::map_drops;
+use crate::server::persist;
 use crate::server::session::{Conn, InventoryItem};
 
+/// Pickup range (C# `Update_H17` case 2: `-150 <= dx <= 150`, same for dy).
+const PICKUP_RANGE: i32 = 150;
+
 /// Dispatch Opcode 0x17 — Inventory operations.
-pub fn handle_inventory(ctx: &mut OpcodeCtx) {
+pub async fn handle_inventory(ctx: &mut OpcodeCtx<'_>) {
     let conn = &mut ctx.conn;
     let out = &mut ctx.out;
+    let pool = ctx.env.pool;
+    let hub = ctx.env.hub;
     let (sub, payload) = (ctx.sub, ctx.payload);
     let decoded = ctx.decoded;
     match sub {
         // Sub 2: Pick up map drop
-        2 => handle_pickup(conn, payload, out),
+        2 => handle_pickup(conn, payload, out, pool).await,
         // Sub 3: Drop item
-        3 => handle_drop(conn, payload, out),
-        // Sub 10: Move / stack item (echo raw packet back)
+        3 => handle_drop(conn, payload, out, pool, hub).await,
+        // Sub 10: Move / stack item (echo raw packet back on success)
         10 => handle_move_stack(conn, payload, decoded, out),
         // Sub 11: Equip player item
-        11 => handle_equip(conn, payload, out),
+        11 => handle_equip(conn, payload, out, pool, hub).await,
         // Sub 12: Unequip player item
-        12 => handle_unequip(conn, payload, out),
+        12 => handle_unequip(conn, payload, out, pool, hub).await,
         // Sub 15: Use item
-        15 => handle_use_item(conn, payload, out),
+        15 => handle_use_item(conn, payload, out, pool, ctx.data).await,
         // Sub 46: Player reborn
         46 => handle_reborn(conn, out),
         _ => {}
     }
 }
 
-fn handle_pickup(conn: &mut Conn, payload: &[u8], out: &mut HandleOutcome) {
+/// Build the `1706` add-item frame (C# `PickupItemOnMap`).
+fn item_added_frame(item: &InventoryItem) -> String {
+    // F4440E001706 + le16(id) + count + 00 + doben + long + (giatriLong+100) + khang + le32(texp)
+    let body = format!(
+        "{:02X}00{:02X}{:02X}{:02X}{:02X}{}",
+        item.count,
+        item.doben,
+        item.long_val,
+        (item.giatri_long as u16 + 100) as u8,
+        item.khang,
+        encoder::le32(item.texp)
+    );
+    let mut full = String::from("1706");
+    full.push_str(&encoder::le16(item.id));
+    full.push_str(&body);
+    crate::protocol::frame("1706", &full[4..])
+}
+
+async fn handle_pickup(
+    conn: &mut Conn,
+    payload: &[u8],
+    out: &mut HandleOutcome,
+    pool: Option<&sqlx::MySqlPool>,
+) {
     if conn.session.battle_id > 0 || payload.is_empty() {
         return;
     }
-    // Dummy / mock item pick: item ID 10001 count 1
-    let item = InventoryItem {
-        slot: 0,
-        id: 10001,
-        count: 1,
-        doben: 100,
-        loai: 1,
-        ..Default::default()
+    let map_id = conn.session.map_id;
+    let slot = payload[0];
+    let Some(drop) = map_drops::take(map_id, slot) else {
+        return; // nothing on that map slot
     };
-    if conn.session.add_homdo_item(item).is_some() {
+    // Distance gate (C# case 2): within ±150 map units of the player.
+    let dx = i32::from(drop.map_x) - i32::from(conn.session.map_x);
+    let dy = i32::from(drop.map_y) - i32::from(conn.session.map_y);
+    if !(-PICKUP_RANGE..=PICKUP_RANGE).contains(&dx)
+        || !(-PICKUP_RANGE..=PICKUP_RANGE).contains(&dy)
+    {
+        // Out of range: put the drop back.
+        map_drops::drop(map_id, slot, drop.item.clone(), drop.map_x, drop.map_y);
+        return;
+    }
+    let item = drop.item;
+    if let Some(homdo_slot) = conn.session.add_homdo_item(item.clone()) {
+        if let Some(added) = conn.session.homdo.iter().find(|i| i.slot == homdo_slot) {
+            persist::upsert_item(pool, conn.session.id, "homdo", added).await;
+        }
+        // C# `PickupItemOnMap` acks: 1702 pickup, 1706 item, then the dump.
+        out.send(format!("F44405001702{:02X}01", slot));
+        out.send(item_added_frame(&item));
         out.send(conn.session.dump_homdo());
     } else {
         out.send("F44403001B0102"); // Inventory full
     }
 }
 
-fn handle_drop(conn: &mut Conn, payload: &[u8], out: &mut HandleOutcome) {
-    if conn.session.battle_id > 0 || payload.is_empty() {
+async fn handle_drop(
+    conn: &mut Conn,
+    payload: &[u8],
+    out: &mut HandleOutcome,
+    pool: Option<&sqlx::MySqlPool>,
+    hub: Option<&crate::web::server_control::ServerControl>,
+) {
+    if conn.session.battle_id > 0 || payload.len() < 2 {
         return;
     }
-    let slot = payload[0];
-    if let Some(pos) = conn.session.homdo.iter().position(|i| i.slot == slot) {
+    let hdslot = payload[0];
+    let count = payload[1] as u16;
+    let Some(pos) = conn.session.homdo.iter().position(|i| i.slot == hdslot) else {
+        return;
+    };
+    let item = conn.session.homdo[pos].clone();
+    if item.id == 0 || item.count == 0 || u16::from(item.count) < count {
+        return; // C# `HomdoDropItem`: `count2 >= count && count2 > 0`
+    }
+    let map_id = conn.session.map_id;
+    let x = conn.session.map_x;
+    let y = conn.session.map_y;
+    // Place the drop under the (map, homdo slot) key; the client uses that
+    // slot in the subsequent pickup (op 0x17 sub 2).
+    map_drops::drop(map_id, hdslot, item.clone(), x, y);
+
+    let rem = item.count - count.min(255) as u8;
+    if rem > 0 {
+        conn.session.homdo[pos].count = rem;
+    } else {
         conn.session.homdo.remove(pos);
-        out.send(format!("F44404001703{:02X}00", slot));
-        out.send(conn.session.dump_homdo());
+    }
+    // C# `HomdoDropItem`: self 1703 (drop at x,y) + 1709 (slot, remaining);
+    // map peers see the 1703-only variant.
+    out.send(format!(
+        "F44409001703{}{}{}01",
+        encoder::le16(item.id),
+        encoder::le16(x),
+        encoder::le16(y)
+    ));
+    out.send(format!("F44404001709{:02X}{:02X}", hdslot, rem));
+    if let Some(hub) = hub {
+        let frame = format!(
+            "F44408001703{}{}{}",
+            encoder::le16(item.id),
+            encoder::le16(x),
+            encoder::le16(y)
+        );
+        hub.broadcast_except(conn.session.id, &frame).await;
+    }
+    // Persist either the reduced count or the cleared slot.
+    match conn.session.homdo.iter().find(|i| i.slot == hdslot) {
+        Some(kept) => persist::upsert_item(pool, conn.session.id, "homdo", kept).await,
+        None => {
+            let empty = InventoryItem {
+                slot: hdslot,
+                ..Default::default()
+            };
+            persist::upsert_item(pool, conn.session.id, "homdo", &empty).await;
+        }
     }
 }
 
@@ -68,183 +164,188 @@ fn handle_move_stack(
     decoded: &[u8],
     out: &mut HandleOutcome,
 ) {
-    if payload.len() < 2 {
+    // C# `HomdoMoveItem(oldslot, count, newslot)`: payload[0]=old, [1]=count, [2]=new.
+    if payload.len() < 3 {
         return;
     }
-    let src_slot = payload[0];
-    let dst_slot = payload[1];
-
-    let src_idx = conn.session.homdo.iter().position(|i| i.slot == src_slot);
-    let dst_idx = conn.session.homdo.iter().position(|i| i.slot == dst_slot);
-
-    match (src_idx, dst_idx) {
-        (Some(s), Some(d)) => {
-            // Swap items
-            conn.session.homdo[s].slot = dst_slot;
-            conn.session.homdo[d].slot = src_slot;
-            conn.session.homdo.swap(s, d);
+    let oldslot = payload[0];
+    let count = payload[1] as u16;
+    let newslot = payload[2];
+    let Some(src_idx) = conn.session.homdo.iter().position(|i| i.slot == oldslot) else {
+        return;
+    };
+    let src = conn.session.homdo[src_idx].clone();
+    if src.id == 0 || src.count == 0 {
+        return;
+    }
+    let dst_idx = conn.session.homdo.iter().position(|i| i.slot == newslot);
+    let src_count = u16::from(src.count);
+    if (1..=6).contains(&src.loai) {
+        // Equipment: only moves to an empty slot.
+        if dst_idx.is_none() {
+            conn.session.homdo[src_idx].slot = newslot;
             out.send(hex_of(decoded));
         }
-        (Some(s), None) => {
-            // Move item to empty slot
-            conn.session.homdo[s].slot = dst_slot;
+        return;
+    }
+    // Stackable: dst empty or same id, dst count < 50, and merge ≤ 50.
+    let dst = dst_idx.map(|i| conn.session.homdo[i].clone());
+    match dst {
+        None => {
+            conn.session.homdo[src_idx].slot = newslot;
             out.send(hex_of(decoded));
         }
-        _ => {}
+        Some(d) => {
+            if d.id != src.id || d.count >= 50 {
+                return;
+            }
+            let dst_count = u16::from(d.count);
+            if count + dst_count > 50 {
+                return;
+            }
+            if count == src_count {
+                // Move all: swap the two slots.
+                conn.session.homdo[src_idx].slot = newslot;
+                if let Some(di) = dst_idx {
+                    conn.session.homdo[di].slot = oldslot;
+                }
+                conn.session.homdo.swap(src_idx, dst_idx.unwrap());
+            } else {
+                // Split: dst = count + dst_count, src = src_count - count.
+                conn.session.homdo[src_idx].count = (src_count - count) as u8;
+                conn.session.homdo[dst_idx.unwrap()].count = (count + dst_count) as u8;
+            }
+            out.send(hex_of(decoded));
+        }
     }
 }
 
-fn handle_equip(conn: &mut Conn, payload: &[u8], out: &mut HandleOutcome) {
+async fn handle_equip(
+    conn: &mut Conn,
+    payload: &[u8],
+    out: &mut HandleOutcome,
+    pool: Option<&sqlx::MySqlPool>,
+    hub: Option<&crate::web::server_control::ServerControl>,
+) {
     if conn.session.battle_id > 0 || payload.is_empty() {
         return;
     }
     let homdo_slot = payload[0];
-    if let Some(pos) = conn.session.homdo.iter().position(|i| i.slot == homdo_slot) {
-        let item = conn.session.homdo[pos].clone();
-        let loai = item.loai;
+    let Some(pos) = conn.session.homdo.iter().position(|i| i.slot == homdo_slot) else {
+        return;
+    };
+    let item = conn.session.homdo[pos].clone();
+    let loai = item.loai;
+    // C# case 11 gates: id > 0, loai 1..=6, and player level >= item level.
+    if item.id == 0 || !(1..=6).contains(&loai) || conn.session.level < item.lv {
+        return;
+    }
 
-        if item.id > 0 && (1..=6).contains(&loai) {
-            conn.session.homdo.remove(pos);
-            // Unequip current item in that slot if exists
-            if let Some(old_pos) = conn.session.trangbi.iter().position(|i| i.slot == loai) {
-                let mut old_item = conn.session.trangbi.remove(old_pos);
-                old_item.slot = homdo_slot;
-                conn.session.homdo.push(old_item);
-            }
+    conn.session.homdo.remove(pos);
+    // Unequip the current occupant of that equip slot into homdo.
+    if let Some(old_pos) = conn.session.trangbi.iter().position(|i| i.slot == loai) {
+        let mut old_item = conn.session.trangbi.remove(old_pos);
+        old_item.slot = homdo_slot;
+        persist::upsert_item(pool, conn.session.id, "homdo", &old_item).await;
+        conn.session.homdo.push(old_item);
+    }
 
-            let mut equipped = item;
-            equipped.slot = loai;
-            conn.session.trangbi.push(equipped);
+    let mut equipped = item;
+    equipped.slot = loai;
+    conn.session.trangbi.push(equipped.clone());
+    persist::upsert_item(pool, conn.session.id, "trangbi", &equipped).await;
 
-            out.send(format!("F44403001711{:02X}", homdo_slot));
-
-            // Recompute bonus stats
-            conn.session.recompute_stats();
-            out.send(conn.session.dump_trangbi());
-
-            // Emit stat update packets
-            out.send(build_stat_update(0xCF, conn.session.hpx2 as i32));
-            out.send(build_stat_update(0xD0, conn.session.spx2 as i32));
-            out.send(build_stat_update(0xD2, conn.session.atk2 as i32));
-            out.send(build_stat_update(0xD3, conn.session.def2 as i32));
-            out.send(build_stat_update(0xD4, conn.session.int2 as i32));
-            out.send(build_stat_update(0xD6, conn.session.agi2 as i32));
-        }
+    out.send(format!("F44403001711{:02X}", homdo_slot));
+    conn.session.recompute_stats();
+    out.send(conn.session.dump_trangbi());
+    // C# `UpdateStatusWhenUseItem` → PlayerUpdateDataId sends HP/SP max + gear 2-stats.
+    out.send(build_stat_update(0x19, conn.session.hp_max as i32));
+    out.send(build_stat_update(0x1A, conn.session.sp_max as i32));
+    out.send(build_stat_update(0xCF, conn.session.hpx2 as i32));
+    out.send(build_stat_update(0xD0, conn.session.spx2 as i32));
+    out.send(build_stat_update(0xD2, conn.session.atk2 as i32));
+    out.send(build_stat_update(0xD3, conn.session.def2 as i32));
+    out.send(build_stat_update(0xD4, conn.session.int2 as i32));
+    out.send(build_stat_update(0xD6, conn.session.agi2 as i32));
+    if let Some(hub) = hub {
+        // C# `ServerSend_EquitItem`: `F44408000502` + id + item.
+        hub.broadcast_except(
+            conn.session.id,
+            &format!(
+                "{}0502{}{}",
+                "F4440800",
+                encoder::le32(conn.session.id),
+                encoder::le16(equipped.id)
+            ),
+        )
+        .await;
     }
 }
 
-fn handle_unequip(conn: &mut Conn, payload: &[u8], out: &mut HandleOutcome) {
+async fn handle_unequip(
+    conn: &mut Conn,
+    payload: &[u8],
+    out: &mut HandleOutcome,
+    pool: Option<&sqlx::MySqlPool>,
+    hub: Option<&crate::web::server_control::ServerControl>,
+) {
     if conn.session.battle_id > 0 || payload.len() < 2 {
         return;
     }
     let trangbi_slot = payload[0];
     let homdo_slot = payload[1];
+    // C# case 12 gate: the target homdo slot must be empty.
+    if conn.session.homdo.iter().any(|i| i.slot == homdo_slot && i.id > 0) {
+        return;
+    }
+    let Some(pos) = conn.session.trangbi.iter().position(|i| i.slot == trangbi_slot) else {
+        return;
+    };
+    let mut item = conn.session.trangbi.remove(pos);
+    item.slot = homdo_slot;
+    conn.session.homdo.push(item.clone());
+    persist::upsert_item(pool, conn.session.id, "trangbi", &item).await;
+    let empty = InventoryItem {
+        slot: trangbi_slot,
+        ..Default::default()
+    };
+    persist::upsert_item(pool, conn.session.id, "trangbi", &empty).await;
+    persist::upsert_item(pool, conn.session.id, "homdo", &item).await;
 
-    if let Some(pos) = conn.session.trangbi.iter().position(|i| i.slot == trangbi_slot) {
-        let mut item = conn.session.trangbi.remove(pos);
-        item.slot = homdo_slot;
-        conn.session.homdo.push(item);
-
-        out.send(format!("F44404001710{:02X}{:02X}", trangbi_slot, homdo_slot));
-
-        conn.session.recompute_stats();
-        out.send(conn.session.dump_trangbi());
-        out.send(conn.session.dump_homdo());
-
-        out.send(build_stat_update(0xCF, conn.session.hpx2 as i32));
-        out.send(build_stat_update(0xD0, conn.session.spx2 as i32));
-        out.send(build_stat_update(0xD2, conn.session.atk2 as i32));
-        out.send(build_stat_update(0xD3, conn.session.def2 as i32));
-        out.send(build_stat_update(0xD4, conn.session.int2 as i32));
-        out.send(build_stat_update(0xD6, conn.session.agi2 as i32));
+    out.send(format!("F44404001710{:02X}{:02X}", trangbi_slot, homdo_slot));
+    conn.session.recompute_stats();
+    out.send(conn.session.dump_trangbi());
+    out.send(conn.session.dump_homdo());
+    out.send(build_stat_update(0x19, conn.session.hp_max as i32));
+    out.send(build_stat_update(0x1A, conn.session.sp_max as i32));
+    out.send(build_stat_update(0xCF, conn.session.hpx2 as i32));
+    out.send(build_stat_update(0xD0, conn.session.spx2 as i32));
+    out.send(build_stat_update(0xD2, conn.session.atk2 as i32));
+    out.send(build_stat_update(0xD3, conn.session.def2 as i32));
+    out.send(build_stat_update(0xD4, conn.session.int2 as i32));
+    out.send(build_stat_update(0xD6, conn.session.agi2 as i32));
+if let Some(hub) = hub {
+        // C# `ServerSend_UnEquitItem`: `F44408000501` + id + item.
+        hub.broadcast_except(
+            conn.session.id,
+            &format!(
+                "F44408000501{}{}",
+                encoder::le32(conn.session.id),
+                encoder::le16(item.id)
+            ),
+        )
+        .await;
     }
 }
 
-fn handle_use_item(conn: &mut Conn, payload: &[u8], out: &mut HandleOutcome) {
-    if payload.is_empty() {
-        return;
-    }
-    let slot = payload[0];
-
-    if let Some(pos) = conn.session.homdo.iter().position(|i| i.slot == slot) {
-        let item = conn.session.homdo[pos].clone();
-        if item.id == 0 {
-
-            return;
-        }
-
-        // Potion / book / item effects:
-        match item.id {
-            // HP Potion (e.g. 10001): restores 100 HP
-            10001 => {
-                conn.session.hp = (conn.session.hp + 100).min(conn.session.hp_max);
-                out.send(build_stat_update(0x19, conn.session.hp as i32));
-            }
-            // SP Potion (e.g. 10002): restores 100 SP
-            10002 => {
-                conn.session.sp = (conn.session.sp + 100).min(conn.session.sp_max);
-                out.send(build_stat_update(0x1A, conn.session.sp as i32));
-            }
-            // Skill Book (e.g. 20001): learns skill 10001 at lv 1
-            20001 => {
-                let skill_id = 10001u16;
-                let lv = 1u8;
-                if !conn.session.skills.iter().any(|(id, _)| *id == skill_id) {
-                    conn.session.skills.push((skill_id, lv));
-                }
-                out.send(format!(
-                    "F4440C0008016E01{}{}",
-                    encoder::le32(lv as u32),
-                    encoder::le32(skill_id as u32)
-                ));
-            }
-            // Stat Point Book (e.g. 20002): adds 5 allocation points
-            20002 => {
-                conn.session.point += 5;
-                out.send(build_stat_update(0x26, conn.session.point as i32));
-            }
-            // Gold item (e.g. 20003): adds 1000 gold
-            20003 => {
-                conn.session.gold += 1000;
-                out.send(format!(
-                    "F4440A001A04{}00000000",
-                    encoder::le32(conn.session.gold)
-                ));
-            }
-            // Doll summon (e.g. 20004): doll 101, npc 5001
-            20004 => {
-                let id4 = encoder::le32(conn.session.id);
-                let npcid = encoder::le16(5001);
-                out.send(format!(
-                    "F44408000505{}{}", id4, npcid
-                ));
-                out.send(format!("F44404001709{:02X}{:02X}", slot, item.count.saturating_sub(1)));
-                out.send("F4440200170F".to_string());
-                // Consume item
-                if item.count > 1 {
-                    conn.session.homdo[pos].count -= 1;
-                } else {
-                    conn.session.homdo.remove(pos);
-                }
-                return;
-            }
-            _ => {
-                // Generic item use default
-            }
-        }
-
-        // Decrement item count or remove
-        let rem = item.count.saturating_sub(1);
-        if rem > 0 {
-            conn.session.homdo[pos].count = rem;
-        } else {
-            conn.session.homdo.remove(pos);
-        }
-
-        // Standard end feedback
-        out.send(format!("F44404001709{:02X}{:02X}", slot, rem));
-        out.send("F4440200170F".to_string());
-    }
+async fn handle_use_item(
+    conn: &mut Conn,
+    payload: &[u8],
+    out: &mut HandleOutcome,
+    pool: Option<&sqlx::MySqlPool>,
+    data: &crate::data::loader::GameData,
+) {
+    super::use_item::use_item(conn, payload, out, pool, data).await;
 }
 
 fn handle_reborn(conn: &mut Conn, out: &mut HandleOutcome) {
@@ -259,7 +360,6 @@ fn handle_reborn(conn: &mut Conn, out: &mut HandleOutcome) {
 
     out.send("F44402002C01");
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -269,62 +369,177 @@ mod tests {
     use crate::server::session::Conn;
     use std::sync::Arc;
 
-    #[test]
-    fn test_equip_and_unequip() {
+    fn bag_item(slot: u8, id: u16, count: u8, loai: u8) -> InventoryItem {
+        InventoryItem {
+            slot,
+            id,
+            count,
+            loai,
+            ..Default::default()
+        }
+    }
+
+    async fn run(conn: &mut Conn, sub: u8, payload: &[u8]) -> HandleOutcome {
+        let data = GameData::default();
+        let service = BattleService::new(Arc::new(GameData::default()));
+        let mut out = HandleOutcome::default();
+        let mut ctx = test_ctx(conn, &data, &service, &mut out, sub, payload);
+        handle_inventory(&mut ctx).await;
+        out
+    }
+
+    #[tokio::test]
+    async fn equip_respects_level_gate() {
         let mut conn = Conn::new();
+        conn.session.level = 5;
         conn.session.homdo.push(InventoryItem {
             slot: 1,
             id: 12001,
             count: 1,
-            doben: 100,
+            lv: 10,
+            loai: 1,
+            ..Default::default()
+        });
+        let out = run(&mut conn, 11, &[1]).await;
+        assert!(conn.session.trangbi.is_empty(), "below level: no equip");
+        assert!(out.outgoing.is_empty());
+    }
+
+    #[tokio::test]
+    async fn equip_moves_to_trangbi_and_sends_stats() {
+        let mut conn = Conn::new();
+        conn.session.level = 10;
+        conn.session.homdo.push(InventoryItem {
+            slot: 1,
+            id: 12001,
+            count: 1,
+            lv: 1,
             loai: 1,
             atk1: 15,
             ..Default::default()
         });
-
-        let data = GameData::default();
-        let service = BattleService::new(Arc::new(GameData::default()));
-
-        let mut out = HandleOutcome::default();
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 11, &[1]);
-        handle_inventory(&mut ctx);
-
+        let out = run(&mut conn, 11, &[1]).await;
         assert_eq!(conn.session.trangbi.len(), 1);
         assert_eq!(conn.session.trangbi[0].id, 12001);
+        assert!(conn.session.homdo.is_empty());
         assert_eq!(conn.session.atk2, 15);
         assert!(out.outgoing.iter().any(|f| f.contains("171101")));
-
-        // Unequip
-        let mut out2 = HandleOutcome::default();
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out2, 12, &[1, 2]);
-        handle_inventory(&mut ctx);
-
-        assert_eq!(conn.session.trangbi.len(), 0);
-        assert_eq!(conn.session.atk2, 0);
-        assert!(out2.outgoing.iter().any(|f| f.contains("17100102")));
+        // Gear stat packets include the HP/SP max recompute frames.
+        assert!(out.outgoing.iter().any(|f| f.contains("08011A")));
+        assert!(out.outgoing.iter().any(|f| f.contains("080119")));
     }
 
-    #[test]
-    fn test_use_hp_potion() {
+    #[tokio::test]
+    async fn unequip_requires_empty_destination_slot() {
         let mut conn = Conn::new();
-        conn.session.hp_max = 200;
-        conn.session.hp = 50;
-        conn.session.homdo.push(InventoryItem {
+        conn.session.homdo.push(bag_item(2, 5001, 1, 0));
+        conn.session.trangbi.push(InventoryItem {
             slot: 1,
-            id: 10001,
-            count: 2,
+            id: 12001,
+            count: 1,
+            lv: 1,
+            loai: 1,
             ..Default::default()
         });
+        // Destination homdo slot 2 is occupied -> rejected.
+        let out = run(&mut conn, 12, &[1, 2]).await;
+        assert_eq!(conn.session.trangbi.len(), 1, "must not unequip onto a full slot");
+        assert!(out.outgoing.is_empty());
+    }
 
+    #[tokio::test]
+    async fn unequip_moves_to_empty_homdo_slot() {
+        let mut conn = Conn::new();
+        conn.session.homdo.push(bag_item(2, 0, 0, 0));
+        conn.session.trangbi.push(InventoryItem {
+            slot: 1,
+            id: 12001,
+            count: 1,
+            lv: 1,
+            loai: 1,
+            atk1: 15,
+            ..Default::default()
+        });
+        let out = run(&mut conn, 12, &[1, 2]).await;
+        assert!(conn.session.trangbi.is_empty());
+        assert_eq!(conn.session.homdo[0].slot, 2);
+        assert_eq!(conn.session.atk2, 0);
+        assert!(out.outgoing.iter().any(|f| f.contains("17100102")));
+    }
+
+    #[tokio::test]
+    async fn move_stack_splits_counts() {
+        let mut conn = Conn::new();
+        conn.session.homdo.push(bag_item(1, 100, 20, 0));
+        conn.session.homdo.push(bag_item(2, 100, 10, 0));
+        // move 5 from slot 1 to slot 2 (loai 0 -> stackable, total 15 <= 50)
+        let decoded = encoder::bytes("F4440700170A010502").unwrap();
         let data = GameData::default();
         let service = BattleService::new(Arc::new(GameData::default()));
         let mut out = HandleOutcome::default();
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 15, &[1]);
-        handle_inventory(&mut ctx);
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 10, &decoded[6..]);
+        // decoded is only used for the echo, so feed it via a raw frame anyway.
+        ctx.decoded = &decoded;
+        handle_inventory(&mut ctx).await;
 
-        assert_eq!(conn.session.hp, 150);
-        assert_eq!(conn.session.homdo[0].count, 1);
-        assert!(out.outgoing.iter().any(|f| f.contains("17090101")));
-        assert!(out.outgoing.iter().any(|f| f.contains("170F")));
+        assert_eq!(conn.session.homdo.iter().find(|i| i.slot == 1).unwrap().count, 15);
+        assert_eq!(conn.session.homdo.iter().find(|i| i.slot == 2).unwrap().count, 15);
+        assert_eq!(out.outgoing, vec![encoder::hex(&decoded)]);
+    }
+
+    #[tokio::test]
+    async fn pickup_requires_distance_gate() {
+        crate::server::map_drops::clear_all();
+        let mut conn = Conn::new();
+        conn.session.map_id = 12009;
+        conn.session.map_x = 1000;
+        conn.session.map_y = 1000;
+        crate::server::map_drops::drop(12009, 1, bag_item(1, 1001, 1, 0), 400, 500);
+        let out = run(&mut conn, 2, &[1]).await;
+        assert!(conn.session.homdo.is_empty(), "out of range: no pickup");
+        assert!(out.outgoing.is_empty());
+        assert!(
+            crate::server::map_drops::get(12009, 1).is_some(),
+            "drop must stay on the map when out of range"
+        );
+        crate::server::map_drops::clear_all();
+    }
+
+    #[tokio::test]
+    async fn pickup_adds_item_to_homdo() {
+        crate::server::map_drops::clear_all();
+        let mut conn = Conn::new();
+        conn.session.map_id = 12010;
+        conn.session.map_x = 400;
+        conn.session.map_y = 500;
+        crate::server::map_drops::drop(12010, 1, bag_item(1, 1001, 2, 0), 400, 500);
+        let out = run(&mut conn, 2, &[1]).await;
+        assert_eq!(conn.session.homdo.len(), 1);
+        assert_eq!(conn.session.homdo[0].id, 1001);
+        assert_eq!(conn.session.homdo[0].count, 2);
+        assert!(
+            crate::server::map_drops::get(12010, 1).is_none(),
+            "drop consumed by pickup"
+        );
+        assert!(out.outgoing.iter().any(|f| f.contains("1702")));
+        assert!(out.outgoing.iter().any(|f| f.contains("1706")));
+        crate::server::map_drops::clear_all();
+    }
+
+    #[tokio::test]
+    async fn drop_creates_map_drop_and_reduces_count() {
+        crate::server::map_drops::clear_all();
+        let mut conn = Conn::new();
+        conn.session.map_id = 12011;
+        conn.session.map_x = 400;
+        conn.session.map_y = 500;
+        conn.session.homdo.push(bag_item(3, 1001, 5, 0));
+        let out = run(&mut conn, 3, &[3, 2]).await;
+        assert_eq!(conn.session.homdo[0].count, 3, "dropped 2 of 5");
+        let drop = crate::server::map_drops::get(12011, 3).expect("drop on map");
+        assert_eq!(drop.item.id, 1001);
+        assert_eq!(drop.item.count, 5);
+        assert!(out.outgoing.iter().any(|f| f.contains("17090303")));
+        crate::server::map_drops::clear_all();
     }
 }

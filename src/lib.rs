@@ -26,6 +26,8 @@ pub mod server {
     pub mod handler;
     pub mod handlers;
     pub mod inventory;
+    pub mod map_drops;
+    pub mod persist;
     pub mod pet_box;
     pub mod session;
     pub mod spawn;

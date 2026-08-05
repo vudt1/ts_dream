@@ -11,6 +11,8 @@ pub struct InventoryItem {
     pub slot: u8,
     pub id: u16,
     pub count: u8,
+    /// Item level requirement (equip gate `player.Lv >= item.Lv`; C# `_Lv`).
+    pub lv: u8,
     pub doben: u8,
     pub long_val: u8,
     pub giatri_long: u8,

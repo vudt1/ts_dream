@@ -15,3 +15,4 @@ pub mod stats;
 pub mod system;
 pub mod talk;
 pub mod trade_storage;
+pub mod use_item;
