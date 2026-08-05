@@ -5,6 +5,7 @@
 
 use crate::protocol::encoder;
 use crate::server::handler::HandleOutcome;
+use crate::server::session::Session;
 use std::sync::atomic::{AtomicI64, Ordering};
 
 /// Wall-clock override (unix seconds) for the deterministic golden replay of
@@ -216,68 +217,89 @@ pub fn server_name_frame(id: u32, server_name: &str) -> String {
     crate::protocol::frame("2709", &body)
 }
 
-/// Build full 22-step Logined1 sequence frames for a logged-in character.
-pub fn build_logined_sequence(
-    id: u32,
-    name: &[u8],
-    sex: u8,
-    hair: u16,
-    color: &str,
-    thuoctinh: u8,
-    map_id: u16,
-    map_x: u16,
-    map_y: u16,
-    gocnhin: u8,
-    pk: u8,
-    tham_chien: u8,
-) -> Vec<String> {
+/// God / HP store / SP store frame (`method_0`): op 0x23 sub 0x04 + point + 12
+/// zero bytes (C# `"F44412002304" + le32(point) + "000000000000000000000000"`).
+pub fn store_frame(point: u32) -> String {
+    let mut body = String::new();
+    body.push_str(&encoder::le32(point));
+    body.push_str(&"00".repeat(12));
+    crate::protocol::frame("2304", &body)
+}
+
+/// Build the full 22-step `Logined1` sequence frames for a logged-in session,
+/// sourced from the session's actual state (props, stats, inventory, gold,
+/// hotkeys, stores) so it matches a real C# `Logined1` byte-for-byte.
+pub fn build_logined_sequence_session(s: &Session) -> Vec<String> {
     let mut frames = Vec::new();
 
     // 1. Step 1: end-talk + marker
     frames.extend(login_start());
 
     // 2. Step 2: player self-appear (op 0x03 sub 0x03)
+    let color = if s.color.is_empty() { "0000000000000000" } else { &s.color };
     frames.push(player_appear(
-        id, sex, 0, 0, map_id, map_x, map_y, gocnhin, hair, color, &[], 0, 0, name,
+        s.id,
+        s.sex,
+        0,
+        0,
+        s.map_id,
+        s.map_x,
+        s.map_y,
+        s.gocnhin,
+        s.hair,
+        color,
+        &s.equipped_ids(),
+        s.reborn,
+        s.job,
+        &s.name,
     ));
 
     // 3. Step 3: stats (op 0x05 sub 0x03)
-    let hp_max = crate::battle::engine::get_hp_max(0, 0, 1, 0) as u16;
-    let sp_max = crate::battle::engine::get_sp_max(0, 0, 1, 0) as u16;
+    let skills_hex = skill_list(&s.skills);
     frames.push(stats(
-        thuoctinh, hp_max, sp_max, 0, 0, 0, 0, 0, 0, 1, 6, 0, 0, 1, hp_max, sp_max, 0, 0, 0, 1, 0, 0, "",
+        s.thuoctinh, s.hp, s.sp, s.int1, s.atk, s.def, s.agi, s.hpx, s.spx, s.level,
+        s.texp, s.skill_point, s.point, s.tiengtam, s.hp_max, s.sp_max, s.atk2, s.def2,
+        s.int2, s.agi2, s.hpx2, s.spx2, &skills_hex,
     ));
 
-    // 4. Step 4: SendPlayerOnline (self-appear for online pool, handled by broadcast)
+    // 4. Step 4: SendPlayerOnline — broadcast to the map, owned by the server loop.
 
-    // 5. Step 5: Pet summary
+    // 5. Step 5: Pet summary (0x0F08/0F14/0F0A).
     frames.push("F44402000F08".to_string());
     frames.push("F44402000F14".to_string());
     frames.push("F44402000F0A".to_string());
 
-    // 6. Step 6: Party frames (none for new login)
+    // 6. Step 6: Party frames (none for new login).
 
-    // 7. Step 7: Pet summon (none active)
+    // 7. Step 7: Pet summon (`F44406001301` + pet id) when one is active.
+    if (1..=4).contains(&s.active_pet_stt) {
+        if let Some(pet) = s.pets.iter().find(|p| p.stt == s.active_pet_stt) {
+            frames.push(crate::protocol::frame("1301", &encoder::le32(u32::from(pet.id))));
+        }
+    }
 
-    // 8. Step 8: Pet stat recompute (no packet)
+    // 8. Step 8: Pet stat recompute (no packet).
 
     // 9. Step 9: PK / war state
-    frames.push(format!("F44404002102{:02X}{:02X}", pk, tham_chien));
+    frames.push(format!("F44404002102{:02X}{:02X}", s.pk, s.tham_chien));
 
     // 10. Step 10: Inventory dumps (Homdo, TienTrang, Tuideo, LuuLang)
-    frames.push("F44402001705".to_string());
-    frames.push("F44402001E01".to_string());
-    frames.push("F4440200172F".to_string());
-    frames.push("F44402001766".to_string());
+    frames.push(s.dump_homdo());
+    frames.push(s.dump_tientrang());
+    frames.push(s.dump_tuideo());
+    frames.push(s.dump_luulang());
 
     // 11. Step 11: Equipped
-    frames.push("F4440200170B".to_string());
+    frames.push(s.dump_trangbi());
 
     // 12. Step 12: Gold
-    frames.push("F4440A001A04000000000000".to_string());
+    let mut gold_body = String::new();
+    gold_body.push_str(&encoder::le32(s.gold));
+    gold_body.push_str("00000000");
+    frames.push(crate::protocol::frame("1A04", &gold_body));
 
     // 13. Step 13: Server name ("TSVN")
-    frames.push(server_name_frame(id, "TSVN"));
+    frames.push(server_name_frame(s.id, "TSVN"));
 
     // 14. Step 14: Terminator
     frames.push("F44402000504F44402000F0A".to_string());
@@ -299,13 +321,12 @@ pub fn build_logined_sequence(
     ));
 
     // 20. Step 20: Hotbar
-    frames.push("F4440300280102".to_string());
+    frames.push(s.dump_hotkeys());
 
-    // 21. Step 21: God / HP store / SP store (3x F44412002304...)
-    let store_frame = format!("F444120023041027{}", "00".repeat(24));
-    frames.push(store_frame.clone());
-    frames.push(store_frame.clone());
-    frames.push(store_frame);
+    // 21. Step 21: God / HP store / SP store (3x)
+    frames.push(store_frame(s.god));
+    frames.push(store_frame(s.hp_store));
+    frames.push(store_frame(s.sp_store));
 
     frames
 }

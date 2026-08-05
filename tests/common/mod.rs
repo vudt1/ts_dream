@@ -171,10 +171,10 @@ pub fn scenario_for(name: &str) -> Option<Scenario<'static>> {
     all_scenarios().into_iter().find(|s| s.name == name)
 }
 
-/// The synchronous dispatch frame stream for a scenario name (empty if the
+/// The in-process dispatch frame stream for a scenario name (empty if the
 /// scenario is the async battle-win).
-pub fn replay_sync(name: &str) -> Vec<String> {
-    scenario_for(name).expect("scenario registered").replay()
+pub async fn replay_sync(name: &str) -> Vec<String> {
+    scenario_for(name).expect("scenario registered").replay().await
 }
 
 // ---- Battle-win replay (golden/03-battle-win) ----
@@ -320,7 +320,7 @@ pub async fn run_all_goldens() {
 
         let got: Vec<String> = match g.name.as_str() {
             "03-battle-win" => battle_win_frames().await,
-            name => replay_sync(name),
+            name => replay_sync(name).await,
         };
 
         assert_eq!(
@@ -343,8 +343,8 @@ pub async fn run_all_goldens() {
 
 /// Regenerate the golden files for all synchronous scenarios (reproducible
 /// re-capture when behaviour legitimately changes; Ch9 §9.2).
-pub fn regenerate(dir: &str, comment: &str) {
+pub async fn regenerate(dir: &str, comment: &str) {
     for s in all_scenarios() {
-        s.save(dir, comment).expect("golden saved");
+        s.save(dir, comment).await.expect("golden saved");
     }
 }

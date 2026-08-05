@@ -370,7 +370,7 @@ pub mod scenario {
         }
 
         /// Replay the scenario in-process and return the ordered S2C frames.
-        pub fn replay(&self) -> Vec<String> {
+        pub async fn replay(&self) -> Vec<String> {
             if let Some(t) = self.now_override {
                 crate::server::spawn::override_now(t);
             }
@@ -382,7 +382,14 @@ pub mod scenario {
                 let Some(decoded) = encoder::bytes(c2s) else {
                     panic!("scenario `{}`: bad c2s hex `{c2s}`", self.name);
                 };
-                let out = handler::dispatch(&mut conn, &decoded, &self.data, &service);
+                let out = handler::dispatch(
+                    &mut conn,
+                    &decoded,
+                    &self.data,
+                    &service,
+                    &handler::ServerEnv::none(),
+                )
+                .await;
                 for frame in out.outgoing {
                     s2c.push(frame);
                 }
@@ -394,7 +401,7 @@ pub mod scenario {
         }
 
         /// Serialize the replayed scenario into golden-file text.
-        pub fn to_golden_text(&self, comment: &str) -> String {
+        pub async fn to_golden_text(&self, comment: &str) -> String {
             let mut out = String::new();
             out.push_str("// ");
             out.push_str(comment);
@@ -407,7 +414,7 @@ pub mod scenario {
             if !self.c2s.is_empty() {
                 out.push('\n');
             }
-            let s2c = self.replay();
+            let s2c = self.replay().await;
             for s in s2c {
                 out.push_str(">>");
                 out.push_str(&s);
@@ -417,9 +424,9 @@ pub mod scenario {
         }
 
         /// Save the replayed golden text to `golden/<name>.golden`.
-        pub fn save(&self, dir: impl AsRef<Path>, comment: &str) -> Result<()> {
+        pub async fn save(&self, dir: impl AsRef<Path>, comment: &str) -> Result<()> {
             let path = dir.as_ref().join(format!("{}.golden", self.name));
-            std::fs::write(&path, self.to_golden_text(comment)).map_err(TsError::Io)
+            std::fs::write(&path, self.to_golden_text(comment).await).map_err(TsError::Io)
         }
     }
 }

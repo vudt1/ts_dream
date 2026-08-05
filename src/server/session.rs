@@ -120,8 +120,11 @@ pub struct Session {
     pub texp: u32,
     pub gold: u32,
     pub tiengtam: u16,
+    pub god: u32,
     pub hp_store: u32,
     pub sp_store: u32,
+    /// Equipped-colour hex string (`_My_Color`), e.g. `"0000000000000000"`.
+    pub color: String,
 
     // Skills: list of (skill_id, level)
     pub skills: Vec<(u16, u8)>,
@@ -151,6 +154,8 @@ pub struct Session {
     pub click_npc_id: i32,
     /// Party members (`_My_IdMem1..4`), 0 = empty.
     pub id_mem: [u32; 4],
+    /// Party leader id (`_My_IdLeader`); 0 = no party follow.
+    pub id_leader: u32,
     /// Quest step updates recorded by `BattleQuestWin` (`npcId, npcVal`).
     pub quest_steps: Vec<(i64, i64)>,
     /// Warp-step updates recorded by `BattleQuestWin` (`npcId, warpVal`).
@@ -218,8 +223,10 @@ impl Default for Session {
             texp: 6,
             gold: 0,
             tiengtam: 1,
+            god: 0,
             hp_store: 10000,
             sp_store: 10000,
+            color: "0000000000000000".to_string(),
 
             skills: Vec::new(),
             hotkeys: [0; 11],
@@ -244,6 +251,7 @@ impl Default for Session {
             completed_quests: Vec::new(),
             click_npc_id: 0,
             id_mem: [0; 4],
+            id_leader: 0,
             quest_steps: Vec::new(),
             warp_steps: Vec::new(),
         }
@@ -283,29 +291,33 @@ impl Session {
 
     /// Dump Homdo inventory frame (`F444` + len + `1705` + entries).
     pub fn dump_homdo(&self) -> String {
-        let mut entries = String::new();
-        for item in &self.homdo {
-            if item.id > 0 {
-                entries.push_str(&format!(
-                    "{:02X}{}{:02X}{:02X}{:02X}{:02X}{:02X}{}",
-                    item.slot,
-                    encoder::le16(item.id),
-                    item.count,
-                    item.doben,
-                    item.long_val,
-                    (item.giatri_long as u16 + 100) as u8,
-                    item.khang,
-                    encoder::le32(item.texp)
-                ));
-            }
-        }
-        crate::protocol::frame("1705", &entries)
+        self.dump_table(&self.homdo, "1705")
     }
 
     /// Dump Trangbi equipment frame (`F444` + len + `170B` + entries).
     pub fn dump_trangbi(&self) -> String {
+        self.dump_table(&self.trangbi, "170B")
+    }
+
+    /// Dump TienTrang storage frame (`F444` + len + `1E01` + entries).
+    pub fn dump_tientrang(&self) -> String {
+        self.dump_table(&self.tientrang, "1E01")
+    }
+
+    /// Dump Tuideo pouch frame (`F444` + len + `172F` + entries).
+    pub fn dump_tuideo(&self) -> String {
+        self.dump_table(&self.tuideo, "172F")
+    }
+
+    /// Dump LuuLang storage frame (`F444` + len + `1766` + entries).
+    pub fn dump_luulang(&self) -> String {
+        self.dump_table(&self.luulang, "1766")
+    }
+
+    /// Serialise one inventory table into a frame (`F444` + len + `code` + entries).
+    fn dump_table(&self, items: &[InventoryItem], code: &str) -> String {
         let mut entries = String::new();
-        for item in &self.trangbi {
+        for item in items {
             if item.id > 0 {
                 entries.push_str(&format!(
                     "{:02X}{}{:02X}{:02X}{:02X}{:02X}{:02X}{}",
@@ -320,7 +332,16 @@ impl Session {
                 ));
             }
         }
-        crate::protocol::frame("170B", &entries)
+        crate::protocol::frame(code, &entries)
+    }
+
+    /// Equipped item ids by slot (used in the self-appear frame, `_My_Color` side).
+    pub fn equipped_ids(&self) -> Vec<u16> {
+        self.trangbi
+            .iter()
+            .filter(|i| i.id > 0)
+            .map(|i| i.id)
+            .collect()
     }
 
     /// Dump Hotkeys skill bar frame (`F444` + len + `2801` + entries).

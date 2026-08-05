@@ -1,3 +1,4 @@
-// Golden scenario: warp — slash command "/warp 12001" (ticket 23, Ch9 §9.6)
+// Golden scenario (ticket 23, Ch9)
 <<F4440D0002022F77617270203132303031
+
 >>F4440D000CE1930400E12E9001F40100

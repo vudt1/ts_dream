@@ -1,5 +1,6 @@
-// Golden scenario: create character — name check then create (ticket 23, Ch9 §9.6)
+// Golden scenario (ticket 23, Ch9)
 <<F4440A000902544553544E414D45
 <<F4441C0009010100020000000000000000000300000000000004000000000000
+
 >>F4440300090300
 >>F44402000901

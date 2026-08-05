@@ -1,5 +1,5 @@
-// Golden scenario: buy from mall — GM shop 0x42 sub 1, item 10001 for 200 pts
-// (ticket 23, Ch9 §9.6). shop_point 1000 → 800, Homdo gains the item.
+// Golden scenario (ticket 23, Ch9)
 <<F4440600420100001127C800
+
 >>F4440600420220030100
 >>F4440E001705011127016400640000000000

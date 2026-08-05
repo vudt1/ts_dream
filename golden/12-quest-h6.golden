@@ -1,9 +1,7 @@
-// Golden scenario: quest via FTalk.H6 branch (ticket 23, Ch9 §9.6)
-//
-// Map 10916, NPC 1. Start talk sends the H6 menu dialog; continuing with
-// select_menu=20 (≠ require 30) takes the LoseDialogs path (FTalk.cs:2687-2713).
+// Golden scenario (ticket 23, Ch9)
 <<F444040014010100
 <<F4440300140600
+
 >>F44402000602
 >>F44411001401000000010603010000000000000100
 >>F44411001401000000010103010000000000009E28

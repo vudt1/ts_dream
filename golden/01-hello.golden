@@ -1,3 +1,4 @@
-// Golden scenario: Hello (0x00)
+// Golden scenario (ticket 23, Ch9)
 <<F444010000
+
 >>F4440300010901

@@ -1,3 +1,4 @@
-// Golden scenario: move — op 0x06 sub 1 broadcast (ticket 23, Ch9 §9.6)
+// Golden scenario (ticket 23, Ch9)
 <<F44407000601026400C800
+
 >>F4440B000601E1930400026400C800

@@ -3,13 +3,20 @@
 //! Controls game TCP server lifecycle: start, stop (with 5s 020C countdown),
 //! announce broadcast, and active client connection tracking.
 
+use crate::battle::service::BattleService;
 use crate::data::loader::GameData;
+use crate::protocol::encoder;
+use crate::protocol::frame;
+use crate::server::handler::{self, ServerEnv};
+use crate::server::session::Conn;
 use crate::server::spawn::announce_frame;
 use crate::state::AppState;
 use axum::http::StatusCode;
 use sqlx::MySqlPool;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
 use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 use tokio::time::{sleep, Duration};
 
@@ -181,21 +188,169 @@ impl ServerControl {
             }
         }
     }
+
+    /// Register a freshly-authenticated connection under `player_id`, atomically
+    /// with the double-login check. Returns `false` (and keeps the map untouched)
+    /// when the id is already online — the login must then be shut down.
+    pub async fn login_register(&self, player_id: u32, sender: &ClientSender) -> bool {
+        let mut clients = self.clients.lock().await;
+        if clients.contains_key(&player_id) {
+            return false;
+        }
+        clients.insert(player_id, sender.clone());
+        true
+    }
+
+    /// Send `hex_frame` to every registered client except `from_id`
+    /// (map-broadcast fan-out for move/expressions).
+    pub async fn broadcast_except(&self, from_id: u32, hex_frame: &str) {
+        let clients = self.clients.lock().await;
+        for (player_id, tx) in clients.iter() {
+            if *player_id != from_id {
+                if let Err(_) = tx.send(hex_frame.to_string()) {
+                    tracing::debug!("Failed to send broadcast to player {player_id}");
+                }
+            }
+        }
+    }
 }
 
-/// Connection handler for game TCP streams.
+/// True when a decoded frame must be fanned out to other players on the same
+/// map: move (op 0x06 sub 0x01) and expressions/actions (op 0x20).
+fn is_map_broadcast(decoded: &[u8]) -> bool {
+    match decoded.get(4).copied().unwrap_or(0) {
+        0x06 => decoded.get(5).copied().unwrap_or(0) == 1,
+        0x20 => true,
+        _ => false,
+    }
+}
+
+/// Connection handler for game TCP streams: frames inbound, dispatches opcodes,
+/// writes outgoing frames, registers/logins the client and fans out
+/// map-broadcast frames to peers.
 async fn handle_client_connection(
-    stream: tokio::net::TcpStream,
+    stream: TcpStream,
     peer: std::net::SocketAddr,
     app: Arc<RwLock<AppState>>,
-    _data: Option<Arc<GameData>>,
-    _pool: Option<MySqlPool>,
-    _control: ServerControl,
+    data: Option<Arc<GameData>>,
+    pool: Option<MySqlPool>,
+    control: ServerControl,
 ) {
     let peer_ip = peer.to_string();
     app.write().await.push_log(
         "system",
         format!("Client connected from {peer_ip}"),
     );
-    let _ = stream;
+
+    let data = data.unwrap_or_else(|| Arc::new(GameData::default()));
+    let service = BattleService::new(Arc::clone(&data));
+
+    let (mut read_half, mut write_half) = stream.into_split();
+    let (tx, mut rx) = mpsc::unbounded_channel::<String>();
+
+    let mut conn = Conn::new();
+    let mut buf = vec![0u8; 8192];
+    let mut logined_id = 0u32;
+
+    loop {
+        tokio::select! {
+            read_res = read_half.read(&mut buf) => {
+                match read_res {
+                    Ok(0) => break, // Peer closed
+                    Ok(n) => {
+                        for frame_hex in conn.decoder.feed(&buf[..n]) {
+                            let Some(decoded) = encoder::bytes(&frame_hex) else {
+                                continue;
+                            };
+                            let env = ServerEnv {
+                                pool: pool.as_ref(),
+                                hub: Some(&control),
+                                sender: Some(&tx),
+                            };
+                            let out = handler::dispatch(&mut conn, &decoded, &data, &service, &env).await;
+                            let id = conn.session.id;
+                            for f in &out.outgoing {
+                                let _ = tx.send(f.clone());
+                            }
+                            if is_map_broadcast(&decoded) {
+                                for f in &out.outgoing {
+                                    control.broadcast_except(id, f).await;
+                                }
+                            }
+                            if conn.session.logined && logined_id == 0 && id > 0 {
+                                logined_id = id;
+                            }
+                            if out.shutdown {
+                                app.write().await.push_log(
+                                    "system",
+                                    format!("Shutting down connection from {peer_ip}"),
+                                );
+                                return;
+                            }
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+            Some(frame_hex) = rx.recv() => {
+                if let Ok(wire) = frame::encode_to_wire(&frame_hex) {
+                    if write_half.write_all(&wire).await.is_err() {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    if logined_id > 0 {
+        control.unregister_client(logined_id).await;
+    }
+    app.write().await.push_log(
+        "system",
+        format!("Client disconnected from {peer_ip}"),
+    );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::AppState;
+
+    fn control() -> ServerControl {
+        let app = Arc::new(RwLock::new(AppState::new(100)));
+        ServerControl::new(6414, app, None, None)
+    }
+
+    #[tokio::test]
+    async fn login_register_is_atomic_double_login_guard() {
+        let c = control();
+        let (tx1, _rx1) = mpsc::unbounded_channel::<String>();
+        let (tx2, _rx2) = mpsc::unbounded_channel::<String>();
+
+        assert!(c.login_register(300001, &tx1).await, "first login registers");
+        assert!(
+            !c.login_register(300001, &tx2).await,
+            "second concurrent login is rejected (double-login guard)"
+        );
+        // The failed registration must not clobber the original sender.
+        assert_eq!(c.clients.lock().await.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn broadcast_except_skips_origin() {
+        let c = control();
+        let (tx1, mut rx1) = mpsc::unbounded_channel::<String>();
+        let (tx2, mut rx2) = mpsc::unbounded_channel::<String>();
+        c.login_register(300001, &tx1).await;
+        c.login_register(300002, &tx2).await;
+
+        c.broadcast_except(300001, "F4440B000601FFFFFFFF026400C800").await;
+
+        assert_eq!(rx1.try_recv(), Err(mpsc::error::TryRecvError::Empty), "origin excluded");
+        assert_eq!(
+            rx2.try_recv().unwrap(),
+            "F4440B000601FFFFFFFF026400C800",
+            "peer receives the broadcast"
+        );
+    }
 }

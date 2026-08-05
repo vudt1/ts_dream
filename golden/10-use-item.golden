@@ -1,6 +1,6 @@
-// Golden scenario: use item — HP potion 10001 (op 0x17 sub 15) (ticket 23, Ch9 §9.6)
-// hp 50 → 150; potion consumed from slot 1 (count 2 → 1).
+// Golden scenario (ticket 23, Ch9)
 <<F4440300170F01
+
 >>F4440C00080119019600000000000000
 >>F444040017090101
 >>F4440200170F

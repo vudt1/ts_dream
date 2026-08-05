@@ -18,8 +18,8 @@ async fn golden_scenarios_replay_byte_exact() {
 
 /// Re-capture helper: rewrites the synchronous golden files from the current
 /// handler output. Ignored by default; run manually when behaviour changes.
-#[test]
+#[tokio::test]
 #[ignore]
-fn regenerate_goldens() {
-    common::regenerate("golden", "Golden scenario (ticket 23, Ch9)");
+async fn regenerate_goldens() {
+    common::regenerate("golden", "Golden scenario (ticket 23, Ch9)").await;
 }
