@@ -1,11 +1,13 @@
 //! Character creation & name check handler (Opcode 0x09).
 
 use crate::protocol::encoder;
-use crate::server::handler::HandleOutcome;
-use crate::server::session::Conn;
+use crate::server::handler::OpcodeCtx;
 
 /// Op 0x09 — Create character / name check.
-pub fn handle_character(conn: &mut Conn, sub: u8, payload: &[u8], out: &mut HandleOutcome) {
+pub fn handle_character(ctx: &mut OpcodeCtx) {
+    let conn = &mut ctx.conn;
+    let out = &mut ctx.out;
+    let (sub, payload) = (ctx.sub, ctx.payload);
     match sub {
         // Sub 2: Name check
         2 => {

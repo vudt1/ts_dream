@@ -8,18 +8,15 @@ use crate::battle::runner::BattleCommand;
 use crate::battle::service::BattleService;
 use crate::data::loader::GameData;
 use crate::protocol::encoder;
-use crate::server::handler::HandleOutcome;
+use crate::server::handler::{HandleOutcome, OpcodeCtx};
 use crate::server::session::{Conn, Session};
 
 /// Dispatch Opcode 0x0B — Battle control (Ch2 §2.3.8).
-pub fn handle_battle(
-    conn: &mut Conn,
-    sub: u8,
-    payload: &[u8],
-    data: &GameData,
-    service: &BattleService,
-    out: &mut HandleOutcome,
-) {
+pub fn handle_battle(ctx: &mut OpcodeCtx) {
+    let conn = &mut ctx.conn;
+    let out = &mut ctx.out;
+    let service = ctx.service;
+    let (sub, payload) = (ctx.sub, ctx.payload);
     match sub {
         1 => handle_leave_battle(conn, payload, service, out),
         2 => handle_pk_or_attack(conn, payload, service, out),
@@ -40,7 +37,7 @@ pub fn handle_battle(
             );
         }
         _ => {
-            let _ = (data, out);
+            let _ = (ctx.data, out);
         }
     }
 }
@@ -127,14 +124,12 @@ fn handle_attack_npc(conn: &mut Conn, payload: &[u8], service: &BattleService) {
 }
 
 /// Dispatch Opcode 0x32 — Battle commands (Ch2 §2.3.27).
-pub fn handle_battle_command(
-    conn: &mut Conn,
-    sub: u8,
-    payload: &[u8],
-    data: &GameData,
-    service: &BattleService,
-    out: &mut HandleOutcome,
-) {
+pub fn handle_battle_command(ctx: &mut OpcodeCtx) {
+    let conn = &mut ctx.conn;
+    let out = &mut ctx.out;
+    let data = ctx.data;
+    let service = ctx.service;
+    let (sub, payload) = (ctx.sub, ctx.payload);
     match sub {
         1 => handle_skill_command(conn, payload, data, service, out),
         2 => handle_use_item(conn, payload, data, service),
@@ -239,6 +234,7 @@ fn skill_level_for(session: &Session, skill_id: i64, row: u8) -> i64 {
 mod tests {
     use super::*;
     use crate::battle::service::BattleService;
+    use crate::server::handler::test_ctx;
     use crate::server::session::Conn;
 
     fn service() -> BattleService {
@@ -251,8 +247,10 @@ mod tests {
         conn.session.id = 300001;
         conn.session.battle_id = 5;
         let svc = service();
+        let data = GameData::default();
         let mut out = HandleOutcome::default();
-        handle_battle(&mut conn, 1, &[3], &GameData::default(), &svc, &mut out);
+        let mut ctx = test_ctx(&mut conn, &data, &svc, &mut out, 1, &[3]);
+        handle_battle(&mut ctx);
         assert_eq!(conn.session.battle_id, 0);
         assert_eq!(out.outgoing.len(), 1);
         assert!(out.outgoing[0].starts_with("F44408000B00"));
@@ -264,8 +262,10 @@ mod tests {
         let mut conn = Conn::new();
         conn.session.battle_id = 5;
         let svc = service();
+        let data = GameData::default();
         let mut out = HandleOutcome::default();
-        handle_battle(&mut conn, 1, &[1], &GameData::default(), &svc, &mut out);
+        let mut ctx = test_ctx(&mut conn, &data, &svc, &mut out, 1, &[1]);
+        handle_battle(&mut ctx);
         assert_eq!(conn.session.battle_id, 5);
         assert!(out.outgoing.is_empty());
     }
@@ -280,8 +280,10 @@ mod tests {
         let mut payload = vec![0u8; 6];
         payload[0] = 3;
         payload[1..5].copy_from_slice(&npc_id.to_le_bytes());
+        let data = GameData::default();
         let mut out = HandleOutcome::default();
-        handle_battle(&mut conn, 2, &payload, &GameData::default(), &svc, &mut out);
+        let mut ctx = test_ctx(&mut conn, &data, &svc, &mut out, 2, &payload);
+        handle_battle(&mut ctx);
         assert_eq!(conn.session.battle_id, 0);
         assert!(out.outgoing.is_empty());
     }
@@ -304,8 +306,10 @@ mod tests {
         let mut payload = vec![0u8; 5];
         payload[0] = 2;
         payload[1..5].copy_from_slice(&300002u32.to_le_bytes());
+        let data = GameData::default();
         let mut out = HandleOutcome::default();
-        handle_battle(&mut conn, 2, &payload, &GameData::default(), &svc, &mut out);
+        let mut ctx = test_ctx(&mut conn, &data, &svc, &mut out, 2, &payload);
+        handle_battle(&mut ctx);
         assert_eq!(out.outgoing, vec!["F4440300210101".to_string()]);
     }
 
@@ -326,8 +330,10 @@ mod tests {
         let mut payload = vec![0u8; 5];
         payload[0] = 2;
         payload[1..5].copy_from_slice(&300002u32.to_le_bytes());
+        let data = GameData::default();
         let mut out = HandleOutcome::default();
-        handle_battle(&mut conn, 2, &payload, &GameData::default(), &svc, &mut out);
+        let mut ctx = test_ctx(&mut conn, &data, &svc, &mut out, 2, &payload);
+        handle_battle(&mut ctx);
         assert!(out.outgoing.is_empty());
     }
 
@@ -336,6 +342,7 @@ mod tests {
         let mut conn = Conn::new();
         conn.session.battle_id = 0;
         let svc = service();
+        let data = GameData::default();
         let mut out = HandleOutcome::default();
         // skill 10000 targeting (0,2)
         let mut payload = vec![0u8; 6];
@@ -344,7 +351,8 @@ mod tests {
         payload[2] = 0;
         payload[3] = 2;
         payload[4..6].copy_from_slice(&10000u16.to_le_bytes());
-        handle_battle_command(&mut conn, 1, &payload, &GameData::default(), &svc, &mut out);
+        let mut ctx = test_ctx(&mut conn, &data, &svc, &mut out, 1, &payload);
+        handle_battle_command(&mut ctx);
         assert!(out.outgoing.is_empty());
     }
 }

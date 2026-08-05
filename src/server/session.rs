@@ -257,49 +257,22 @@ impl Session {
 
     /// Recompute gear bonus stats and max HP/SP.
     pub fn recompute_stats(&mut self) {
-        let mut int2 = 0u32;
-        let mut atk2 = 0u32;
-        let mut def2 = 0u32;
-        let mut hpx2 = 0u32;
-        let mut spx2 = 0u32;
-        let mut agi2 = 0u32;
-
-        for item in &self.trangbi {
-            if item.id > 0 {
-                int2 += item.int1.max(0) as u32;
-                atk2 += item.atk1.max(0) as u32;
-                def2 += item.def1.max(0) as u32;
-                hpx2 += item.hpx1.max(0) as u32;
-                spx2 += item.spx1.max(0) as u32;
-                agi2 += item.agi1.max(0) as u32;
-            }
-        }
-
-        self.int2 = int2;
-        self.atk2 = atk2;
-        self.def2 = def2;
-        self.hpx2 = hpx2;
-        self.spx2 = spx2;
-        self.agi2 = agi2;
-
-        let computed_hp = get_hp_max(
-            self.reborn as i64,
-            self.job as i64,
-            self.level as i64,
-            self.hpx as i64,
-        ) as u16
-            + hpx2 as u16;
-        let computed_sp = get_sp_max(
-            self.reborn as i64,
-            self.job as i64,
-            self.level as i64,
-            self.spx as i64,
-        ) as u16
-            + spx2 as u16;
-
-        self.hp_max = computed_hp;
-        self.sp_max = computed_sp;
-
+        let sheet = crate::server::character_sheet::CharacterSheet::recompute(
+            i64::from(self.reborn),
+            i64::from(self.job),
+            i64::from(self.level),
+            i64::from(self.hpx),
+            i64::from(self.spx),
+            &self.trangbi,
+        );
+        self.int2 = sheet.gear.int2;
+        self.atk2 = sheet.gear.atk2;
+        self.def2 = sheet.gear.def2;
+        self.hpx2 = sheet.gear.hpx2;
+        self.spx2 = sheet.gear.spx2;
+        self.agi2 = sheet.gear.agi2;
+        self.hp_max = sheet.hp_max;
+        self.sp_max = sheet.sp_max;
         if self.hp > self.hp_max {
             self.hp = self.hp_max;
         }
@@ -326,8 +299,7 @@ impl Session {
                 ));
             }
         }
-        let total_len = 2 + entries.len() / 2;
-        format!("F444{}1705{}", encoder::le16(total_len as u16), entries)
+        crate::protocol::frame("1705", &entries)
     }
 
     /// Dump Trangbi equipment frame (`F444` + len + `170B` + entries).
@@ -348,8 +320,7 @@ impl Session {
                 ));
             }
         }
-        let total_len = 2 + entries.len() / 2;
-        format!("F444{}170B{}", encoder::le16(total_len as u16), entries)
+        crate::protocol::frame("170B", &entries)
     }
 
     /// Dump Hotkeys skill bar frame (`F444` + len + `2801` + entries).
@@ -364,51 +335,18 @@ impl Session {
         if entries.is_empty() {
             "F4440300280102".to_string()
         } else {
-            let payload = format!("2801{entries}");
-            let total_len = 2 + payload.len() / 2;
-            format!("F444{}{}", encoder::le16(total_len as u16), payload)
+            crate::protocol::frame("2801", &entries)
         }
     }
 
     /// Add an item to Homdo. Returns slot index (1..25) on success, None if full.
-    pub fn add_homdo_item(&mut self, mut item: InventoryItem) -> Option<u8> {
-        // If stackable, find existing slot
-        if item.count > 0 {
-            for existing in &mut self.homdo {
-                if existing.id == item.id && existing.count < 255 {
-                    existing.count = existing.count.saturating_add(item.count);
-                    return Some(existing.slot);
-                }
-            }
-        }
-
-        // Find free slot
-        for slot in 1..=25 {
-            if !self.homdo.iter().any(|i| i.slot == slot && i.id > 0) {
-                item.slot = slot;
-                self.homdo.push(item);
-                return Some(slot);
-            }
-        }
-        None
+    pub fn add_homdo_item(&mut self, item: InventoryItem) -> Option<u8> {
+        crate::server::inventory::add_item(&mut self.homdo, item)
     }
 
     /// Remove up to `count` of `item_id` from inventory; returns the removed count.
     pub fn remove_homdo_item(&mut self, item_id: u16, count: u32) -> u32 {
-        let mut removed = 0u32;
-        for item in &mut self.homdo {
-            if item.id != item_id || item.count == 0 {
-                continue;
-            }
-            let take = (count - removed).min(item.count as u32) as u8;
-            item.count -= take;
-            removed += take as u32;
-            if removed >= count {
-                break;
-            }
-        }
-        self.homdo.retain(|i| i.count > 0 || i.id == 0);
-        removed
+        crate::server::inventory::remove_item(&mut self.homdo, item_id, count)
     }
 }
 

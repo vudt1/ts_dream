@@ -1,18 +1,16 @@
 //! Inventory base (Op 0x17 subs 2, 3, 10, 11, 12) & Use items (Op 0x17 sub 15) & Reborn (sub 46).
 
 use crate::protocol::encoder;
-use crate::server::handler::{hex_of, HandleOutcome};
+use crate::server::handler::{hex_of, HandleOutcome, OpcodeCtx};
 use crate::server::handlers::stats::build_stat_update;
 use crate::server::session::{Conn, InventoryItem};
 
 /// Dispatch Opcode 0x17 — Inventory operations.
-pub fn handle_inventory(
-    conn: &mut Conn,
-    sub: u8,
-    payload: &[u8],
-    decoded: &[u8],
-    out: &mut HandleOutcome,
-) {
+pub fn handle_inventory(ctx: &mut OpcodeCtx) {
+    let conn = &mut ctx.conn;
+    let out = &mut ctx.out;
+    let (sub, payload) = (ctx.sub, ctx.payload);
+    let decoded = ctx.decoded;
     match sub {
         // Sub 2: Pick up map drop
         2 => handle_pickup(conn, payload, out),
@@ -265,6 +263,11 @@ fn handle_reborn(conn: &mut Conn, out: &mut HandleOutcome) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::battle::service::BattleService;
+    use crate::data::loader::GameData;
+    use crate::server::handler::{test_ctx, HandleOutcome};
+    use crate::server::session::Conn;
+    use std::sync::Arc;
 
     #[test]
     fn test_equip_and_unequip() {
@@ -279,9 +282,12 @@ mod tests {
             ..Default::default()
         });
 
+        let data = GameData::default();
+        let service = BattleService::new(Arc::new(GameData::default()));
+
         let mut out = HandleOutcome::default();
-        let decoded = vec![0xF4, 0x44, 0x03, 0x00, 0x17, 0x0B, 0x01];
-        handle_inventory(&mut conn, 11, &[1], &decoded, &mut out);
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 11, &[1]);
+        handle_inventory(&mut ctx);
 
         assert_eq!(conn.session.trangbi.len(), 1);
         assert_eq!(conn.session.trangbi[0].id, 12001);
@@ -290,8 +296,8 @@ mod tests {
 
         // Unequip
         let mut out2 = HandleOutcome::default();
-        let decoded2 = vec![0xF4, 0x44, 0x04, 0x00, 0x17, 0x0C, 0x01, 0x02];
-        handle_inventory(&mut conn, 12, &[1, 2], &decoded2, &mut out2);
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out2, 12, &[1, 2]);
+        handle_inventory(&mut ctx);
 
         assert_eq!(conn.session.trangbi.len(), 0);
         assert_eq!(conn.session.atk2, 0);
@@ -310,9 +316,11 @@ mod tests {
             ..Default::default()
         });
 
+        let data = GameData::default();
+        let service = BattleService::new(Arc::new(GameData::default()));
         let mut out = HandleOutcome::default();
-        let decoded = vec![0xF4, 0x44, 0x03, 0x00, 0x17, 0x0F, 0x01];
-        handle_inventory(&mut conn, 15, &[1], &decoded, &mut out);
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 15, &[1]);
+        handle_inventory(&mut ctx);
 
         assert_eq!(conn.session.hp, 150);
         assert_eq!(conn.session.homdo[0].count, 1);

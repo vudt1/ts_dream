@@ -1,12 +1,14 @@
 //! Movement & map position handlers (Opcode 0x05, 0x06).
 
 use crate::protocol::encoder;
-use crate::server::handler::HandleOutcome;
-use crate::server::session::Conn;
+use crate::server::handler::OpcodeCtx;
 use crate::server::spawn;
 
 /// Op 0x05 / 0x06 — Move.
-pub fn handle_move(conn: &mut Conn, sub: u8, payload: &[u8], out: &mut HandleOutcome) {
+pub fn handle_move(ctx: &mut OpcodeCtx) {
+    let conn = &mut ctx.conn;
+    let out = &mut ctx.out;
+    let (sub, payload) = (ctx.sub, ctx.payload);
     if sub == 1 && payload.len() >= 5 {
         let dir = payload[0];
         let x = encoder::u16_le(payload[1], payload[2]);

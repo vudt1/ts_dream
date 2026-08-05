@@ -1,16 +1,14 @@
 //! Learn / upgrade skills (Opcode 0x1C) & Pet Reborn (Opcode 0x2C) handlers.
 
 use crate::protocol::encoder;
-use crate::server::handler::HandleOutcome;
+use crate::server::handler::{HandleOutcome, OpcodeCtx};
 use crate::server::session::Conn;
 
 /// Dispatch Opcode 0x1C — Learn / upgrade skills.
-pub fn handle_skills(
-    conn: &mut Conn,
-    sub: u8,
-    payload: &[u8],
-    out: &mut HandleOutcome,
-) {
+pub fn handle_skills(ctx: &mut OpcodeCtx) {
+    let conn = &mut ctx.conn;
+    let out = &mut ctx.out;
+    let (sub, payload) = (ctx.sub, ctx.payload);
     match sub {
         // Sub 1: Player skill learn / upgrade
         1 => handle_player_skill_learn(conn, payload, out),
@@ -91,12 +89,10 @@ fn handle_pet_skill_upgrade(conn: &mut Conn, payload: &[u8], out: &mut HandleOut
 }
 
 /// Handle Opcode 0x2C — Pet Reborn.
-pub fn handle_pet_reborn(
-    conn: &mut Conn,
-    _sub: u8,
-    payload: &[u8],
-    out: &mut HandleOutcome,
-) {
+pub fn handle_pet_reborn(ctx: &mut OpcodeCtx) {
+    let conn = &mut ctx.conn;
+    let out = &mut ctx.out;
+    let payload = ctx.payload;
     if payload.is_empty() {
         return;
     }
@@ -123,17 +119,24 @@ pub fn handle_pet_reborn(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::server::session::PetState;
+    use crate::battle::service::BattleService;
+    use crate::data::loader::GameData;
+    use crate::server::handler::{test_ctx, HandleOutcome};
+    use crate::server::session::{Conn, PetState};
+    use std::sync::Arc;
 
     #[test]
     fn test_player_skill_learn() {
         let mut conn = Conn::new();
         conn.session.skill_point = 5;
 
+        let data = GameData::default();
+        let service = BattleService::new(Arc::new(GameData::default()));
         let mut out = HandleOutcome::default();
         // skill 10001 (0x2711) target lv 1
         let payload = vec![0x11, 0x27, 0x01];
-        handle_skills(&mut conn, 1, &payload, &mut out);
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &payload);
+        handle_skills(&mut ctx);
 
         assert_eq!(conn.session.skills.len(), 1);
         assert_eq!(conn.session.skills[0], (10001, 1));
@@ -153,8 +156,11 @@ mod tests {
             ..Default::default()
         });
 
+        let data = GameData::default();
+        let service = BattleService::new(Arc::new(GameData::default()));
         let mut out = HandleOutcome::default();
-        handle_pet_reborn(&mut conn, 1, &[1], &mut out);
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[1]);
+        handle_pet_reborn(&mut ctx);
 
         assert_eq!(conn.session.pets[0].reborn, 1);
         assert_eq!(conn.session.pets[0].level, 1);

@@ -52,6 +52,46 @@ pub struct NpcRow {
     pub agi: i64,
 }
 
+impl NpcRow {
+    /// Project the loaded NPc tables into display rows, sorted by id.
+    pub fn from_data(data: &GameData) -> Vec<NpcRow> {
+        let mut npcs: Vec<NpcRow> = data
+            .npcs
+            .values()
+            .map(|n| NpcRow {
+                id: n.id,
+                name: n
+                    .name
+                    .iter()
+                    .map(|&b| crate::encoding::viscii_to_unicode(b))
+                    .collect(),
+                lv: n.lv,
+                thuoctinh: n.thuoctinh,
+                hp: n.hp,
+                sp: n.sp,
+                atk: n.atk,
+                def: n.def,
+                agi: n.agi,
+            })
+            .collect();
+        npcs.sort_by_key(|n| n.id);
+        npcs
+    }
+}
+
+/// Respond as HTML when the request came via HTMX (`HX-Request`), else JSON.
+fn htmx_or_json(
+    headers: &HeaderMap,
+    html: impl FnOnce() -> String,
+    json: serde_json::Value,
+) -> Response {
+    if headers.get("HX-Request").is_some() {
+        Html(html()).into_response()
+    } else {
+        Json(json).into_response()
+    }
+}
+
 #[derive(Template)]
 #[template(path = "dashboard.html")]
 pub struct DashboardTemplate {
@@ -156,21 +196,8 @@ async fn index(State(s): State<WebState>) -> Response {
 
     let mut npcs = Vec::new();
     if let Some(ref data) = s.data {
-        for n in data.npcs.values() {
-            npcs.push(NpcRow {
-                id: n.id,
-                name: n.name.iter().map(|&b| crate::encoding::viscii_to_unicode(b)).collect(),
-                lv: n.lv,
-                thuoctinh: n.thuoctinh,
-                hp: n.hp,
-                sp: n.sp,
-                atk: n.atk,
-                def: n.def,
-                agi: n.agi,
-            });
-        }
+        npcs = NpcRow::from_data(data);
     }
-    npcs.sort_by_key(|n| n.id);
 
     let template = DashboardTemplate {
         running,
@@ -200,8 +227,9 @@ async fn server_start(
         s.app.write().await.running = true;
     }
 
-    if headers.get("HX-Request").is_some() {
-        let html = r##"
+    htmx_or_json(
+        &headers,
+        || String::from(r##"
         <div class="card" id="server-control-card">
             <div class="card-header">Server Lifecycle</div>
             <div class="card-value" style="font-size: 20px; margin-bottom: 14px;">
@@ -212,11 +240,9 @@ async fn server_start(
                 <button class="btn btn-red" hx-post="/api/server/stop" hx-target="#server-control-card" hx-swap="outerHTML" onclick="return confirm('Stop game server with 5s countdown?')">Stop</button>
             </div>
         </div>
-        "##;
-        Html(html).into_response()
-    } else {
-        Json(json!({ "running": true })).into_response()
-    }
+        "##),
+        json!({ "running": true }),
+    )
 }
 
 async fn server_stop(
@@ -238,8 +264,9 @@ async fn server_stop(
         app.running = false;
     }
 
-    if headers.get("HX-Request").is_some() {
-        let html = r##"
+    htmx_or_json(
+        &headers,
+        || String::from(r##"
         <div class="card" id="server-control-card">
             <div class="card-header">Server Lifecycle</div>
             <div class="card-value" style="font-size: 20px; margin-bottom: 14px;">
@@ -250,11 +277,9 @@ async fn server_stop(
                 <button class="btn btn-red" hx-post="/api/server/stop" hx-target="#server-control-card" hx-swap="outerHTML" onclick="return confirm('Stop game server with 5s countdown?')">Stop</button>
             </div>
         </div>
-        "##;
-        Html(html).into_response()
-    } else {
-        Json(json!({ "running": false })).into_response()
-    }
+        "##),
+        json!({ "running": false }),
+    )
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -333,43 +358,27 @@ async fn create_account(
     };
 
     let player_id = res.last_insert_id() as i64;
-    if headers.get("HX-Request").is_some() {
-        let html = format!(
-            "<tr><td><strong>{}</strong></td><td>{}</td><td>{}</td></tr>",
-            player_id, payload.pass1, payload.pass2
-        );
-        Html(html).into_response()
-    } else {
-        (
-            StatusCode::OK,
-            Json(json!({
-                "player_id": player_id,
-                "pass1": payload.pass1,
-                "pass2": payload.pass2
-            })),
-        )
-            .into_response()
-    }
+    htmx_or_json(
+        &headers,
+        || {
+            format!(
+                "<tr><td><strong>{}</strong></td><td>{}</td><td>{}</td></tr>",
+                player_id, payload.pass1, payload.pass2
+            )
+        },
+        json!({
+            "player_id": player_id,
+            "pass1": payload.pass1,
+            "pass2": payload.pass2
+        }),
+    )
 }
 
 async fn list_npcs(State(s): State<WebState>) -> Json<Vec<NpcRow>> {
-    let mut npcs = Vec::new();
-    if let Some(ref data) = s.data {
-        for n in data.npcs.values() {
-            npcs.push(NpcRow {
-                id: n.id,
-                name: n.name.iter().map(|&b| crate::encoding::viscii_to_unicode(b)).collect(),
-                lv: n.lv,
-                thuoctinh: n.thuoctinh,
-                hp: n.hp,
-                sp: n.sp,
-                atk: n.atk,
-                def: n.def,
-                agi: n.agi,
-            });
-        }
-    }
-    npcs.sort_by_key(|n| n.id);
+    let npcs = match &s.data {
+        Some(data) => NpcRow::from_data(data),
+        None => Vec::new(),
+    };
     Json(npcs)
 }
 
@@ -421,9 +430,5 @@ async fn set_perexp(
     let mut app = s.app.write().await;
     app.perexp = v;
 
-    if headers.get("HX-Request").is_some() {
-        Html(format!("{v}")).into_response()
-    } else {
-        Json(json!({ "perexp": v })).into_response()
-    }
+    htmx_or_json(&headers, || format!("{v}"), json!({ "perexp": v }))
 }

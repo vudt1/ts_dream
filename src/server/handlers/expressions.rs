@@ -1,11 +1,13 @@
 //! Expressions and emotion action handler (Opcode 0x20).
 
-use crate::server::handler::HandleOutcome;
-use crate::server::session::Conn;
+use crate::server::handler::OpcodeCtx;
 use crate::server::spawn;
 
 /// Op 0x20 — Expressions.
-pub fn handle_expressions(conn: &mut Conn, sub: u8, payload: &[u8], out: &mut HandleOutcome) {
+pub fn handle_expressions(ctx: &mut OpcodeCtx) {
+    let conn = &mut ctx.conn;
+    let out = &mut ctx.out;
+    let (sub, payload) = (ctx.sub, ctx.payload);
     match sub {
         1 => {
             if let Some(&action) = payload.first() {

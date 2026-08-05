@@ -1,19 +1,23 @@
 //! Login & session handlers (Opcode 0x00, 0x01, 0x03).
 
 use crate::protocol::encoder;
-use crate::server::handler::HandleOutcome;
-use crate::server::session::Conn;
+use crate::server::handler::OpcodeCtx;
 use crate::server::spawn;
 
 /// Op 0x00 — Hello: exact opcode 0x00 with length 1 and no sub byte.
-pub fn handle_hello(payload: &[u8], out: &mut HandleOutcome) {
+pub fn handle_hello(ctx: &mut OpcodeCtx) {
+    let out = &mut ctx.out;
+    let payload = ctx.payload;
     if payload.is_empty() {
         out.send(spawn::HELLO_REPLY);
     }
 }
 
 /// Op 0x01 — Login (version check >= 186, auth & session initialization).
-pub fn handle_login(conn: &mut Conn, payload: &[u8], out: &mut HandleOutcome) {
+pub fn handle_login(ctx: &mut OpcodeCtx) {
+    let conn = &mut ctx.conn;
+    let out = &mut ctx.out;
+    let payload = ctx.payload;
     if payload.len() < 8 {
         return;
     }
@@ -69,7 +73,10 @@ pub fn handle_login(conn: &mut Conn, payload: &[u8], out: &mut HandleOutcome) {
 }
 
 /// Op 0x03 — Enter game confirmation.
-pub fn handle_enter_game(conn: &mut Conn, sub: u8, out: &mut HandleOutcome) {
+pub fn handle_enter_game(ctx: &mut OpcodeCtx) {
+    let conn = &mut ctx.conn;
+    let out = &mut ctx.out;
+    let sub = ctx.sub;
     if sub == 1 {
         if !conn.session.authed {
             out.send(spawn::ENTER_GAME_CREATE);

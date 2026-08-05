@@ -1,12 +1,14 @@
 //! Chat & slash commands handler (Opcode 0x02).
 
 use crate::protocol::encoder;
-use crate::server::handler::HandleOutcome;
-use crate::server::session::Conn;
+use crate::server::handler::OpcodeCtx;
 use crate::server::spawn;
 
 /// Op 0x02 — Chat & slash commands.
-pub fn handle_chat(conn: &mut Conn, sub: u8, payload: &[u8], out: &mut HandleOutcome) {
+pub fn handle_chat(ctx: &mut OpcodeCtx) {
+    let conn = &mut ctx.conn;
+    let out = &mut ctx.out;
+    let (sub, payload) = (ctx.sub, ctx.payload);
     match sub {
         // Sub 2: Global / Map chat
         2 => {

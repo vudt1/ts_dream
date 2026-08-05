@@ -87,12 +87,7 @@ pub fn player_appear(
 
     // Frame: F444 + len + 03 03 + body. len counts bytes after the header,
     // i.e. 2 (opcode/sub) + body_len.
-    let total_len = 2 + body.len() / 2;
-    let mut frame = String::from("F444");
-    frame.push_str(&encoder::le16(total_len as u16));
-    frame.push_str("0303");
-    frame.push_str(&body);
-    frame
+    crate::protocol::frame("0303", &body)
 }
 
 /// Stats frame — op 0x05 sub 0x03 (Logined  step 3). `skills_hex` = the
@@ -155,14 +150,8 @@ pub fn stats(
     body.push_str(&"00".repeat(90));
     body.push_str(skills_hex);
 
-    let total_len = 2 + body.len() / 2;
-    let mut frame = String::from("F444");
-    frame.push_str(&encoder::le16(total_len as u16));
-    frame.push_str("0503");
-    frame.push_str(&body);
-    frame
+    crate::protocol::frame("0503", &body)
 }
-
 /// Build the skill-list hex from (skillId, level) pairs used in the stats
 /// frame: each entry is `le16(skillId)` + `lv`.
 pub fn skill_list(skills: &[(u16, u8)]) -> String {
@@ -176,24 +165,21 @@ pub fn skill_list(skills: &[(u16, u8)]) -> String {
 
 /// Build the move broadcast frame (op 0x06 sub 0x01).
 pub fn move_broadcast(id: u32, dir: u8, x: u16, y: u16) -> String {
-    format!(
-        "F4440B000601{}{}{:02X}{}{}",
-        encoder::le32(id),
-        "",
-        dir,
-        encoder::le16(x),
-        encoder::le16(y)
-    )
+    let mut body = String::new();
+    body.push_str(&encoder::le32(id));
+    body.push_str(&format!("{:02X}", dir));
+    body.push_str(&encoder::le16(x));
+    body.push_str(&encoder::le16(y));
+    crate::protocol::frame("0601", &body)
 }
 
 /// Build expression/action frame (op 0x20 sub 0x01 / 0x02).
 pub fn expression_frame(id: u32, sub: u8, action: u8) -> String {
-    format!(
-        "F444070020{:02X}{}{:02X}",
-        sub,
-        encoder::le32(id),
-        action
-    )
+    let mut body = String::new();
+    body.push_str(&format!("{:02X}", sub));
+    body.push_str(&encoder::le32(id));
+    body.push_str(&format!("{:02X}", action));
+    crate::protocol::frame("20", &body)
 }
 
 /// Build chat packet frame (op 0x02 sub 0x01 / 0x02 / 0x03 / 0x05).
@@ -201,24 +187,21 @@ pub fn chat_frame(sub: u8, id: u32, chat_raw: &[u8]) -> String {
     let mut body = String::new();
     body.push_str(&encoder::le32(id));
     body.push_str(&encoder::hex(chat_raw));
-    let total_len = 2 + body.len() / 2;
-    format!("F444{}02{:02X}{}", encoder::le16(total_len as u16), sub, body)
+    crate::protocol::frame(&format!("02{:02X}", sub), &body)
 }
 
 /// Build system message banner packet (op 0x02 sub 0x0B).
 pub fn sys_msg_frame(msg: &str) -> String {
     let mut body = String::from("00000000");
     body.push_str(&encoder::strhex(msg.as_bytes()));
-    let total_len = 2 + body.len() / 2;
-    format!("F444{}020B{}", encoder::le16(total_len as u16), body)
+    crate::protocol::frame("020B", &body)
 }
 
 /// Build announcement packet (op 0x02 sub 0x0C).
 pub fn announce_frame(msg: &str) -> String {
     let mut body = String::from("00000000");
     body.push_str(&encoder::strhex(msg.as_bytes()));
-    let total_len = 2 + body.len() / 2;
-    format!("F444{}020C{}", encoder::le16(total_len as u16), body)
+    crate::protocol::frame("020C", &body)
 }
 
 /// Build server name packet (op 0x27 sub 0x09).
@@ -230,8 +213,7 @@ pub fn server_name_frame(id: u32, server_name: &str) -> String {
     body.push_str("C4000000");
     body.push_str(&format!("{:02X}", name_len));
     body.push_str(&name_hex);
-    let total_len = 2 + body.len() / 2;
-    format!("F444{}2709{}", encoder::le16(total_len as u16), body)
+    crate::protocol::frame("2709", &body)
 }
 
 /// Build full 22-step Logined1 sequence frames for a logged-in character.

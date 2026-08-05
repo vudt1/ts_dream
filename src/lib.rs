@@ -22,8 +22,11 @@ pub mod db {
 }
 
 pub mod server {
+    pub mod character_sheet;
     pub mod handler;
     pub mod handlers;
+    pub mod inventory;
+    pub mod pet_box;
     pub mod session;
     pub mod spawn;
 }

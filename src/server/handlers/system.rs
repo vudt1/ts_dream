@@ -1,17 +1,15 @@
 //! System & Role handlers: PK/War (0x21), Game points (0x22), Rank (0x41), GM Shop (0x42), Teleport confirm (0x0C), Account Mgmt (0x23).
 
 use crate::protocol::encoder;
-use crate::server::handler::HandleOutcome;
-use crate::server::session::{Conn, InventoryItem};
+use crate::server::handler::OpcodeCtx;
+use crate::server::session::InventoryItem;
 use crate::server::spawn::sys_msg_frame;
 
 /// Handle Opcode 0x21 — PK / War Mode.
-pub fn handle_pk_war(
-    conn: &mut Conn,
-    sub: u8,
-    payload: &[u8],
-    out: &mut HandleOutcome,
-) {
+pub fn handle_pk_war(ctx: &mut OpcodeCtx) {
+    let conn = &mut ctx.conn;
+    let out = &mut ctx.out;
+    let (sub, payload) = (ctx.sub, ctx.payload);
     if payload.is_empty() {
         return;
     }
@@ -37,12 +35,9 @@ pub fn handle_pk_war(
 }
 
 /// Handle Opcode 0x22 — Game points / God panel.
-pub fn handle_game_points(
-    conn: &mut Conn,
-    _sub: u8,
-    _payload: &[u8],
-    out: &mut HandleOutcome,
-) {
+pub fn handle_game_points(ctx: &mut OpcodeCtx) {
+    let conn = &mut ctx.conn;
+    let out = &mut ctx.out;
     out.send(format!(
         "F44412002304{}{}",
         encoder::le16(conn.session.gold as u16),
@@ -51,12 +46,9 @@ pub fn handle_game_points(
 }
 
 /// Handle Opcode 0x41 — Rank system.
-pub fn handle_rank(
-    _conn: &mut Conn,
-    sub: u8,
-    _payload: &[u8],
-    out: &mut HandleOutcome,
-) {
+pub fn handle_rank(ctx: &mut OpcodeCtx) {
+    let out = &mut ctx.out;
+    let sub = ctx.sub;
     match sub {
         1 => out.send("F44402004101"),
         2 => out.send("F44402004102"),
@@ -65,12 +57,10 @@ pub fn handle_rank(
 }
 
 /// Handle Opcode 0x42 — GM / Mall shop.
-pub fn handle_gm_shop(
-    conn: &mut Conn,
-    sub: u8,
-    payload: &[u8],
-    out: &mut HandleOutcome,
-) {
+pub fn handle_gm_shop(ctx: &mut OpcodeCtx) {
+    let conn = &mut ctx.conn;
+    let out = &mut ctx.out;
+    let (sub, payload) = (ctx.sub, ctx.payload);
     match sub {
         // Sub 1: Buy item from GM shop
         1 => {
@@ -113,24 +103,19 @@ pub fn handle_gm_shop(
 }
 
 /// Handle Opcode 0x0C — Teleport confirm.
-pub fn handle_teleport_confirm(
-    conn: &mut Conn,
-    _sub: u8,
-    _payload: &[u8],
-    out: &mut HandleOutcome,
-) {
+pub fn handle_teleport_confirm(ctx: &mut OpcodeCtx) {
+    let conn = &mut ctx.conn;
+    let out = &mut ctx.out;
     conn.session.idtalking = 0;
     conn.session.select_menu = 0;
     out.send("F44402000504F44402001408");
 }
 
 /// Handle Opcode 0x23 — Account Management (change pass, delete char, gift code).
-pub fn handle_account_mgmt(
-    conn: &mut Conn,
-    sub: u8,
-    payload: &[u8],
-    out: &mut HandleOutcome,
-) {
+pub fn handle_account_mgmt(ctx: &mut OpcodeCtx) {
+    let conn = &mut ctx.conn;
+    let out = &mut ctx.out;
+    let (sub, payload) = (ctx.sub, ctx.payload);
     match sub {
         // Sub 1: Change password
         1 => {
@@ -173,18 +158,27 @@ pub fn handle_account_mgmt(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::battle::service::BattleService;
+    use crate::data::loader::GameData;
+    use crate::server::handler::{test_ctx, HandleOutcome};
+    use crate::server::session::Conn;
+    use std::sync::Arc;
 
     #[test]
     fn test_pk_and_war_toggle() {
         let mut conn = Conn::new();
-        let mut out = HandleOutcome::default();
+        let data = GameData::default();
+        let service = BattleService::new(Arc::new(GameData::default()));
 
-        handle_pk_war(&mut conn, 1, &[1], &mut out);
+        let mut out = HandleOutcome::default();
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[1]);
+        handle_pk_war(&mut ctx);
         assert_eq!(conn.session.pk, 1);
         assert_eq!(out.outgoing[0], "F444040021020100");
 
         let mut out2 = HandleOutcome::default();
-        handle_pk_war(&mut conn, 2, &[1], &mut out2);
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out2, 2, &[1]);
+        handle_pk_war(&mut ctx);
         assert_eq!(conn.session.tham_chien, 1);
         assert_eq!(out2.outgoing[0], "F444040021020101");
     }
@@ -194,10 +188,13 @@ mod tests {
         let mut conn = Conn::new();
         conn.session.shop_point = 500;
 
+        let data = GameData::default();
+        let service = BattleService::new(Arc::new(GameData::default()));
         let mut out = HandleOutcome::default();
         // Buy item 10001 (0x2711) for 200 pts (0x00C8) -> payload: 0, 0, 0x11, 0x27, 0xC8, 0x00
         let payload = vec![0, 0, 0x11, 0x27, 0xC8, 0x00];
-        handle_gm_shop(&mut conn, 1, &payload, &mut out);
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &payload);
+        handle_gm_shop(&mut ctx);
 
         assert_eq!(conn.session.shop_point, 300);
         assert_eq!(conn.session.homdo.len(), 1);

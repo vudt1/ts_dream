@@ -247,20 +247,8 @@ fn clamp_u16(v: i64) -> u16 {
 }
 
 fn add_pet_to_session(s: &mut Session, npc_id: u16) {
-    if s.pets.iter().any(|p| p.id == npc_id) {
-        return;
-    }
-    let stt = (s.pets.len() as u8 + 1).max(1);
     let hp_max = get_hp_max(0, 0, 1, 0) as u16;
-    s.pets.push(crate::server::session::PetState {
-        stt,
-        id: npc_id,
-        level: 1,
-        thuoctinh: 1,
-        hp: hp_max,
-        hp_max,
-        ..Default::default()
-    });
+    crate::server::pet_box::add_caught(&mut s.pets, npc_id, hp_max);
 }
 
 /// The server-side battle service.
@@ -356,7 +344,8 @@ impl BattleService {
             npc_on_map_id,
             112,
         );
-        self.launch(battle, session)
+        let (extra_players, extra_pets) = self.party_snapshots(session);
+        self.spawn_battle(battle, session, extra_players, extra_pets, Vec::new(), Vec::new())
     }
 
     /// Seeded NPC battle start — deterministic RNG for golden replay.
@@ -377,7 +366,8 @@ impl BattleService {
         battle.add_player(session, i64::from(session.id), 3, 2);
         battle.load_leader_pets(session, i64::from(session.id), 3);
         battle.add_npc(&npc, npc_on_map_id, 0, 2, 3);
-        self.launch(battle, session)
+        let (extra_players, extra_pets) = self.party_snapshots(session);
+        self.spawn_battle(battle, session, extra_players, extra_pets, Vec::new(), Vec::new())
     }
 
     /// Start a PK battle (`TheBattle(leader, opponent, 112)`).
@@ -396,14 +386,25 @@ impl BattleService {
         let mut battle = Battle::new(id, 112);
         battle.add_player(session, i64::from(session.id), 3, 2);
         battle.load_leader_pets(session, i64::from(session.id), 3);
-        {
-            let opp = opp.try_read();
-            match opp {
-                Ok(o) => battle.add_player(&o, opponent, 0, 2),
-                Err(_) => return 0,
-            }
-        }
-        self.launch_pk(battle, session, opponent)
+        let opp_guard = match opp.try_read() {
+            Ok(g) => g,
+            Err(_) => return 0,
+        };
+        battle.add_player(&opp_guard, opponent, 0, 2);
+        let opponent_start = battle.member_battle_frame(112, opponent);
+        let mut extra_players = HashMap::new();
+        let mut extra_pets = HashMap::new();
+        extra_players.insert(opponent, self.snapshot(&opp_guard));
+        extra_pets.insert(opponent, self.pet_slots(&opp_guard));
+        drop(opp_guard);
+        self.spawn_battle(
+            battle,
+            session,
+            extra_players,
+            extra_pets,
+            vec![opponent],
+            opponent_start,
+        )
     }
 
     /// Start a TeamDef (quest) battle from a `BattleTrigger`.
@@ -426,7 +427,8 @@ impl BattleService {
             &defenders,
             trigger.diahinh,
         );
-        self.launch(battle, session)
+        let (extra_players, extra_pets) = self.party_snapshots(session);
+        self.spawn_battle(battle, session, extra_players, extra_pets, Vec::new(), Vec::new())
     }
 
     /// Register a player in an existing battle (op 0x0B sub 4 join).
@@ -475,12 +477,7 @@ impl BattleService {
             session.thuoctinh
         );
         text.push_str(&cell_records);
-        format!(
-            "F444{}0BFA{}{}",
-            encoder::le16((4 + text.len() / 2) as u16),
-            encoder::le16(diahinh as u16),
-            text
-        )
+        crate::protocol::frame(&format!("0BFA{}", encoder::le16(diahinh as u16)), &text)
     }
 
     /// Leave the current battle (op 0x0B sub 1).
@@ -610,28 +607,52 @@ impl BattleService {
         }
     }
 
-    /// Common spawn path: register participants, spawn the battle task, push
-    /// the `0BFA` start frames, and record join cells + handle.
-    fn launch(&self, battle: Battle, session: &mut Session) -> i32 {
-        let id = battle.id_battle;
-        session.battle_id = id;
-
+    /// Snapshots + pet slots for each online party member (`id_mem`), excluding
+    /// the leader (added inside [`BattleService::spawn_battle`]).
+    fn party_snapshots(
+        &self,
+        session: &Session,
+    ) -> (HashMap<i64, PlayerSnapshot>, HashMap<i64, [i64; 4]>) {
         let mut players = HashMap::new();
-        let mut pet_slots = HashMap::new();
-        let lid = i64::from(session.id);
-        players.insert(lid, self.snapshot(session));
-        pet_slots.insert(lid, self.pet_slots(session));
-        // Include party members' snapshots where registered.
+        let mut pets = HashMap::new();
         for mem in session.id_mem.iter().filter(|m| **m > 0) {
             if let Ok(online) = self.online.try_read() {
                 if let Some(p) = online.get(&i64::from(*mem)) {
                     if let Ok(s) = p.session.try_read() {
                         players.insert(i64::from(*mem), self.snapshot(&s));
-                        pet_slots.insert(i64::from(*mem), self.pet_slots(&s));
+                        pets.insert(i64::from(*mem), self.pet_slots(&s));
                     }
                 }
             }
         }
+        (players, pets)
+    }
+
+    /// Common spawn path: register participants, spawn the battle task, push
+    /// the `0BFA` start frames, and record join cells + handle.
+    ///
+    /// `extra_players`/`extra_pets`/`extra_members` cover participants beyond the
+    /// leader (party members, PK opponents); `extra_start` holds their
+    /// member-style open frames.
+    fn spawn_battle(
+        &self,
+        battle: Battle,
+        session: &mut Session,
+        extra_players: HashMap<i64, PlayerSnapshot>,
+        extra_pets: HashMap<i64, [i64; 4]>,
+        extra_members: Vec<i64>,
+        extra_start: Vec<StartPacket>,
+    ) -> i32 {
+        let id = battle.id_battle;
+        session.battle_id = id;
+        let lid = i64::from(session.id);
+
+        let mut players = HashMap::new();
+        let mut pet_slots = HashMap::new();
+        players.insert(lid, self.snapshot(session));
+        pet_slots.insert(lid, self.pet_slots(session));
+        players.extend(extra_players);
+        pet_slots.extend(extra_pets);
 
         let npcs = Arc::new(self.data.npcs.clone());
         let skills = Arc::new(self.data.skills.clone());
@@ -642,6 +663,7 @@ impl BattleService {
 
         if let Ok(mut members) = self.sink.members.lock() {
             members.insert(lid);
+            members.extend(extra_members);
         }
         self.record_join_cells(id, &battle);
 
@@ -665,70 +687,7 @@ impl BattleService {
             h.insert(id, handle);
         }
 
-        for packet in start {
-            match packet {
-                StartPacket::To { player, frame } => self.sink.send_to(player, frame),
-                StartPacket::Map { player, frame } => self.sink.send_map(player, frame),
-            }
-        }
-        id
-    }
-
-    fn launch_pk(&self, battle: Battle, session: &mut Session, opponent: i64) -> i32 {
-        let id = battle.id_battle;
-        session.battle_id = id;
-        let lid = i64::from(session.id);
-
-        let mut players = HashMap::new();
-        let mut pet_slots = HashMap::new();
-        players.insert(lid, self.snapshot(session));
-        pet_slots.insert(lid, self.pet_slots(session));
-        if let Ok(online) = self.online.try_read() {
-            if let Some(p) = online.get(&opponent) {
-                if let Ok(o) = p.session.try_read() {
-                    players.insert(opponent, self.snapshot(&o));
-                    pet_slots.insert(opponent, self.pet_slots(&o));
-                }
-            }
-        }
-
-        if let Ok(mut members) = self.sink.members.lock() {
-            members.insert(lid);
-            members.insert(opponent);
-        }
-        self.record_join_cells(id, &battle);
-
-        let start = battle.npc_battle_start_packets(112);
-        // The opponent gets their own member-style open frame (PK view).
-        let opponent_start = battle.member_battle_frame(112, opponent);
-        let npcs = Arc::new(self.data.npcs.clone());
-        let skills = Arc::new(self.data.skills.clone());
-        let items = Arc::new(self.data.items.clone());
-        let pet_slots = Arc::new(pet_slots);
-        let players = Arc::new(players);
-        let texps: Arc<Vec<TexpRow>> = Arc::new(self.data.texps.clone());
-        let manager = Arc::clone(&self.manager);
-        let sink = Arc::clone(&self.sink) as Arc<dyn BattleSink>;
-        let handle = manager.spawn_timeout(
-            battle,
-            npcs,
-            skills,
-            items,
-            pet_slots,
-            players,
-            texps,
-            self.per_exp,
-            self.input_timeout,
-            sink,
-        );
-        if let Ok(mut h) = self.handles.lock() {
-            h.insert(id, handle);
-        }
-        let all_start = start
-            .into_iter()
-            .chain(opponent_start)
-            .collect::<Vec<_>>();
-        for packet in all_start {
+        for packet in start.into_iter().chain(extra_start) {
             match packet {
                 StartPacket::To { player, frame } => self.sink.send_to(player, frame),
                 StartPacket::Map { player, frame } => self.sink.send_map(player, frame),

@@ -28,3 +28,28 @@ pub const ADMIN_ID_THRESHOLD: u32 = 300012;
 pub mod codec;
 pub mod encoder;
 pub mod frame;
+
+/// Build an outgoing frame: `F444` + LE16(len) + `code` + `body`, where `len`
+/// counts every byte after the 4-byte header (i.e. `code` + `body`).
+///
+/// This is the single place where the frame header and length are computed.
+/// Every outgoing packet is built through it (directly, or via a named builder)
+/// so the seam between business logic and wire format stays in one module.
+pub fn frame(code: &str, body: &str) -> String {
+    let total_len = (code.len() + body.len()) / 2;
+    format!("F444{}{code}{body}", encoder::le16(total_len as u16))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn frame_builds_known_literals_byte_identical() {
+        // Matches the fixed literals used across the codebase: len counts every
+        // byte after the 4-byte header (code + body).
+        assert_eq!(frame("0801", "1B0102000000000000"), "F4440B0008011B0102000000000000");
+        assert_eq!(frame("0601", "01000000026400C800"), "F4440B00060101000000026400C800");
+        assert_eq!(frame("1705", ""), "F44402001705");
+    }
+}

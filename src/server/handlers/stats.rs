@@ -2,8 +2,7 @@
 
 use crate::battle::engine::{get_hp_max, get_sp_max};
 use crate::protocol::encoder;
-use crate::server::handler::HandleOutcome;
-use crate::server::session::Conn;
+use crate::server::handler::OpcodeCtx;
 
 /// Build stat update frame `F4440C000801` + type + sign + le32(val) + `00000000`.
 pub fn build_stat_update(stat_type: u8, val: i32) -> String {
@@ -12,22 +11,15 @@ pub fn build_stat_update(stat_type: u8, val: i32) -> String {
     } else {
         ("02", (-val) as u32)
     };
-    format!(
-        "F4440C000801{:02X}{}{}{}",
-        stat_type,
-        sign,
-        encoder::le32(abs_val),
-        "00000000"
-    )
+    let body = format!("{:02X}{}{}{}", stat_type, sign, encoder::le32(abs_val), "00000000");
+    crate::protocol::frame("0801", &body)
 }
 
 /// Handle Opcode 0x08 — Stat allocation.
-pub fn handle_stat_allocation(
-    conn: &mut Conn,
-    sub: u8,
-    payload: &[u8],
-    out: &mut HandleOutcome,
-) {
+pub fn handle_stat_allocation(ctx: &mut OpcodeCtx) {
+    let conn = &mut ctx.conn;
+    let out = &mut ctx.out;
+    let (sub, payload) = (ctx.sub, ctx.payload);
     if sub != 1 || conn.session.battle_id > 0 {
         return;
     }
@@ -133,12 +125,9 @@ pub fn handle_stat_allocation(
 }
 
 /// Handle Opcode 0x28 — Hotkey / skill bar.
-pub fn handle_hotkey(
-    conn: &mut Conn,
-    _sub: u8,
-    payload: &[u8],
-    _out: &mut HandleOutcome,
-) {
+pub fn handle_hotkey(ctx: &mut OpcodeCtx) {
+    let conn = &mut ctx.conn;
+    let payload = ctx.payload;
     // payload: data[7..8] LE u16 skill_id, data[9] slot (1..10)
     // payload indices: payload[1..3] as LE u16 skill_id, payload[3] slot
     if payload.len() >= 4 {
@@ -159,6 +148,11 @@ pub fn handle_hotkey(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::battle::service::BattleService;
+    use crate::data::loader::GameData;
+    use crate::server::handler::{test_ctx, HandleOutcome};
+    use crate::server::session::Conn;
+    use std::sync::Arc;
 
     #[test]
     fn test_stat_allocation_int() {
@@ -166,10 +160,13 @@ mod tests {
         conn.session.point = 10;
         conn.session.int1 = 5;
 
+        let data = GameData::default();
+        let service = BattleService::new(Arc::new(GameData::default()));
         let mut out = HandleOutcome::default();
         // stat_id = 27 (0x1B), points = 2
         let payload = vec![0, 0, 27, 2];
-        handle_stat_allocation(&mut conn, 1, &payload, &mut out);
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &payload);
+        handle_stat_allocation(&mut ctx);
 
         assert_eq!(conn.session.point, 8);
         assert_eq!(conn.session.int1, 7);
@@ -181,10 +178,13 @@ mod tests {
     #[test]
     fn test_hotkey_assignment() {
         let mut conn = Conn::new();
+        let data = GameData::default();
+        let service = BattleService::new(Arc::new(GameData::default()));
         let mut out = HandleOutcome::default();
         // skill_id = 10001 (0x2711), slot = 3
         let payload = vec![0x00, 0x11, 0x27, 3];
-        handle_hotkey(&mut conn, 1, &payload, &mut out);
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &payload);
+        handle_hotkey(&mut ctx);
 
         assert_eq!(conn.session.hotkeys[3], 10001);
         assert!(out.outgoing.is_empty());

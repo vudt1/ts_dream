@@ -33,6 +33,20 @@ impl HandleOutcome {
     }
 }
 
+/// Everything an opcode handler may touch, bundled into one context so the
+/// dispatcher and every handler share a single, uniform interface.
+pub struct OpcodeCtx<'a> {
+    pub conn: &'a mut Conn,
+    pub data: &'a GameData,
+    pub service: &'a BattleService,
+    pub out: &'a mut HandleOutcome,
+    pub opcode: u8,
+    pub sub: u8,
+    pub payload: &'a [u8],
+    /// The full decoded frame (a few handlers re-parse it).
+    pub decoded: &'a [u8],
+}
+
 /// Dispatch one full decoded frame (its bytes). `conn` carries session state,
 /// `data` gives read tables, `service` drives the battle engine. Handlers run
 /// inside a silent catch. A `battle_trigger` produced by a talk is processed
@@ -44,119 +58,117 @@ pub fn dispatch(
     service: &BattleService,
 ) -> HandleOutcome {
     let mut out = HandleOutcome::default();
-    let opcode = decoded.get(4).copied().unwrap_or(0);
-    let sub = decoded.get(5).copied().unwrap_or(0);
-    let payload = decoded.get(6..).unwrap_or(&[]);
+    let mut ctx = OpcodeCtx {
+        conn,
+        data,
+        service,
+        out: &mut out,
+        opcode: decoded.get(4).copied().unwrap_or(0),
+        sub: decoded.get(5).copied().unwrap_or(0),
+        payload: decoded.get(6..).unwrap_or(&[]),
+        decoded,
+    };
     // C# swallows handler exceptions: never propagate.
-    let _ = handle(conn, opcode, sub, payload, decoded, data, service, &mut out);
-    if let Some(trigger) = out.battle_trigger.take() {
-        if service.start_teamdef_battle(&mut conn.session, &trigger) > 0 {
+    let _ = handle(&mut ctx);
+    let trigger = ctx.out.battle_trigger.take();
+    if let Some(trigger) = trigger {
+        if ctx.service.start_teamdef_battle(&mut ctx.conn.session, &trigger) > 0 {
             // The open-board frames were pushed through the service channels.
         }
     }
     out
 }
 
-fn handle(
-    conn: &mut Conn,
-    opcode: u8,
-    sub: u8,
-    payload: &[u8],
-    decoded: &[u8],
-    data: &GameData,
-    service: &BattleService,
-    out: &mut HandleOutcome,
-) -> Result<()> {
-    match opcode {
+fn handle(ctx: &mut OpcodeCtx) -> Result<()> {
+    match ctx.opcode {
         // Op 0x00, 0x01, 0x03 — Hello, Login, Enter game confirm
-        0x00 => login::handle_hello(payload, out),
-        0x01 => login::handle_login(conn, payload, out),
-        0x03 => login::handle_enter_game(conn, sub, out),
+        0x00 => login::handle_hello(ctx),
+        0x01 => login::handle_login(ctx),
+        0x03 => login::handle_enter_game(ctx),
 
         // Op 0x02 — Chat & slash commands
-        0x02 => chat::handle_chat(conn, sub, payload, out),
+        0x02 => chat::handle_chat(ctx),
 
         // Op 0x05, 0x06 — Move
-        0x05 | 0x06 => movement::handle_move(conn, sub, payload, out),
+        0x05 | 0x06 => movement::handle_move(ctx),
 
         // Op 0x08 — Stat allocation
-        0x08 => stats::handle_stat_allocation(conn, sub, payload, out),
+        0x08 => stats::handle_stat_allocation(ctx),
 
         // Op 0x09 — Character creation & name check
-        0x09 => character::handle_character(conn, sub, payload, out),
+        0x09 => character::handle_character(ctx),
 
         // Op 0x0B — Battle control (ticket 21)
-        0x0B => battle::handle_battle(conn, sub, payload, data, service, out),
+        0x0B => battle::handle_battle(ctx),
 
         // Op 0x0C — Teleport confirm
-        0x0C => system::handle_teleport_confirm(conn, sub, payload, out),
+        0x0C => system::handle_teleport_confirm(ctx),
 
         // Op 0x0F — Pet actions (release, store, mount, rename, take, swap)
-        0x0F => pet_actions::handle_pet_actions(conn, sub, payload, out),
+        0x0F => pet_actions::handle_pet_actions(ctx),
 
         // Op 0x13 — Pet summon / recall
-        0x13 => pet_actions::handle_pet_summon(conn, sub, payload, out),
+        0x13 => pet_actions::handle_pet_summon(ctx),
 
         // Op 0x14 — Action / Talk
-        0x14 => talk::handle_talk(conn, sub, payload, data, out),
+        0x14 => talk::handle_talk(ctx),
 
         // Op 0x17 — Inventory base, use item, player shop, reborn
         0x17 => {
-            if (30..=33).contains(&sub) {
-                shops::handle_player_shop(conn, sub, payload, out);
+            if (30..=33).contains(&ctx.sub) {
+                shops::handle_player_shop(ctx);
             } else {
-                inventory::handle_inventory(conn, sub, payload, decoded, out);
+                inventory::handle_inventory(ctx);
             }
         }
 
         // Op 0x19 — Trade
-        0x19 => trade_storage::handle_trade(conn, sub, payload, out),
+        0x19 => trade_storage::handle_trade(ctx),
 
         // Op 0x1B — NPC shop buy/sell
-        0x1B => shops::handle_npc_shop(conn, sub, payload, out),
+        0x1B => shops::handle_npc_shop(ctx),
 
         // Op 0x1C — Learn / upgrade skills
-        0x1C => skills::handle_skills(conn, sub, payload, out),
+        0x1C => skills::handle_skills(ctx),
 
         // Op 0x1D — Bank gold
-        0x1D => trade_storage::handle_bank_gold(conn, sub, payload, out),
+        0x1D => trade_storage::handle_bank_gold(ctx),
 
         // Op 0x1E — Storage transfer (TienTrang)
-        0x1E => trade_storage::handle_storage_transfer(conn, sub, payload, out),
+        0x1E => trade_storage::handle_storage_transfer(ctx),
 
         // Op 0x1F — Pet stable menu
-        0x1F => pet_actions::handle_pet_stable(conn, sub, payload, out),
+        0x1F => pet_actions::handle_pet_stable(ctx),
 
         // Op 0x20 — Expressions
-        0x20 => expressions::handle_expressions(conn, sub, payload, out),
+        0x20 => expressions::handle_expressions(ctx),
 
         // Op 0x21 — PK / War mode
-        0x21 => system::handle_pk_war(conn, sub, payload, out),
+        0x21 => system::handle_pk_war(ctx),
 
         // Op 0x22 — Game points / God panel
-        0x22 => system::handle_game_points(conn, sub, payload, out),
+        0x22 => system::handle_game_points(ctx),
 
         // Op 0x23 — Account management
-        0x23 => system::handle_account_mgmt(conn, sub, payload, out),
+        0x23 => system::handle_account_mgmt(ctx),
 
         // Op 0x28 — Hotkey / skill bar
-        0x28 => stats::handle_hotkey(conn, sub, payload, out),
+        0x28 => stats::handle_hotkey(ctx),
 
         // Op 0x2C — Pet reborn
-        0x2C => skills::handle_pet_reborn(conn, sub, payload, out),
+        0x2C => skills::handle_pet_reborn(ctx),
 
         // Op 0x32 — Battle commands (ticket 21)
-        0x32 => battle::handle_battle_command(conn, sub, payload, data, service, out),
+        0x32 => battle::handle_battle_command(ctx),
 
         // Op 0x41 — Rank system
-        0x41 => system::handle_rank(conn, sub, payload, out),
+        0x41 => system::handle_rank(ctx),
 
         // Op 0x42 — GM / Mall shop
-        0x42 => system::handle_gm_shop(conn, sub, payload, out),
+        0x42 => system::handle_gm_shop(ctx),
 
         _ => {
             // Not yet ported / unknown: silently ignored.
-            let _ = (sub, payload, data, service);
         }
     }
     Ok(())
@@ -166,6 +178,28 @@ fn handle(
 /// already have the bytes rather than the wire hex).
 pub fn hex_of(decoded: &[u8]) -> String {
     encoder::hex(decoded)
+}
+
+/// Build an `OpcodeCtx` for a test that drives one handler directly.
+#[cfg(test)]
+pub fn test_ctx<'a>(
+    conn: &'a mut Conn,
+    data: &'a GameData,
+    service: &'a BattleService,
+    out: &'a mut HandleOutcome,
+    sub: u8,
+    payload: &'a [u8],
+) -> OpcodeCtx<'a> {
+    OpcodeCtx {
+        conn,
+        data,
+        service,
+        out,
+        opcode: 0,
+        sub,
+        payload,
+        decoded: &[],
+    }
 }
 
 #[cfg(test)]

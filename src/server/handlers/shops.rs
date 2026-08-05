@@ -1,8 +1,8 @@
 //! NPC shop buy/sell (Opcode 0x1B) & Player shop (Opcode 0x17 subs 30–33) handlers.
 
 use crate::protocol::encoder;
-use crate::server::handler::HandleOutcome;
-use crate::server::session::{Conn, InventoryItem};
+use crate::server::handler::OpcodeCtx;
+use crate::server::session::InventoryItem;
 
 
 /// Lookup NPC shop item price by (map_id, menu_id, item_id).
@@ -16,12 +16,10 @@ pub fn get_npc_shop_price(_map_id: u16, item_id: u16) -> u32 {
 }
 
 /// Handle Opcode 0x1B — NPC shop buy/sell.
-pub fn handle_npc_shop(
-    conn: &mut Conn,
-    sub: u8,
-    payload: &[u8],
-    out: &mut HandleOutcome,
-) {
+pub fn handle_npc_shop(ctx: &mut OpcodeCtx) {
+    let conn = &mut ctx.conn;
+    let out = &mut ctx.out;
+    let (sub, payload) = (ctx.sub, ctx.payload);
     if payload.is_empty() {
         return;
     }
@@ -93,12 +91,10 @@ pub fn handle_npc_shop(
 }
 
 /// Handle Opcode 0x17 subs 30..33 — Player shop.
-pub fn handle_player_shop(
-    conn: &mut Conn,
-    sub: u8,
-    payload: &[u8],
-    out: &mut HandleOutcome,
-) {
+pub fn handle_player_shop(ctx: &mut OpcodeCtx) {
+    let conn = &mut ctx.conn;
+    let out = &mut ctx.out;
+    let (sub, payload) = (ctx.sub, ctx.payload);
     match sub {
         // Sub 30: Open player shop
         30 => {
@@ -107,8 +103,7 @@ pub fn handle_player_shop(
 
             let name_hex = encoder::strhex(conn.session.shop.name.as_bytes());
             let body = format!("{}{}", encoder::le32(conn.session.id), name_hex);
-            let total_len = 2 + body.len() / 2;
-            out.send(format!("F444{}171E{}", encoder::le16(total_len as u16), body));
+            out.send(crate::protocol::frame("171E", &body));
         }
         // Sub 31: Close player shop
         31 => {
@@ -120,8 +115,7 @@ pub fn handle_player_shop(
             if payload.len() >= 4 {
                 let target_id = encoder::u32_le(payload[0], payload[1], payload[2], payload[3]);
                 let body = format!("{}00", encoder::le32(target_id));
-                let total_len = 2 + body.len() / 2;
-                out.send(format!("F444{}1720{}", encoder::le16(total_len as u16), body));
+                out.send(crate::protocol::frame("1720", &body));
             }
         }
         // Sub 33: Buy from player shop
@@ -146,16 +140,24 @@ pub fn handle_player_shop(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::battle::service::BattleService;
+    use crate::data::loader::GameData;
+    use crate::server::handler::{test_ctx, HandleOutcome};
+    use crate::server::session::Conn;
+    use std::sync::Arc;
 
     #[test]
     fn test_npc_shop_buy() {
         let mut conn = Conn::new();
         conn.session.gold = 1000;
 
+        let data = GameData::default();
+        let service = BattleService::new(Arc::new(GameData::default()));
         let mut out = HandleOutcome::default();
         // Item 10001, count 1
         let payload = vec![0x11, 0x27, 0x01];
-        handle_npc_shop(&mut conn, 1, &payload, &mut out);
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &payload);
+        handle_npc_shop(&mut ctx);
 
         assert_eq!(conn.session.gold, 900);
         assert_eq!(conn.session.homdo.len(), 1);
@@ -168,13 +170,18 @@ mod tests {
         let mut conn = Conn::new();
         conn.session.id = 300001;
 
+        let data = GameData::default();
+        let service = BattleService::new(Arc::new(GameData::default()));
+
         let mut out1 = HandleOutcome::default();
-        handle_player_shop(&mut conn, 30, &[], &mut out1);
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out1, 30, &[]);
+        handle_player_shop(&mut ctx);
         assert!(conn.session.shop.active);
         assert!(out1.outgoing.iter().any(|f| f.contains("171E")));
 
         let mut out2 = HandleOutcome::default();
-        handle_player_shop(&mut conn, 31, &[], &mut out2);
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out2, 31, &[]);
+        handle_player_shop(&mut ctx);
         assert!(!conn.session.shop.active);
         assert!(out2.outgoing.iter().any(|f| f.contains("171F")));
     }

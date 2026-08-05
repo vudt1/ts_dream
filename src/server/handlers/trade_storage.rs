@@ -1,17 +1,15 @@
 //! Trade (Opcode 0x19), Storage Transfer (Opcode 0x1E), & Bank Gold (Opcode 0x1D) handlers.
 
 use crate::protocol::encoder;
-use crate::server::handler::HandleOutcome;
-use crate::server::session::{Conn, TradeState};
+use crate::server::handler::OpcodeCtx;
+use crate::server::session::TradeState;
 
 
 /// Handle Opcode 0x19 — Trade.
-pub fn handle_trade(
-    conn: &mut Conn,
-    sub: u8,
-    payload: &[u8],
-    out: &mut HandleOutcome,
-) {
+pub fn handle_trade(ctx: &mut OpcodeCtx) {
+    let conn = &mut ctx.conn;
+    let out = &mut ctx.out;
+    let (sub, payload) = (ctx.sub, ctx.payload);
     match sub {
         // Sub 1: Request / open trade
         1 => {
@@ -66,8 +64,7 @@ pub fn handle_trade(
             if payload.len() >= 8 {
                 let recipient_id = encoder::u32_le(payload[4], payload[5], payload[6], payload[7]);
                 let body = format!("{}01", encoder::le32(recipient_id));
-                let total_len = 2 + body.len() / 2;
-                out.send(format!("F444{}1706{}", encoder::le16(total_len as u16), body));
+                out.send(crate::protocol::frame("1706", &body));
                 out.send(conn.session.dump_homdo());
             }
         }
@@ -76,12 +73,10 @@ pub fn handle_trade(
 }
 
 /// Handle Opcode 0x1E — Storage Transfer (TienTrang).
-pub fn handle_storage_transfer(
-    conn: &mut Conn,
-    sub: u8,
-    payload: &[u8],
-    out: &mut HandleOutcome,
-) {
+pub fn handle_storage_transfer(ctx: &mut OpcodeCtx) {
+    let conn = &mut ctx.conn;
+    let out = &mut ctx.out;
+    let (sub, payload) = (ctx.sub, ctx.payload);
     match sub {
         // Sub 1: TienTrang -> Homdo
         1 => {
@@ -111,8 +106,7 @@ pub fn handle_storage_transfer(
                 out.send(format!("F44404001709{:02X}32", homdo_slot));
 
                 let entries = format!("{:02X}0000000000000000000000", next_slot);
-                let total_len = 2 + entries.len() / 2;
-                out.send(format!("F444{}1E04{}", encoder::le16(total_len as u16), entries));
+                out.send(crate::protocol::frame("1E04", &entries));
             }
         }
         // Sub 8: SelectMenu = 40
@@ -124,12 +118,10 @@ pub fn handle_storage_transfer(
 }
 
 /// Handle Opcode 0x1D — Bank Gold.
-pub fn handle_bank_gold(
-    conn: &mut Conn,
-    sub: u8,
-    payload: &[u8],
-    out: &mut HandleOutcome,
-) {
+pub fn handle_bank_gold(ctx: &mut OpcodeCtx) {
+    let conn = &mut ctx.conn;
+    let out = &mut ctx.out;
+    let (sub, payload) = (ctx.sub, ctx.payload);
     if payload.len() < 2 {
         return;
     }
@@ -171,15 +163,24 @@ pub fn handle_bank_gold(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::battle::service::BattleService;
+    use crate::data::loader::GameData;
+    use crate::server::handler::{test_ctx, HandleOutcome};
+    use crate::server::session::Conn;
+    use std::sync::Arc;
 
     #[test]
     fn test_trade_open_and_confirm() {
         let mut conn = Conn::new();
         conn.session.id = 300001;
 
+        let data = GameData::default();
+        let service = BattleService::new(Arc::new(GameData::default()));
+
         let mut out1 = HandleOutcome::default();
         let payload_open = vec![0x02, 0x93, 0x04, 0x00]; // partner 300034
-        handle_trade(&mut conn, 1, &payload_open, &mut out1);
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out1, 1, &payload_open);
+        handle_trade(&mut ctx);
 
         assert!(conn.session.trade.active);
         assert_eq!(conn.session.trade.partner_id, 299778);
@@ -187,7 +188,8 @@ mod tests {
 
 
         let mut out2 = HandleOutcome::default();
-        handle_trade(&mut conn, 3, &[1], &mut out2);
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out2, 3, &[1]);
+        handle_trade(&mut ctx);
         assert!(conn.session.trade.accepted);
         assert_eq!(out2.outgoing[0], "F4440300190204");
     }
@@ -198,9 +200,13 @@ mod tests {
         conn.session.gold = 5000;
         conn.session.bank_gold = 1000;
 
+        let data = GameData::default();
+        let service = BattleService::new(Arc::new(GameData::default()));
+
         let mut out1 = HandleOutcome::default();
         // Deposit 1000 gold -> hex 0x03E8
-        handle_bank_gold(&mut conn, 2, &[0xE8, 0x03], &mut out1);
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out1, 2, &[0xE8, 0x03]);
+        handle_bank_gold(&mut ctx);
 
         assert_eq!(conn.session.gold, 4000);
         assert_eq!(conn.session.bank_gold, 2000);
@@ -208,7 +214,8 @@ mod tests {
 
         let mut out2 = HandleOutcome::default();
         // Withdraw 500 gold -> hex 0x01F4
-        handle_bank_gold(&mut conn, 1, &[0xF4, 0x01], &mut out2);
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out2, 1, &[0xF4, 0x01]);
+        handle_bank_gold(&mut ctx);
 
         assert_eq!(conn.session.gold, 4500);
         assert_eq!(conn.session.bank_gold, 1500);

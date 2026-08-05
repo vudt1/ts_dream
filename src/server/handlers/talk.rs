@@ -2,7 +2,7 @@
 
 use crate::data::loader::GameData;
 use crate::protocol::encoder;
-use crate::server::handler::HandleOutcome;
+use crate::server::handler::{HandleOutcome, OpcodeCtx};
 use crate::server::handlers::stats::build_stat_update;
 use crate::server::session::{Conn, InventoryItem};
 
@@ -28,13 +28,11 @@ pub fn talk_messages(conn: &mut Conn, talk_string: &str, out: &mut HandleOutcome
 }
 
 /// Dispatch Opcode 0x14 — Action / Talk.
-pub fn handle_talk(
-    conn: &mut Conn,
-    sub: u8,
-    payload: &[u8],
-    data: &GameData,
-    out: &mut HandleOutcome,
-) {
+pub fn handle_talk(ctx: &mut OpcodeCtx) {
+    let conn = &mut ctx.conn;
+    let out = &mut ctx.out;
+    let data = ctx.data;
+    let (sub, payload) = (ctx.sub, ctx.payload);
     match sub {
         // Sub 1: Start talk (H1)
         1 => handle_talk_start(conn, payload, data, out),
@@ -221,15 +219,20 @@ fn handle_talk_select_menu(conn: &mut Conn, payload: &[u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::battle::service::BattleService;
+    use crate::server::handler::test_ctx;
+    use std::sync::Arc;
 
     #[test]
     fn test_talk_start_banker() {
         let mut conn = Conn::new();
         let data = GameData::default();
+        let service = BattleService::new(Arc::new(GameData::default()));
         let mut out = HandleOutcome::default();
 
         // Start talk with banker 16080 (0x3ED0) -> payload: 0xD0, 0x3E
-        handle_talk(&mut conn, 1, &[0xD0, 0x3E], &data, &mut out);
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[0xD0, 0x3E]);
+        handle_talk(&mut ctx);
 
         assert_eq!(conn.session.idtalking, 16080);
         assert_eq!(out.outgoing.len(), 2);
@@ -240,12 +243,14 @@ mod tests {
     fn test_talk_banker_menu_30() {
         let mut conn = Conn::new();
         let data = GameData::default();
+        let service = BattleService::new(Arc::new(GameData::default()));
         conn.session.idtalking = 16080;
         conn.session.bank_gold = 5000;
         conn.session.select_menu = 30;
 
         let mut out = HandleOutcome::default();
-        handle_talk(&mut conn, 6, &[], &data, &mut out);
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 6, &[]);
+        handle_talk(&mut ctx);
 
         assert_eq!(out.outgoing.len(), 4);
         assert_eq!(out.outgoing[0], "F44403001D0900");
@@ -255,11 +260,13 @@ mod tests {
     fn test_talk_end() {
         let mut conn = Conn::new();
         let data = GameData::default();
+        let service = BattleService::new(Arc::new(GameData::default()));
         conn.session.idtalking = 16080;
         conn.session.select_menu = 30;
 
         let mut out = HandleOutcome::default();
-        handle_talk(&mut conn, 4, &[], &data, &mut out);
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 4, &[]);
+        handle_talk(&mut ctx);
 
         assert_eq!(conn.session.idtalking, 0);
         assert_eq!(conn.session.select_menu, 0);
