@@ -158,7 +158,7 @@ pub async fn use_item(
         let pet_id = add_pet as u16;
         if conn.session.pets.iter().any(|p| p.id == pet_id) {
             // Already owned: C# sends a red message and breaks (no consume).
-            out.send(spawn_sys_msg("Ban da co pet nay roi"));
+            out.send(crate::server::spawn::sys_msg_frame("Ban da co pet nay roi"));
             return;
         }
         if conn.session.pets.len() < 4 {
@@ -179,7 +179,7 @@ pub async fn use_item(
             return;
         }
         // Pet box full: C# red message, no consume.
-        out.send(spawn_sys_msg("Pet box full"));
+        out.send(crate::server::spawn::sys_msg_frame("Pet box full"));
         return;
     }
 
@@ -212,7 +212,7 @@ pub async fn use_item(
             out.send(crate::protocol::frame("0801", &body));
             consume(conn, slot, count, out, pool).await;
         } else {
-            out.send(spawn_sys_msg("Ban da co ky nang nay roi"));
+            out.send(crate::server::spawn::sys_msg_frame("Ban da co ky nang nay roi"));
         }
         return;
     }
@@ -317,13 +317,6 @@ pub async fn use_item(
             consume(conn, slot, count, out, pool).await;
         }
     }
-}
-
-/// Red-message banner (op 0x02 sub 0x0B) for use-item feedback.
-fn spawn_sys_msg(msg: &str) -> String {
-    let mut body = String::from("00000000");
-    body.push_str(&encoder::strhex(msg.as_bytes()));
-    crate::protocol::frame("020B", &body)
 }
 
 #[cfg(test)]

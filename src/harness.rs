@@ -10,11 +10,9 @@ use crate::protocol::frame;
 use std::path::Path;
 
 /// Protocol constants for the harness (Chapter 9 §9.7 / Chapter 8 §8.2).
-pub const XOR_KEY: u8 = 0xAD;
-pub const FRAME_MAGIC: &[u8] = &[0xF4, 0x44];
-pub const ID_PREFIX: &str = "vn";
-pub const MIN_VERSION: u16 = 186;
-pub const SERVER_NAME: &str = "TSVN";
+/// Re-exported from the protocol layer so the harness can never drift from it.
+pub use crate::protocol::{ID_PREFIX, MIN_VERSION, SERVER_NAME, XOR_KEY};
+pub const FRAME_MAGIC: &[u8] = &crate::protocol::MAGIC;
 
 /// One golden scenario: directed frames parsed from a `.golden` text file.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

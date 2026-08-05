@@ -234,6 +234,16 @@ impl ServerControl {
             }
         }
     }
+
+    /// Disconnect teardown for a logged-in session (Ch2 §2.1): broadcast the
+    /// leave-battle / offline hide frame to peers, then drop the client
+    /// registration and the online-session snapshot.
+    pub async fn disconnect_player(&self, player_id: u32) {
+        let hide = crate::server::spawn::session_offline_frame(player_id);
+        self.broadcast_except(player_id, &hide).await;
+        self.unregister_client(player_id).await;
+        online_sessions().lock().unwrap().remove(&player_id);
+    }
 }
 
 /// True when a decoded frame must be fanned out to other players on the same
@@ -273,16 +283,23 @@ async fn handle_client_connection(
     let mut buf = vec![0u8; 8192];
     let mut logined_id = 0u32;
 
-    loop {
+    // One teardown path for every exit (peer close, read error, handler
+    // shutdown, write error): set `close` and break, then run the cleanup once.
+    let mut close = false;
+    while !close {
         tokio::select! {
             read_res = read_half.read(&mut buf) => {
                 match read_res {
-                    Ok(0) => break, // Peer closed
+                    Ok(0) => close = true, // Peer closed (0-byte receive → shutdown)
                     Ok(n) => {
                         for frame_hex in conn.decoder.feed(&buf[..n]) {
                             let Some(decoded) = encoder::bytes(&frame_hex) else {
                                 continue;
                             };
+                            if !frame::check_magic(&decoded) {
+                                tracing::warn!("dropping frame without F4 44 magic from {peer_ip}");
+                                continue;
+                            }
                             let env = ServerEnv {
                                 pool: pool.as_ref(),
                                 hub: Some(&control),
@@ -318,17 +335,18 @@ async fn handle_client_connection(
                                     "system",
                                     format!("Shutting down connection from {peer_ip}"),
                                 );
-                                return;
+                                close = true;
+                                break;
                             }
                         }
                     }
-                    Err(_) => break,
+                    Err(_) => close = true,
                 }
             }
             Some(frame_hex) = rx.recv() => {
                 if let Ok(wire) = frame::encode_to_wire(&frame_hex) {
                     if write_half.write_all(&wire).await.is_err() {
-                        break;
+                        close = true;
                     }
                 }
             }
@@ -336,8 +354,9 @@ async fn handle_client_connection(
     }
 
     if logined_id > 0 {
-        control.unregister_client(logined_id).await;
-        online_sessions().lock().unwrap().remove(&logined_id);
+        // Ch2 §2.1: a logged-in disconnect broadcasts the leave-battle +
+        // offline hide frame to the map, then drops registration.
+        control.disconnect_player(logined_id).await;
     }
     app.write().await.push_log(
         "system",
@@ -412,5 +431,24 @@ mod tests {
             "F4440B000601FFFFFFFF026400C800",
             "peer receives the broadcast"
         );
+    }
+
+    #[tokio::test]
+    async fn disconnect_player_broadcasts_offline_and_unregisters() {
+        let c = control();
+        let (tx1, mut rx1) = mpsc::unbounded_channel::<String>();
+        let (tx2, mut rx2) = mpsc::unbounded_channel::<String>();
+        c.login_register(300001, &tx1).await;
+        c.login_register(300002, &tx2).await;
+        online_sessions().lock().unwrap().insert(300001, Default::default());
+
+        c.disconnect_player(300001).await;
+
+        // Peers receive the leave/offline hide frame (Ch2 §2.1).
+        assert_eq!(rx2.try_recv().unwrap(), "F44408000B00E19304000000");
+        assert_eq!(rx1.try_recv(), Err(mpsc::error::TryRecvError::Empty), "origin gets nothing");
+        // Registration and online snapshot are dropped.
+        assert_eq!(c.clients.lock().await.len(), 1);
+        assert!(!online_sessions().lock().unwrap().contains_key(&300001));
     }
 }

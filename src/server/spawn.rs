@@ -191,30 +191,47 @@ pub fn chat_frame(sub: u8, id: u32, chat_raw: &[u8]) -> String {
     crate::protocol::frame(&format!("02{:02X}", sub), &body)
 }
 
+/// Shared banner builder for server-authored text (op 0x02 sub 0x0B/0x0C).
+///
+/// Routes the message through `to_viscii` so the wire always carries
+/// single-byte VISCII/Latin-1 rather than raw multi-byte UTF-8 (§4.2). ASCII
+/// text is identity; a proper-Unicode codepoint >0xFF not in the reverse map
+/// (e.g. Đ) collapses to `'?'` 0x3F — full Unicode→VISCII (smethod_17, §4.4
+/// item 3) is ticket 03, so the current contract is "never leak UTF-8".
+fn text_banner(op: &str, msg: &str) -> String {
+    let visc = crate::encoding::to_viscii(msg);
+    let mut body = String::from("00000000");
+    body.push_str(&encoder::strhex(&visc));
+    crate::protocol::frame(op, &body)
+}
+
 /// Build system message banner packet (op 0x02 sub 0x0B).
 pub fn sys_msg_frame(msg: &str) -> String {
-    let mut body = String::from("00000000");
-    body.push_str(&encoder::strhex(msg.as_bytes()));
-    crate::protocol::frame("020B", &body)
+    text_banner("020B", msg)
 }
 
 /// Build announcement packet (op 0x02 sub 0x0C).
 pub fn announce_frame(msg: &str) -> String {
-    let mut body = String::from("00000000");
-    body.push_str(&encoder::strhex(msg.as_bytes()));
-    crate::protocol::frame("020C", &body)
+    text_banner("020C", msg)
 }
 
 /// Build server name packet (op 0x27 sub 0x09).
 pub fn server_name_frame(id: u32, server_name: &str) -> String {
-    let name_hex = encoder::strhex(server_name.as_bytes());
-    let name_len = server_name.len() as u8;
+    let visc = crate::encoding::to_viscii(server_name);
+    let name_len = visc.len() as u8;
     let mut body = String::new();
     body.push_str(&encoder::le32(id));
     body.push_str("C4000000");
     body.push_str(&format!("{:02X}", name_len));
-    body.push_str(&name_hex);
+    body.push_str(&encoder::strhex(&visc));
     crate::protocol::frame("2709", &body)
+}
+
+/// World-hide broadcast frame emitted when a logged-in session disconnects
+/// (Ch2 §2.1 / research 04 §7.4): `F44408000B00` + LE32(id) + `0000` removes
+/// the entity from every peer's map on the wire.
+pub fn session_offline_frame(id: u32) -> String {
+    format!("F44408000B00{}0000", encoder::le32(id))
 }
 
 /// God / HP store / SP store frame (`method_0`): op 0x23 sub 0x04 + point + 12
@@ -340,4 +357,42 @@ pub fn logined_sequence(ok: Vec<String>, _id: u32) -> HandleOutcome {
         out.send(f);
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn session_offline_frame_is_leave_hide_packet() {
+        // Same literal as golden/13-battle-leave: F444 0800 0B00 + id + 0000.
+        assert_eq!(session_offline_frame(300001), "F44408000B00E19304000000");
+    }
+
+    #[test]
+    fn sys_msg_frame_never_emits_utf8() {
+        // ASCII text is unchanged on the wire.
+        assert_eq!(
+            sys_msg_frame("TSVN"),
+            "F4440A00020B000000005453564E"
+        );
+        // Latin-1 accented é (U+00E9) travels as the single byte 0xE9 — never
+        // as the two-byte UTF-8 pair C3 A9. The reverse map covers ≤0xFF.
+        let f = sys_msg_frame("café");
+        assert!(f.ends_with("636166E9"), "got {f}"); // 63 61 66 E9
+        assert!(!f.contains("C3A9"), "got {f}");
+        // Unmapped proper-Unicode (Đ U+0110 > 0xFF) currently collapses to
+        // '?' (0x3F): full Unicode→VISCII (smethod_17, ticket 03) is pending.
+        // The wire must still never carry raw UTF-8 bytes.
+        let cfg = sys_msg_frame("Đậu2");
+        assert!(!cfg.contains("C490"), "got {cfg}");
+    }
+
+    #[test]
+    fn server_name_frame_counts_viscii_bytes_not_utf8() {
+        // "câu" = c(63) â(0xE2) u(75) → name_len = 3 VISCII bytes, hex 63 E2 75.
+        let n = server_name_frame(1, "câu");
+        assert!(n.ends_with("0363E275"), "got {n}");
+        assert!(!n.contains("C3A2"), "got {n}");
+    }
 }
