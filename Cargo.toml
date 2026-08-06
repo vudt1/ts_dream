@@ -1,8 +1,8 @@
 [package]
 name = "ts_dream"
 version = "0.1.0"
-edition = "2021"
-description = "TS Dream — Rust port of the TS Online C# server (byte-level parity)"
+edition = "2026"
+description = "TS Dream - TS offline server written by Rust"
 
 [[bin]]
 name = "ts_dream"
