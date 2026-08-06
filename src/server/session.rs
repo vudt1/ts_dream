@@ -389,9 +389,8 @@ pub struct Conn {
 /// session snapshots, synced by the connection loop on every frame. Cross-player
 /// flows (player shop op 0x17 sub 32/33) read and mutate it.
 pub fn online_sessions() -> &'static std::sync::Mutex<std::collections::HashMap<u32, Session>> {
-    static ONLINE: std::sync::OnceLock<
-        std::sync::Mutex<std::collections::HashMap<u32, Session>>,
-    > = std::sync::OnceLock::new();
+    static ONLINE: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<u32, Session>>> =
+        std::sync::OnceLock::new();
     ONLINE.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
 }
 

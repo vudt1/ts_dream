@@ -1,9 +1,9 @@
 //! Stat allocation (Opcode 0x08) & hotkey skill bar (Opcode 0x28) handlers.
 
 use crate::battle::engine::{get_hp_max, get_sp_max};
+use crate::db::persist;
 use crate::protocol::encoder;
 use crate::server::handler::OpcodeCtx;
-use crate::server::persist;
 
 /// Build stat update frame `F4440C000801` + type + sign + le32(val) + `00000000`.
 pub fn build_stat_update(stat_type: u8, val: i32) -> String {
@@ -12,7 +12,13 @@ pub fn build_stat_update(stat_type: u8, val: i32) -> String {
     } else {
         ("02", (-val) as u32)
     };
-    let body = format!("{:02X}{}{}{}", stat_type, sign, encoder::le32(abs_val), "00000000");
+    let body = format!(
+        "{:02X}{}{}{}",
+        stat_type,
+        sign,
+        encoder::le32(abs_val),
+        "00000000"
+    );
     crate::protocol::frame("0801", &body)
 }
 
@@ -75,7 +81,8 @@ pub async fn handle_stat_allocation(ctx: &mut OpcodeCtx<'_>) {
             if conn.session.int1 < 400 {
                 conn.session.point -= pts;
                 conn.session.int1 += pts;
-                persist::update_player(pool, player_id, "Point", i64::from(conn.session.point)).await;
+                persist::update_player(pool, player_id, "Point", i64::from(conn.session.point))
+                    .await;
                 persist::update_player(pool, player_id, "Int", i64::from(conn.session.int1)).await;
                 out.send(build_stat_update(0x26, conn.session.point as i32));
                 out.send(build_stat_update(0x1B, conn.session.int1 as i32));
@@ -86,7 +93,8 @@ pub async fn handle_stat_allocation(ctx: &mut OpcodeCtx<'_>) {
             if conn.session.atk < 400 {
                 conn.session.point -= pts;
                 conn.session.atk += pts;
-                persist::update_player(pool, player_id, "Point", i64::from(conn.session.point)).await;
+                persist::update_player(pool, player_id, "Point", i64::from(conn.session.point))
+                    .await;
                 persist::update_player(pool, player_id, "Atk", i64::from(conn.session.atk)).await;
                 out.send(build_stat_update(0x26, conn.session.point as i32));
                 out.send(build_stat_update(0x1C, conn.session.atk as i32));
@@ -97,7 +105,8 @@ pub async fn handle_stat_allocation(ctx: &mut OpcodeCtx<'_>) {
             if conn.session.def < 400 {
                 conn.session.point -= pts;
                 conn.session.def += pts;
-                persist::update_player(pool, player_id, "Point", i64::from(conn.session.point)).await;
+                persist::update_player(pool, player_id, "Point", i64::from(conn.session.point))
+                    .await;
                 persist::update_player(pool, player_id, "Def", i64::from(conn.session.def)).await;
                 out.send(build_stat_update(0x26, conn.session.point as i32));
                 out.send(build_stat_update(0x1D, conn.session.def as i32));
@@ -108,7 +117,8 @@ pub async fn handle_stat_allocation(ctx: &mut OpcodeCtx<'_>) {
             if conn.session.agi < 400 {
                 conn.session.point -= pts;
                 conn.session.agi += pts;
-                persist::update_player(pool, player_id, "Point", i64::from(conn.session.point)).await;
+                persist::update_player(pool, player_id, "Point", i64::from(conn.session.point))
+                    .await;
                 persist::update_player(pool, player_id, "Agi", i64::from(conn.session.agi)).await;
                 out.send(build_stat_update(0x26, conn.session.point as i32));
                 out.send(build_stat_update(0x1E, conn.session.agi as i32));
@@ -120,9 +130,11 @@ pub async fn handle_stat_allocation(ctx: &mut OpcodeCtx<'_>) {
                 conn.session.point -= pts;
                 conn.session.hpx += pts;
                 conn.session.recompute_stats();
-                persist::update_player(pool, player_id, "Point", i64::from(conn.session.point)).await;
+                persist::update_player(pool, player_id, "Point", i64::from(conn.session.point))
+                    .await;
                 persist::update_player(pool, player_id, "Hpx", i64::from(conn.session.hpx)).await;
-                persist::update_player(pool, player_id, "HpMax", i64::from(conn.session.hp_max)).await;
+                persist::update_player(pool, player_id, "HpMax", i64::from(conn.session.hp_max))
+                    .await;
                 out.send(build_stat_update(0x26, conn.session.point as i32));
                 out.send(build_stat_update(0x19, conn.session.hp_max as i32));
                 out.send(build_stat_update(0x1F, conn.session.hpx as i32));
@@ -134,9 +146,11 @@ pub async fn handle_stat_allocation(ctx: &mut OpcodeCtx<'_>) {
                 conn.session.point -= pts;
                 conn.session.spx += pts;
                 conn.session.recompute_stats();
-                persist::update_player(pool, player_id, "Point", i64::from(conn.session.point)).await;
+                persist::update_player(pool, player_id, "Point", i64::from(conn.session.point))
+                    .await;
                 persist::update_player(pool, player_id, "Spx", i64::from(conn.session.spx)).await;
-                persist::update_player(pool, player_id, "SpMax", i64::from(conn.session.sp_max)).await;
+                persist::update_player(pool, player_id, "SpMax", i64::from(conn.session.sp_max))
+                    .await;
                 out.send(build_stat_update(0x26, conn.session.point as i32));
                 out.send(build_stat_update(0x1A, conn.session.sp_max as i32));
                 out.send(build_stat_update(0x20, conn.session.spx as i32));
@@ -260,7 +274,10 @@ mod tests {
         handle_hotkey(&mut ctx).await;
 
         assert_eq!(conn.session.hotkeys[0], 0);
-        assert_eq!(conn.session.hotkeys[4], 777, "clear must not touch other slots");
+        assert_eq!(
+            conn.session.hotkeys[4], 777,
+            "clear must not touch other slots"
+        );
         assert!(out.outgoing.is_empty());
     }
 }

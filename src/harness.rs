@@ -120,24 +120,17 @@ impl Golden {
 /// and compare against the golden S2C stream frame-by-frame byte-exact.
 ///
 /// Returns the S2C received on success, or the first mismatch error.
-pub async fn run_golden(
-    golden: &Golden,
-    addr: &str,
-) -> Result<Vec<String>> {
+pub async fn run_golden(golden: &Golden, addr: &str) -> Result<Vec<String>> {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpStream;
     use tokio::time::{timeout, Duration};
 
-    let mut sock = TcpStream::connect(addr)
-        .await
-        .map_err(TsError::Io)?;
+    let mut sock = TcpStream::connect(addr).await.map_err(TsError::Io)?;
 
     // Send each C2S frame (hex → xor → write).
     for c2s in &golden.c2s {
         let wire = frame::encode_to_wire(c2s)?;
-        sock.write_all(&wire)
-            .await
-            .map_err(TsError::Io)?;
+        sock.write_all(&wire).await.map_err(TsError::Io)?;
     }
 
     // Read back until expected S2C count is met or timeout/EOF.
@@ -452,7 +445,9 @@ mod tests {
     #[tokio::test]
     async fn test_capture_proxy_forwarding() -> Result<()> {
         // 1. Start a mock server
-        let mock_listener = TcpListener::bind("127.0.0.1:0").await.map_err(TsError::Io)?;
+        let mock_listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .map_err(TsError::Io)?;
         let server_addr = mock_listener.local_addr().map_err(TsError::Io)?;
 
         tokio::spawn(async move {
@@ -473,11 +468,16 @@ mod tests {
         });
 
         // 2. Start proxy
-        let proxy_listener = TcpListener::bind("127.0.0.1:0").await.map_err(TsError::Io)?;
+        let proxy_listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .map_err(TsError::Io)?;
         let proxy_addr = proxy_listener.local_addr().map_err(TsError::Io)?;
         drop(proxy_listener); // release port for CaptureProxy
 
-        let proxy = Arc::new(proxy::CaptureProxy::new(proxy_addr.to_string(), server_addr.to_string()));
+        let proxy = Arc::new(proxy::CaptureProxy::new(
+            proxy_addr.to_string(),
+            server_addr.to_string(),
+        ));
         let (tx, rx) = watch::channel(false);
         let proxy_clone = Arc::clone(&proxy);
         let proxy_task = tokio::spawn(async move {
@@ -488,13 +488,18 @@ mod tests {
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
         // 3. Client connects to proxy and sends F444010000 wire bytes
-        let mut client = tokio::net::TcpStream::connect(proxy_addr).await.map_err(TsError::Io)?;
+        let mut client = tokio::net::TcpStream::connect(proxy_addr)
+            .await
+            .map_err(TsError::Io)?;
         let req_wire = frame::encode_to_wire("F444010000")?;
         client.write_all(&req_wire).await.map_err(TsError::Io)?;
 
         let mut resp_buf = vec![0u8; 1024];
         let n = client.read(&mut resp_buf).await.map_err(TsError::Io)?;
-        let resp_decoded = resp_buf[..n].iter().map(|b| b ^ XOR_KEY).collect::<Vec<_>>();
+        let resp_decoded = resp_buf[..n]
+            .iter()
+            .map(|b| b ^ XOR_KEY)
+            .collect::<Vec<_>>();
         assert_eq!(resp_decoded, vec![0xF4, 0x44, 0x03, 0x00, 0x01, 0x09, 0x01]);
 
         let _ = tx.send(true);

@@ -1,0 +1,34 @@
+# Thiết kế schema MySQL 8 (thay thế SQLite)
+
+Status: resolved
+Type: grilling
+Blocked by: 03
+
+## Question
+
+Quyết định schema MySQL 8 cho spec, thay thế quyết định "Thiết kế schema SQLite" (ticket 05 — superseded). Nền đã chốt: MySQL 8 chạy local (`localhost:3306`), **shared schema**: MỘT database `ts_dream` (InnoDB), mọi bảng gameplay thêm cột `player_id`, nhân vật mới = INSERT seed (bỏ template copy file). Cần chốt từng quyết định con để chapter Database (MySQL 8) của spec chính xác:
+
+1. **DDL đầy đủ** cho 10 bảng + `accounts` + `item_code`: map chính xác từng cột Access → cột MySQL (tên snake_case + bảng đối chiếu bắt buộc, kế thừa decision 05), PK kép mỗi bảng (`player_id, slot`/`stt`/`id`), bảng `Quest` không PK Access → chọn PK/unique gì. **Quy tắc scoping bắt buộc**: schema shared làm mất cô lập per-file → MỌI câu lệnh SQL của C# trên 9 bảng gameplay phải được port kèm `player_id` ở predicate (hoặc PK kép), không chỉ riêng DDL. Liệt kê sẵn các pattern nguy hiểm nếu port nguyên vẹn: `SkillSaveGetId` / `SkillSaveUpdateId` (`WHERE Id = n`, Client.cs:8348/8360 — Id 1..10 lặp ở mọi player), DELETE-rồi-build lại `Skill` lúc login (`WHERE Id >= 10001 AND Id <= 13033 …`, Client.cs:5726; `WHERE Id >= 0 AND Id <= 9`, Client.cs:8193), và họ `DELETE FROM Quest WHERE MapId…` (FTalk.cs:789-955) → tất cả phải cộng `player_id`.
+2. **Kiểu cột**: mọi cột số (bao gồm `DOUBLE` Access) → `BIGINT`; DEFAULT y nguyên (`ShopPoint 0`, `SP_Store/HP_Store 10000`, ...); KHÔNG thêm FK/NOT NULL. `AUTO_INCREMENT` cho `accounts.id`, nhân vật giữ id do app chỉ định (import Member.ini 300003+).
+3. **Encoding cột chuỗi**: giữ **raw byte VISCII** (nền ticket 03): `VARBINARY` hay `VARCHAR ... CHARACTER SET latin1` cho `Player.Name`, `Pet.Name`, `Color`...; connection charset của sqlx = latin1 (không để utf8mb4 transcode làm lệch byte).
+4. **`item_code`** (table MySQL gốc của opcode 0x23 sub 3, `Client.cs:7571-7659`): DDL (`code`, `password`, `player_id`, `used_at` unix, `item_id`, `count`) + đưa cả nhánh redeem vào spec functional (không degrade) — giao móc với ticket 10. **Chống SQL injection**: C# cũ concatenate chuỗi client (`code`/`password`) vào SQL — port Rust BẮT BUỘC dùng bind parameter (`sqlx`), và bọc chuỗi SELECT-`player_id=0` → UPDATE trong một transaction (tránh redeem trùng race).
+5. **Bootstrap/migration**: `sqlx::migrate!` chạy lúc boot, TRƯỚC khi bind listener (fail-fast: MySQL không reachable → exit với lỗi rõ ràng, không để dashboard "up" với DB chết); script tạo database/user local lần đầu; import `Member.ini` vào `accounts`; seed `SkillSave` 1..10 + tạo hàng `Skill` lúc tạo nhân vật (opcode 0x09 sub 1).
+6. **Config**: `database_url` = `mysql://user:pass@localhost:3306/ts_dream`, key `TS_DATABASE_URL`; bỏ `account_db_path`/`member_dir`/`template_db_path` (từ 07).
+7. **Chỉ mục**: giữ index tương đương `Player(MapId)`, `Pet(IdSkill1..4)`, `Quest(QuestId)`, `SkillSave(IdSkill)` — dạng KEY trong MySQL.
+
+Nghiên cứu: [05-mysql-8](../../research/05-mysql-8.md).
+
+## Answer
+
+Chốt qua grilling (HITL), từng quyết định con cho chapter Database (MySQL 8):
+
+1. **PK & layout**: Một DB `ts_dream` (InnoDB). 9 bảng gameplay dùng **PK kép** per-player: `(player_id, slot)` cho Homdo/LuuLang/TienTrang/Trangbi/Tuideo, `(player_id, stt)` cho Pet, `(player_id, Id)` cho Skill, `(player_id, ID)` cho SkillSave. **Bảng `Quest` KHÔNG có PK** (Access cũng không) — không thêm NOT NULL/FK, giữ index `QuestId`; và mọi `DELETE FROM Quest WHERE MapId=…` (FTalk.cs:789-955) phải cộng `player_id` ở predicate.
+2. **Scoping contract (bắt buộc)**: vì shared schema mất cô lập per-file, MỌI câu lệnh C# trên 9 bảng gameplay port kèm `player_id` ở predicate/composite-PK. Liệt kê pattern nguy hiểm nếu port nguyên vẹn: `SkillSaveGetId`/`SkillSaveUpdateId` (`WHERE Id = n`, Client.cs:8348/8360 — Id 1..10 lặp mọi player), DELETE-rồi-build lại `Skill` lúc login (`WHERE Id >= 10001 AND Id <= 13033 …`, Client.cs:5726; `WHERE Id >= 0 AND Id <= 9`, Client.cs:8193), và họ `DELETE FROM Quest WHERE MapKey…` (FTalk.cs:789-955, 2845-2918) — tất cả cộng `player_id`.
+3. **Kiểu cột**: mọi cột số (kể cả `DOUBLE` Access) → `BIGINT`; DEFAULT y nguyên (`ShopPoint 0`, `SP_Store`/`HP_Store` 10000, TTL v.v.); KHÔNG thêm FK/NOT NULL ngoài Access. `accounts.id BIGINT AUTO_INCREMENT`.
+4. **Encoding cột chuỗi**: `VARCHAR(n) CHARACTER SET latin1` (khuyến nghị `COLLATE latin1_bin` để so khớp byte-exact) cho `players.Name`, `Pet.Name`, `Color`, quest `Title`; connection charset sqlx = `latin1` (không để utf8mb4 transcode làm lệch byte VISCII). **CHARACTER SET phải khai TƯỜNG MINH ở mỗi cột/bảng** — server default `character-set-server=utf8mb4` (my.ini, `Huong_Dan_Cai_Dat_MySQL_ZIP.md`) và DB `ts_dream` đều thừa kế utf8mb4; cột `VARCHAR` trần sẽ fall về utf8mb4 → byte VISCII cao (0x80–0xFF) thành UTF-8 không hợp lệ ⇒ hỏng mất tên. Không gợi ý chuyển sang utf8/utf8mb4: wire vẫn là VISCII, utf8mb4 là byte-store vô hại. `utf8mb4` chỉ OK cho dữ liệu metadata/dashboard, tuyệt đối không cho cột game text.
+5. **`item_code`** (opcode 0x23 sub 3, Client.cs:7571-7659): bảng riêng `item_code(code VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_bin, password VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_bin, player_id BIGINT NOT NULL DEFAULT 0, used_at BIGINT NULL unix, item_id BIGINT, count BIGINT)`. Redeem functional (không degrade — giao móc ticket 10): bind param toàn bộ (không concat chuỗi client), transaction `SELECT … WHERE code=? AND password=?` → guard `player_id=0` → `UPDATE … SET player_id=?, used_at=? WHERE code=? AND password=? AND player_id=0` (gate rowcount chống race redeem trùng) → thêm item.
+6. **Seed lúc tạo nhân vật**: opcode 0x09 sub 1 — MỘT transaction atomic: INSERT `players` row (giá trị stat tính qua formula, cột còn lại nhờ DEFAULT) + INSERT `SkillSave` 1..10 (IdSkill=0) + bảng `Skill` như C# build; mọi hàng explicit `player_id`. Login vẫn chạy DELETE-rồi-build lại bảng `Skill` như C#.
+7. **Bootstrap/migration**: `sqlx::migrate!` chạy lúc boot, TRƯỚC khi bind listener; fail-fast — MySQL không reachable ⇒ hard exit với lỗi rõ ràng, dashboard không bao giờ lên với DB chết. `item_code` + `accounts` nằm trong migration.
+8. **Accounts (SUPERSEDE base cũ)**: KHÔNG import `Member.ini` nữa. `accounts` tạo thuần qua web dashboard (quyết định mới — ghi đè dòng base "import Member.ini lúc bootstrap"). Không cần set `AUTO_INCREMENT` thủ công theo Member.ini nhập vì không còn import.
+9. **Config**: `database_url` = `mysql://user:pass@localhost:3306/ts_dream`, key `TS_DATABASE_URL`; bỏ `account_db_path`/`member_dir`/`template_db_path` (từ 07).
+10. **Index**: index tương đương Access dạng KEY MySQL: `players(MapId)`, `Pet(IdSkill1..4)`, `Quest(QuestId)`, `SkillSave(IdSkill)`.

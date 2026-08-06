@@ -121,10 +121,7 @@ mod tests {
     fn feed_concatenated_frames_in_one_chunk() {
         let mut d = Decoder::new();
         let frames = d.feed(&wire("F444010000F4440300010901F44402000901"));
-        assert_eq!(
-            frames,
-            vec!["F444010000", "F4440300010901", "F44402000901"]
-        );
+        assert_eq!(frames, vec!["F444010000", "F4440300010901", "F44402000901"]);
         assert!(d.pending().is_empty());
     }
 
@@ -161,7 +158,10 @@ mod tests {
         assert!(d.feed(&wire("F4440B")).is_empty());
         assert_eq!(d.pending(), "F4440B");
         // Remainder completes it on chunk 3.
-        assert_eq!(d.feed(&wire("000601E1930400026400C800")), vec!["F4440B000601E1930400026400C800"]);
+        assert_eq!(
+            d.feed(&wire("000601E1930400026400C800")),
+            vec!["F4440B000601E1930400026400C800"]
+        );
         assert!(d.pending().is_empty());
     }
 

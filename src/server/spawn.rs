@@ -251,7 +251,11 @@ pub fn build_logined_sequence_session(s: &Session) -> Vec<String> {
     frames.extend(login_start());
 
     // 2. Step 2: player self-appear (op 0x03 sub 0x03)
-    let color = if s.color.is_empty() { "0000000000000000" } else { &s.color };
+    let color = if s.color.is_empty() {
+        "0000000000000000"
+    } else {
+        &s.color
+    };
     frames.push(player_appear(
         s.id,
         s.sex,
@@ -272,9 +276,29 @@ pub fn build_logined_sequence_session(s: &Session) -> Vec<String> {
     // 3. Step 3: stats (op 0x05 sub 0x03)
     let skills_hex = skill_list(&s.skills);
     frames.push(stats(
-        s.thuoctinh, s.hp, s.sp, s.int1, s.atk, s.def, s.agi, s.hpx, s.spx, s.level,
-        s.texp, s.skill_point, s.point, s.tiengtam, s.hp_max, s.sp_max, s.atk2, s.def2,
-        s.int2, s.agi2, s.hpx2, s.spx2, &skills_hex,
+        s.thuoctinh,
+        s.hp,
+        s.sp,
+        s.int1,
+        s.atk,
+        s.def,
+        s.agi,
+        s.hpx,
+        s.spx,
+        s.level,
+        s.texp,
+        s.skill_point,
+        s.point,
+        s.tiengtam,
+        s.hp_max,
+        s.sp_max,
+        s.atk2,
+        s.def2,
+        s.int2,
+        s.agi2,
+        s.hpx2,
+        s.spx2,
+        &skills_hex,
     ));
 
     // 4. Step 4: SendPlayerOnline — broadcast to the map, owned by the server loop.
@@ -289,7 +313,10 @@ pub fn build_logined_sequence_session(s: &Session) -> Vec<String> {
     // 7. Step 7: Pet summon (`F44406001301` + pet id) when one is active.
     if (1..=4).contains(&s.active_pet_stt) {
         if let Some(pet) = s.pets.iter().find(|p| p.stt == s.active_pet_stt) {
-            frames.push(crate::protocol::frame("1301", &encoder::le32(u32::from(pet.id))));
+            frames.push(crate::protocol::frame(
+                "1301",
+                &encoder::le32(u32::from(pet.id)),
+            ));
         }
     }
 
@@ -370,10 +397,7 @@ mod tests {
     #[test]
     fn sys_msg_frame_never_emits_utf8() {
         // ASCII text is unchanged on the wire.
-        assert_eq!(
-            sys_msg_frame("TSVN"),
-            "F4440A00020B000000005453564E"
-        );
+        assert_eq!(sys_msg_frame("TSVN"), "F4440A00020B000000005453564E");
         // Latin-1 accented é (U+00E9) travels as the single byte 0xE9 — never
         // as the two-byte UTF-8 pair C3 A9. The reverse map covers ≤0xFF.
         let f = sys_msg_frame("café");

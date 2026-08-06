@@ -15,8 +15,8 @@ use ts_dream::battle::runner::BattleCommand;
 use ts_dream::battle::service::BattleService;
 use ts_dream::data::loader::GameData;
 use ts_dream::data::tables::{Npc, QuestResult, Skill};
-use ts_dream::harness::Golden;
 use ts_dream::harness::scenario::Scenario;
+use ts_dream::harness::Golden;
 use ts_dream::server::session::{Conn, InventoryItem, PetState};
 
 /// Fixed instant (unix seconds) the login-success banner is pinned to.
@@ -76,7 +76,12 @@ fn create_char_frame() -> String {
 /// file (except the two hello scaffolds and the async battle-win).
 pub fn all_scenarios() -> Vec<Scenario<'static>> {
     vec![
-        Scenario::new("01-hello", game_data(), vec!["F444010000".to_string()], |_| {}),
+        Scenario::new(
+            "01-hello",
+            game_data(),
+            vec!["F444010000".to_string()],
+            |_| {},
+        ),
         Scenario::new(
             "02-login-scaffold",
             game_data(),
@@ -107,12 +112,22 @@ pub fn all_scenarios() -> Vec<Scenario<'static>> {
             ],
             |_| {},
         ),
-        Scenario::new("07-move", game_data(), vec!["F44407000601026400C800".to_string()], |c| {
-            c.session.id = 300001;
-        }),
-        Scenario::new("08-chat", game_data(), vec!["F4440700020248454C4C4F".to_string()], |c| {
-            c.session.id = 300001;
-        }),
+        Scenario::new(
+            "07-move",
+            game_data(),
+            vec!["F44407000601026400C800".to_string()],
+            |c| {
+                c.session.id = 300001;
+            },
+        ),
+        Scenario::new(
+            "08-chat",
+            game_data(),
+            vec!["F4440700020248454C4C4F".to_string()],
+            |c| {
+                c.session.id = 300001;
+            },
+        ),
         Scenario::new(
             "09-mall-buy",
             game_data(),
@@ -147,10 +162,7 @@ pub fn all_scenarios() -> Vec<Scenario<'static>> {
         Scenario::new(
             "12-quest-h6",
             quest_data(),
-            vec![
-                "F444040014010100".to_string(),
-                "F4440300140600".to_string(),
-            ],
+            vec!["F444040014010100".to_string(), "F4440300140600".to_string()],
             |c| {
                 c.session.map_id = 10916;
                 c.session.select_menu = 20;
@@ -168,10 +180,7 @@ pub fn all_scenarios() -> Vec<Scenario<'static>> {
         Scenario::new(
             "14-pet",
             game_data(),
-            vec![
-                "F44404001301993A".to_string(),
-                "F4440300130200".to_string(),
-            ],
+            vec!["F44404001301993A".to_string(), "F4440300130200".to_string()],
             |c| {
                 c.session.pets.push(PetState {
                     stt: 1,
@@ -202,7 +211,10 @@ pub fn scenario_for(name: &str) -> Option<Scenario<'static>> {
 /// The in-process dispatch frame stream for a scenario name (empty if the
 /// scenario is the async battle-win).
 pub async fn replay_sync(name: &str) -> Vec<String> {
-    scenario_for(name).expect("scenario registered").replay().await
+    scenario_for(name)
+        .expect("scenario registered")
+        .replay()
+        .await
 }
 
 // ---- Battle-win replay (golden/03-battle-win) ----
@@ -258,7 +270,9 @@ fn battle_data() -> GameData {
 }
 
 fn strong_session() -> Arc<tokio::sync::RwLock<ts_dream::server::session::Session>> {
-    let s = Arc::new(tokio::sync::RwLock::new(ts_dream::server::session::Session::new()));
+    let s = Arc::new(tokio::sync::RwLock::new(
+        ts_dream::server::session::Session::new(),
+    ));
     {
         let mut s = s.try_write().unwrap();
         s.id = 300001;
@@ -352,7 +366,8 @@ pub async fn run_all_goldens() {
         };
 
         assert_eq!(
-            got, expected,
+            got,
+            expected,
             "golden `{}` mismatch ({} got vs {} expected)\nGOT:\n{}\nEXPECTED:\n{}",
             g.name,
             got.len(),

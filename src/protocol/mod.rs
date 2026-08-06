@@ -48,8 +48,14 @@ mod tests {
     fn frame_builds_known_literals_byte_identical() {
         // Matches the fixed literals used across the codebase: len counts every
         // byte after the 4-byte header (code + body).
-        assert_eq!(frame("0801", "1B0102000000000000"), "F4440B0008011B0102000000000000");
-        assert_eq!(frame("0601", "01000000026400C800"), "F4440B00060101000000026400C800");
+        assert_eq!(
+            frame("0801", "1B0102000000000000"),
+            "F4440B0008011B0102000000000000"
+        );
+        assert_eq!(
+            frame("0601", "01000000026400C800"),
+            "F4440B00060101000000026400C800"
+        );
         assert_eq!(frame("1705", ""), "F44402001705");
     }
 }

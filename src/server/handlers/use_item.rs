@@ -8,9 +8,9 @@
 //! frame pair unless the branch returns early (C# §2.3.14).
 
 use crate::data::loader::GameData;
+use crate::db::persist;
 use crate::protocol::encoder;
 use crate::server::handler::HandleOutcome;
-use crate::server::persist;
 use crate::server::session::Conn;
 
 /// Warp items: item id → (map_id, x, y). Source: C# case-15 warp table.
@@ -185,17 +185,18 @@ pub async fn use_item(
 
     // --- Leader-only sleep item (C# 46167). ---
     if id == 46167 {
-        let leader_ok =
-            conn.session.id == conn.session.id_leader || conn.session.id_leader == 0;
+        let leader_ok = conn.session.id == conn.session.id_leader || conn.session.id_leader == 0;
         if leader_ok {
             conn.session.hp = conn.session.hp_max;
             conn.session.sp = conn.session.sp_max;
             out.send("F44402001F0A".to_string());
             out.send(crate::server::handlers::stats::build_stat_update(
-                0x19, conn.session.hp as i32,
+                0x19,
+                conn.session.hp as i32,
             ));
             out.send(crate::server::handlers::stats::build_stat_update(
-                0x1A, conn.session.sp as i32,
+                0x1A,
+                conn.session.sp as i32,
             ));
             consume(conn, slot, count, out, pool).await;
         }
@@ -208,11 +209,17 @@ pub async fn use_item(
             let lv = 1u8;
             conn.session.skills.push((skill_id, lv));
             // C# `F4440C0008016E01` + le32(lv) + le32(skillid).
-            let body = format!("6E01{}{}", encoder::le32(lv as u32), encoder::le32(skill_id as u32));
+            let body = format!(
+                "6E01{}{}",
+                encoder::le32(lv as u32),
+                encoder::le32(skill_id as u32)
+            );
             out.send(crate::protocol::frame("0801", &body));
             consume(conn, slot, count, out, pool).await;
         } else {
-            out.send(crate::server::spawn::sys_msg_frame("Ban da co ky nang nay roi"));
+            out.send(crate::server::spawn::sys_msg_frame(
+                "Ban da co ky nang nay roi",
+            ));
         }
         return;
     }
@@ -221,8 +228,17 @@ pub async fn use_item(
     match id {
         50010 => {
             conn.session.point += 1;
-            persist::update_player(pool, conn.session.id, "Point", i64::from(conn.session.point)).await;
-            out.send(crate::server::handlers::stats::build_stat_update(0x26, conn.session.point as i32));
+            persist::update_player(
+                pool,
+                conn.session.id,
+                "Point",
+                i64::from(conn.session.point),
+            )
+            .await;
+            out.send(crate::server::handlers::stats::build_stat_update(
+                0x26,
+                conn.session.point as i32,
+            ));
             // C# tail: standard end feedback, item kept.
             out.send(format!("F44404001709{:02X}{:02X}", slot, count));
             out.send("F4440200170F".to_string());
@@ -230,8 +246,17 @@ pub async fn use_item(
         }
         50011 => {
             conn.session.skill_point += 1;
-            persist::update_player(pool, conn.session.id, "SkillPoint", i64::from(conn.session.skill_point)).await;
-            out.send(crate::server::handlers::stats::build_stat_update(0x25, conn.session.skill_point as i32));
+            persist::update_player(
+                pool,
+                conn.session.id,
+                "SkillPoint",
+                i64::from(conn.session.skill_point),
+            )
+            .await;
+            out.send(crate::server::handlers::stats::build_stat_update(
+                0x25,
+                conn.session.skill_point as i32,
+            ));
             out.send(format!("F44404001709{:02X}{:02X}", slot, count));
             out.send("F4440200170F".to_string());
             return;
@@ -256,9 +281,15 @@ pub async fn use_item(
 
     // --- Generic potion path (C# default: `Hp*Sp*Fai1` × count). ---
     let info = data.items.get(&i64::from(id));
-    let hp_amt = info.map(|i| i.hp.saturating_mul(i64::from(count))).unwrap_or(0);
-    let sp_amt = info.map(|i| i.sp.saturating_mul(i64::from(count))).unwrap_or(0);
-    let fai_amt = info.map(|i| i.fai1.saturating_mul(i64::from(count))).unwrap_or(0);
+    let hp_amt = info
+        .map(|i| i.hp.saturating_mul(i64::from(count)))
+        .unwrap_or(0);
+    let sp_amt = info
+        .map(|i| i.sp.saturating_mul(i64::from(count)))
+        .unwrap_or(0);
+    let fai_amt = info
+        .map(|i| i.fai1.saturating_mul(i64::from(count)))
+        .unwrap_or(0);
     if hp_amt == 0 && sp_amt == 0 && fai_amt == 0 {
         // Unknown/statless item: standard consume + end feedback (ticket #12).
         consume(conn, slot, count, out, pool).await;
@@ -268,17 +299,25 @@ pub async fn use_item(
         // Restore the player.
         let mut restored = false;
         if hp_amt > 0 && conn.session.hp < conn.session.hp_max {
-            let new_hp = (i64::from(conn.session.hp) + hp_amt).min(i64::from(conn.session.hp_max)) as u16;
+            let new_hp =
+                (i64::from(conn.session.hp) + hp_amt).min(i64::from(conn.session.hp_max)) as u16;
             conn.session.hp = new_hp;
             persist::update_player(pool, conn.session.id, "Hp", i64::from(new_hp)).await;
-            out.send(crate::server::handlers::stats::build_stat_update(0x19, new_hp as i32));
+            out.send(crate::server::handlers::stats::build_stat_update(
+                0x19,
+                new_hp as i32,
+            ));
             restored = true;
         }
         if sp_amt > 0 && conn.session.sp < conn.session.sp_max {
-            let new_sp = (i64::from(conn.session.sp) + sp_amt).min(i64::from(conn.session.sp_max)) as u16;
+            let new_sp =
+                (i64::from(conn.session.sp) + sp_amt).min(i64::from(conn.session.sp_max)) as u16;
             conn.session.sp = new_sp;
             persist::update_player(pool, conn.session.id, "Sp", i64::from(new_sp)).await;
-            out.send(crate::server::handlers::stats::build_stat_update(0x1A, new_sp as i32));
+            out.send(crate::server::handlers::stats::build_stat_update(
+                0x1A,
+                new_sp as i32,
+            ));
             restored = true;
         }
         if restored {
@@ -300,17 +339,19 @@ pub async fn use_item(
         let mut restored = false;
         if hp_amt > 0 && conn.session.pets[pet_idx].hp < conn.session.pets[pet_idx].hp_max {
             conn.session.pets[pet_idx].hp = (i64::from(conn.session.pets[pet_idx].hp) + hp_amt)
-                .min(i64::from(conn.session.pets[pet_idx].hp_max)) as u16;
+                .min(i64::from(conn.session.pets[pet_idx].hp_max))
+                as u16;
             restored = true;
         }
         if sp_amt > 0 && conn.session.pets[pet_idx].sp < conn.session.pets[pet_idx].sp_max {
             conn.session.pets[pet_idx].sp = (i64::from(conn.session.pets[pet_idx].sp) + sp_amt)
-                .min(i64::from(conn.session.pets[pet_idx].sp_max)) as u16;
+                .min(i64::from(conn.session.pets[pet_idx].sp_max))
+                as u16;
             restored = true;
         }
         if fai_amt > 0 && conn.session.pets[pet_idx].fai < 100 {
-            conn.session.pets[pet_idx].fai = (i64::from(conn.session.pets[pet_idx].fai) + fai_amt)
-                .min(100) as u16;
+            conn.session.pets[pet_idx].fai =
+                (i64::from(conn.session.pets[pet_idx].fai) + fai_amt).min(100) as u16;
             restored = true;
         }
         if restored {
@@ -342,7 +383,15 @@ mod tests {
         conn.session.sp_max = 200;
         conn.session.homdo.push(item(30001, 5));
         let mut data = GameData::default();
-        data.items.insert(30001, crate::data::tables::Item { id: 30001, hp: 100, sp: 50, ..Default::default() });
+        data.items.insert(
+            30001,
+            crate::data::tables::Item {
+                id: 30001,
+                hp: 100,
+                sp: 50,
+                ..Default::default()
+            },
+        );
         let mut out = HandleOutcome::default();
         // slot 1, count 2, use_type 0
         use_item(&mut conn, &[1, 2, 0], &mut out, None, &data).await;
@@ -386,7 +435,14 @@ mod tests {
         let mut conn = Conn::new();
         conn.session.homdo.push(item(46001, 1));
         let mut data = GameData::default();
-        data.items.insert(46001, crate::data::tables::Item { id: 46001, add_pet: 10001, ..Default::default() });
+        data.items.insert(
+            46001,
+            crate::data::tables::Item {
+                id: 46001,
+                add_pet: 10001,
+                ..Default::default()
+            },
+        );
         let mut out = HandleOutcome::default();
         use_item(&mut conn, &[1, 1], &mut out, None, &data).await;
 
@@ -404,8 +460,15 @@ mod tests {
         use_item(&mut conn, &[1, 1], &mut out, None, &data).await;
 
         assert_eq!(conn.session.point, 1);
-        assert_eq!(conn.session.homdo.len(), 1, "point book is not consumed (C# quirk)");
-        assert!(out.outgoing.iter().any(|f| f.starts_with("F4440C0008012601")));
+        assert_eq!(
+            conn.session.homdo.len(),
+            1,
+            "point book is not consumed (C# quirk)"
+        );
+        assert!(out
+            .outgoing
+            .iter()
+            .any(|f| f.starts_with("F4440C0008012601")));
     }
 
     #[tokio::test]

@@ -3,11 +3,12 @@
 //! Sub 1 (create) mirrors C# `Update_H9` case 1: parse the client layout, then
 //! in **one atomic transaction** INSERT the `players` row (stats computed via
 //! the TEXP/HP formula), seed `SkillSave` 1..10 / IdSkill=0, rebuild the
-//! `Skill` table and update `accounts.pass1/pass2`. Any failure → `shutdown()`
-//! (Ch5 §5.6). Sub 2 checks the candidate name against `players.Name`.
-//! Without a pool (golden replay) it degrades to the in-memory stub.
+//! `Skill` table and update `accounts.pass1/pass2` (Ch5 §5.6 — the transaction
+//! lives in the `db::players` repository). Any failure → `shutdown()`. Sub 2
+//! checks the candidate name against `players.Name`. Without a pool (golden
+//! replay) it degrades to the in-memory stub.
 
-use crate::battle::engine::{get_hp_max, get_sp_max};
+use crate::db;
 use crate::protocol::encoder;
 use crate::server::handler::OpcodeCtx;
 use crate::server::session::Session;
@@ -68,15 +69,9 @@ pub async fn handle_character(ctx: &mut OpcodeCtx<'_>) {
             let candidate = payload;
             match ctx.env.pool {
                 Some(pool) => {
-                    let exists = sqlx::query_scalar::<_, String>(
-                        "SELECT HEX(Name) FROM players WHERE HEX(Name) = HEX(?) LIMIT 1",
-                    )
-                    .bind(candidate)
-                    .fetch_optional(pool)
-                    .await;
-                    match exists {
-                        Ok(Some(_)) => out.send("F4440300090301"), // Name used
-                        Ok(None) => {
+                    match db::players::name_exists(pool, candidate).await {
+                        Ok(true) => out.send("F4440300090301"), // Name used
+                        Ok(false) => {
                             conn.session.pending_new_char_name = candidate.to_vec();
                             out.send("F4440300090300"); // Name available
                         }
@@ -101,7 +96,10 @@ pub async fn handle_character(ctx: &mut OpcodeCtx<'_>) {
             };
             match ctx.env.pool {
                 Some(pool) => {
-                    if create_char_db(pool, &mut conn.session, &data).await.is_err() {
+                    if create_char_db(pool, &mut conn.session, &data)
+                        .await
+                        .is_err()
+                    {
                         out.shutdown = true; // Exception -> shutdown (Ch5 §5.6)
                     } else {
                         out.send("F44402000901"); // Character created success
@@ -118,84 +116,45 @@ pub async fn handle_character(ctx: &mut OpcodeCtx<'_>) {
     }
 }
 
-/// C# `Update_H9` case 1: one atomic transaction INSERTing `players`, seeding
-/// `SkillSave` 1..10, rebuilding `Skill` and updating `accounts` — all-or-nothing.
+/// Build the `db::players::CreateCharacter` parameters for the pending name,
+/// then run the one atomic transaction (repository). On success the session is
+/// updated in-memory to match what the DB now holds.
 async fn create_char_db(
     pool: &sqlx::MySqlPool,
     session: &mut Session,
     data: &CreateCharData,
 ) -> Result<(), sqlx::Error> {
-    let id = i64::from(session.id);
     let name = if session.pending_new_char_name.is_empty() {
-        &session.name
+        session.name.clone()
     } else {
-        &session.pending_new_char_name
+        session.pending_new_char_name.clone()
     };
 
     // New-character stats (C# num25/num26): reborn 0, job 0, lv 1.
-    let hp = get_hp_max(0, 0, 1, i64::from(data.hpx)) as i64;
-    let sp = get_sp_max(0, 0, 1, i64::from(data.spx)) as i64;
+    let (hp, sp) = db::players::starting_hp_sp(data.hpx, data.spx);
 
-    let mut tx = pool.begin().await?;
-
-    // 1. players row — every column explicit (Ch5 §5.4), same layout as C#.
-    sqlx::query(
-        "INSERT INTO players (\
-         player_id, Name, Lv, Hp, HpMax, Sp, SpMax, Point, SkillPoint, `Int`, Atk, Def, \
-         Hpx, Spx, Agi, Int2, Atk2, Def2, Hpx2, Spx2, Agi2, Texp, MapId, MapX, MapY, \
-         Reborn, Job, Sex, Hair, Thuoctinh, Ghost, God, Color, Gold, Tiengtam, Gocnhin, \
-         SttPetXuatchien, Pk, ThamChien) \
-         VALUES (?, ?, 1, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 1, 6, \
-                 10817, 442, 758, 0, 0, ?, ?, ?, 0, 0, ?, 0, 1, 0, 0, 0, 1)",
-    )
-    .bind(id)
-    .bind(name.as_slice())
-    .bind(hp)
-    .bind(hp)
-    .bind(sp)
-    .bind(sp)
-    .bind(i64::from(data.int1))
-    .bind(i64::from(data.atk))
-    .bind(i64::from(data.def))
-    .bind(i64::from(data.hpx))
-    .bind(i64::from(data.spx))
-    .bind(i64::from(data.agi))
-    .bind(i64::from(data.sex))
-    .bind(i64::from(data.hair))
-    .bind(i64::from(data.thuoctinh))
-    .bind(&data.color_hex)
-    .execute(&mut *tx)
-    .await?;
-
-    // 2. SkillSave seed: rows 1..10 / IdSkill=0 (mandatory seed).
-    for slot in 1..=10i64 {
-        sqlx::query(
-            "INSERT INTO skillsave (player_id, ID, IdSkill) VALUES (?, ?, 0)",
-        )
-        .bind(id)
-        .bind(slot)
-        .execute(&mut *tx)
-        .await?;
-    }
-
-    // 3. Rebuild Skill: a fresh character owns no skills — clear stale rows.
-    sqlx::query("DELETE FROM skill WHERE player_id = ?")
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
-
-    // 4. accounts pass1/pass2 (C# `Data.MemberChangedPass`).
-    sqlx::query("UPDATE accounts SET pass1 = ?, pass2 = ? WHERE player_id = ?")
-        .bind(data.pass1.as_slice())
-        .bind(data.pass2.as_slice())
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
-
-    tx.commit().await?;
+    let params = db::players::CreateCharacter {
+        player_id: i64::from(session.id),
+        name,
+        hp,
+        sp,
+        sex: data.sex,
+        hair: data.hair,
+        thuoctinh: data.thuoctinh,
+        color_hex: data.color_hex.clone(),
+        int1: data.int1,
+        atk: data.atk,
+        def: data.def,
+        hpx: data.hpx,
+        spx: data.spx,
+        agi: data.agi,
+        pass1: data.pass1.clone(),
+        pass2: data.pass2.clone(),
+    };
+    db::players::create(pool, &params).await?;
 
     // Reflect the new character into the live session for the upcoming login.
-    session.name = name.to_vec();
+    session.name = params.name;
     apply_to_session(session, data);
     Ok(())
 }

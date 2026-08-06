@@ -1,8 +1,8 @@
 //! Learn / upgrade skills (Opcode 0x1C) & Pet Reborn (Opcode 0x2C) handlers.
 
+use crate::db::persist;
 use crate::protocol::encoder;
 use crate::server::handler::{HandleOutcome, OpcodeCtx};
-use crate::server::persist;
 use crate::server::session::Conn;
 
 pub fn can_learn_element(player_element: u8, skill_element: i64) -> bool {
@@ -77,7 +77,11 @@ async fn handle_player_skill_learn(
             continue;
         }
 
-        let existing_pos = conn.session.skills.iter().position(|(id, _)| *id == skill_id);
+        let existing_pos = conn
+            .session
+            .skills
+            .iter()
+            .position(|(id, _)| *id == skill_id);
 
         if let Some(pos) = existing_pos {
             let current_lv = conn.session.skills[pos].1;
@@ -96,7 +100,15 @@ async fn handle_player_skill_learn(
                 encoder::le32(target_lv as u32),
                 encoder::le32(skill_id as u32)
             ));
-            persist::upsert_skill(pool, conn.session.id, skill_id, target_lv, skill_def.sp as u8, 0).await;
+            persist::upsert_skill(
+                pool,
+                conn.session.id,
+                skill_id,
+                target_lv,
+                skill_def.sp as u8,
+                0,
+            )
+            .await;
             count += 1;
         } else {
             // Learning a new skill
@@ -106,13 +118,19 @@ async fn handle_player_skill_learn(
             // Check prerequisites id_dk (must be all 0, or at least 1 learned)
             let has_prereq = skill_def.id_dk.iter().all(|&id| id == 0)
                 || skill_def.id_dk.iter().any(|&id| {
-                    id > 0 && conn.session.skills.iter().any(|(s_id, _)| *s_id == id as u16)
+                    id > 0
+                        && conn
+                            .session
+                            .skills
+                            .iter()
+                            .any(|(s_id, _)| *s_id == id as u16)
                 });
             if !has_prereq {
                 break;
             }
 
-            let base_cost = get_point_skill_add(conn.session.thuoctinh, skill_def.thuoctinh, skill_def.point);
+            let base_cost =
+                get_point_skill_add(conn.session.thuoctinh, skill_def.thuoctinh, skill_def.point);
             let extra_cost = u16::from(target_lv.saturating_sub(1));
             let total_needed = base_cost + extra_cost;
 
@@ -128,13 +146,27 @@ async fn handle_player_skill_learn(
                 encoder::le32(target_lv as u32),
                 encoder::le32(skill_id as u32)
             ));
-            persist::upsert_skill(pool, conn.session.id, skill_id, target_lv, skill_def.sp as u8, 0).await;
+            persist::upsert_skill(
+                pool,
+                conn.session.id,
+                skill_id,
+                target_lv,
+                skill_def.sp as u8,
+                0,
+            )
+            .await;
             count += 1;
         }
     }
 
     if count > 0 {
-        persist::update_player(pool, conn.session.id, "SkillPoint", i64::from(conn.session.skill_point)).await;
+        persist::update_player(
+            pool,
+            conn.session.id,
+            "SkillPoint",
+            i64::from(conn.session.skill_point),
+        )
+        .await;
         out.send(format!(
             "F4440C0008012501{}00000000",
             encoder::le32(conn.session.skill_point as u32)
@@ -233,13 +265,27 @@ pub async fn handle_pet_reborn(ctx: &mut OpcodeCtx<'_>) {
     };
 
     // Consume 1 unit of reborn item from homdo
-    let hd_pos = conn.session.homdo.iter().position(|i| i.slot == hd_slot).unwrap();
+    let hd_pos = conn
+        .session
+        .homdo
+        .iter()
+        .position(|i| i.slot == hd_slot)
+        .unwrap();
     if conn.session.homdo[hd_pos].count > 1 {
         conn.session.homdo[hd_pos].count -= 1;
     } else {
         conn.session.homdo.remove(hd_pos);
     }
-    let updated_item = conn.session.homdo.iter().find(|i| i.slot == hd_slot).cloned().unwrap_or(crate::server::session::InventoryItem { slot: hd_slot, ..Default::default() });
+    let updated_item = conn
+        .session
+        .homdo
+        .iter()
+        .find(|i| i.slot == hd_slot)
+        .cloned()
+        .unwrap_or(crate::server::session::InventoryItem {
+            slot: hd_slot,
+            ..Default::default()
+        });
     persist::upsert_item(pool, conn.session.id, "homdo", &updated_item).await;
 
     let new_npc = &data.npcs[&target_npc_id];
@@ -435,7 +481,10 @@ mod tests {
         let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &payload);
         handle_skills(&mut ctx).await;
 
-        assert!(conn.session.skills.is_empty(), "Earth player cannot learn Fire skill");
+        assert!(
+            conn.session.skills.is_empty(),
+            "Earth player cannot learn Fire skill"
+        );
         assert_eq!(conn.session.skill_point, 5);
     }
 
@@ -472,4 +521,3 @@ mod tests {
         assert!(out.outgoing.iter().any(|f| f.contains("2C01")));
     }
 }
-

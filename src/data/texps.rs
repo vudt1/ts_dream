@@ -5,8 +5,8 @@
 //! `Texp1[i] = ... Pow(i+1, 3.0) ... + 5`
 //! `Texp2[i] = ... Pow(i+1, 3.05) ... + 5` (cumulative).
 
-use crate::protocol::MAX_LEVEL;
 use crate::data::tables::TexpRow;
+use crate::protocol::MAX_LEVEL;
 
 /// Compute the full Texps table. Reproduces the C# loop (Data.cs:4677-4693)
 /// exactly: `for i in 0..MaxLevel`, each row accumulates from the previous,

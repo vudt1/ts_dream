@@ -3,7 +3,6 @@
 use crate::protocol::encoder;
 use crate::server::handler::OpcodeCtx;
 
-
 /// Handle Opcode 0x0F — Pet actions (release, store, mount/unmount, rename, take, swap).
 pub fn handle_pet_actions(ctx: &mut OpcodeCtx) {
     let conn = &mut ctx.conn;
@@ -42,7 +41,9 @@ pub fn handle_pet_actions(ctx: &mut OpcodeCtx) {
                     out.send(format!("F44405001F06{:02X}0000", stt));
                     out.send(format!(
                         "F4440C000F01{}{:02X}{}01",
-                        player_id_le, stt, encoder::le32(pet_id as u32)
+                        player_id_le,
+                        stt,
+                        encoder::le32(pet_id as u32)
                     ));
                     out.send("F44402001F0C");
                 }
@@ -160,7 +161,6 @@ mod tests {
     use crate::server::handler::{test_ctx, HandleOutcome};
     use crate::server::session::{Conn, PetState};
     use std::sync::Arc;
-
 
     #[test]
     fn test_mount_unmount_horse() {

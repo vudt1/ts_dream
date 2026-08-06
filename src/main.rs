@@ -12,7 +12,11 @@ use ts_dream::web::server_control::ServerControl;
 /// `map_drops` registry (C# `SystemDropItem`, Data.cs:5278-5345). The C#
 /// broadcast fires with no clients during boot — a no-op we do not repeat.
 fn seed_static_drops(data: &GameData) {
-    let spawned: Vec<_> = data.item_drop_on_map.values().filter(|d| d.item_id != 0).collect();
+    let spawned: Vec<_> = data
+        .item_drop_on_map
+        .values()
+        .filter(|d| d.item_id != 0)
+        .collect();
     for drop in &spawned {
         let item = ts_dream::server::session::InventoryItem {
             slot: drop.slot as u8,
@@ -38,20 +42,23 @@ fn seed_static_drops(data: &GameData) {
             drop.map_y as u16,
         );
     }
-    tracing::info!("seeded {} static map drops into the drop registry", spawned.len());
+    tracing::info!(
+        "seeded {} static map drops into the drop registry",
+        spawned.len()
+    );
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt().with_env_filter(
-        tracing_subscriber::EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
-    )
-    .init();
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .init();
 
     // 1. Load config.
-    let cfg = Config::load()
-        .map_err(|e| anyhow::anyhow!("config load failed: {e}"))?;
+    let cfg = Config::load().map_err(|e| anyhow::anyhow!("config load failed: {e}"))?;
     tracing::info!(
         "config loaded: game={} web={} data_dir={}",
         cfg.game_port,
@@ -59,8 +66,9 @@ async fn main() -> anyhow::Result<()> {
         cfg.data_dir.display()
     );
 
-    // 2. Connect MySQL pool (fail-fast).
-    let pool = ts_dream::db::pool::connect(&cfg.database_url).await?;
+    // 2. Connect MySQL pool (fail-fast), auto-creating the `ts_dream` database
+    //    when missing and `db_auto_create` is enabled (default true).
+    let pool = ts_dream::db::pool::bootstrap(&cfg.database_url, cfg.db_auto_create).await?;
     tracing::info!("connected to MySQL; running migrations");
     ts_dream::db::pool::migrate(&pool).await?;
 

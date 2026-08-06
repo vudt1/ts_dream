@@ -102,7 +102,11 @@ pub async fn dispatch(
     let _ = handle(&mut ctx).await;
     let trigger = ctx.out.battle_trigger.take();
     if let Some(trigger) = trigger {
-        if ctx.service.start_teamdef_battle(&mut ctx.conn.session, &trigger) > 0 {
+        if ctx
+            .service
+            .start_teamdef_battle(&mut ctx.conn.session, &trigger)
+            > 0
+        {
             // The open-board frames were pushed through the service channels.
         }
     }
@@ -180,7 +184,7 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         0x22 => system::handle_game_points(ctx),
 
         // Op 0x23 — Account management
-        0x23 => system::handle_account_mgmt(ctx),
+        0x23 => system::handle_account_mgmt(ctx).await,
 
         // Op 0x28 — Hotkey / skill bar
         0x28 => stats::handle_hotkey(ctx).await,
@@ -260,7 +264,14 @@ mod tests {
         let mut conn = Conn::new();
         // frame: F4 44 01 00 00 (opcode 0x00, length 1, no sub byte).
         let decoded = encoder::bytes("F444010000").unwrap();
-        let out = dispatch(&mut conn, &decoded, &dummy_data(), &dummy_service(), &ServerEnv::none()).await;
+        let out = dispatch(
+            &mut conn,
+            &decoded,
+            &dummy_data(),
+            &dummy_service(),
+            &ServerEnv::none(),
+        )
+        .await;
         assert_eq!(out.outgoing, vec!["F4440300010901"]);
     }
 
@@ -269,7 +280,14 @@ mod tests {
         let mut conn = Conn::new();
         // Login payload with version 100 (< 186): opcode 0x01 sub 0x01 id=1 prefix="vn" ver=100 pass="123"
         let decoded = encoder::bytes("F4440B00010101000000766E6400313233").unwrap();
-        let out = dispatch(&mut conn, &decoded, &dummy_data(), &dummy_service(), &ServerEnv::none()).await;
+        let out = dispatch(
+            &mut conn,
+            &decoded,
+            &dummy_data(),
+            &dummy_service(),
+            &ServerEnv::none(),
+        )
+        .await;
         assert!(out.shutdown);
     }
 
@@ -278,7 +296,14 @@ mod tests {
         let mut conn = Conn::new();
         // ver=186 (0xBA), pass="WRONG"
         let decoded = encoder::bytes("F4440D00010101000000766EBA0057524F4E47").unwrap();
-        let out = dispatch(&mut conn, &decoded, &dummy_data(), &dummy_service(), &ServerEnv::none()).await;
+        let out = dispatch(
+            &mut conn,
+            &decoded,
+            &dummy_data(),
+            &dummy_service(),
+            &ServerEnv::none(),
+        )
+        .await;
         assert_eq!(out.outgoing, vec!["F44402000106"]);
         assert!(!out.shutdown);
     }
@@ -289,7 +314,14 @@ mod tests {
 
         // 1. Name check free: opcode 0x09 sub 2 name "TESTNAME"
         let name_check_decoded = encoder::bytes("F4440A000902544553544E414D45").unwrap();
-        let out1 = dispatch(&mut conn, &name_check_decoded, &dummy_data(), &dummy_service(), &ServerEnv::none()).await;
+        let out1 = dispatch(
+            &mut conn,
+            &name_check_decoded,
+            &dummy_data(),
+            &dummy_service(),
+            &ServerEnv::none(),
+        )
+        .await;
         assert_eq!(out1.outgoing, vec!["F4440300090300"]);
         assert_eq!(conn.session.pending_new_char_name, b"TESTNAME");
 
@@ -302,7 +334,14 @@ mod tests {
         let mut frame_bytes = vec![0xF4, 0x44, 28, 0x00, 0x09, 0x01];
         frame_bytes.extend(payload);
 
-        let out2 = dispatch(&mut conn, &frame_bytes, &dummy_data(), &dummy_service(), &ServerEnv::none()).await;
+        let out2 = dispatch(
+            &mut conn,
+            &frame_bytes,
+            &dummy_data(),
+            &dummy_service(),
+            &ServerEnv::none(),
+        )
+        .await;
         assert_eq!(out2.outgoing, vec!["F44402000901"]);
     }
 
@@ -312,7 +351,14 @@ mod tests {
         conn.session.id = 300001;
         // Move opcode 0x06 sub 1: dir=2, x=100 (0x0064), y=200 (0x00C8)
         let move_decoded = encoder::bytes("F44407000601026400C800").unwrap();
-        let out = dispatch(&mut conn, &move_decoded, &dummy_data(), &dummy_service(), &ServerEnv::none()).await;
+        let out = dispatch(
+            &mut conn,
+            &move_decoded,
+            &dummy_data(),
+            &dummy_service(),
+            &ServerEnv::none(),
+        )
+        .await;
         assert_eq!(conn.session.map_x, 100);
         assert_eq!(conn.session.map_y, 200);
         assert_eq!(conn.session.gocnhin, 2);
@@ -326,7 +372,14 @@ mod tests {
         conn.session.id = 300001;
         conn.session.battle_id = 7;
         let move_decoded = encoder::bytes("F44407000601026400C800").unwrap();
-        let out = dispatch(&mut conn, &move_decoded, &dummy_data(), &dummy_service(), &ServerEnv::none()).await;
+        let out = dispatch(
+            &mut conn,
+            &move_decoded,
+            &dummy_data(),
+            &dummy_service(),
+            &ServerEnv::none(),
+        )
+        .await;
         assert!(out.outgoing.is_empty(), "move must be ignored in battle");
     }
 
@@ -337,8 +390,19 @@ mod tests {
         conn.session.id_leader = 300001;
         conn.session.id_mem = [300002, 300003, 0, 0];
         let move_decoded = encoder::bytes("F44407000601026400C800").unwrap();
-        let out = dispatch(&mut conn, &move_decoded, &dummy_data(), &dummy_service(), &ServerEnv::none()).await;
-        assert_eq!(out.outgoing.len(), 3, "leader + 2 members each broadcast a walk");
+        let out = dispatch(
+            &mut conn,
+            &move_decoded,
+            &dummy_data(),
+            &dummy_service(),
+            &ServerEnv::none(),
+        )
+        .await;
+        assert_eq!(
+            out.outgoing.len(),
+            3,
+            "leader + 2 members each broadcast a walk"
+        );
         assert!(out.outgoing[0].starts_with("F4440B000601E1930400"));
         assert!(out.outgoing[1].starts_with("F4440B000601E2930400")); // member 300002
         assert!(out.outgoing[2].starts_with("F4440B000601E3930400")); // member 300003
@@ -350,7 +414,14 @@ mod tests {
         conn.session.id = 300002;
         conn.session.id_leader = 300001; // not self
         let move_decoded = encoder::bytes("F44407000601026400C800").unwrap();
-        let out = dispatch(&mut conn, &move_decoded, &dummy_data(), &dummy_service(), &ServerEnv::none()).await;
+        let out = dispatch(
+            &mut conn,
+            &move_decoded,
+            &dummy_data(),
+            &dummy_service(),
+            &ServerEnv::none(),
+        )
+        .await;
         assert!(out.outgoing.is_empty(), "member does not self-broadcast");
     }
 
@@ -360,7 +431,14 @@ mod tests {
         conn.session.id = 300001;
         // Expression sub 2 action=5
         let expr_decoded = encoder::bytes("F4440300200205").unwrap();
-        let out = dispatch(&mut conn, &expr_decoded, &dummy_data(), &dummy_service(), &ServerEnv::none()).await;
+        let out = dispatch(
+            &mut conn,
+            &expr_decoded,
+            &dummy_data(),
+            &dummy_service(),
+            &ServerEnv::none(),
+        )
+        .await;
         assert_eq!(conn.session.dongtac, 5);
         assert_eq!(out.outgoing, vec!["F44407002002E193040005"]);
     }
@@ -374,7 +452,14 @@ mod tests {
         conn.session.map_y = 500;
         // Chat "/where": op 0x02 sub 2 msg="/where"
         let chat_decoded = encoder::bytes("F4440C0002022F7768657265").unwrap();
-        let out = dispatch(&mut conn, &chat_decoded, &dummy_data(), &dummy_service(), &ServerEnv::none()).await;
+        let out = dispatch(
+            &mut conn,
+            &chat_decoded,
+            &dummy_data(),
+            &dummy_service(),
+            &ServerEnv::none(),
+        )
+        .await;
         assert_eq!(out.outgoing.len(), 1);
         assert!(out.outgoing[0].contains("020B")); // sys msg frame
     }
@@ -385,14 +470,28 @@ mod tests {
         conn.session.point = 10;
         // Op 0x08 sub 1: stat_id 27 (Int), points 3 -> hex: F444 0400 0801 1B03
         let decoded = encoder::bytes("F444040008011B03").unwrap();
-        let out = dispatch(&mut conn, &decoded, &dummy_data(), &dummy_service(), &ServerEnv::none()).await;
+        let out = dispatch(
+            &mut conn,
+            &decoded,
+            &dummy_data(),
+            &dummy_service(),
+            &ServerEnv::none(),
+        )
+        .await;
         assert_eq!(conn.session.point, 7);
         assert_eq!(conn.session.int1, 3);
         assert_eq!(out.outgoing.len(), 2);
 
         // Op 0x28 sub 1: skill 10001 (0x2711), slot 5 -> hex: F444 0400 2801 1127 05
         let decoded_hotkey = encoder::bytes("F4440500280100112705").unwrap();
-        let out_hk = dispatch(&mut conn, &decoded_hotkey, &dummy_data(), &dummy_service(), &ServerEnv::none()).await;
+        let out_hk = dispatch(
+            &mut conn,
+            &decoded_hotkey,
+            &dummy_data(),
+            &dummy_service(),
+            &ServerEnv::none(),
+        )
+        .await;
         assert_eq!(conn.session.hotkeys[5], 10001);
         assert!(out_hk.outgoing.is_empty());
     }
@@ -408,7 +507,14 @@ mod tests {
 
         // NPC Shop buy (op 0x1B): menu 0 at map 12002 → item 20023 @ 58800 → gold 41200
         let shop_decoded = encoder::bytes("F44404001B010000").unwrap();
-        let out_shop = dispatch(&mut conn, &shop_decoded, &dummy_data(), &dummy_service(), &ServerEnv::none()).await;
+        let out_shop = dispatch(
+            &mut conn,
+            &shop_decoded,
+            &dummy_data(),
+            &dummy_service(),
+            &ServerEnv::none(),
+        )
+        .await;
         assert_eq!(conn.session.gold, 41200);
         assert!(conn.session.homdo.iter().any(|i| i.id == 20023));
         assert!(out_shop.outgoing.iter().any(|f| f.contains("1A04")));
@@ -416,20 +522,41 @@ mod tests {
         // Player shop open (op 0x17 sub 30): name "TEST" + one listing.
         let open_hex = crate::protocol::frame("171E", "045445535400");
         let open_decoded = encoder::bytes(&open_hex).unwrap();
-        let out_open = dispatch(&mut conn, &open_decoded, &dummy_data(), &dummy_service(), &ServerEnv::none()).await;
+        let out_open = dispatch(
+            &mut conn,
+            &open_decoded,
+            &dummy_data(),
+            &dummy_service(),
+            &ServerEnv::none(),
+        )
+        .await;
         assert!(conn.session.shop.active);
         assert!(out_open.outgoing.iter().any(|f| f.contains("171E")));
 
         // Player shop close (op 0x17 sub 31 / wire 171F): reply 1720 + player id.
         let close_hex = crate::protocol::frame("171F", "");
         let close_decoded = encoder::bytes(&close_hex).unwrap();
-        let out_close = dispatch(&mut conn, &close_decoded, &dummy_data(), &dummy_service(), &ServerEnv::none()).await;
+        let out_close = dispatch(
+            &mut conn,
+            &close_decoded,
+            &dummy_data(),
+            &dummy_service(),
+            &ServerEnv::none(),
+        )
+        .await;
         assert!(!conn.session.shop.active);
         assert!(out_close.outgoing.iter().any(|f| f.contains("1720")));
 
         // Skill learn skill 10001 (0x2711) lv 1 -> F444 0500 1C01 1127 01
         let skill_decoded = encoder::bytes("F44405001C01112701").unwrap();
-        let out_skill = dispatch(&mut conn, &skill_decoded, &dummy_data(), &dummy_service(), &ServerEnv::none()).await;
+        let out_skill = dispatch(
+            &mut conn,
+            &skill_decoded,
+            &dummy_data(),
+            &dummy_service(),
+            &ServerEnv::none(),
+        )
+        .await;
         assert_eq!(conn.session.skills.len(), 1);
         assert_eq!(conn.session.skill_point, 4);
         assert_eq!(out_skill.outgoing.len(), 2);
@@ -443,20 +570,41 @@ mod tests {
 
         // Op 0x1D sub 1: withdraw 1000 gold -> F444 0400 1D01 E803
         let bank_decoded = encoder::bytes("F44404001D01E803").unwrap();
-        let out_bank = dispatch(&mut conn, &bank_decoded, &dummy_data(), &dummy_service(), &ServerEnv::none()).await;
+        let out_bank = dispatch(
+            &mut conn,
+            &bank_decoded,
+            &dummy_data(),
+            &dummy_service(),
+            &ServerEnv::none(),
+        )
+        .await;
         assert_eq!(conn.session.gold, 6000);
         assert_eq!(conn.session.bank_gold, 1000);
         assert_eq!(out_bank.outgoing.len(), 3);
 
         // Op 0x21 sub 1: set PK = 1 -> F444 0300 2101 01
         let pk_decoded = encoder::bytes("F4440300210101").unwrap();
-        let out_pk = dispatch(&mut conn, &pk_decoded, &dummy_data(), &dummy_service(), &ServerEnv::none()).await;
+        let out_pk = dispatch(
+            &mut conn,
+            &pk_decoded,
+            &dummy_data(),
+            &dummy_service(),
+            &ServerEnv::none(),
+        )
+        .await;
         assert_eq!(conn.session.pk, 1);
         assert_eq!(out_pk.outgoing[0], "F444040021020100");
 
         // Op 0x14 sub 1: talk start banker 16080 (0x3ED0) -> F444 0400 1401 D03E
         let talk_decoded = encoder::bytes("F44404001401D03E").unwrap();
-        let out_talk = dispatch(&mut conn, &talk_decoded, &dummy_data(), &dummy_service(), &ServerEnv::none()).await;
+        let out_talk = dispatch(
+            &mut conn,
+            &talk_decoded,
+            &dummy_data(),
+            &dummy_service(),
+            &ServerEnv::none(),
+        )
+        .await;
         assert_eq!(conn.session.idtalking, 16080);
         assert_eq!(out_talk.outgoing.len(), 2);
     }

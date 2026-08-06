@@ -75,8 +75,8 @@ impl ServerControl {
             return Ok(true);
         }
         if !app.data_loaded {
-            let err_msg = "Game server cannot start: static data not loaded (DataLoaded=false)"
-                .to_string();
+            let err_msg =
+                "Game server cannot start: static data not loaded (DataLoaded=false)".to_string();
             app.push_log("error", err_msg.clone());
             return Err(err_msg);
         }
@@ -97,7 +97,10 @@ impl ServerControl {
         app.running = true;
         app.push_log(
             "system",
-            format!("Game server started listening on 0.0.0.0:{}", self.game_port),
+            format!(
+                "Game server started listening on 0.0.0.0:{}",
+                self.game_port
+            ),
         );
         drop(app);
 
@@ -268,10 +271,9 @@ async fn handle_client_connection(
     control: ServerControl,
 ) {
     let peer_ip = peer.to_string();
-    app.write().await.push_log(
-        "system",
-        format!("Client connected from {peer_ip}"),
-    );
+    app.write()
+        .await
+        .push_log("system", format!("Client connected from {peer_ip}"));
 
     let data = data.unwrap_or_else(|| Arc::new(GameData::default()));
     let service = BattleService::new(Arc::clone(&data));
@@ -358,10 +360,9 @@ async fn handle_client_connection(
         // offline hide frame to the map, then drops registration.
         control.disconnect_player(logined_id).await;
     }
-    app.write().await.push_log(
-        "system",
-        format!("Client disconnected from {peer_ip}"),
-    );
+    app.write()
+        .await
+        .push_log("system", format!("Client disconnected from {peer_ip}"));
 }
 
 #[cfg(test)]
@@ -378,8 +379,14 @@ mod tests {
     async fn start_refuses_when_data_not_loaded() {
         let c = control(); // AppState::new() leaves data_loaded = false
         let r = c.start().await;
-        assert!(r.is_err(), "must refuse to start when static data not loaded");
-        assert!(!c.app.read().await.running, "must not flip running on a refused start");
+        assert!(
+            r.is_err(),
+            "must refuse to start when static data not loaded"
+        );
+        assert!(
+            !c.app.read().await.running,
+            "must not flip running on a refused start"
+        );
     }
 
     #[tokio::test]
@@ -391,7 +398,10 @@ mod tests {
 
         let r = c.start().await;
         assert!(r.unwrap_or(false), "must start once static data is loaded");
-        assert!(c.app.read().await.running, "running flag flips once started");
+        assert!(
+            c.app.read().await.running,
+            "running flag flips once started"
+        );
 
         // Stop the accept loop cleanly (no 5s countdown in tests).
         if let Some(tx) = c.shutdown_tx.lock().await.take() {
@@ -406,7 +416,10 @@ mod tests {
         let (tx1, _rx1) = mpsc::unbounded_channel::<String>();
         let (tx2, _rx2) = mpsc::unbounded_channel::<String>();
 
-        assert!(c.login_register(300001, &tx1).await, "first login registers");
+        assert!(
+            c.login_register(300001, &tx1).await,
+            "first login registers"
+        );
         assert!(
             !c.login_register(300001, &tx2).await,
             "second concurrent login is rejected (double-login guard)"
@@ -423,9 +436,14 @@ mod tests {
         c.login_register(300001, &tx1).await;
         c.login_register(300002, &tx2).await;
 
-        c.broadcast_except(300001, "F4440B000601FFFFFFFF026400C800").await;
+        c.broadcast_except(300001, "F4440B000601FFFFFFFF026400C800")
+            .await;
 
-        assert_eq!(rx1.try_recv(), Err(mpsc::error::TryRecvError::Empty), "origin excluded");
+        assert_eq!(
+            rx1.try_recv(),
+            Err(mpsc::error::TryRecvError::Empty),
+            "origin excluded"
+        );
         assert_eq!(
             rx2.try_recv().unwrap(),
             "F4440B000601FFFFFFFF026400C800",
@@ -440,13 +458,20 @@ mod tests {
         let (tx2, mut rx2) = mpsc::unbounded_channel::<String>();
         c.login_register(300001, &tx1).await;
         c.login_register(300002, &tx2).await;
-        online_sessions().lock().unwrap().insert(300001, Default::default());
+        online_sessions()
+            .lock()
+            .unwrap()
+            .insert(300001, Default::default());
 
         c.disconnect_player(300001).await;
 
         // Peers receive the leave/offline hide frame (Ch2 §2.1).
         assert_eq!(rx2.try_recv().unwrap(), "F44408000B00E19304000000");
-        assert_eq!(rx1.try_recv(), Err(mpsc::error::TryRecvError::Empty), "origin gets nothing");
+        assert_eq!(
+            rx1.try_recv(),
+            Err(mpsc::error::TryRecvError::Empty),
+            "origin gets nothing"
+        );
         // Registration and online snapshot are dropped.
         assert_eq!(c.clients.lock().await.len(), 1);
         assert!(!online_sessions().lock().unwrap().contains_key(&300001));

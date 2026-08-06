@@ -41,19 +41,19 @@ fn player_column(col: &str) -> Option<&'static str> {
 }
 
 /// `UPDATE players SET <col> = ? WHERE player_id = ?` (C# `PlayerUpdateDataId`).
-pub async fn update_player(
-    pool: Option<&MySqlPool>,
-    player_id: u32,
-    col: &str,
-    value: i64,
-) {
+pub async fn update_player(pool: Option<&MySqlPool>, player_id: u32, col: &str, value: i64) {
     let Some(pool) = pool else { return };
     let Some(col) = player_column(col) else {
         tracing::warn!("skipped unknown players column write: {col}");
         return;
     };
     let q = format!("UPDATE players SET {col} = ? WHERE player_id = ?");
-    if let Err(e) = sqlx::query(&q).bind(value).bind(i64::from(player_id)).execute(pool).await {
+    if let Err(e) = sqlx::query(&q)
+        .bind(value)
+        .bind(i64::from(player_id))
+        .execute(pool)
+        .await
+    {
         tracing::warn!("update_player({col}) failed: {e}");
     }
 }
@@ -93,9 +93,15 @@ fn item_table(table: &str) -> Option<&'static str> {
 #[allow(dead_code)]
 pub async fn clear_items(pool: Option<&MySqlPool>, player_id: u32, table: &str) {
     let Some(pool) = pool else { return };
-    let Some(table) = item_table(table) else { return };
+    let Some(table) = item_table(table) else {
+        return;
+    };
     let q = format!("DELETE FROM {table} WHERE player_id = ?");
-    if let Err(e) = sqlx::query(&q).bind(i64::from(player_id)).execute(pool).await {
+    if let Err(e) = sqlx::query(&q)
+        .bind(i64::from(player_id))
+        .execute(pool)
+        .await
+    {
         tracing::warn!("clear_items({table}) failed: {e}");
     }
 }
@@ -109,7 +115,9 @@ pub async fn upsert_item(
     item: &InventoryItem,
 ) {
     let Some(pool) = pool else { return };
-    let Some(table) = item_table(table) else { return };
+    let Some(table) = item_table(table) else {
+        return;
+    };
     let player_id = i64::from(player_id);
     let res = if item.id == 0 {
         let q = format!("DELETE FROM {table} WHERE player_id = ? AND Slot = ?");
@@ -198,7 +206,11 @@ pub async fn delete_reborn_skills(pool: Option<&MySqlPool>, player_id: u32) {
 }
 
 /// Upserts a pet entry in MySQL `pet` table.
-pub async fn upsert_pet(pool: Option<&MySqlPool>, player_id: u32, pet: &crate::server::session::PetState) {
+pub async fn upsert_pet(
+    pool: Option<&MySqlPool>,
+    player_id: u32,
+    pet: &crate::server::session::PetState,
+) {
     let Some(pool) = pool else { return };
     let name_str = String::from_utf8_lossy(&pet.name);
     let q = "INSERT INTO pet (player_id, Stt, Id, Name, Lv, Thuoctinh, Reborn, Hp, HpMax, Sp, SpMax, \

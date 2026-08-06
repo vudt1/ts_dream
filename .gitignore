@@ -20,3 +20,10 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# Workspace / agent state
+.kilo/
+
+# Legacy reference source + JSON refs (kept locally, not committed)
+ts_server_old/
+json_data_ref/

@@ -4,7 +4,6 @@ use crate::protocol::encoder;
 use crate::server::handler::OpcodeCtx;
 use crate::server::session::TradeState;
 
-
 /// Handle Opcode 0x19 — Trade.
 pub fn handle_trade(ctx: &mut OpcodeCtx) {
     let conn = &mut ctx.conn;
@@ -84,7 +83,12 @@ pub fn handle_storage_transfer(ctx: &mut OpcodeCtx) {
                 return;
             }
             let tt_slot = payload[0];
-            if let Some(pos) = conn.session.tientrang.iter().position(|i| i.slot == tt_slot) {
+            if let Some(pos) = conn
+                .session
+                .tientrang
+                .iter()
+                .position(|i| i.slot == tt_slot)
+            {
                 let item = conn.session.tientrang.remove(pos);
                 let _ = conn.session.add_homdo_item(item);
                 out.send(conn.session.dump_homdo());
@@ -185,7 +189,6 @@ mod tests {
         assert!(conn.session.trade.active);
         assert_eq!(conn.session.trade.partner_id, 299778);
         assert!(out1.outgoing[0].contains("1901"));
-
 
         let mut out2 = HandleOutcome::default();
         let mut ctx = test_ctx(&mut conn, &data, &service, &mut out2, 3, &[1]);

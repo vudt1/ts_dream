@@ -2,11 +2,11 @@
 //! & Reborn (sub 46). Live-server path persists homdo/trangbi mutations through
 //! `persist`; golden replay keeps everything in-memory over the seeded session.
 
+use crate::db::persist;
 use crate::protocol::encoder;
 use crate::server::handler::{hex_of, HandleOutcome, OpcodeCtx};
 use crate::server::handlers::stats::build_stat_update;
 use crate::server::map_drops;
-use crate::server::persist;
 use crate::server::session::{Conn, InventoryItem};
 
 /// Pickup range (C# `Update_H17` case 2: `-150 <= dx <= 150`, same for dy).
@@ -158,12 +158,7 @@ async fn handle_drop(
     }
 }
 
-fn handle_move_stack(
-    conn: &mut Conn,
-    payload: &[u8],
-    decoded: &[u8],
-    out: &mut HandleOutcome,
-) {
+fn handle_move_stack(conn: &mut Conn, payload: &[u8], decoded: &[u8], out: &mut HandleOutcome) {
     // C# `HomdoMoveItem(oldslot, count, newslot)`: payload[0]=old, [1]=count, [2]=new.
     if payload.len() < 3 {
         return;
@@ -295,10 +290,20 @@ async fn handle_unequip(
     let trangbi_slot = payload[0];
     let homdo_slot = payload[1];
     // C# case 12 gate: the target homdo slot must be empty.
-    if conn.session.homdo.iter().any(|i| i.slot == homdo_slot && i.id > 0) {
+    if conn
+        .session
+        .homdo
+        .iter()
+        .any(|i| i.slot == homdo_slot && i.id > 0)
+    {
         return;
     }
-    let Some(pos) = conn.session.trangbi.iter().position(|i| i.slot == trangbi_slot) else {
+    let Some(pos) = conn
+        .session
+        .trangbi
+        .iter()
+        .position(|i| i.slot == trangbi_slot)
+    else {
         return;
     };
     let mut item = conn.session.trangbi.remove(pos);
@@ -312,7 +317,10 @@ async fn handle_unequip(
     persist::upsert_item(pool, conn.session.id, "trangbi", &empty).await;
     persist::upsert_item(pool, conn.session.id, "homdo", &item).await;
 
-    out.send(format!("F44404001710{:02X}{:02X}", trangbi_slot, homdo_slot));
+    out.send(format!(
+        "F44404001710{:02X}{:02X}",
+        trangbi_slot, homdo_slot
+    ));
     conn.session.recompute_stats();
     out.send(conn.session.dump_trangbi());
     out.send(conn.session.dump_homdo());
@@ -324,7 +332,7 @@ async fn handle_unequip(
     out.send(build_stat_update(0xD3, conn.session.def2 as i32));
     out.send(build_stat_update(0xD4, conn.session.int2 as i32));
     out.send(build_stat_update(0xD6, conn.session.agi2 as i32));
-if let Some(hub) = hub {
+    if let Some(hub) = hub {
         // C# `ServerSend_UnEquitItem`: `F44408000501` + id + item.
         hub.broadcast_except(
             conn.session.id,
@@ -415,8 +423,20 @@ async fn handle_reborn(
     conn.session.recompute_stats();
 
     persist::update_player(pool, conn.session.id, "Lv", 1).await;
-    persist::update_player(pool, conn.session.id, "Point", i64::from(conn.session.point)).await;
-    persist::update_player(pool, conn.session.id, "SkillPoint", i64::from(conn.session.skill_point)).await;
+    persist::update_player(
+        pool,
+        conn.session.id,
+        "Point",
+        i64::from(conn.session.point),
+    )
+    .await;
+    persist::update_player(
+        pool,
+        conn.session.id,
+        "SkillPoint",
+        i64::from(conn.session.skill_point),
+    )
+    .await;
     persist::update_player(pool, conn.session.id, "Hp", 181).await;
     persist::update_player(pool, conn.session.id, "HpMax", 181).await;
     persist::update_player(pool, conn.session.id, "Sp", 181).await;
@@ -515,7 +535,11 @@ mod tests {
         });
         // Destination homdo slot 2 is occupied -> rejected.
         let out = run(&mut conn, 12, &[1, 2]).await;
-        assert_eq!(conn.session.trangbi.len(), 1, "must not unequip onto a full slot");
+        assert_eq!(
+            conn.session.trangbi.len(),
+            1,
+            "must not unequip onto a full slot"
+        );
         assert!(out.outgoing.is_empty());
     }
 
@@ -554,8 +578,24 @@ mod tests {
         ctx.decoded = &decoded;
         handle_inventory(&mut ctx).await;
 
-        assert_eq!(conn.session.homdo.iter().find(|i| i.slot == 1).unwrap().count, 15);
-        assert_eq!(conn.session.homdo.iter().find(|i| i.slot == 2).unwrap().count, 15);
+        assert_eq!(
+            conn.session
+                .homdo
+                .iter()
+                .find(|i| i.slot == 1)
+                .unwrap()
+                .count,
+            15
+        );
+        assert_eq!(
+            conn.session
+                .homdo
+                .iter()
+                .find(|i| i.slot == 2)
+                .unwrap()
+                .count,
+            15
+        );
         assert_eq!(out.outgoing, vec![encoder::hex(&decoded)]);
     }
 
@@ -648,4 +688,3 @@ mod tests {
         assert!(out.outgoing.contains(&"F44402002C01".to_string()));
     }
 }
-

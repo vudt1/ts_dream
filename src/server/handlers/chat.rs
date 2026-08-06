@@ -5,10 +5,10 @@
 //! global broadcast) goes through `ServerControl` when the live hub is present;
 //! golden replay (hub = None) degrades to self-echo only.
 
+use crate::db::persist;
 use crate::protocol::encoder;
-use crate::server::handler::{OpcodeCtx, HandleOutcome};
+use crate::server::handler::{HandleOutcome, OpcodeCtx};
 use crate::server::handlers::quest::BattleTrigger;
-use crate::server::persist;
 use crate::server::session::{Conn, InventoryItem, PetState};
 use crate::server::spawn;
 
@@ -302,13 +302,15 @@ async fn handle_slash(
             if conn.session.hp < conn.session.hp_max {
                 conn.session.hp = conn.session.hp_max;
                 out.send(crate::server::handlers::stats::build_stat_update(
-                    0x19, conn.session.hp as i32,
+                    0x19,
+                    conn.session.hp as i32,
                 ));
             }
             if conn.session.sp < conn.session.sp_max {
                 conn.session.sp = conn.session.sp_max;
                 out.send(crate::server::handlers::stats::build_stat_update(
-                    0x1A, conn.session.sp as i32,
+                    0x1A,
+                    conn.session.sp as i32,
                 ));
             }
             return;
@@ -316,7 +318,12 @@ async fn handle_slash(
         "/openhotel" => {
             // C# `OpenHotel`: one `1F06` frame per stable pet (stt 5..8) + 1F07.
             let mut entries = String::new();
-            for p in conn.session.pets.iter().filter(|p| (5..=8).contains(&p.stt)) {
+            for p in conn
+                .session
+                .pets
+                .iter()
+                .filter(|p| (5..=8).contains(&p.stt))
+            {
                 entries.push_str(&format!(
                     "{:02X}{}L{:02X}{:02X}00",
                     p.stt - 4,
@@ -368,7 +375,8 @@ mod tests {
         let payload = b"HELLO";
         let data = GameData::default();
         let service = BattleService::new(Arc::new(GameData::default()));
-        let mut ctx = crate::server::handler::test_ctx(&mut conn, &data, &service, &mut out, 2, payload);
+        let mut ctx =
+            crate::server::handler::test_ctx(&mut conn, &data, &service, &mut out, 2, payload);
         handle_chat(&mut ctx).await;
         assert_eq!(out.outgoing, vec!["F4440B000202E193040048454C4C4F"]);
     }
@@ -381,7 +389,8 @@ mod tests {
         let payload = vec![b'X'; 61];
         let data = GameData::default();
         let service = BattleService::new(Arc::new(GameData::default()));
-        let mut ctx = crate::server::handler::test_ctx(&mut conn, &data, &service, &mut out, 2, &payload);
+        let mut ctx =
+            crate::server::handler::test_ctx(&mut conn, &data, &service, &mut out, 2, &payload);
         handle_chat(&mut ctx).await;
         assert!(out.outgoing.is_empty());
     }
@@ -398,7 +407,8 @@ mod tests {
         let mut out = HandleOutcome::default();
         let data = GameData::default();
         let service = BattleService::new(Arc::new(GameData::default()));
-        let mut ctx = crate::server::handler::test_ctx(&mut conn, &data, &service, &mut out, 2, b"HI");
+        let mut ctx =
+            crate::server::handler::test_ctx(&mut conn, &data, &service, &mut out, 2, b"HI");
         handle_chat(&mut ctx).await;
         assert_eq!(out.outgoing.len(), 1);
         assert!(out.outgoing[0].starts_with("F44408000201"));
@@ -414,7 +424,8 @@ mod tests {
         let mut out = HandleOutcome::default();
         let data = GameData::default();
         let service = BattleService::new(Arc::new(GameData::default()));
-        let mut ctx = crate::server::handler::test_ctx(&mut conn, &data, &service, &mut out, 2, b"/where");
+        let mut ctx =
+            crate::server::handler::test_ctx(&mut conn, &data, &service, &mut out, 2, b"/where");
         handle_chat(&mut ctx).await;
         assert_eq!(out.outgoing.len(), 1);
         assert!(out.outgoing[0].contains("020B"));
@@ -428,7 +439,14 @@ mod tests {
         let mut out = HandleOutcome::default();
         let data = GameData::default();
         let service = BattleService::new(Arc::new(GameData::default()));
-        let mut ctx = crate::server::handler::test_ctx(&mut conn, &data, &service, &mut out, 2, b"/additem 10001,2");
+        let mut ctx = crate::server::handler::test_ctx(
+            &mut conn,
+            &data,
+            &service,
+            &mut out,
+            2,
+            b"/additem 10001,2",
+        );
         handle_chat(&mut ctx).await;
         assert!(
             conn.session.homdo.is_empty(),
@@ -443,7 +461,14 @@ mod tests {
         let mut out = HandleOutcome::default();
         let data = GameData::default();
         let service = BattleService::new(Arc::new(GameData::default()));
-        let mut ctx = crate::server::handler::test_ctx(&mut conn, &data, &service, &mut out, 2, b"/additem 10001,2");
+        let mut ctx = crate::server::handler::test_ctx(
+            &mut conn,
+            &data,
+            &service,
+            &mut out,
+            2,
+            b"/additem 10001,2",
+        );
         handle_chat(&mut ctx).await;
         assert_eq!(conn.session.homdo.len(), 1);
         assert_eq!(conn.session.homdo[0].id, 10001);
@@ -458,7 +483,8 @@ mod tests {
         let mut out = HandleOutcome::default();
         let data = GameData::default();
         let service = BattleService::new(Arc::new(GameData::default()));
-        let mut ctx = crate::server::handler::test_ctx(&mut conn, &data, &service, &mut out, 2, b"/battle 5");
+        let mut ctx =
+            crate::server::handler::test_ctx(&mut conn, &data, &service, &mut out, 2, b"/battle 5");
         handle_chat(&mut ctx).await;
         let trigger = out.battle_trigger.as_ref().expect("battle trigger set");
         assert_eq!(trigger.teamdef.len(), 10);
@@ -476,7 +502,8 @@ mod tests {
         payload.extend_from_slice(b"hey");
         let data = GameData::default();
         let service = BattleService::new(Arc::new(GameData::default()));
-        let mut ctx = crate::server::handler::test_ctx(&mut conn, &data, &service, &mut out, 3, &payload);
+        let mut ctx =
+            crate::server::handler::test_ctx(&mut conn, &data, &service, &mut out, 3, &payload);
         handle_chat(&mut ctx).await;
         assert_eq!(out.outgoing.len(), 1);
         assert!(out.outgoing[0].starts_with("F44409000203"));
@@ -491,7 +518,14 @@ mod tests {
         let mut out = HandleOutcome::default();
         let data = GameData::default();
         let service = BattleService::new(Arc::new(GameData::default()));
-        let mut ctx = crate::server::handler::test_ctx(&mut conn, &data, &service, &mut out, 5, b"hello party");
+        let mut ctx = crate::server::handler::test_ctx(
+            &mut conn,
+            &data,
+            &service,
+            &mut out,
+            5,
+            b"hello party",
+        );
         handle_chat(&mut ctx).await;
         assert_eq!(out.outgoing.len(), 1);
         assert!(out.outgoing[0].starts_with("F44411000205"));

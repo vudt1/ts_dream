@@ -18,6 +18,10 @@ pub mod data {
 }
 
 pub mod db {
+    pub mod accounts;
+    pub mod item_code;
+    pub mod persist;
+    pub mod players;
     pub mod pool;
 }
 
@@ -27,7 +31,6 @@ pub mod server {
     pub mod handlers;
     pub mod inventory;
     pub mod map_drops;
-    pub mod persist;
     pub mod pet_box;
     pub mod session;
     pub mod spawn;

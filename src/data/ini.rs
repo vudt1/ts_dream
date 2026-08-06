@@ -44,10 +44,7 @@ impl Ini {
                 if value.len() > VALUE_CAP {
                     value.truncate(VALUE_CAP);
                 }
-                let entry =
-                    ini.data
-                        .entry(cur_section.to_lowercase())
-                        .or_default();
+                let entry = ini.data.entry(cur_section.to_lowercase()).or_default();
                 entry.push((key, value));
             }
         }
@@ -115,7 +112,7 @@ mod tests {
         // [OnLose] WarpTo must read from ONWIN — a C# bug the spec keeps.
         let ini = Ini::parse("[OnWin]\nWarpTo=99");
         assert_eq!(ini.get("ONLOSE", "WarpTo"), NOTHING); // absent -> sentinel
-        // Executor must replicate the bug by reading ONWIN for OnLose.WarpTo.
+                                                          // Executor must replicate the bug by reading ONWIN for OnLose.WarpTo.
         assert_eq!(ini.get("ONWIN", "WarpTo"), "99");
     }
 

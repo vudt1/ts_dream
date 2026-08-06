@@ -178,12 +178,7 @@ fn handle_skill_command(
 
 /// Sub 2 — use item (`26001..=27165`). Heals the target cell + owner's pet
 /// (in the battle task), removes 1 from inventory, sets `_Attacked = 1`.
-fn handle_use_item(
-    conn: &mut Conn,
-    payload: &[u8],
-    _data: &GameData,
-    service: &BattleService,
-) {
+fn handle_use_item(conn: &mut Conn, payload: &[u8], _data: &GameData, service: &BattleService) {
     if payload.len() < 6 || conn.session.battle_id == 0 {
         return;
     }
@@ -214,7 +209,11 @@ fn handle_use_item(
 fn skill_level_for(session: &Session, skill_id: i64, row: u8) -> i64 {
     if row == 2 {
         // Pet cells resolve against the session's active pet's skill list.
-        if let Some(pet) = session.pets.iter().find(|p| p.stt == session.active_pet_stt) {
+        if let Some(pet) = session
+            .pets
+            .iter()
+            .find(|p| p.stt == session.active_pet_stt)
+        {
             for (sid, lv) in &pet.skills {
                 if i64::from(*sid) == skill_id {
                     return i64::from(*lv);

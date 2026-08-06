@@ -17,7 +17,12 @@ async fn mock_web_state() -> WebState {
     // can start, so the start gate (`DataLoaded`) is satisfied.
     app_state.write().await.data_loaded = true;
     let data = Arc::new(GameData::default());
-    let server_control = Arc::new(ServerControl::new(6414, app_state.clone(), Some(data.clone()), None));
+    let server_control = Arc::new(ServerControl::new(
+        6414,
+        app_state.clone(),
+        Some(data.clone()),
+        None,
+    ));
 
     WebState {
         app: app_state,
@@ -39,7 +44,9 @@ async fn test_index_page_and_static_htmx() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::OK);
-    let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let body_str = String::from_utf8_lossy(&body_bytes);
     assert!(body_str.contains("TS DREAM ADMIN"));
     assert!(body_str.contains("/static/htmx.js"));
@@ -79,7 +86,12 @@ async fn test_server_status_and_lifecycle() {
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::OK);
-    let json: Value = serde_json::from_slice(&axum::body::to_bytes(res.into_body(), usize::MAX).await.unwrap()).unwrap();
+    let json: Value = serde_json::from_slice(
+        &axum::body::to_bytes(res.into_body(), usize::MAX)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
     assert_eq!(json["running"], false);
 
     // Stop when stopped -> 409 Conflict
@@ -136,7 +148,12 @@ async fn test_server_status_and_lifecycle() {
         )
         .await
         .unwrap();
-    let json_status: Value = serde_json::from_slice(&axum::body::to_bytes(res_status_true.into_body(), usize::MAX).await.unwrap()).unwrap();
+    let json_status: Value = serde_json::from_slice(
+        &axum::body::to_bytes(res_status_true.into_body(), usize::MAX)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
     assert_eq!(json_status["running"], true);
 
     // Announce when running -> 200 OK
@@ -147,7 +164,9 @@ async fn test_server_status_and_lifecycle() {
                 .method("POST")
                 .uri("/api/server/announce")
                 .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(json!({ "text": "Server maintenance in 10 mins" }).to_string()))
+                .body(Body::from(
+                    json!({ "text": "Server maintenance in 10 mins" }).to_string(),
+                ))
                 .unwrap(),
         )
         .await
@@ -187,7 +206,12 @@ async fn test_perexp_configuration() {
         .await
         .unwrap();
     assert_eq!(res_set.status(), StatusCode::OK);
-    let json: Value = serde_json::from_slice(&axum::body::to_bytes(res_set.into_body(), usize::MAX).await.unwrap()).unwrap();
+    let json: Value = serde_json::from_slice(
+        &axum::body::to_bytes(res_set.into_body(), usize::MAX)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
     assert_eq!(json["perexp"], 10);
 
     // Check AppState
@@ -197,11 +221,16 @@ async fn test_perexp_configuration() {
 #[tokio::test]
 async fn test_npcs_and_online_endpoints() {
     let state = mock_web_state().await;
-    state.app.write().await.online.push(ts_dream::state::OnlineEntry {
-        id: 300001,
-        name: "TestPlayer".to_string(),
-        ip: "127.0.0.1".to_string(),
-    });
+    state
+        .app
+        .write()
+        .await
+        .online
+        .push(ts_dream::state::OnlineEntry {
+            id: 300001,
+            name: "TestPlayer".to_string(),
+            ip: "127.0.0.1".to_string(),
+        });
 
     let app = router(state);
 
@@ -217,7 +246,12 @@ async fn test_npcs_and_online_endpoints() {
         .await
         .unwrap();
     assert_eq!(res_online.status(), StatusCode::OK);
-    let online_json: Value = serde_json::from_slice(&axum::body::to_bytes(res_online.into_body(), usize::MAX).await.unwrap()).unwrap();
+    let online_json: Value = serde_json::from_slice(
+        &axum::body::to_bytes(res_online.into_body(), usize::MAX)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
     assert_eq!(online_json[0]["name"], "TestPlayer");
 
     // GET /api/npcs

@@ -129,7 +129,10 @@ fn quests_parse_random_rewards_triples() {
     }
     let d = GameData::load(&dir).expect("load real data");
     // Find any quest with RandomRewards and assert 3-tuple shape.
-    let found = d.talks.values().find(|q| !q.on_win.random_rewards.is_empty());
+    let found = d
+        .talks
+        .values()
+        .find(|q| !q.on_win.random_rewards.is_empty());
     if let Some(q) = found {
         assert!(q.on_win.random_rewards.iter().all(|t| t.2 >= 0));
         assert!(!q.on_win.random_rewards.is_empty());
@@ -192,7 +195,13 @@ fn item_drops_prefill_and_spawn() {
     assert_eq!(spawned.map_y, 126);
     assert_eq!(spawned.delay, 999_999);
     // Pre-filled empty slots 1..255 for every ItemOnMap map.
-    assert_eq!(d.item_drop_on_map.get(&(10965, 255)).expect("slot 255").item_id, 0);
+    assert_eq!(
+        d.item_drop_on_map
+            .get(&(10965, 255))
+            .expect("slot 255")
+            .item_id,
+        0
+    );
     // The static drop frame is the C# `F44408001703` + le16 id + x + y.
     assert_eq!(
         GameData::static_drop_frame(31099, 2228, 126),

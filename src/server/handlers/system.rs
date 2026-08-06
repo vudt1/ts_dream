@@ -112,7 +112,7 @@ pub fn handle_teleport_confirm(ctx: &mut OpcodeCtx) {
 }
 
 /// Handle Opcode 0x23 — Account Management (change pass, delete char, gift code).
-pub fn handle_account_mgmt(ctx: &mut OpcodeCtx) {
+pub async fn handle_account_mgmt(ctx: &mut OpcodeCtx<'_>) {
     let conn = &mut ctx.conn;
     let out = &mut ctx.out;
     let (sub, payload) = (ctx.sub, ctx.payload);
@@ -120,7 +120,9 @@ pub fn handle_account_mgmt(ctx: &mut OpcodeCtx) {
         // Sub 1: Change password
         1 => {
             // Check old password matches
-            if !conn.session.pending_pass.is_empty() && payload.starts_with(&conn.session.pending_pass) {
+            if !conn.session.pending_pass.is_empty()
+                && payload.starts_with(&conn.session.pending_pass)
+            {
                 out.send("F4440300230101");
             } else {
                 out.send("F4440300230102");
@@ -132,27 +134,78 @@ pub fn handle_account_mgmt(ctx: &mut OpcodeCtx) {
             out.send("F4440300230201");
             out.shutdown = true;
         }
-        // Sub 3: Redeem item_code / gift code
+        // Sub 3: Redeem item_code / gift code (DB-backed, Ch5 §5.5).
+        // Payload = `codeLen code passLen password` (two len-prefixed strings).
         3 => {
-            if conn.session.gift_code_redeemed {
-                out.send(sys_msg_frame("Ma qua tang da duoc su dung!"));
-            } else {
-                conn.session.gift_code_redeemed = true;
-                let gift = InventoryItem {
-                    slot: 0,
-                    id: 20002, // Stat point book
-                    count: 1,
-                    doben: 100,
-                    loai: 1,
-                    ..Default::default()
-                };
-                let _ = conn.session.add_homdo_item(gift);
-                out.send(sys_msg_frame("Nhan ma qua tang thanh cong!"));
-                out.send(conn.session.dump_homdo());
+            let Some((code, password)) = parse_gift_code(payload) else {
+                out.send(sys_msg_frame("Ma qua tang sai!"));
+                return;
+            };
+            let code_str = String::from_utf8_lossy(code).into_owned();
+            let pass_str = String::from_utf8_lossy(password).into_owned();
+
+            let reward = match ctx.env.pool {
+                Some(pool) => crate::db::item_code::redeem(
+                    pool,
+                    i64::from(conn.session.id),
+                    &code_str,
+                    &pass_str,
+                )
+                .await
+                .ok()
+                .flatten(),
+                None => {
+                    // Golden replay (no live DB): a deterministic demo gift.
+                    Some(crate::db::item_code::Redeem {
+                        item_id: 20002,
+                        count: 1,
+                    })
+                }
+            };
+
+            match reward {
+                Some(r) => {
+                    let gift = InventoryItem {
+                        slot: 0,
+                        id: r.item_id as u16,
+                        count: r.count as u8,
+                        doben: 100,
+                        loai: 1,
+                        ..Default::default()
+                    };
+                    let _ = conn.session.add_homdo_item(gift);
+                    out.send(sys_msg_frame("Nhan ma qua tang thanh cong!"));
+                    out.send(conn.session.dump_homdo());
+                }
+                None => {
+                    out.send(sys_msg_frame(
+                        "Ma qua tang khong hop le hoac da duoc su dung!",
+                    ));
+                }
             }
         }
         _ => {}
     }
+}
+
+/// Parse the two len-prefixed `code`/`password` byte strings
+/// (`[0] code_len, [1..] code, [..] pass_len, [..] password`).
+fn parse_gift_code(payload: &[u8]) -> Option<(&[u8], &[u8])> {
+    if payload.len() < 2 {
+        return None;
+    }
+    let code_len = payload[0] as usize;
+    if 1 + code_len + 1 > payload.len() {
+        return None;
+    }
+    let code = &payload[1..1 + code_len];
+    let pass_len = payload[1 + code_len] as usize;
+    let pass_start = 1 + code_len + 1;
+    let pass_rest = payload.get(pass_start..)?;
+    if pass_rest.len() < pass_len {
+        return None;
+    }
+    Some((code, &pass_rest[..pass_len]))
 }
 
 #[cfg(test)]

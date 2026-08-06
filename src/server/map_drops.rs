@@ -26,10 +26,14 @@ fn registry() -> &'static Mutex<HashMap<(u16, u8), DropItem>> {
 
 /// Place a drop under the `(map_id, slot)` key. Replaces any prior entry.
 pub fn drop(map_id: u16, slot: u8, item: InventoryItem, x: u16, y: u16) {
-    registry()
-        .lock()
-        .unwrap()
-        .insert((map_id, slot), DropItem { map_x: x, map_y: y, item });
+    registry().lock().unwrap().insert(
+        (map_id, slot),
+        DropItem {
+            map_x: x,
+            map_y: y,
+            item,
+        },
+    );
 }
 
 /// Look up a drop slot on a map.

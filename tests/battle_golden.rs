@@ -129,10 +129,7 @@ async fn battle_win_golden_replay() {
     // Wait for the battle task to finish.
     let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
     loop {
-        let empty = service
-            .manager
-            .len()
-            .await == 0;
+        let empty = service.manager.len().await == 0;
         if empty {
             break;
         }
@@ -154,7 +151,8 @@ async fn battle_win_golden_replay() {
         .collect();
 
     assert_eq!(
-        frames, expected,
+        frames,
+        expected,
         "battle-win frame stream mismatch ({} got vs {} expected)\nGOT:\n{}\nEXPECTED:\n{}",
         frames.len(),
         expected.len(),

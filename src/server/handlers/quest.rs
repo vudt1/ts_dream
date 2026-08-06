@@ -346,10 +346,7 @@ fn warp_member(
     session.map_id = map;
     session.map_x = x;
     session.map_y = y;
-    frames.push(format!(
-        "F4440700142C{}01",
-        encoder::le32(leader as u32)
-    ));
+    frames.push(format!("F4440700142C{}01", encoder::le32(leader as u32)));
     frames.push(format!(
         "F4440D000C{}{}{}{}0000",
         encoder::le32(id),
@@ -370,12 +367,7 @@ fn clear_quest_talk(session: &mut Session) {
 /// Compat wrapper: the pre-ticket win processing (see `battle_quest_win`).
 pub fn process_quest_win(conn: &mut Conn, data: &GameData, out: &mut HandleOutcome) {
     let mut frames = Vec::new();
-    battle_quest_win(
-        &mut conn.session,
-        data,
-        &mut frames,
-        &mut |_| None,
-    );
+    battle_quest_win(&mut conn.session, data, &mut frames, &mut |_| None);
     for f in frames {
         out.send(f);
     }

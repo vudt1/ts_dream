@@ -32,7 +32,10 @@ pub fn u32_le(b0: u8, b1: u8, b2: u8, b3: u8) -> u32 {
 
 /// little-endian u32 from a byte slice (missing trailing bytes read as 0).
 pub fn u32_le_slice(b: &[u8]) -> u32 {
-    u16::from_le_bytes([b.get(0).copied().unwrap_or(0), b.get(1).copied().unwrap_or(0)]) as u32
+    u16::from_le_bytes([
+        b.get(0).copied().unwrap_or(0),
+        b.get(1).copied().unwrap_or(0),
+    ]) as u32
         | ((u16::from_le_bytes([
             b.get(2).copied().unwrap_or(0),
             b.get(3).copied().unwrap_or(0),

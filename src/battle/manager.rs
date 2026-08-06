@@ -7,9 +7,7 @@
 //! The grid + RNG live only inside the task, so battle state is race-free.
 
 use crate::battle::construction::Battle;
-use crate::battle::runner::{
-    BattleCommand, BattleData, DbUpdate, Out, Outcome, PlayerSnapshot,
-};
+use crate::battle::runner::{BattleCommand, BattleData, DbUpdate, Out, Outcome, PlayerSnapshot};
 use crate::data::tables::{Item, Npc, Skill, TexpRow};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI32, Ordering};
@@ -107,7 +105,18 @@ impl BattleManager {
         per_exp: i64,
         sink: Arc<dyn BattleSink>,
     ) -> BattleHandle {
-        self.spawn_timeout(battle, npcs, skills, items, pet_slots, players, texps, per_exp, self.default_timeout, sink)
+        self.spawn_timeout(
+            battle,
+            npcs,
+            skills,
+            items,
+            pet_slots,
+            players,
+            texps,
+            per_exp,
+            self.default_timeout,
+            sink,
+        )
     }
 
     /// Spawn with a custom per-turn input timeout (shorter makes tests fast).
@@ -135,14 +144,7 @@ impl BattleManager {
             let mut rx = rx;
             // Build the per-task data from the tables it now owns.
             let data = BattleData::new(
-                &npcs,
-                &skills,
-                &items,
-                &pet_slots,
-                &players,
-                &texps,
-                None,
-                0,
+                &npcs, &skills, &items, &pet_slots, &players, &texps, None, 0,
             );
             let mut out: Vec<Out> = Vec::new();
             loop {
@@ -219,7 +221,14 @@ fn dispatch(out: &[Out], sink: &dyn BattleSink) {
             ToPlayer(p, f) => sink.send_to(*p, f.clone()),
             MapBroadcast { player, frame } => sink.send_map(*player, frame.clone()),
             Db(u) => sink.apply_db(*u),
-            Drop { item_id, npc_row, npc_col, row, col, owner } => sink.apply_drop(Out::Drop {
+            Drop {
+                item_id,
+                npc_row,
+                npc_col,
+                row,
+                col,
+                owner,
+            } => sink.apply_drop(Out::Drop {
                 item_id: *item_id,
                 npc_row: *npc_row,
                 npc_col: *npc_col,

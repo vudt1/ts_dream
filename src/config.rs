@@ -16,6 +16,10 @@ pub struct Config {
     pub data_dir: PathBuf,
     pub database_url: String,
     pub perexp_default: u32,
+    /// Auto-create the `ts_dream` database (and a latin1 charset) at boot if
+    /// it does not exist yet. Off when an operator provisions the DB themselves
+    /// (spec §8.3). Override with `TS_DB_AUTO_CREATE`.
+    pub db_auto_create: bool,
 }
 
 impl Default for Config {
@@ -26,6 +30,7 @@ impl Default for Config {
             data_dir: PathBuf::from("./Data"),
             database_url: "mysql://user:pass@localhost:3306/ts_dream".to_string(),
             perexp_default: 0,
+            db_auto_create: true,
         }
     }
 }
@@ -36,15 +41,20 @@ fn parse_u16(s: &str) -> std::result::Result<u16, String> {
         .map_err(|e| format!("invalid u16: {e}"))
 }
 fn parse_u32(s: &str) -> std::result::Result<u32, String> {
-    s.trim().parse::<u32>().map_err(|e| format!("invalid u32: {e}"))
+    s.trim()
+        .parse::<u32>()
+        .map_err(|e| format!("invalid u32: {e}"))
+}
+fn parse_bool(s: &str) -> std::result::Result<bool, String> {
+    match s.trim().to_ascii_lowercase().as_str() {
+        "true" | "1" | "yes" | "on" => Ok(true),
+        "false" | "0" | "no" | "off" => Ok(false),
+        other => Err(format!("invalid bool: {other:?}")),
+    }
 }
 
 /// Apply a `TS_` env var override if present, else keep the TOML value.
-fn env_override<T, F>(
-    key: &str,
-    toml: T,
-    parse: F,
-) -> std::result::Result<T, String>
+fn env_override<T, F>(key: &str, toml: T, parse: F) -> std::result::Result<T, String>
 where
     F: Fn(&str) -> std::result::Result<T, String>,
 {
@@ -65,16 +75,14 @@ impl Config {
             Config::default()
         };
 
-        cfg.game_port = env_override("TS_GAME_PORT", cfg.game_port, parse_u16).map_err(|e| {
-            TsError::Config(format!("TS_GAME_PORT: {e}"))
-        })?;
-        cfg.web_port = env_override("TS_WEB_PORT", cfg.web_port, parse_u16).map_err(|e| {
-            TsError::Config(format!("TS_WEB_PORT: {e}"))
-        })?;
-        cfg.perexp_default =
-            env_override("TS_PEREXP_DEFAULT", cfg.perexp_default, parse_u32).map_err(|e| {
-                TsError::Config(format!("TS_PEREXP_DEFAULT: {e}"))
-            })?;
+        cfg.game_port = env_override("TS_GAME_PORT", cfg.game_port, parse_u16)
+            .map_err(|e| TsError::Config(format!("TS_GAME_PORT: {e}")))?;
+        cfg.web_port = env_override("TS_WEB_PORT", cfg.web_port, parse_u16)
+            .map_err(|e| TsError::Config(format!("TS_WEB_PORT: {e}")))?;
+        cfg.perexp_default = env_override("TS_PEREXP_DEFAULT", cfg.perexp_default, parse_u32)
+            .map_err(|e| TsError::Config(format!("TS_PEREXP_DEFAULT: {e}")))?;
+        cfg.db_auto_create = env_override("TS_DB_AUTO_CREATE", cfg.db_auto_create, parse_bool)
+            .map_err(|e| TsError::Config(format!("TS_DB_AUTO_CREATE: {e}")))?;
         if let Ok(raw) = std::env::var("TS_DATA_DIR") {
             cfg.data_dir = PathBuf::from(raw);
         }
@@ -144,6 +152,18 @@ mod tests {
         assert_eq!(cfg.web_port, 8090);
         assert_eq!(cfg.perexp_default, 0);
         assert!(cfg.database_url.contains("ts_dream"));
+        assert!(cfg.db_auto_create, "auto-create defaults to true");
+    }
+
+    #[test]
+    fn parse_bool_accepts_true_false_forms() {
+        assert!(parse_bool("true").unwrap());
+        assert!(parse_bool("1").unwrap());
+        assert!(parse_bool("YES").unwrap());
+        assert!(!parse_bool("false").unwrap());
+        assert!(!parse_bool("0").unwrap());
+        assert!(!parse_bool("Off").unwrap());
+        assert!(parse_bool("maybe").is_err());
     }
 
     #[test]
@@ -198,10 +218,7 @@ mod tests {
 
         // The configured relative path does NOT exist in the CWD here, but the
         // exe-adjacent one does -> resolve to `exe_dir/bundle`.
-        let got = Config::resolve_data_dir_with(
-            &std::path::PathBuf::from("bundle"),
-            Some(exe_dir),
-        );
+        let got = Config::resolve_data_dir_with(&std::path::PathBuf::from("bundle"), Some(exe_dir));
         assert_eq!(got, bundled);
     }
 
@@ -209,10 +226,8 @@ mod tests {
     fn resolve_data_dir_returns_configured_when_none_exist() {
         // Neither the configured path nor an exe-adjacent bundle exists ->
         // the configured path is returned unchanged (caller reports it).
-        let got = Config::resolve_data_dir_with(
-            &std::path::PathBuf::from("does-not-exist-data"),
-            None,
-        );
+        let got =
+            Config::resolve_data_dir_with(&std::path::PathBuf::from("does-not-exist-data"), None);
         assert_eq!(got, std::path::PathBuf::from("does-not-exist-data"));
     }
 }

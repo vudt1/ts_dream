@@ -8,7 +8,9 @@ static INIT: Once = Once::new();
 
 fn init() {
     INIT.call_once(|| {
-        let _ = tracing_subscriber::fmt().with_max_level(tracing::Level::ERROR).try_init();
+        let _ = tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::ERROR)
+            .try_init();
     });
 }
 
@@ -40,7 +42,10 @@ async fn golden_parse_and_validate_format() {
 async fn golden_load_directory() {
     init();
     let goldens = ts_dream::harness::Golden::load_dir("golden").expect("load_dir ok");
-    assert!(!goldens.is_empty(), "expected at least 1 placeholder golden scenario in golden/");
+    assert!(
+        !goldens.is_empty(),
+        "expected at least 1 placeholder golden scenario in golden/"
+    );
     for g in goldens {
         assert!(!g.name.is_empty());
         assert!(!g.c2s.is_empty());
@@ -62,6 +67,11 @@ async fn golden_driven_scenarios_gate() {
 
     for g in &goldens {
         let received = ts_dream::harness::run_golden(g, &addr).await;
-        assert!(received.is_ok(), "golden `{}` failed: {:?}", g.name, received);
+        assert!(
+            received.is_ok(),
+            "golden `{}` failed: {:?}",
+            g.name,
+            received
+        );
     }
 }

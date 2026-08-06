@@ -399,10 +399,9 @@ impl GameData {
             // Spawn the static drop (C# `SystemDropItem(mapid, slot, x, y,
             // itemId, 999999)`): copies the item's full stats, `_Delay=999999`,
             // `_Gold=3` (Data.cs:5278-5345).
-            let item = self
-                .items
-                .get(&item_id)
-                .ok_or_else(|| TsError::Data(format!("ItemOnMap references unknown item {item_id}")))?;
+            let item = self.items.get(&item_id).ok_or_else(|| {
+                TsError::Data(format!("ItemOnMap references unknown item {item_id}"))
+            })?;
             let drop = ItemDropOnMap {
                 map_id,
                 slot,
@@ -600,7 +599,10 @@ fn parse_tuples(s: &str, file: &str) -> Result<Vec<(i64, i64, i64)>> {
         let a = parts[0]
             .parse::<i64>()
             .map_err(|_| TsError::Data(format!("bad tuple `{tok}` in {file}")))?;
-        let b = parts.get(1).copied().unwrap_or("0")
+        let b = parts
+            .get(1)
+            .copied()
+            .unwrap_or("0")
             .parse::<i64>()
             .map_err(|_| TsError::Data(format!("bad tuple `{tok}` in {file}")))?;
         let c = match parts.get(2) {
@@ -624,12 +626,19 @@ fn parse_condition(s: &str, file: &str) -> Result<Option<(i64, i64)>> {
         return Ok(None);
     }
     let mut it = s.split('\t');
-    let value = it.next().unwrap_or("").trim().parse::<i64>().map_err(|_| {
-        TsError::Data(format!("bad condition `{s}` in {file}"))
-    })?;
+    let value = it
+        .next()
+        .unwrap_or("")
+        .trim()
+        .parse::<i64>()
+        .map_err(|_| TsError::Data(format!("bad condition `{s}` in {file}")))?;
     let op = it.next().unwrap_or("").trim();
     let ops = ["=", ">=", ">", "<=", "<", "!="];
-    let op_index = ops.iter().position(|&o| o == op).map(|i| i as i64).unwrap_or(-1);
+    let op_index = ops
+        .iter()
+        .position(|&o| o == op)
+        .map(|i| i as i64)
+        .unwrap_or(-1);
     Ok(Some((value, op_index)))
 }
 
@@ -683,7 +692,10 @@ fn parse_wear_tuples(s: &str, file: &str) -> Result<Vec<(i64, i64)>> {
         let a = parts[0]
             .parse::<i64>()
             .map_err(|_| TsError::Data(format!("bad wears tuple `{tok}` in {file}")))?;
-        let b = parts.get(1).copied().unwrap_or("0")
+        let b = parts
+            .get(1)
+            .copied()
+            .unwrap_or("0")
             .parse::<i64>()
             .map_err(|_| TsError::Data(format!("bad wears tuple `{tok}` in {file}")))?;
         out.push((a, b));
@@ -709,7 +721,10 @@ fn parse_use_items(s: &str, file: &str) -> Result<Vec<(i64, i64)>> {
         let item_id = parts[0]
             .parse::<i64>()
             .map_err(|_| TsError::Data(format!("bad UseItems `{tok}` in {file}")))?;
-        let target = parts.get(1).copied().unwrap_or("0")
+        let target = parts
+            .get(1)
+            .copied()
+            .unwrap_or("0")
             .parse::<i64>()
             .map_err(|_| TsError::Data(format!("bad UseItems `{tok}` in {file}")))?;
         out.push((item_id, target));
@@ -862,11 +877,27 @@ mod tests {
     fn write_dataset(dir: &std::path::Path) {
         std::fs::create_dir_all(dir.join("Quests")).unwrap();
         std::fs::write(dir.join("Items.txt"), b"//Id\tName\t...\n1\tA\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\n").unwrap();
-        std::fs::write(dir.join("Skills.txt"), b"//Id\tName\t...\n1\tA\t1\t1\t1\t0\t0\t0\t0\t0\t0\t1\t1\t1\t1\t0\t0\t0\t0\n").unwrap();
-        std::fs::write(dir.join("BattleGate.txt"), b"//Mapid1\tWarpId\tDiahinh\n1\t2\t3\t4\t5\t6\t7\t8\t9\t10\t11\t12\t13\n").unwrap();
+        std::fs::write(
+            dir.join("Skills.txt"),
+            b"//Id\tName\t...\n1\tA\t1\t1\t1\t0\t0\t0\t0\t0\t0\t1\t1\t1\t1\t0\t0\t0\t0\n",
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("BattleGate.txt"),
+            b"//Mapid1\tWarpId\tDiahinh\n1\t2\t3\t4\t5\t6\t7\t8\t9\t10\t11\t12\t13\n",
+        )
+        .unwrap();
         std::fs::write(dir.join("Dolls.txt"), b"//DollId\tNpcId\n1\t2\n").unwrap();
-        std::fs::write(dir.join("NpcOnMap.txt"), b"//MapId\tId\tNpcId\tX\tY\tCoord\tSoLuong\n1\t1\t2\t3\t4\t5\t0\n").unwrap();
-        std::fs::write(dir.join("ItemOnMap.txt"), b"//MapId\tId\tItemId\tX\tY\tDelay\n").unwrap();
+        std::fs::write(
+            dir.join("NpcOnMap.txt"),
+            b"//MapId\tId\tNpcId\tX\tY\tCoord\tSoLuong\n1\t1\t2\t3\t4\t5\t0\n",
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("ItemOnMap.txt"),
+            b"//MapId\tId\tItemId\tX\tY\tDelay\n",
+        )
+        .unwrap();
         // Npcs.txt is UTF-16LE with BOM (24-col row: id..agi, skills, drops, NotPet, Reborn).
         let npc = "1\tA\t1\t1\t1\t1\t1\t1\t1\t1\t1\t1\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0";
         let mut bytes = vec![0xFF, 0xFE];

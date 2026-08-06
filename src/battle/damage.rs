@@ -92,12 +92,21 @@ fn physical_base(stat: i64, element: f64, def: i64) -> f64 {
 }
 
 /// Level-difference and skill term refinements.
-fn refine_base(base: f64, att_lv: i64, def_lv: i64, skill_tt: i64, def_tt: i64, do_manh: i64, skill_lv: i64) -> f64 {
+fn refine_base(
+    base: f64,
+    att_lv: i64,
+    def_lv: i64,
+    skill_tt: i64,
+    def_tt: i64,
+    do_manh: i64,
+    skill_lv: i64,
+) -> f64 {
     let mut b = base
         + banker_round((att_lv - def_lv) as f64 / 1.5)
         + banker_round(att_lv as f64 / 20.0) * 8.0;
     b = banker_round(
-        b + get_damage_skill_int(skill_tt, def_tt) as f64 * do_manh as f64
+        b + get_damage_skill_int(skill_tt, def_tt) as f64
+            * do_manh as f64
             * (1.0 + skill_lv as f64 * 0.033),
     );
     b
@@ -141,7 +150,9 @@ pub fn calc_physical_damage(
     skill_lv: i64,
     num37: f64,
 ) -> i64 {
-    calc_physical_damage_stat(atk, def, att_tt, def_tt, att_lv, def_lv, skill_tt, do_manh, skill_lv, num37)
+    calc_physical_damage_stat(
+        atk, def, att_tt, def_tt, att_lv, def_lv, skill_tt, do_manh, skill_lv, num37,
+    )
 }
 
 /// Magic damage (skill Type 2) base pipeline — uses `_Int`, and never applies
@@ -233,7 +244,13 @@ pub fn apply_buff_modifiers(
 
 /// `GetRandomMissAttack(lv1, lv2, lvtb1, lvtb2)` — returns `1` (hit) or `0` (miss).
 /// `percent = 100 + round((lv1-lv2)/10) + round((lvtb1-lvtb2)/10)`.
-pub fn get_random_miss_attack(rng: &mut DotNetRandom, lv1: i64, lv2: i64, lvtb1: i64, lvtb2: i64) -> i64 {
+pub fn get_random_miss_attack(
+    rng: &mut DotNetRandom,
+    lv1: i64,
+    lv2: i64,
+    lvtb1: i64,
+    lvtb2: i64,
+) -> i64 {
     let num = banker_round((lv1 - lv2) as f64 / 10.0) as i64;
     let num2 = banker_round((lvtb1 - lvtb2) as f64 / 10.0) as i64;
     let percent = 100 + num + num2;
@@ -268,7 +285,13 @@ pub fn get_random_miss_troi(
 }
 
 /// `GetRandomMissChayTron(...)` — flee roll. `percent = 60 + (lv1-lv2) + (lvtb1-lvtb2)`.
-pub fn get_random_miss_flee(rng: &mut DotNetRandom, lv1: i64, lv2: i64, lvtb1: i64, lvtb2: i64) -> i64 {
+pub fn get_random_miss_flee(
+    rng: &mut DotNetRandom,
+    lv1: i64,
+    lv2: i64,
+    lvtb1: i64,
+    lvtb2: i64,
+) -> i64 {
     let num = lv1 - lv2;
     let num2 = lvtb1 - lvtb2;
     let percent = 60 + num + num2;
@@ -296,7 +319,12 @@ pub fn randomize_array(rng: &mut DotNetRandom, items: &[i64]) -> i64 {
 
 /// `RandomizeArrayWithPercent(value1, value2, percent)` — clamped to [0,100].
 /// negative percent behaves like 0 (roll `<= p*10` always false → value2).
-pub fn randomize_with_percent(rng: &mut DotNetRandom, value1: i64, value2: i64, percent: i64) -> i64 {
+pub fn randomize_with_percent(
+    rng: &mut DotNetRandom,
+    value1: i64,
+    value2: i64,
+    percent: i64,
+) -> i64 {
     let p = percent.clamp(0, 100);
     let roll = rng.next_range(1, 1000);
     if i64::from(roll) <= p * 10 {
@@ -308,17 +336,26 @@ pub fn randomize_with_percent(rng: &mut DotNetRandom, value1: i64, value2: i64, 
 
 /// `GetRandomSkillNPC(lv, reborn, skill1..3)` — default missing skills to 10000.
 /// Draws fresh `random_0.Next(1,100)` per roll (RNG-parity sensitive).
-pub fn get_random_skill_npc(rng: &mut DotNetRandom, _lv: i64, reborn: i64, skills: [i64; 4]) -> i64 {
+pub fn get_random_skill_npc(
+    rng: &mut DotNetRandom,
+    _lv: i64,
+    reborn: i64,
+    skills: [i64; 4],
+) -> i64 {
     let s1 = if skills[0] == 0 { 10000 } else { skills[0] };
     let s2 = if skills[1] == 0 { 10000 } else { skills[1] };
     let s3 = if skills[2] == 0 { 10000 } else { skills[2] };
     if i64::from(rng.next_range(1, 100)) <= 5 * (reborn + 1) {
         return s3;
     }
-    if i64::from(rng.next_range(1, 100)) <= 15 * (reborn + 1) && i64::from(rng.next_range(1, 100)) > 5 * reborn {
+    if i64::from(rng.next_range(1, 100)) <= 15 * (reborn + 1)
+        && i64::from(rng.next_range(1, 100)) > 5 * reborn
+    {
         return s2;
     }
-    if i64::from(rng.next_range(1, 100)) <= 30 * (reborn + 1) && i64::from(rng.next_range(1, 100)) > 15 * reborn {
+    if i64::from(rng.next_range(1, 100)) <= 30 * (reborn + 1)
+        && i64::from(rng.next_range(1, 100)) > 15 * reborn
+    {
         return s2;
     }
     s1
@@ -441,7 +478,10 @@ pub fn get_turn(id_skill: i64, lv_skill: i64) -> i64 {
         return 3;
     }
     // GROUP_d: {13015,13016,13017,13018,10016,10017,10018,10019}
-    if matches!(id_skill, 13015 | 13016 | 13017 | 13018 | 10016 | 10017 | 10018 | 10019) {
+    if matches!(
+        id_skill,
+        13015 | 13016 | 13017 | 13018 | 10016 | 10017 | 10018 | 10019
+    ) {
         return 4;
     }
     // GROUP_e: {11014,20014,20022,20023}

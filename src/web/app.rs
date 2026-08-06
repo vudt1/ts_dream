@@ -16,6 +16,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::data::loader::GameData;
+use crate::db;
+use crate::db::accounts::AccountRow;
 use crate::state::{AppState, LogEvent, OnlineEntry};
 use crate::web::server_control::ServerControl;
 
@@ -30,13 +32,6 @@ pub struct WebState {
     pub pool: Option<MySqlPool>,
     pub data: Option<Arc<GameData>>,
     pub server_control: Option<Arc<ServerControl>>,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, sqlx::FromRow)]
-pub struct AccountRow {
-    pub player_id: i64,
-    pub pass1: String,
-    pub pass2: String,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -161,7 +156,10 @@ pub fn router(state: WebState) -> axum::Router {
         .route("/api/server/status", get(server_status))
         .route("/api/server/start", get(server_start).post(server_start))
         .route("/api/server/stop", get(server_stop).post(server_stop))
-        .route("/api/server/announce", get(server_announce).post(server_announce))
+        .route(
+            "/api/server/announce",
+            get(server_announce).post(server_announce),
+        )
         .route("/api/accounts", get(list_accounts).post(create_account))
         .route("/api/npcs", get(list_npcs))
         .route("/api/online", get(list_online))
@@ -183,14 +181,7 @@ async fn index(State(s): State<WebState>) -> Response {
     drop(app_guard);
 
     let accounts = match &s.pool {
-        Some(pool) => {
-            sqlx::query_as::<_, AccountRow>(
-                "SELECT player_id, pass1, pass2 FROM accounts ORDER BY player_id DESC",
-            )
-            .fetch_all(pool)
-            .await
-            .unwrap_or_default()
-        }
+        Some(pool) => db::accounts::list(pool).await.unwrap_or_default(),
         None => Vec::new(),
     };
 
@@ -217,10 +208,7 @@ async fn server_status(State(s): State<WebState>) -> Json<serde_json::Value> {
     Json(json!({ "running": s.app.read().await.running }))
 }
 
-async fn server_start(
-    State(s): State<WebState>,
-    headers: HeaderMap,
-) -> Response {
+async fn server_start(State(s): State<WebState>, headers: HeaderMap) -> Response {
     if let Some(ref control) = s.server_control {
         let _ = control.start().await;
     } else {
@@ -229,7 +217,9 @@ async fn server_start(
 
     htmx_or_json(
         &headers,
-        || String::from(r##"
+        || {
+            String::from(
+                r##"
         <div class="card" id="server-control-card">
             <div class="card-header">Server Lifecycle</div>
             <div class="card-value" style="font-size: 20px; margin-bottom: 14px;">
@@ -240,15 +230,14 @@ async fn server_start(
                 <button class="btn btn-red" hx-post="/api/server/stop" hx-target="#server-control-card" hx-swap="outerHTML" onclick="return confirm('Stop game server with 5s countdown?')">Stop</button>
             </div>
         </div>
-        "##),
+        "##,
+            )
+        },
         json!({ "running": true }),
     )
 }
 
-async fn server_stop(
-    State(s): State<WebState>,
-    headers: HeaderMap,
-) -> Response {
+async fn server_stop(State(s): State<WebState>, headers: HeaderMap) -> Response {
     if let Some(ref control) = s.server_control {
         match control.stop().await {
             Ok(_) => {}
@@ -259,14 +248,20 @@ async fn server_stop(
     } else {
         let mut app = s.app.write().await;
         if !app.running {
-            return (StatusCode::CONFLICT, Json(json!({ "error": "server not running" }))).into_response();
+            return (
+                StatusCode::CONFLICT,
+                Json(json!({ "error": "server not running" })),
+            )
+                .into_response();
         }
         app.running = false;
     }
 
     htmx_or_json(
         &headers,
-        || String::from(r##"
+        || {
+            String::from(
+                r##"
         <div class="card" id="server-control-card">
             <div class="card-header">Server Lifecycle</div>
             <div class="card-value" style="font-size: 20px; margin-bottom: 14px;">
@@ -277,7 +272,9 @@ async fn server_stop(
                 <button class="btn btn-red" hx-post="/api/server/stop" hx-target="#server-control-card" hx-swap="outerHTML" onclick="return confirm('Stop game server with 5s countdown?')">Stop</button>
             </div>
         </div>
-        "##),
+        "##,
+            )
+        },
         json!({ "running": false }),
     )
 }
@@ -304,24 +301,22 @@ async fn server_announce(
     } else {
         let app = s.app.read().await;
         if !app.running {
-            return (StatusCode::CONFLICT, Json(json!({ "error": "server not running" }))).into_response();
+            return (
+                StatusCode::CONFLICT,
+                Json(json!({ "error": "server not running" })),
+            )
+                .into_response();
         }
         Json(json!({ "ok": true })).into_response()
     }
 }
 
-async fn list_accounts(
-    State(s): State<WebState>,
-) -> Result<Json<Vec<AccountRow>>, StatusCode> {
+async fn list_accounts(State(s): State<WebState>) -> Result<Json<Vec<AccountRow>>, StatusCode> {
     match s.pool {
-        Some(ref pool) => {
-            let rows: Vec<AccountRow> =
-                sqlx::query_as("SELECT player_id, pass1, pass2 FROM accounts ORDER BY player_id")
-                    .fetch_all(pool)
-                    .await
-                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            Ok(Json(rows))
-        }
+        Some(ref pool) => db::accounts::list(pool)
+            .await
+            .map(Json)
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR),
         None => Err(StatusCode::SERVICE_UNAVAILABLE),
     }
 }
@@ -347,17 +342,10 @@ async fn create_account(
         None => return StatusCode::SERVICE_UNAVAILABLE.into_response(),
     };
 
-    let res = match sqlx::query("INSERT INTO accounts (pass1, pass2) VALUES (?, ?)")
-        .bind(&payload.pass1)
-        .bind(&payload.pass2)
-        .execute(pool)
-        .await
-    {
-        Ok(r) => r,
+    let player_id = match db::accounts::create(pool, &payload.pass1, &payload.pass2).await {
+        Ok(id) => id,
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
-
-    let player_id = res.last_insert_id() as i64;
     htmx_or_json(
         &headers,
         || {

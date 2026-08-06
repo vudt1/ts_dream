@@ -19,7 +19,9 @@ use crate::battle::construction::{Battle, StartPacket};
 use crate::battle::engine::get_hp_max;
 use crate::battle::manager::{BattleHandle, BattleManager, BattleSink};
 use crate::battle::packets;
-use crate::battle::runner::{BattleCommand, DbTarget, DbUpdate, Out, Outcome, PlayerSnapshot, Stat};
+use crate::battle::runner::{
+    BattleCommand, DbTarget, DbUpdate, Out, Outcome, PlayerSnapshot, Stat,
+};
 use crate::data::loader::GameData;
 use crate::data::tables::TexpRow;
 use crate::protocol::encoder;
@@ -228,7 +230,9 @@ fn apply_player_stat(s: &mut Session, stat: Stat, value: i64) -> Option<String> 
     let (byte, apply): (Option<u8>, fn(&mut Session, i64)) = match stat {
         Stat::Hp => (Some(0x19), |s, v| s.hp = clamp_u16(v)),
         Stat::Sp => (Some(0x1A), |s, v| s.sp = clamp_u16(v)),
-        Stat::Texp => (Some(0x24), |s, v| s.texp = v.clamp(0, u32::MAX as i64) as u32),
+        Stat::Texp => (Some(0x24), |s, v| {
+            s.texp = v.clamp(0, u32::MAX as i64) as u32
+        }),
         Stat::Lv => (Some(0x23), |s, v| s.level = v.clamp(0, 0xFF) as u8),
         Stat::Hpmax => (None, |s, v| s.hp_max = clamp_u16(v)),
         Stat::Spmax => (None, |s, v| s.sp_max = clamp_u16(v)),
@@ -237,9 +241,7 @@ fn apply_player_stat(s: &mut Session, stat: Stat, value: i64) -> Option<String> 
         Stat::Fai => (Some(0x40), |s, v| s.tiengtam = clamp_u16(v)),
     };
     apply(s, value);
-    byte.map(|b| {
-        packets::status_update(b, value.clamp(i32::MIN as i64, i32::MAX as i64) as i32)
-    })
+    byte.map(|b| packets::status_update(b, value.clamp(i32::MIN as i64, i32::MAX as i64) as i32))
 }
 
 fn clamp_u16(v: i64) -> u16 {
@@ -309,7 +311,13 @@ impl BattleService {
     ) -> mpsc::UnboundedReceiver<String> {
         let (tx, rx) = mpsc::unbounded_channel();
         if let Ok(mut online) = self.online.try_write() {
-            online.insert(player, OnlinePlayer { session, frames: tx });
+            online.insert(
+                player,
+                OnlinePlayer {
+                    session,
+                    frames: tx,
+                },
+            );
         }
         rx
     }
@@ -336,16 +344,17 @@ impl BattleService {
             return 0;
         };
         let id = self.next_battle_id();
-        let battle = Battle::npc_battle(
-            id,
-            session,
-            i64::from(session.id),
-            &npc,
-            npc_on_map_id,
-            112,
-        );
+        let battle =
+            Battle::npc_battle(id, session, i64::from(session.id), &npc, npc_on_map_id, 112);
         let (extra_players, extra_pets) = self.party_snapshots(session);
-        self.spawn_battle(battle, session, extra_players, extra_pets, Vec::new(), Vec::new())
+        self.spawn_battle(
+            battle,
+            session,
+            extra_players,
+            extra_pets,
+            Vec::new(),
+            Vec::new(),
+        )
     }
 
     /// Seeded NPC battle start — deterministic RNG for golden replay.
@@ -367,7 +376,14 @@ impl BattleService {
         battle.load_leader_pets(session, i64::from(session.id), 3);
         battle.add_npc(&npc, npc_on_map_id, 0, 2, 3);
         let (extra_players, extra_pets) = self.party_snapshots(session);
-        self.spawn_battle(battle, session, extra_players, extra_pets, Vec::new(), Vec::new())
+        self.spawn_battle(
+            battle,
+            session,
+            extra_players,
+            extra_pets,
+            Vec::new(),
+            Vec::new(),
+        )
     }
 
     /// Start a PK battle (`TheBattle(leader, opponent, 112)`).
@@ -428,7 +444,14 @@ impl BattleService {
             trigger.diahinh,
         );
         let (extra_players, extra_pets) = self.party_snapshots(session);
-        self.spawn_battle(battle, session, extra_players, extra_pets, Vec::new(), Vec::new())
+        self.spawn_battle(
+            battle,
+            session,
+            extra_players,
+            extra_pets,
+            Vec::new(),
+            Vec::new(),
+        )
     }
 
     /// Register a player in an existing battle (op 0x0B sub 4 join).
@@ -442,12 +465,16 @@ impl BattleService {
         }
         let join = self.build_join_frame(session, battle_id);
         self.sink.send_to(i64::from(session.id), join);
-        self.sink.send_to(i64::from(session.id), packets::battle_trailer());
+        self.sink
+            .send_to(i64::from(session.id), packets::battle_trailer());
         true
     }
 
     fn battle_exists(&self, battle_id: i32) -> bool {
-        self.handles.lock().map(|h| h.contains_key(&battle_id)).unwrap_or(false)
+        self.handles
+            .lock()
+            .map(|h| h.contains_key(&battle_id))
+            .unwrap_or(false)
     }
 
     /// Build the op 0x0B sub-4 join frame: `0BFA` + LE16(diahinh) + `0402` +
@@ -762,12 +789,7 @@ mod tests {
         let mut out = Vec::new();
         let mut collected = 0usize;
         while collected < 200 {
-            match tokio::time::timeout(
-                std::time::Duration::from_millis(1),
-                rx.recv(),
-            )
-            .await
-            {
+            match tokio::time::timeout(std::time::Duration::from_millis(1), rx.recv()).await {
                 Ok(Some(f)) => {
                     out.push(f);
                     collected += 1;
@@ -779,8 +801,7 @@ mod tests {
     }
 
     async fn wait_no_members(service: &Arc<BattleService>) {
-        let deadline =
-            tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
         while tokio::time::Instant::now() < deadline {
             let empty = service
                 .sink
@@ -866,10 +887,7 @@ mod tests {
             service.build_join_frame(&s, battle_id)
         };
         assert!(join.starts_with("F444"));
-        let len_bytes = encoder::u16_le(
-            hex_u8(&join[4..6]),
-            hex_u8(&join[6..8]),
-        ) as usize;
+        let len_bytes = encoder::u16_le(hex_u8(&join[4..6]), hex_u8(&join[6..8])) as usize;
         let payload = &join[8..];
         assert_eq!(
             len_bytes,

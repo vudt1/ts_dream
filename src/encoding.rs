@@ -165,7 +165,7 @@ pub fn viscii_to_unicode(byte: u8) -> char {
         0xCB => '\u{1EBA}', // Ẻ
         0xCE => '\u{0128}', // Ĩ
         0xCF => '\u{1EF3}', // ỳ
-        0xD0 => 'Đ', // smethod_17 addition
+        0xD0 => 'Đ',        // smethod_17 addition
         0xD1 => '\u{1EE9}', // ứ
         0xD5 => '\u{1EA1}', // ạ
         0xD6 => '\u{1EF7}', // ỷ
@@ -173,7 +173,7 @@ pub fn viscii_to_unicode(byte: u8) -> char {
         0xD8 => '\u{1EED}', // ử
         0xDB => '\u{1EF9}', // ỹ
         0xDC => '\u{1EF5}', // ỵ
-        0xDD => 'Đ', // smethod_17 addition
+        0xDD => 'Đ',        // smethod_17 addition
         0xDE => '\u{1EE1}', // ỡ
         0xDF => '\u{01B0}', // ư
         0xE4 => '\u{1EA3}', // ả
@@ -192,7 +192,7 @@ pub fn viscii_to_unicode(byte: u8) -> char {
         0xFC => '\u{1EE7}', // ủ
         0xFE => '\u{1EE3}', // ợ
         0xFF => '\u{1EEE}', // Ữ
-        b => b as char, // Latin-1 pass-through fallback
+        b => b as char,     // Latin-1 pass-through fallback
     }
 }
 
@@ -293,7 +293,10 @@ mod tests {
         // "D¤u Ch¤m Höi" = VISCII 44 A4 75 20 43 68 A4 6D 20 48 F6 69
         let s = "D¤u Ch¤m Höi";
         let v = to_viscii(s);
-        assert_eq!(v, vec![0x44, 0xA4, 0x75, 0x20, 0x43, 0x68, 0xA4, 0x6D, 0x20, 0x48, 0xF6, 0x69]);
+        assert_eq!(
+            v,
+            vec![0x44, 0xA4, 0x75, 0x20, 0x43, 0x68, 0xA4, 0x6D, 0x20, 0x48, 0xF6, 0x69]
+        );
     }
 
     #[test]
@@ -320,10 +323,7 @@ mod tests {
         // §4.6 item 18973 "Thái „t binh pháp": „ U+201E -> "201E" -> bytes 20 1E.
         let g = compute_garble("Thái „t binh pháp").expect("garble name");
         assert!(!g.abort);
-        assert_eq!(
-            g.hex,
-            "5468E16920201E742062696E68207068E170"
-        );
+        assert_eq!(g.hex, "5468E16920201E742062696E68207068E170");
         assert_eq!(
             name_wire_hex(b"", &Some(g.clone())).as_deref(),
             Some("5468E16920201E742062696E68207068E170")
@@ -343,10 +343,7 @@ mod tests {
     fn garble_none_for_clean_names() {
         // Item 10000 "D¤u Ch¤m Höi" — all codepoints ≤ 0xFF → no override.
         assert_eq!(compute_garble("D¤u Ch¤m Höi"), None);
-        assert_eq!(
-            name_wire_hex(&[0x44, 0xA4], &None).as_deref(),
-            Some("44A4")
-        );
+        assert_eq!(name_wire_hex(&[0x44, 0xA4], &None).as_deref(), Some("44A4"));
     }
 
     #[test]
@@ -373,7 +370,7 @@ mod tests {
         // Unmappable positions collapse to '?' (0x3F) exactly like C#.
         assert_eq!(viscii_encode("Ỷ"), vec![0x3F]);
         assert_eq!(viscii_encode("Ẳ"), vec![0x41]); // -> 'A'
-        // ASCII passes through unchanged; CR/LF are preserved.
+                                                    // ASCII passes through unchanged; CR/LF are preserved.
         assert_eq!(viscii_encode("TSVN"), b"TSVN".to_vec());
         assert_eq!(viscii_encode("a\r\nb"), b"a\r\nb".to_vec());
         // "Th¶i gian:" = ờ is 0xB6 (Client.cs:8169 uses ¶ for the banner).

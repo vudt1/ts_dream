@@ -213,7 +213,14 @@ pub fn is_valid_target(pos: GridPos) -> bool {
 pub const COL_ORDER: [u8; 5] = [2, 1, 3, 0, 4];
 
 /// Run one full `GetPosAttack` picker: anchor selection + SLDanh expansion.
-pub fn get_pos_attack(cells: &[CellInfo], myteam: i64, row: u8, col: u8, sl_danh: i64, rule: AnchorRule) -> Vec<GridPos> {
+pub fn get_pos_attack(
+    cells: &[CellInfo],
+    myteam: i64,
+    row: u8,
+    col: u8,
+    sl_danh: i64,
+    rule: AnchorRule,
+) -> Vec<GridPos> {
     let anchor = pick_anchor(cells, myteam, row, col, rule);
     if !is_valid_target(anchor) {
         return Vec::new();
@@ -227,37 +234,86 @@ pub fn get_pos_attack(cells: &[CellInfo], myteam: i64, row: u8, col: u8, sl_danh
 }
 
 /// `GetPosAttack` — default hostile targeting.
-pub fn get_pos_attack_default(cells: &[CellInfo], myteam: i64, row: u8, col: u8, sl_danh: i64) -> Vec<GridPos> {
+pub fn get_pos_attack_default(
+    cells: &[CellInfo],
+    myteam: i64,
+    row: u8,
+    col: u8,
+    sl_danh: i64,
+) -> Vec<GridPos> {
     get_pos_attack(cells, myteam, row, col, sl_danh, AnchorRule::Hostile)
 }
 
 /// `GetPosAttackCombo` — same expansion, combo anchor rule.
-pub fn get_pos_attack_combo(cells: &[CellInfo], myteam: i64, row: u8, col: u8, sl_danh: i64) -> Vec<GridPos> {
+pub fn get_pos_attack_combo(
+    cells: &[CellInfo],
+    myteam: i64,
+    row: u8,
+    col: u8,
+    sl_danh: i64,
+) -> Vec<GridPos> {
     get_pos_attack(cells, myteam, row, col, sl_danh, AnchorRule::Combo)
 }
 
 /// `GetPosAttackTG` — hostile with no type4 exclusion.
-pub fn get_pos_attack_tg(cells: &[CellInfo], myteam: i64, row: u8, col: u8, sl_danh: i64) -> Vec<GridPos> {
-    get_pos_attack(cells, myteam, row, col, sl_danh, AnchorRule::HostileAnyType4)
+pub fn get_pos_attack_tg(
+    cells: &[CellInfo],
+    myteam: i64,
+    row: u8,
+    col: u8,
+    sl_danh: i64,
+) -> Vec<GridPos> {
+    get_pos_attack(
+        cells,
+        myteam,
+        row,
+        col,
+        sl_danh,
+        AnchorRule::HostileAnyType4,
+    )
 }
 
 /// `GetPosAttack3_15` — default hostile rule (same as `get_pos_attack_default`).
-pub fn get_pos_attack_3_15(cells: &[CellInfo], myteam: i64, row: u8, col: u8, sl_danh: i64) -> Vec<GridPos> {
+pub fn get_pos_attack_3_15(
+    cells: &[CellInfo],
+    myteam: i64,
+    row: u8,
+    col: u8,
+    sl_danh: i64,
+) -> Vec<GridPos> {
     get_pos_attack(cells, myteam, row, col, sl_danh, AnchorRule::Hostile)
 }
 
 /// `GetPosAttack_GiaiTru` — any-entity targeting (dispel/cleanse).
-pub fn get_pos_attack_giai_tru(cells: &[CellInfo], myteam: i64, row: u8, col: u8, sl_danh: i64) -> Vec<GridPos> {
+pub fn get_pos_attack_giai_tru(
+    cells: &[CellInfo],
+    myteam: i64,
+    row: u8,
+    col: u8,
+    sl_danh: i64,
+) -> Vec<GridPos> {
     get_pos_attack(cells, myteam, row, col, sl_danh, AnchorRule::Any)
 }
 
 /// `GetPosAttack_Type4` — own-team buffs/heals.
-pub fn get_pos_attack_type4(cells: &[CellInfo], myteam: i64, row: u8, col: u8, sl_danh: i64) -> Vec<GridPos> {
+pub fn get_pos_attack_type4(
+    cells: &[CellInfo],
+    myteam: i64,
+    row: u8,
+    col: u8,
+    sl_danh: i64,
+) -> Vec<GridPos> {
     get_pos_attack(cells, myteam, row, col, sl_danh, AnchorRule::Friendly)
 }
 
 /// `GetPosAttack_honLoan` — own-team splash (berserk).
-pub fn get_pos_attack_hon_loan(cells: &[CellInfo], myteam: i64, row: u8, col: u8, sl_danh: i64) -> Vec<GridPos> {
+pub fn get_pos_attack_hon_loan(
+    cells: &[CellInfo],
+    myteam: i64,
+    row: u8,
+    col: u8,
+    sl_danh: i64,
+) -> Vec<GridPos> {
     get_pos_attack(cells, myteam, row, col, sl_danh, AnchorRule::Friendly)
 }
 
@@ -337,7 +393,11 @@ mod tests {
     #[test]
     fn picker_friendly_targets_own_team() {
         // Heal/buff picks own team; requested cell is friendly.
-        let cells = cells_from(&[(0, 2, 9001, 100, 2), (3, 2, 300001, 100, 1), (3, 1, 300002, 100, 1)]);
+        let cells = cells_from(&[
+            (0, 2, 9001, 100, 2),
+            (3, 2, 300001, 100, 1),
+            (3, 1, 300002, 100, 1),
+        ]);
         let t = get_pos_attack_type4(&cells, 1, 3, 2, 3);
         // Anchor (3,2) then left (3,1) alive.
         assert_eq!(t, vec![GridPos::new(3, 2), GridPos::new(3, 1)]);

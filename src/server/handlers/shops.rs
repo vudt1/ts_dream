@@ -1,8 +1,8 @@
 //! NPC shop buy/sell (Opcode 0x1B) & Player shop (Opcode 0x17 subs 30–33) handlers.
 
+use crate::db::persist;
 use crate::protocol::encoder;
 use crate::server::handler::{HandleOutcome, OpcodeCtx};
-use crate::server::persist;
 use crate::server::session::{Conn, InventoryItem};
 
 /// `F4440A001A04` + gold + `00000000` — the gold-update frame C# sends after
@@ -34,7 +34,12 @@ fn try_sell_range(
         return false;
     }
     for item_id in item_range {
-        if conn.session.homdo.iter().any(|i| i.id == item_id && i.count > 0) {
+        if conn
+            .session
+            .homdo
+            .iter()
+            .any(|i| i.id == item_id && i.count > 0)
+        {
             let removed = conn.session.remove_homdo_item(item_id, u32::from(count));
             conn.session.gold = conn.session.gold.saturating_add(removed);
             out.send(gold_frame(conn.session.gold));
@@ -44,7 +49,6 @@ fn try_sell_range(
     }
     false
 }
-
 
 /// Lookup NPC shop entry by (idtalking, map_id, menu) → (item_id, price).
 /// Source: C# `Update_H1B` (Client.cs:6472–7130), transcribed verbatim.
@@ -235,7 +239,10 @@ pub fn player_shop_catalog_frame(seller: &crate::server::session::Session) -> St
         body.push_str(&encoder::le16(u16::from(item.count)));
         body.push_str(&encoder::le32(listing.price));
         body.push_str(&format!("{:02X}", item.long_val));
-        body.push_str(&format!("{:02X}", (100u16.wrapping_add(u16::from(item.giatri_long))) & 0xFF));
+        body.push_str(&format!(
+            "{:02X}",
+            (100u16.wrapping_add(u16::from(item.giatri_long))) & 0xFF
+        ));
         body.push_str(&format!("{:02X}", item.khang));
         body.push_str(&encoder::le32(item.texp));
         body.push_str(&format!("{:02X}", idx));
@@ -311,11 +318,8 @@ pub fn complete_shop_buy(
     buyer.gold -= total;
     seller.gold = (u64::from(seller.gold).saturating_add(u64::from(total))).min(9_999_999) as u32;
 
-    let removed = crate::server::inventory::remove_item(
-        &mut seller.homdo,
-        seller_item.id,
-        u32::from(count),
-    );
+    let removed =
+        crate::server::inventory::remove_item(&mut seller.homdo, seller_item.id, u32::from(count));
     let moved = removed.min(u32::from(count)) as u8;
 
     if equip {
@@ -381,18 +385,26 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
                     payload[cursor + 3],
                     payload[cursor + 4],
                 );
-                conn.session.shop.items.push(crate::server::session::ShopItem {
-                    slot,
-                    price,
-                    ..Default::default()
-                });
+                conn.session
+                    .shop
+                    .items
+                    .push(crate::server::session::ShopItem {
+                        slot,
+                        price,
+                        ..Default::default()
+                    });
                 items_hex.push_str(&format!("{:02X}", slot));
                 items_hex.push_str(&encoder::le32(price));
                 cursor += 5;
             }
 
             // Self catalog (171E) + broadcast open (171F) to other map clients.
-            let body = format!("{:02X}{}{}", name_len, encoder::strhex(&name_bytes), items_hex);
+            let body = format!(
+                "{:02X}{}{}",
+                name_len,
+                encoder::strhex(&name_bytes),
+                items_hex
+            );
             out.send(crate::protocol::frame("171E", &body));
             if let Some(hub) = hub {
                 let bcast = crate::protocol::frame(
@@ -477,10 +489,7 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
                     }
                 }
                 Err(ShopBuyError::NotEnoughGold { total }) => {
-                    out.send(red_message(&format!(
-                        "Không đủ vàng để mua, cần {}",
-                        total
-                    )));
+                    out.send(red_message(&format!("Không đủ vàng để mua, cần {}", total)));
                 }
                 Err(ShopBuyError::NotEnoughStock) => {
                     out.send(red_message("Người bán không đủ hàng"));
@@ -547,8 +556,7 @@ mod tests {
         let frame = player_shop_catalog_frame(&seller);
         assert_eq!(
             frame,
-            "F44423001721"
-                .to_string()
+            "F44423001721".to_string()
                 + "0000000000000000000000000000000000"
                 + "374E0500B0E5000064961ED204000001"
         );
@@ -647,7 +655,9 @@ mod tests {
         let mut conn = Conn::new();
         conn.session.id = 300001;
         // payload: name_len(4) "TEST" pad slot price(1000)
-        let payload = [4u8, b'T', b'E', b'S', b'T', 0x00, 0x01, 0xE8, 0x03, 0x00, 0x00];
+        let payload = [
+            4u8, b'T', b'E', b'S', b'T', 0x00, 0x01, 0xE8, 0x03, 0x00, 0x00,
+        ];
 
         let data = GameData::default();
         let service = BattleService::new(Arc::new(GameData::default()));
@@ -733,9 +743,17 @@ mod tests {
 
         assert_eq!(conn.session.gold, 41200);
         assert!(conn.session.homdo.iter().any(|i| i.id == 20023));
-        let seller_now = online_sessions().lock().unwrap().get(&300002).unwrap().clone();
+        let seller_now = online_sessions()
+            .lock()
+            .unwrap()
+            .get(&300002)
+            .unwrap()
+            .clone();
         assert_eq!(seller_now.gold, 59800);
-        assert!(seller_now.homdo.iter().any(|i| i.id == 20023 && i.count == 1));
+        assert!(seller_now
+            .homdo
+            .iter()
+            .any(|i| i.id == 20023 && i.count == 1));
         let gold_frame = format!("F4440A001A04{}00000000", encoder::le32(41200));
         assert!(out.outgoing.iter().any(|f| f == &gold_frame));
         online_sessions().lock().unwrap().clear();
@@ -781,7 +799,11 @@ mod tests {
         handle_npc_shop(&mut ctx).await;
 
         assert_eq!(conn.session.gold, 41200);
-        assert!(conn.session.homdo.iter().any(|i| i.id == 20023 && i.count == 1));
+        assert!(conn
+            .session
+            .homdo
+            .iter()
+            .any(|i| i.id == 20023 && i.count == 1));
         let gold_frame = format!("F4440A001A04{}00000000", encoder::le32(41200));
         assert!(out.outgoing.iter().any(|f| f == &gold_frame));
         // Red message ("Khách quan mua hàng thành công") via op 0x02 sub 0x0B.
@@ -891,9 +913,21 @@ mod tests {
         let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[0, 0]);
         handle_npc_shop(&mut ctx).await;
 
-        assert!(conn.session.homdo.iter().any(|i| i.id == 18001 && i.count >= 1));
-        assert!(conn.session.homdo.iter().any(|i| i.id == 27156 && i.count >= 50));
-        assert!(conn.session.homdo.iter().any(|i| i.id == 52015 && i.count >= 50));
+        assert!(conn
+            .session
+            .homdo
+            .iter()
+            .any(|i| i.id == 18001 && i.count >= 1));
+        assert!(conn
+            .session
+            .homdo
+            .iter()
+            .any(|i| i.id == 27156 && i.count >= 50));
+        assert!(conn
+            .session
+            .homdo
+            .iter()
+            .any(|i| i.id == 52015 && i.count >= 50));
         assert_eq!(conn.session.gold, 0);
     }
 }
