@@ -166,6 +166,7 @@ async fn login_db(
     // (Client.cs:8193, §5.6); the shared schema requires the `player_id`
     // predicate (§5.4 note 2). Runs after the stats frame is built so the
     // Logined1 skill list still matches the pre-purge C# output.
-    db::persist::delete_system_skills(Some(pool), conn.session.id).await;
+    // Temporary disabled.
+    // db::persist::delete_system_skills(Some(pool), conn.session.id).await;
     Ok(())
 }
