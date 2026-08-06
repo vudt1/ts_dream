@@ -246,8 +246,9 @@ All changes flow through the `PlayerUpdateDataId` path which emits op 0x08 stat 
 
 ### 2.3.7 Opcode 0x09 — Create character
 
-**Sub 1 (create)** layout:
-`sex(1) | unused(1) | hair(1) | thuoctinh(1) | color(8 raw bytes → hex) | int atk def hpx spx agi (6×1B) | name_len(1B)+name_ascii | 2×{ len(1B) + string } = pass1, pass2`.
+**Sub 1 (create)** layout (`payload` = `decoded[6..]`; C# `Client.cs:1150-1200`):
+`sex(1) | unused(1) | hair(1) | unused(1) | color(8 raw bytes → hex) | thuoctinh(1) | int atk def hpx spx agi (6×1B) | pass1_len(1B) + pass1 | pass2 (len-prefixed)`.
+Byte offsets: `[0]` sex, `[2]` hair (single byte — the byte at `[3]` is an unused gap), `[4..12]` color (8 raw bytes → hex), `[12]` thuoctinh, `[13..19]` the six stats, `[19]` pass1 length, `[20..20+len]` pass1, `[20+len+1..]` pass2. The character **name is not in this packet** — it comes from the name-check (sub 2), which stashes it (`string_1` / `pending_new_char_name`).
 
 Action = **one atomic DB transaction** (§5.6):
 - INSERT `players` row (stats computed; remaining columns rely on DEFAULT).

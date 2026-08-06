@@ -124,7 +124,29 @@ pub async fn create(pool: &MySqlPool, c: &CreateCharacter) -> Result<(), sqlx::E
         .execute(&mut *tx)
         .await?;
 
-    // 4. accounts pass1/pass2 (C# `Data.MemberChangedPass`).
+    // 4. Seed starter Homdo/Trangbi rows (C# NewChar.accdb template). Every
+    // numeric column the item loader reads (Lv/DoBen/Long/GiatriLong/Khang/
+    // Texp) is written explicitly so the row round-trips with non-NULL values.
+    for row in starter_rows() {
+        let Some(table) = item_table(row.table) else {
+            continue;
+        };
+        let q = format!(
+            "INSERT INTO {table} (player_id, Slot, Id, `Count`, Lv, DoBen, Agi1, \
+             `Long`, GiatriLong, Khang, Loai, Texp) VALUES (?, ?, ?, ?, 0, 0, ?, 0, 0, 0, ?, 0)"
+        );
+        sqlx::query(&q)
+            .bind(c.player_id)
+            .bind(row.slot)
+            .bind(row.id)
+            .bind(row.count)
+            .bind(row.agi1)
+            .bind(row.loai)
+            .execute(&mut *tx)
+            .await?;
+    }
+
+    // 5. accounts pass1/pass2 (C# `Data.MemberChangedPass`).
     sqlx::query("UPDATE accounts SET pass1 = ?, pass2 = ? WHERE player_id = ?")
         .bind(c.pass1.as_slice())
         .bind(c.pass2.as_slice())
@@ -140,6 +162,60 @@ pub fn starting_hp_sp(hpx: u8, spx: u8) -> (i64, i64) {
     let hp = get_hp_max(0, 0, 1, i64::from(hpx));
     let sp = get_sp_max(0, 0, 1, i64::from(spx));
     (hp, sp)
+}
+
+/// One starter inventory row a freshly created character owns. Mirrors the C#
+/// `NewChar.accdb` template (`ts_server_old/CSDL/NewChar_init.sql`).
+///
+/// The C# server is per-player-file: it grows a character by copying
+/// `NewChar.accdb`. Because MySQL uses one shared schema (Ch5 §5.4), the Rust
+/// port carries those template rows as data and INSERTs them (scoped by
+/// `player_id`) inside the same atomic create transaction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StarterRow {
+    pub table: &'static str,
+    pub slot: i64,
+    pub id: i64,
+    pub count: i64,
+    pub agi1: i64,
+    pub loai: i64,
+}
+
+/// The starter inventory for a new character (C# `NewChar_init.sql`):
+/// - `Homdo` slot 1: item 32012 × 4 (the starter potion "Đăng các");
+/// - `Trangbi` slot 2: item 19737 × 1, Agi1=1, Loai=2 (the starter armor).
+///
+/// The template's empty `Trangbi` slot-1 row (Id=0) is intentionally omitted:
+/// it carries no stats and loads as a filtered no-op in the session.
+pub fn starter_rows() -> Vec<StarterRow> {
+    vec![
+        StarterRow {
+            table: "homdo",
+            slot: 1,
+            id: 32012,
+            count: 4,
+            agi1: 0,
+            loai: 0,
+        },
+        StarterRow {
+            table: "trangbi",
+            slot: 2,
+            id: 19737,
+            count: 1,
+            agi1: 1,
+            loai: 2,
+        },
+    ]
+}
+
+/// Whitelist the item tables the starter seed may write (never interpolate
+/// client input into `{table}`).
+fn item_table(table: &'static str) -> Option<&'static str> {
+    match table {
+        "homdo" => Some("homdo"),
+        "trangbi" => Some("trangbi"),
+        _ => None,
+    }
 }
 
 /// One `players` row loaded from MySQL (columns aliased to snake_case).
@@ -341,4 +417,30 @@ async fn load_items(
             )
             .collect(),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn starter_rows_match_newchar_template() {
+        // Literals transcribed from ts_server_old/CSDL/NewChar_init.sql — the
+        // two behavioral rows of the NewChar.accdb template.
+        assert_eq!(
+            starter_rows(),
+            vec![
+                StarterRow { table: "homdo", slot: 1, id: 32012, count: 4, agi1: 0, loai: 0 },
+                StarterRow { table: "trangbi", slot: 2, id: 19737, count: 1, agi1: 1, loai: 2 },
+            ]
+        );
+    }
+
+    #[test]
+    fn starter_tables_are_whitelisted_for_insert() {
+        for row in starter_rows() {
+            assert!(item_table(row.table).is_some(), "{} not whitelisted", row.table);
+        }
+        assert!(item_table("tientrang").is_none());
+    }
 }
