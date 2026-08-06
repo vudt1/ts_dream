@@ -203,11 +203,12 @@ const SM17_UNI: &str = "áàảãạăắằẳẵặâấầẩẫậéèẻẽ
 /// each `SM17_UNI` position, as Latin-1 chars. Same length as `SM17_UNI`.
 const SM17_ENC: &str = "áàäãÕå¡¢ÆÇ£â¤¥¦ç§éèë¨©êª«¬\u{ad}®íìïî¸óòöõ÷ô¯°±²µ½¾¶·ÞþúùüûøßÑ×ØæñýÏÖÛÜðÁÀÄÃÁÅ\u{81}‚AAƒÂ„…†\u{06}‡ÉÈËˆ‰ÊŠ‹Œ\u{8d}ÊÍÌ›Î˜ÓÒ???Ô\u{8f}\u{90}‘’´•–—³ÚÙœ\u{9d}Ú¿º»¼ÿ¹ÝŸ???Ð";
 
-/// `smethod_17(s)` — server-authored Unicode → VISCII bytes, byte-exact with
-/// the C# positional table (Class5.cs:420-462). Each char's position in
-/// `SM17_UNI` picks the Latin-1 / VISCII byte in `SM17_ENC`; unmapped chars
-/// pass through (their low byte), and `\r`/`\n` are preserved verbatim.
-pub fn smethod_17(s: &str) -> Vec<u8> {
+/// `viscii_encode(s)` — server-authored Unicode → VISCII bytes, byte-exact
+/// with the C# positional table `smethod_17` (Class5.cs:420-462). Each char's
+/// position in `SM17_UNI` picks the Latin-1 / VISCII byte in `SM17_ENC`;
+/// unmapped chars pass through (their low byte), and `\r`/`\n` are preserved
+/// verbatim.
+pub fn viscii_encode(s: &str) -> Vec<u8> {
     let uni: Vec<char> = SM17_UNI.chars().collect();
     let enc: Vec<char> = SM17_ENC.chars().collect();
     let mut out = Vec::with_capacity(s.len());
@@ -365,19 +366,19 @@ mod tests {
     }
 
     #[test]
-    fn smethod17_maps_vietnamese_unicode() {
+    fn viscii_encode_maps_vietnamese_unicode() {
         // Đ -> 0xD0, ấ -> 0xA4 (research 03 §3.2 verified).
-        assert_eq!(smethod_17("Đ"), vec![0xD0]);
-        assert_eq!(smethod_17("ấ"), vec![0xA4]);
+        assert_eq!(viscii_encode("Đ"), vec![0xD0]);
+        assert_eq!(viscii_encode("ấ"), vec![0xA4]);
         // Unmappable positions collapse to '?' (0x3F) exactly like C#.
-        assert_eq!(smethod_17("Ỷ"), vec![0x3F]);
-        assert_eq!(smethod_17("Ẳ"), vec![0x41]); // -> 'A'
+        assert_eq!(viscii_encode("Ỷ"), vec![0x3F]);
+        assert_eq!(viscii_encode("Ẳ"), vec![0x41]); // -> 'A'
         // ASCII passes through unchanged; CR/LF are preserved.
-        assert_eq!(smethod_17("TSVN"), b"TSVN".to_vec());
-        assert_eq!(smethod_17("a\r\nb"), b"a\r\nb".to_vec());
+        assert_eq!(viscii_encode("TSVN"), b"TSVN".to_vec());
+        assert_eq!(viscii_encode("a\r\nb"), b"a\r\nb".to_vec());
         // "Th¶i gian:" = ờ is 0xB6 (Client.cs:8169 uses ¶ for the banner).
         assert_eq!(
-            smethod_17("Thời gian:"),
+            viscii_encode("Thời gian:"),
             vec![0x54, 0x68, 0xB6, 0x69, 0x20, 0x67, 0x69, 0x61, 0x6E, 0x3A]
         );
     }

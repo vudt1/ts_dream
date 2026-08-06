@@ -1,0 +1,71 @@
+
+<<F4440A00320203020302976561E7
+<<F4440A003202020202029765803D
+
+>>F44402003401 <<F44402000A01
+<<F4440A003202[0302][0302]A4658625
+<<F4440A003202[0202][0302]AA6978EF
+----
+<<F4440B0025013132372E302E302E31
+<<F44402000A01
+<<F44402004203
+Client: 200004 >> Enter Item Mall...
+Client: 200004 >> Click Open GetPoint...
+>>F444060042023F420F000100
+<<F44405004202010201
+Client: 200004 >> Enter Item Mall...
+<<F44405004202010101
+Client: 200004 >> Enter Item Mall...
+<<F44405004202020101
+Client: 200004 >> Enter Item Mall...
+<<F4440900420102010105292800
+Client: 200004 >> Enter Item Mall...
+Client: 200004 >> Buying Item Mall...
+----
+>>F4440C00080119013018000000000000
+>>F4440C0008011A01B90A000000000000
+>>F444040017091801F4440200170F
+
+//use sp item outter battle doubleclick->use
+<<F4440600[17]0F13010000
+>>F4440C0008011A01E10A000000000000
+>>F444040017091301F4440200170F
+
+//use item for other
+<<F4440B001714018069040261B00000
+<<F4440B001714019C69040261B00000
+<<F4440B00171401AD65040261B00000
+//use skill for other [waree]
+<<F4440B00171402FC2A040261B00000
+
+นอนเต้น
+if (num19 == 46167) 
+{ 
+int num20 = homdoInfo6._Count - num18; 
+if (num20 > 0) 
+{ 
+Data.HomdoUpdateItem(this.conn, slot3, DataStructure.Type_Homdo._Count, num20); 
+} 
+else 
+{ 
+DataStructure.HomdoInfo homdo = default(DataStructure.HomdoInfo); 
+Data.HomdoUpdateSlot(this.conn, slot3, homdo); 
+} 
+
+this.Sendpacket("F44402001F0A"); 
+if (this._My_Hp < this._My_HpMax) 
+{ 
+Data.PlayerUpdateDataId(this._My_Id, DataStructure.Type_Player._Hp, this._My_HpMax); 
+
+Data.PetUpdateData(this._My_Id, stt, DataStructure.Type_Pet._Hp, _My_HpMax); 
+} 
+if (this._My_Sp < this._My_SpMax) 
+{ 
+Data.PlayerUpdateDataId(this._My_Id, DataStructure.Type_Player._Sp, this._My_SpMax); 
+
+Data.PetUpdateData(this._My_Id, stt, DataStructure.Type_Pet._Sp, _My_SpMax); 
+
+} 
+} 
+else 
+{

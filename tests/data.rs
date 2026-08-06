@@ -4,8 +4,9 @@
 
 use ts_dream::data::loader::GameData;
 
-// Default data dir as shipped in the repo.
-const DATA_DIR: &str = "ts_server_old/Data";
+// Default data dir as shipped in the repo (the bundled `Data/` the server
+// loads at boot).
+const DATA_DIR: &str = "Data";
 
 fn data_dir() -> std::path::PathBuf {
     // Allow override for environments where the repo is checked out elsewhere.
@@ -74,6 +75,9 @@ fn quests_parse_requires_select_menu() {
         .get("10916:NPC:1:0")
         .expect("10916 NPC 1 step 0 quest");
     assert_eq!(q.require_select_menu, 30);
+    // Absent Level/Reborn keys = no condition (None), never a `= 0` block.
+    assert_eq!(q.require_level, None);
+    assert_eq!(q.require_reborn, None);
 }
 
 #[test]
@@ -207,8 +211,8 @@ fn quests_parse_requires_conditions() {
     // "12021 triệu quảng 7 step 0.ini": Level=20 >=, Reborn=1 >=, SelectMenu=30,
     // TEAMDEF Diahinh=5479 + 10 npcs.
     let q = d.talks.get("12041:NPC:7:0").expect("12041 NPC 7 step 0");
-    assert_eq!(q.require_level, (20, 1));
-    assert_eq!(q.require_reborn, (1, 1));
+    assert_eq!(q.require_level, Some((20, 1)));
+    assert_eq!(q.require_reborn, Some((1, 1)));
     assert_eq!(q.require_select_menu, 30);
     assert_eq!(
         q.teamdef,

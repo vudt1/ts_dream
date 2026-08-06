@@ -16,7 +16,7 @@ fn gold_frame(gold: u32) -> String {
 /// text is mapped through `smethod_17` (§4.4 item 3) so ư/ờ/đ survive as
 /// single-byte VISCII instead of collapsing to `'?'`.
 fn red_message(msg: &str) -> String {
-    let visc = crate::encoding::smethod_17(msg);
+    let visc = crate::encoding::viscii_encode(msg);
     let body = format!("00000000{}", encoder::strhex(&visc));
     crate::protocol::frame("020B", &body)
 }

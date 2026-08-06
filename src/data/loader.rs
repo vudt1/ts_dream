@@ -102,7 +102,10 @@ impl GameData {
         let decoded = String::from_utf16_lossy(&u16s);
         for line in decoded.split('\n') {
             let line = line.trim_end_matches('\r');
-            if line.trim().is_empty() || line.trim().starts_with("//") {
+            if line.trim().is_empty() {
+                break;
+            }
+            if line.trim().starts_with("//") {
                 continue;
             }
             let f: Vec<&str> = line.split('\t').collect();
@@ -149,7 +152,10 @@ impl GameData {
             .map_err(|e| TsError::Data(format!("read {}: {}", path.display(), e)))?;
         for line in text.lines() {
             let line = line.trim_end_matches('\r');
-            if line.trim().is_empty() || line.trim().starts_with("//") {
+            if line.trim().is_empty() {
+                break;
+            }
+            if line.trim().starts_with("//") {
                 continue;
             }
             let f: Vec<&str> = line.split('\t').collect();
@@ -193,7 +199,10 @@ impl GameData {
             .map_err(|e| TsError::Data(format!("read {}: {}", path.display(), e)))?;
         for line in text.lines() {
             let line = line.trim_end_matches('\r');
-            if line.trim().is_empty() || line.trim().starts_with("//") {
+            if line.trim().is_empty() {
+                break;
+            }
+            if line.trim().starts_with("//") {
                 continue;
             }
             let f: Vec<&str> = line.split('\t').collect();
@@ -232,7 +241,10 @@ impl GameData {
             .map_err(|e| TsError::Data(format!("read {}: {}", path.display(), e)))?;
         for line in text.lines() {
             let line = line.trim_end_matches('\r');
-            if line.trim().is_empty() || line.starts_with("//") {
+            if line.trim().is_empty() {
+                break;
+            }
+            if line.starts_with("//") {
                 continue;
             }
             if line.trim().len() < 5 {
@@ -260,7 +272,10 @@ impl GameData {
             .map_err(|e| TsError::Data(format!("read {}: {}", path.display(), e)))?;
         for line in text.lines() {
             let line = line.trim_end_matches('\r');
-            if line.trim().is_empty() || line.starts_with("//") {
+            if line.trim().is_empty() {
+                break;
+            }
+            if line.starts_with("//") {
                 continue;
             }
             if line.trim().len() < 5 {
@@ -288,7 +303,10 @@ impl GameData {
             .map_err(|e| TsError::Data(format!("read {}: {}", path.display(), e)))?;
         for line in text.lines() {
             let line = line.trim_end_matches('\r');
-            if line.trim().is_empty() || line.starts_with("//") {
+            if line.trim().is_empty() {
+                break;
+            }
+            if line.starts_with("//") {
                 continue;
             }
             let f: Vec<&str> = line.split('\t').collect();
@@ -307,7 +325,10 @@ impl GameData {
             .map_err(|e| TsError::Data(format!("read {}: {}", path.display(), e)))?;
         for line in text.lines() {
             let line = line.trim_end_matches('\r');
-            if line.trim().is_empty() || line.starts_with("//") {
+            if line.trim().is_empty() {
+                break;
+            }
+            if line.starts_with("//") {
                 continue;
             }
             let f: Vec<&str> = line.split('\t').collect();
@@ -334,9 +355,13 @@ impl GameData {
         let text = std::fs::read_to_string(path)
             .map_err(|e| TsError::Data(format!("read {}: {}", path.display(), e)))?;
         let mut seen_maps: std::collections::HashSet<i64> = Default::default();
+        let mut seen_keys: std::collections::HashSet<(i64, i64, i64, i64)> = Default::default();
         for line in text.lines() {
             let line = line.trim_end_matches('\r');
-            if line.trim().is_empty() || line.starts_with("//") {
+            if line.trim().is_empty() {
+                break;
+            }
+            if line.starts_with("//") {
                 continue;
             }
             let f: Vec<&str> = line.split('\t').collect();
@@ -358,6 +383,11 @@ impl GameData {
             let x = num_at(3, &f, "ItemOnMap.txt")?;
             let y = num_at(4, &f, "ItemOnMap.txt")?;
             let delay = num_at(5, &f, "ItemOnMap.txt")?;
+            // Duplicate `(mapId, itemId, x, y)` rows are skipped (C# guard
+            // `if (!ItemOnMap.ContainsKey(key))`, Data.cs:5390) — no re-spawn.
+            if !seen_keys.insert((map_id, item_id, x, y)) {
+                continue;
+            }
             self.item_on_map.push(ItemOnMap {
                 map_id,
                 id: slot,
@@ -367,7 +397,8 @@ impl GameData {
                 delay,
             });
             // Spawn the static drop (C# `SystemDropItem(mapid, slot, x, y,
-            // itemId, 999999)`): copies the item's stats, `_Delay=999999`.
+            // itemId, 999999)`): copies the item's full stats, `_Delay=999999`,
+            // `_Gold=3` (Data.cs:5278-5345).
             let item = self
                 .items
                 .get(&item_id)
@@ -379,7 +410,9 @@ impl GameData {
                 map_x: x,
                 map_y: y,
                 delay: 999_999,
+                count: 1,
                 lv: item.level,
+                doben: 0,
                 int1: item.int1,
                 atk1: item.atk1,
                 def1: item.def1,
@@ -387,10 +420,23 @@ impl GameData {
                 spx1: item.spx1,
                 agi1: item.agi1,
                 fai1: item.fai1,
+                int2: item.int2,
+                atk2: item.atk2,
+                def2: item.def2,
+                hpx2: item.hpx2,
+                spx2: item.spx2,
+                agi2: item.agi2,
+                fai2: item.fai2,
                 hp: item.hp,
                 sp: item.sp,
+                long_val: 0,
+                giatri_long: 0,
+                khang: 0,
                 thuoctinh: item.thuoctinh,
+                giatri_thuoctinh: item.value,
                 loai: item.loai,
+                texp: 0,
+                gold: 3,
             };
             self.item_drop_on_map.insert((map_id, slot), drop);
         }
@@ -571,10 +617,11 @@ fn parse_tuples(s: &str, file: &str) -> Result<Vec<(i64, i64, i64)>> {
 
 /// `[REQUIRES] Level/Reborn` — `value\top`; operator index per C#
 /// `genTalkInfoCondition` (Data.cs:6054-6067): `["=",">=",">","<=","<","!="]`
-/// → 0..5. Absent → `(0, 0)`.
-fn parse_condition(s: &str, file: &str) -> Result<(i64, i64)> {
+/// → 0..5. Absent key → `None` (C# returns the empty `int[0]` = no condition,
+/// NOT a `= 0` requirement).
+fn parse_condition(s: &str, file: &str) -> Result<Option<(i64, i64)>> {
     if s == NOTHING || s.trim().is_empty() {
-        return Ok((0, 0));
+        return Ok(None);
     }
     let mut it = s.split('\t');
     let value = it.next().unwrap_or("").trim().parse::<i64>().map_err(|_| {
@@ -583,7 +630,7 @@ fn parse_condition(s: &str, file: &str) -> Result<(i64, i64)> {
     let op = it.next().unwrap_or("").trim();
     let ops = ["=", ">=", ">", "<=", "<", "!="];
     let op_index = ops.iter().position(|&o| o == op).map(|i| i as i64).unwrap_or(-1);
-    Ok((value, op_index))
+    Ok(Some((value, op_index)))
 }
 
 /// `[REQUIRES] Quests` — tab-separated `mapId-npcId-warpId-step` tuples

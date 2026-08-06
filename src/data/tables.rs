@@ -140,10 +140,11 @@ pub struct QuestDef {
     pub on_lose: QuestResult,
     /// `[REQUIRES] SelectMenu` — the menu choice that must be set (0 if absent).
     pub require_select_menu: i64,
-    /// `[REQUIRES] Level` — `(value, opIndex)`; op 0 `=` 1 `>=` 2 `>` 3 `<=` 4 `<` 5 `!=`.
-    pub require_level: (i64, i64),
-    /// `[REQUIRES] Reborn` — `(value, opIndex)`.
-    pub require_reborn: (i64, i64),
+    /// `[REQUIRES] Level` — `Some((value, opIndex))`; op 0 `=` 1 `>=` 2 `>`
+    /// 3 `<=` 4 `<` 5 `!=`. `None` = key absent = no requirement (C# `int[0]`).
+    pub require_level: Option<(i64, i64)>,
+    /// `[REQUIRES] Reborn` — `Some((value, opIndex))`, `None` when absent.
+    pub require_reborn: Option<(i64, i64)>,
     /// `[REQUIRES] Thuoctinh` — element 1..4 (0 if absent).
     pub require_thuoctinh: i64,
     /// `[REQUIRES] Quests` — `(mapId, npcId, warpId, step)` tuples.
@@ -215,8 +216,8 @@ pub struct ItemOnMap {
 /// A spawned static drop (`Data.ItemDropOnMap`), created by `CreatMapItem`.
 ///
 /// Pre-filled as empty slots 1..255 per map; each ItemOnMap.txt row spawns one
-/// with a full copy of the item's stats (C# `SystemDropItem`) and `_Delay =
-/// 999999` (never auto-removed). Keyed `(map_id, slot)`.
+/// with a full copy of the item's stats (C# `SystemDropItem`, Data.cs:5278-5345)
+/// and `_Delay = 999999` (never auto-removed). Keyed `(map_id, slot)`.
 #[derive(Debug, Clone, Default)]
 pub struct ItemDropOnMap {
     pub map_id: i64,
@@ -225,8 +226,10 @@ pub struct ItemDropOnMap {
     pub map_x: i64,
     pub map_y: i64,
     pub delay: i64,
+    pub count: i64,
     /// The spawned item carries a copy of `Data_Items` stats (C# `_ItemDropOnMap`).
     pub lv: i64,
+    pub doben: i64,
     pub int1: i64,
     pub atk1: i64,
     pub def1: i64,
@@ -234,10 +237,24 @@ pub struct ItemDropOnMap {
     pub spx1: i64,
     pub agi1: i64,
     pub fai1: i64,
+    pub int2: i64,
+    pub atk2: i64,
+    pub def2: i64,
+    pub hpx2: i64,
+    pub spx2: i64,
+    pub agi2: i64,
+    pub fai2: i64,
     pub hp: i64,
     pub sp: i64,
+    pub long_val: i64,
+    pub giatri_long: i64,
+    pub khang: i64,
     pub thuoctinh: i64,
+    pub giatri_thuoctinh: i64,
     pub loai: i64,
+    pub texp: i64,
+    /// C# always sets `_Gold = 3` on spawned drops (Data.cs:5341).
+    pub gold: i64,
 }
 
 pub fn name_to_string(name: &[u8]) -> String {

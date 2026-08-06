@@ -12,7 +12,8 @@ use ts_dream::web::server_control::ServerControl;
 /// `map_drops` registry (C# `SystemDropItem`, Data.cs:5278-5345). The C#
 /// broadcast fires with no clients during boot — a no-op we do not repeat.
 fn seed_static_drops(data: &GameData) {
-    for drop in data.item_drop_on_map.values().filter(|d| d.item_id != 0) {
+    let spawned: Vec<_> = data.item_drop_on_map.values().filter(|d| d.item_id != 0).collect();
+    for drop in &spawned {
         let item = ts_dream::server::session::InventoryItem {
             slot: drop.slot as u8,
             id: drop.item_id as u16,
@@ -37,10 +38,7 @@ fn seed_static_drops(data: &GameData) {
             drop.map_y as u16,
         );
     }
-    tracing::info!(
-        "seeded {} static map drops into the drop registry",
-        data.item_drop_on_map.values().filter(|d| d.item_id != 0).count()
-    );
+    tracing::info!("seeded {} static map drops into the drop registry", spawned.len());
 }
 
 #[tokio::main]
@@ -69,8 +67,10 @@ async fn main() -> anyhow::Result<()> {
     // 3. Shared AppState
     let app_state = Arc::new(RwLock::new(AppState::new(cfg.perexp_default)));
 
-    // 4. Load static data (DataLoaded gate).
-    let data = match GameData::load(&cfg.data_dir) {
+    // 4. Load static data (DataLoaded gate). `resolve_data_dir` prefers the
+    //    configured path (repo `./Data/`), then the exe-adjacent build.rs copy.
+    let data_dir = cfg.resolve_data_dir();
+    let data = match GameData::load(&data_dir) {
         Ok(d) => Arc::new(d),
         Err(e) => {
             tracing::warn!("static data loading failed: {e}; running with empty GameData");
@@ -78,11 +78,12 @@ async fn main() -> anyhow::Result<()> {
         }
     };
     tracing::info!(
-        "data loaded: {} npcs, {} items, {} skills, {} talks",
+        "data loaded: {} npcs, {} items, {} skills, {} talks (data_dir={})",
         data.npcs.len(),
         data.items.len(),
         data.skills.len(),
-        data.talks.len()
+        data.talks.len(),
+        data_dir.display()
     );
 
     // Set DataLoaded flag in AppState

@@ -197,7 +197,7 @@ pub fn chat_frame(sub: u8, id: u32, chat_raw: &[u8]) -> String {
 /// Vietnamese becomes single-byte VISCII on the wire (Đ→0xD0, not `'?'`), the
 /// same path the C# server uses for banners and `/where` (Class5.smethod_17).
 fn text_banner(op: &str, msg: &str) -> String {
-    let visc = crate::encoding::smethod_17(msg);
+    let visc = crate::encoding::viscii_encode(msg);
     let mut body = String::from("00000000");
     body.push_str(&encoder::strhex(&visc));
     crate::protocol::frame(op, &body)
@@ -215,7 +215,7 @@ pub fn announce_frame(msg: &str) -> String {
 
 /// Build server name packet (op 0x27 sub 0x09).
 pub fn server_name_frame(id: u32, server_name: &str) -> String {
-    let visc = crate::encoding::smethod_17(server_name);
+    let visc = crate::encoding::viscii_encode(server_name);
     let name_len = visc.len() as u8;
     let mut body = String::new();
     body.push_str(&encoder::le32(id));

@@ -6,7 +6,7 @@
 
 use crate::error::{Result, TsError};
 use serde::Deserialize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
@@ -83,6 +83,36 @@ impl Config {
         }
         Ok(cfg)
     }
+
+    /// Resolve the runtime static-data directory (Chapter 3 §3.0).
+    ///
+    /// Returns the first existing candidate:
+    /// 1. the configured `data_dir` as-is (absolute, or relative to the CWD —
+    ///    the bundled repo-root `Data/`),
+    /// 2. the same relative path next to the current executable (the
+    ///    `build.rs`-packaged `Data/` shipped beside the binary),
+    /// 3. otherwise the configured path unchanged (the caller reports it).
+    pub fn resolve_data_dir(&self) -> PathBuf {
+        let exe_dir = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|d| d.to_path_buf()));
+        Self::resolve_data_dir_with(&self.data_dir, exe_dir)
+    }
+
+    /// Candidate resolution, injectable for tests (no `current_exe()`).
+    fn resolve_data_dir_with(data_dir: &Path, exe_dir: Option<PathBuf>) -> PathBuf {
+        if data_dir.exists() {
+            return data_dir.to_path_buf();
+        }
+        if let Some(exe) = exe_dir {
+            // `Path::join` with an absolute `data_dir` yields `data_dir` itself.
+            let candidate = exe.join(data_dir);
+            if candidate.exists() {
+                return candidate;
+            }
+        }
+        data_dir.to_path_buf()
+    }
 }
 
 /// Read + validate + parse a TOML file (no env overrides). Rejects the removed
@@ -144,5 +174,45 @@ mod tests {
         let cfg = from_file(&path).unwrap();
         assert_eq!(cfg.game_port, 7000);
         assert_eq!(cfg.web_port, 8100);
+    }
+
+    #[test]
+    fn resolve_data_dir_prefers_existing_configured_path() {
+        let dir = tempfile::tempdir().unwrap();
+        // An absolute data_dir that exists is returned unchanged.
+        let cfg = Config {
+            data_dir: dir.path().to_path_buf(),
+            ..Config::default()
+        };
+        assert_eq!(cfg.resolve_data_dir(), dir.path().to_path_buf());
+    }
+
+    #[test]
+    fn resolve_data_dir_falls_back_to_exe_adjacent_bundle() {
+        let dir = tempfile::tempdir().unwrap();
+        let exe_dir = dir.path().join("bin");
+        std::fs::create_dir_all(&exe_dir).unwrap();
+        // The build.rs-packaged `Data/` sits next to the executable.
+        let bundled = exe_dir.join("bundle");
+        std::fs::create_dir_all(&bundled).unwrap();
+
+        // The configured relative path does NOT exist in the CWD here, but the
+        // exe-adjacent one does -> resolve to `exe_dir/bundle`.
+        let got = Config::resolve_data_dir_with(
+            &std::path::PathBuf::from("bundle"),
+            Some(exe_dir),
+        );
+        assert_eq!(got, bundled);
+    }
+
+    #[test]
+    fn resolve_data_dir_returns_configured_when_none_exist() {
+        // Neither the configured path nor an exe-adjacent bundle exists ->
+        // the configured path is returned unchanged (caller reports it).
+        let got = Config::resolve_data_dir_with(
+            &std::path::PathBuf::from("does-not-exist-data"),
+            None,
+        );
+        assert_eq!(got, std::path::PathBuf::from("does-not-exist-data"));
     }
 }
