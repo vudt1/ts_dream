@@ -17,9 +17,21 @@ async fn golden_scenarios_replay_byte_exact() {
 }
 
 /// Re-capture helper: rewrites the synchronous golden files from the current
-/// handler output. Ignored by default; run manually when behaviour changes.
+/// handler output. Ignored by default AND gated behind `TS_REGENERATE_GOLDENS=1`
+/// so it can never be run accidentally (Ch9 §9.4).
+///
+/// The golden files are the byte-level contract: they must come from analysis
+/// of the C# `Logined1`/handlers (or a real C#↔client capture), never blindly
+/// regenerated from the Rust output — otherwise the diff gate degrades into
+/// "Rust diffs against itself" and stops guarding actual wire parity.
 #[tokio::test]
 #[ignore]
 async fn regenerate_goldens() {
+    assert!(
+        std::env::var("TS_REGENERATE_GOLDENS").is_ok(),
+        "regeneration is gated behind TS_REGENERATE_GOLDENS=1; re-run with \
+         the env var set, and diff the result against the C# reference before \
+         committing"
+    );
     common::regenerate("golden", "Golden scenario (ticket 23, Ch9)").await;
 }

@@ -276,6 +276,23 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn hello_with_sub_byte_is_silent() {
+        let mut conn = Conn::new();
+        // op 0x00 with a sub byte and empty payload is NOT the exact
+        // `F444010000` frame — anything else must be silently ignored (§2.3.1).
+        let decoded = encoder::bytes("F44402000000").unwrap();
+        let out = dispatch(
+            &mut conn,
+            &decoded,
+            &dummy_data(),
+            &dummy_service(),
+            &ServerEnv::none(),
+        )
+        .await;
+        assert!(out.outgoing.is_empty());
+    }
+
+    #[tokio::test]
     async fn login_version_too_low_causes_shutdown() {
         let mut conn = Conn::new();
         // Login payload with version 100 (< 186): opcode 0x01 sub 0x01 id=1 prefix="vn" ver=100 pass="123"
@@ -306,6 +323,10 @@ mod tests {
         .await;
         assert_eq!(out.outgoing, vec!["F44402000106"]);
         assert!(!out.shutdown);
+        assert!(
+            !conn.session.authed,
+            "auth flag must only be set once login succeeds (wrong pass)"
+        );
     }
 
     #[tokio::test]

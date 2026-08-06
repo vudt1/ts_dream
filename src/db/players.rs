@@ -361,17 +361,19 @@ async fn load_hotkeys(pool: &MySqlPool, s: &mut Session) -> Result<(), sqlx::Err
 
 async fn load_pets(pool: &MySqlPool, s: &mut Session) -> Result<(), sqlx::Error> {
     let id = i64::from(s.id);
-    s.pets = sqlx::query_as::<_, (i64, i64, Option<String>)>(
-        "SELECT Stt AS stt, Id AS id, HEX(Name) AS name_hex FROM pet WHERE player_id = ?",
+    s.pets = sqlx::query_as::<_, (i64, i64, Option<String>, i64)>(
+        "SELECT Stt AS stt, Id AS id, HEX(Name) AS name_hex, Quest AS quest \
+         FROM pet WHERE player_id = ?",
     )
     .bind(id)
     .fetch_all(pool)
     .await?
     .into_iter()
-    .map(|(stt, pet_id, name_hex)| {
+    .map(|(stt, pet_id, name_hex, quest)| {
         let mut p = PetState {
             stt: stt as u8,
             id: pet_id as u16,
+            quest: quest as u8,
             ..Default::default()
         };
         if let Some(h) = name_hex {

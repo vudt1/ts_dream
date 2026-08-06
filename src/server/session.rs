@@ -51,6 +51,7 @@ pub struct PetState {
     pub fai: u16,
     pub texp: u32,
     pub skill_point: u16,
+    pub quest: u8,
     pub skills: [(u16, u8); 4],
 }
 

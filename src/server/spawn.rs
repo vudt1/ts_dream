@@ -86,9 +86,10 @@ pub fn player_appear(
     body.push_str(&format!("{:02X}{:02X}", reborn, job));
     body.push_str(&encoder::strhex(name));
 
-    // Frame: F444 + len + 03 03 + body. len counts bytes after the header,
-    // i.e. 2 (opcode/sub) + body_len.
-    crate::protocol::frame("0303", &body)
+    // Frame: F444 + len + 03 + body. The C# Logined1 emits a single opcode
+    // byte `03` (no sub byte — Client.cs:8060), so len counts 1 + body_len,
+    // i.e. `33 + equipped*2 + nameLen` (§2.4.1 step 2).
+    crate::protocol::frame("03", &body)
 }
 
 /// Stats frame — op 0x05 sub 0x03 (Logined  step 3). `skills_hex` = the
@@ -134,7 +135,8 @@ pub fn stats(
         encoder::le32(texp),
         encoder::le16(skill_point),
         encoder::le16(point),
-        encoder::le16(tiengtam),
+        // C# Logined1 emits Tiengtam via `smethod_12` = LE32 (Client.cs:8061).
+        encoder::le32(u32::from(tiengtam)),
         encoder::le16(hp_max),
         encoder::le16(sp_max),
         encoder::le32(atk2),
@@ -241,6 +243,84 @@ pub fn store_frame(point: u32) -> String {
     crate::protocol::frame("2304", &body)
 }
 
+/// Pet summary frames (C# `Data.SendStatusAllPet`, Logined1 step 5).
+///
+/// Emits **nothing** when the player owns no active pet (C# guards on
+/// `text.Length > 0`). With pets (stt 1..4, id > 0) it builds the `0F08`
+/// per-pet stat entries, the `0F14` slot summary, and the fixed stable-open
+/// trailer — byte-for-byte the C# layout (Client.cs / Data.SendStatusAllPet).
+pub fn pet_summary(s: &Session) -> Vec<String> {
+    let mut stats = String::new();
+    let mut slots = String::new();
+
+    let active: Vec<&crate::server::session::PetState> = s
+        .pets
+        .iter()
+        .filter(|p| (1..=4).contains(&p.stt) && p.id > 0)
+        .collect();
+
+    for p in active {
+        let stt = p.stt;
+        let lv_skill = [
+            p.skills.first().map(|x| x.1).unwrap_or(0),
+            p.skills.get(1).map(|x| x.1).unwrap_or(0),
+            p.skills.get(2).map(|x| x.1).unwrap_or(0),
+            p.skills.get(3).map(|x| x.1).unwrap_or(0),
+        ];
+        stats.push_str(&format!("{:02X}", stt));
+        stats.push_str(&encoder::le32(u32::from(p.id)));
+        stats.push_str(&encoder::le32(p.texp));
+        stats.push_str(&format!("{:02X}", p.level));
+        stats.push_str(&encoder::le16(p.hp));
+        stats.push_str(&encoder::le16(p.sp));
+        stats.push_str(&encoder::le16(p.int1));
+        stats.push_str(&encoder::le16(p.atk));
+        stats.push_str(&encoder::le16(p.def));
+        stats.push_str(&encoder::le16(p.agi));
+        stats.push_str(&encoder::le16(p.hpx));
+        stats.push_str(&encoder::le16(p.spx));
+        stats.push_str("00"); // reserved byte
+        stats.push_str(&format!("{:02X}{:02X}", p.fai, p.quest));
+        stats.push_str(&encoder::le16(p.skill_point));
+        stats.push_str(&format!("{:02X}", p.name.len()));
+        stats.push_str(&encoder::strhex(&p.name));
+        stats.push_str(&format!("{:02X}{:02X}{:02X}", lv_skill[0], lv_skill[1], lv_skill[2]));
+        // 6 pet-equipment slots (Trangbi rows `stt*10+1..=stt*10+6`), each
+        // `le32(id) + 000000000000`.
+        for sub in 1..=6u16 {
+            let slot = (stt as u16) * 10 + sub;
+            let eq_id = s
+                .trangbi
+                .iter()
+                .find(|i| u16::from(i.slot) == slot)
+                .map(|i| i.id)
+                .unwrap_or(0);
+            stats.push_str(&encoder::le32(u32::from(eq_id)));
+            stats.push_str("000000000000");
+        }
+        stats.push_str("00000000000000"); // 7 reserved bytes
+        stats.push_str(&format!("{:02X}", lv_skill[3]));
+        stats.push_str("00000000"); // 4 reserved bytes
+
+        slots.push_str(&format!("{:02X}0000", stt));
+    }
+
+    if stats.is_empty() {
+        return Vec::new();
+    }
+
+    vec![
+        crate::protocol::frame("0F08", &stats),
+        crate::protocol::frame("0F14", &slots),
+        "F44402000F0A".to_string(),
+        "F44405000F12010000".to_string(),
+        "F44405000F12020000".to_string(),
+        "F44405000F12030000".to_string(),
+        "F44405000F12040000".to_string(),
+        "F44404000F130100".to_string(),
+    ]
+}
+
 /// Build the full 22-step `Logined1` sequence frames for a logged-in session,
 /// sourced from the session's actual state (props, stats, inventory, gold,
 /// hotkeys, stores) so it matches a real C# `Logined1` byte-for-byte.
@@ -303,10 +383,9 @@ pub fn build_logined_sequence_session(s: &Session) -> Vec<String> {
 
     // 4. Step 4: SendPlayerOnline — broadcast to the map, owned by the server loop.
 
-    // 5. Step 5: Pet summary (0x0F08/0F14/0F0A).
-    frames.push("F44402000F08".to_string());
-    frames.push("F44402000F14".to_string());
-    frames.push("F44402000F0A".to_string());
+    // 5. Step 5: Pet summary (0x0F08/0F14 + trailer) — only when pets exist
+    //    (C# `SendStatusAllPet` sends nothing for a petless character).
+    frames.extend(pet_summary(s));
 
     // 6. Step 6: Party frames (none for new login).
 
@@ -387,6 +466,78 @@ pub fn logined_sequence(ok: Vec<String>, _id: u32) -> HandleOutcome {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pet_summary_empty_for_petless_session() {
+        let s = Session::new();
+        assert!(pet_summary(&s).is_empty(), "C# sends no pet frames with no pets");
+    }
+
+    #[test]
+    fn pet_summary_builds_0f08_0f14_for_active_pet() {
+        let mut s = Session::new();
+        s.pets.push(crate::server::session::PetState {
+            stt: 1,
+            id: 15001,
+            name: b"PET1".to_vec(),
+            level: 2,
+            hp: 100,
+            sp: 50,
+            int1: 10,
+            atk: 20,
+            def: 30,
+            agi: 40,
+            hpx: 50,
+            spx: 60,
+            fai: 70,
+            texp: 1234,
+            skill_point: 5,
+            quest: 0,
+            skills: [(10001, 1), (0, 0), (0, 0), (0, 0)],
+            ..Default::default()
+        });
+        // Pet equipment lives in the Trangbi table at slot `stt*10+1` (11).
+        s.trangbi.push(crate::server::session::InventoryItem {
+            slot: 11,
+            id: 20001,
+            ..Default::default()
+        });
+
+        let frames = pet_summary(&s);
+        assert_eq!(frames.len(), 8);
+        // 0F14 slot summary: stt(01) + 0000 → 3 bytes → length 0x05.
+        assert_eq!(frames[1], "F44405000F14010000");
+        assert_eq!(frames[2], "F44402000F0A");
+        assert_eq!(frames[3], "F44405000F12010000");
+        assert_eq!(frames[4], "F44405000F12020000");
+        assert_eq!(frames[5], "F44405000F12030000");
+        assert_eq!(frames[6], "F44405000F12040000");
+        assert_eq!(frames[7], "F44404000F130100");
+
+        // 0F08: fixed prefix `00` + stt, id le32, texp le32.
+        assert!(frames[0].starts_with("F444"));
+        assert!(frames[0].contains("01993A0000D2040000"), "got {}", frames[0]);
+        assert!(frames[0].contains("50455431"), "pet name PET1 embedded: {}", frames[0]);
+        // Pet equipment slot 1 id (20001 = 0x4E21) + 6 zero bytes.
+        assert!(frames[0].contains("214E0000"), "pet equip id: {}", frames[0]);
+    }
+
+    #[test]
+    fn pet_summary_skips_stable_slots_and_id_zero() {
+        let mut s = Session::new();
+        // Stable slot (stt 7) and a zero-id pet must not appear.
+        s.pets.push(crate::server::session::PetState {
+            stt: 7,
+            id: 15002,
+            ..Default::default()
+        });
+        s.pets.push(crate::server::session::PetState {
+            stt: 2,
+            id: 0,
+            ..Default::default()
+        });
+        assert!(pet_summary(&s).is_empty());
+    }
 
     #[test]
     fn session_offline_frame_is_leave_hide_packet() {

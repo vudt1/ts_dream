@@ -15,12 +15,11 @@ use crate::server::spawn;
 use crate::web::server_control::{ClientSender, ServerControl};
 use sqlx::MySqlPool;
 
-/// Op 0x00 — Hello: exact opcode 0x00 with length 1 and no sub byte.
+/// Op 0x00 — Hello: reply only to the exact `F444010000` frame (opcode 0x00,
+/// length 1, no sub byte). Anything else is silently ignored (§2.3.1).
 pub fn handle_hello(ctx: &mut OpcodeCtx) {
-    let out = &mut ctx.out;
-    let payload = ctx.payload;
-    if payload.is_empty() {
-        out.send(spawn::HELLO_REPLY);
+    if ctx.decoded.len() == 5 && ctx.payload.is_empty() {
+        ctx.out.send(spawn::HELLO_REPLY);
     }
 }
 
@@ -46,7 +45,10 @@ pub async fn handle_login(ctx: &mut OpcodeCtx<'_>) {
     let password = &payload[8..];
     conn.session.id = acc_id;
     conn.session.pending_pass = password.to_vec();
-    conn.session.authed = true;
+    // `authed` is set only once auth succeeds — never before the password /
+    // account / double-login gates (a failed or partial login must not leave a
+    // connection in an authenticated state).
+    conn.session.authed = false;
 
     match ctx.env.pool {
         Some(pool) => {
@@ -65,6 +67,7 @@ pub async fn handle_login(ctx: &mut OpcodeCtx<'_>) {
             {
                 out.send(spawn::LOGIN_CREATE_CHAR);
             } else {
+                conn.session.authed = true;
                 conn.session.logined = true;
                 if conn.session.name.is_empty() {
                     conn.session.name = conn.session.pending_new_char_name.clone();
