@@ -11,13 +11,13 @@ pub fn handle_expressions(ctx: &mut OpcodeCtx) {
     match sub {
         1 => {
             if let Some(&action) = payload.first() {
-                out.send(spawn::expression_frame(conn.session.id, 1, action));
+                out.broadcast(conn.session.id, spawn::expression_frame(conn.session.id, 1, action));
             }
         }
         2 => {
             if let Some(&action) = payload.first() {
                 conn.session.dongtac = action;
-                out.send(spawn::expression_frame(conn.session.id, 2, action));
+                out.broadcast(conn.session.id, spawn::expression_frame(conn.session.id, 2, action));
             }
         }
         3 => {

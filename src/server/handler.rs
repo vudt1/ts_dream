@@ -39,6 +39,19 @@ impl<'a> ServerEnv<'a> {
     }
 }
 
+/// A map-scoped broadcast frame (op 0x06 move, op 0x20 expressions). The
+/// connection loop (`ServerControl::broadcast_map`) delivers `frame` to every
+/// other player on `subject`'s map whose id is not `subject`, so the owner
+/// never receives its own move/expression (C# `SendToAllClientMapid` skips
+/// `client._My_Id == _Id`). P1/P2/P3 of issue 08.
+#[derive(Debug, Clone)]
+pub struct MapBroadcast {
+    /// The entity the frame is about (used to exclude the owner from its own
+    /// broadcast and, in the follow flow, co-locates on the origin's map).
+    pub subject: u32,
+    pub frame: String,
+}
+
 /// Result of handling one decoded frame.
 #[derive(Debug, Default, Clone)]
 pub struct HandleOutcome {
@@ -46,11 +59,22 @@ pub struct HandleOutcome {
     pub shutdown: bool,
     /// If set, a TEAMDEF battle should be triggered after processing.
     pub battle_trigger: Option<crate::server::handlers::quest::BattleTrigger>,
+    pub map_broadcast: Vec<MapBroadcast>,
 }
 
 impl HandleOutcome {
     pub fn send(&mut self, frame: impl Into<String>) {
         self.outgoing.push(frame.into());
+    }
+
+    /// Queue a map-scoped broadcast frame owned by `subject`. The fan-out is
+    /// performed by the connection loop (`ServerControl::broadcast_map`), which
+    /// never sends the frame back to `subject` or to other maps.
+    pub fn broadcast(&mut self, subject: u32, frame: impl Into<String>) {
+        self.map_broadcast.push(MapBroadcast {
+            subject,
+            frame: frame.into(),
+        });
     }
 }
 
@@ -123,8 +147,8 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         // Op 0x02 — Chat & slash commands
         0x02 => chat::handle_chat(ctx).await,
 
-        // Op 0x05, 0x06 — Move
-        0x05 | 0x06 => movement::handle_move(ctx),
+        // Op 0x06 — Move
+        0x06 => movement::handle_move(ctx),
 
         // Op 0x08 — Stat allocation
         0x08 => stats::handle_stat_allocation(ctx).await,
@@ -240,6 +264,7 @@ pub fn test_ctx<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::server::session::Session;
 
     fn dummy_data() -> GameData {
         let mut data = GameData::default();
@@ -383,8 +408,12 @@ mod tests {
         assert_eq!(conn.session.map_x, 100);
         assert_eq!(conn.session.map_y, 200);
         assert_eq!(conn.session.gocnhin, 2);
-        assert_eq!(out.outgoing.len(), 1);
-        assert!(out.outgoing[0].starts_with("F4440B000601"));
+        // The walk is a map broadcast — never echoed to the mover itself (C#
+        // `SendToAllClientMapid` skips `client._My_Id == subject`).
+        assert!(out.outgoing.is_empty(), "mover must not receive its own walk");
+        assert_eq!(out.map_broadcast.len(), 1);
+        assert_eq!(out.map_broadcast[0].subject, 300001, "subject is the mover");
+        assert!(out.map_broadcast[0].frame.starts_with("F4440B000601"));
     }
 
     #[tokio::test]
@@ -402,6 +431,7 @@ mod tests {
         )
         .await;
         assert!(out.outgoing.is_empty(), "move must be ignored in battle");
+        assert!(out.map_broadcast.is_empty());
     }
 
     #[tokio::test]
@@ -419,14 +449,15 @@ mod tests {
             &ServerEnv::none(),
         )
         .await;
-        assert_eq!(
-            out.outgoing.len(),
-            3,
-            "leader + 2 members each broadcast a walk"
-        );
-        assert!(out.outgoing[0].starts_with("F4440B000601E1930400"));
-        assert!(out.outgoing[1].starts_with("F4440B000601E2930400")); // member 300002
-        assert!(out.outgoing[2].starts_with("F4440B000601E3930400")); // member 300003
+        // Leader + 2 members → 3 map-broadcast walks; none echoed to the mover.
+        assert!(out.outgoing.is_empty(), "mover must not receive its own walk");
+        assert_eq!(out.map_broadcast.len(), 3);
+        assert_eq!(out.map_broadcast[0].subject, 300001);
+        assert_eq!(out.map_broadcast[1].subject, 300002);
+        assert_eq!(out.map_broadcast[2].subject, 300003);
+        assert!(out.map_broadcast[0].frame.starts_with("F4440B000601E1930400"));
+        assert!(out.map_broadcast[1].frame.starts_with("F4440B000601E2930400")); // member 300002
+        assert!(out.map_broadcast[2].frame.starts_with("F4440B000601E3930400")); // member 300003
     }
 
     #[tokio::test]
@@ -444,6 +475,67 @@ mod tests {
         )
         .await;
         assert!(out.outgoing.is_empty(), "member does not self-broadcast");
+        assert!(out.map_broadcast.is_empty(), "member sends no walks at all");
+    }
+
+    #[tokio::test]
+    async fn leader_move_persists_member_positions() {
+        // P4: C# `Walked(member)` persists the member's new position
+        // (`PlayerUpdateDataId`); the shared online registry must follow.
+        {
+            let mut sessions = crate::server::session::online_sessions().lock().unwrap();
+            sessions.insert(300002, Session::new());
+            sessions.insert(300003, Session::new());
+        }
+        let mut conn = Conn::new();
+        conn.session.id = 300001;
+        conn.session.id_leader = 300001;
+        conn.session.id_mem = [300002, 300003, 0, 0];
+        let move_decoded = encoder::bytes("F44407000601026400C800").unwrap();
+        let _out = dispatch(
+            &mut conn,
+            &move_decoded,
+            &dummy_data(),
+            &dummy_service(),
+            &ServerEnv::none(),
+        )
+        .await;
+
+        let sessions = crate::server::session::online_sessions().lock().unwrap();
+        let mem1 = sessions.get(&300002).expect("member 300002 online");
+        assert_eq!(mem1.map_x, 100);
+        assert_eq!(mem1.map_y, 200);
+        assert_eq!(mem1.gocnhin, 2);
+        let mem2 = sessions.get(&300003).expect("member 300003 online");
+        assert_eq!(mem2.map_x, 100);
+        assert_eq!(mem2.map_y, 200);
+        assert_eq!(mem2.gocnhin, 2);
+        drop(sessions);
+
+        // Cleanup so parallel tests never see the seeded members.
+        let mut sessions = crate::server::session::online_sessions().lock().unwrap();
+        sessions.remove(&300002);
+        sessions.remove(&300003);
+    }
+
+    #[tokio::test]
+    async fn op_005_is_not_routed_to_move() {
+        // P5: the spec lists only op 0x06 as Move; 0x05 (stats/appearance) must
+        // not be fed into handle_move (a sub-1 0x05 frame would otherwise walk).
+        let mut conn = Conn::new();
+        conn.session.id = 300001;
+        let decoded = encoder::bytes("F44407000501026400C800").unwrap();
+        let out = dispatch(
+            &mut conn,
+            &decoded,
+            &dummy_data(),
+            &dummy_service(),
+            &ServerEnv::none(),
+        )
+        .await;
+        assert!(out.outgoing.is_empty());
+        assert!(out.map_broadcast.is_empty());
+        assert_eq!(conn.session.map_x, Session::new().map_x, "position untouched");
     }
 
     #[tokio::test]
@@ -461,7 +553,11 @@ mod tests {
         )
         .await;
         assert_eq!(conn.session.dongtac, 5);
-        assert_eq!(out.outgoing, vec!["F44407002002E193040005"]);
+        // Map broadcast only — never echoed to the actor.
+        assert!(out.outgoing.is_empty());
+        assert_eq!(out.map_broadcast.len(), 1);
+        assert_eq!(out.map_broadcast[0].subject, 300001);
+        assert_eq!(out.map_broadcast[0].frame, "F44407002002E193040005");
     }
 
     #[tokio::test]

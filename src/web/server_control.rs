@@ -214,14 +214,55 @@ impl ServerControl {
         true
     }
 
-    /// Send `hex_frame` to every registered client except `from_id`
-    /// (map-broadcast fan-out for move/expressions).
+    /// Send `hex_frame` to every registered client except `from_id` (used by
+    /// chat/inventory/shop handlers that broadcast directly).
     pub async fn broadcast_except(&self, from_id: u32, hex_frame: &str) {
         let clients = self.clients.lock().await;
         for (player_id, tx) in clients.iter() {
             if *player_id != from_id {
                 if let Err(_) = tx.send(hex_frame.to_string()) {
                     tracing::debug!("Failed to send broadcast to player {player_id}");
+                }
+            }
+        }
+    }
+
+    /// Map-scoped fan-out for move/expression frames (C# `SendToAllClientMapid`).
+    ///
+    /// Every `MapBroadcast` is delivered to each registered client on the same
+    /// map as `from_id` whose id differs from the broadcast's `subject`, so:
+    /// - the origin never receives its own walk/expression (P1),
+    /// - a party member never receives the walk addressed to itself (P2),
+    /// - players on other maps receive nothing (P3).
+    ///
+    /// Scope keys on the origin's map (not each subject's map): in the party
+    /// follow flow members are co-located with the leader, so the two sets are
+    /// identical; a member warped to another map leaves the party.
+    pub async fn broadcast_map(&self, from_id: u32, frames: &[handler::MapBroadcast]) {
+        let same_map_ids: Vec<u32> = {
+            let sessions = online_sessions().lock().unwrap();
+            let Some(from) = sessions.get(&from_id) else {
+                return; // no map scope → nothing to fan out
+            };
+            sessions
+                .iter()
+                .filter(|(pid, s)| **pid != from_id && s.map_id == from.map_id)
+                .map(|(pid, _)| *pid)
+                .collect()
+        };
+        if same_map_ids.is_empty() {
+            return;
+        }
+        let clients = self.clients.lock().await;
+        for b in frames {
+            for pid in &same_map_ids {
+                if *pid == b.subject {
+                    continue;
+                }
+                if let Some(tx) = clients.get(pid) {
+                    if tx.send(b.frame.clone()).is_err() {
+                        tracing::debug!("Failed to send map broadcast to player {pid}");
+                    }
                 }
             }
         }
@@ -246,16 +287,6 @@ impl ServerControl {
         self.broadcast_except(player_id, &hide).await;
         self.unregister_client(player_id).await;
         online_sessions().lock().unwrap().remove(&player_id);
-    }
-}
-
-/// True when a decoded frame must be fanned out to other players on the same
-/// map: move (op 0x06 sub 0x01) and expressions/actions (op 0x20).
-fn is_map_broadcast(decoded: &[u8]) -> bool {
-    match decoded.get(4).copied().unwrap_or(0) {
-        0x06 => decoded.get(5).copied().unwrap_or(0) == 1,
-        0x20 => true,
-        _ => false,
     }
 }
 
@@ -324,10 +355,8 @@ async fn handle_client_connection(
                             for f in &out.outgoing {
                                 let _ = tx.send(f.clone());
                             }
-                            if is_map_broadcast(&decoded) {
-                                for f in &out.outgoing {
-                                    control.broadcast_except(id, f).await;
-                                }
+                            if !out.map_broadcast.is_empty() {
+                                control.broadcast_map(id, &out.map_broadcast).await;
                             }
                             if conn.session.logined && logined_id == 0 && id > 0 {
                                 logined_id = id;
@@ -449,6 +478,123 @@ mod tests {
             "F4440B000601FFFFFFFF026400C800",
             "peer receives the broadcast"
         );
+    }
+
+    #[tokio::test]
+    async fn broadcast_map_scopes_to_same_map_and_skips_subjects() {
+        // P2 + P3: each `(subject, frame)` goes only to clients on the source's
+        // map whose id != subject — nobody receives their own move/expression.
+        let c = control();
+        let (tx1, mut rx1) = mpsc::unbounded_channel::<String>(); // 300001 map 12001
+        let (tx2, mut rx2) = mpsc::unbounded_channel::<String>(); // 300002 map 12001
+        let (tx3, mut rx3) = mpsc::unbounded_channel::<String>(); // 300003 map 13001
+        c.login_register(300001, &tx1).await;
+        c.login_register(300002, &tx2).await;
+        c.login_register(300003, &tx3).await;
+        {
+            let mut sessions = online_sessions().lock().unwrap();
+            sessions.insert(
+                300001,
+                crate::server::session::Session {
+                    map_id: 12001,
+                    ..Default::default()
+                },
+            );
+            sessions.insert(
+                300002,
+                crate::server::session::Session {
+                    map_id: 12001,
+                    ..Default::default()
+                },
+            );
+            sessions.insert(
+                300003,
+                crate::server::session::Session {
+                    map_id: 13001,
+                    ..Default::default()
+                },
+            );
+        }
+
+        // Leader 300001 walks self + member 300002.
+        c.broadcast_map(
+            300001,
+            &[
+                handler::MapBroadcast {
+                    subject: 300001,
+                    frame: "F4440B000601E1930400026400C800".into(),
+                },
+                handler::MapBroadcast {
+                    subject: 300002,
+                    frame: "F4440B000601E2930400026400C800".into(),
+                },
+            ],
+        )
+        .await;
+
+        // Same-map peer 300002: gets leader's walk, NOT its own walk.
+        assert_eq!(
+            rx2.try_recv().unwrap(),
+            "F4440B000601E1930400026400C800"
+        );
+        assert_eq!(
+            rx2.try_recv(),
+            Err(mpsc::error::TryRecvError::Empty),
+            "member must not receive its own walk"
+        );
+        // Different map 300003: nothing.
+        assert_eq!(
+            rx3.try_recv(),
+            Err(mpsc::error::TryRecvError::Empty),
+            "other map receives nothing"
+        );
+        // The origin 300001 receives nothing at all (no self-echo).
+        assert_eq!(
+            rx1.try_recv(),
+            Err(mpsc::error::TryRecvError::Empty),
+            "origin excluded"
+        );
+
+        let mut sessions = online_sessions().lock().unwrap();
+        sessions.remove(&300001);
+        sessions.remove(&300002);
+        sessions.remove(&300003);
+    }
+
+    #[tokio::test]
+    async fn broadcast_map_is_noop_without_online_source() {
+        // An unregistered source has no map scope → no fan-out.
+        let c = control();
+        let (tx2, mut rx2) = mpsc::unbounded_channel::<String>();
+        c.login_register(300002, &tx2).await;
+        {
+            let mut sessions = online_sessions().lock().unwrap();
+            sessions.insert(
+                300002,
+                crate::server::session::Session {
+                    map_id: 12001,
+                    ..Default::default()
+                },
+            );
+        }
+
+        c.broadcast_map(
+            300001,
+            &[handler::MapBroadcast {
+                subject: 300001,
+                frame: "F4440B000601E1930400026400C800".into(),
+            }],
+        )
+        .await;
+
+        assert_eq!(
+            rx2.try_recv(),
+            Err(mpsc::error::TryRecvError::Empty),
+            "no broadcast when the source has no online session"
+        );
+
+        let mut sessions = online_sessions().lock().unwrap();
+        sessions.remove(&300002);
     }
 
     #[tokio::test]

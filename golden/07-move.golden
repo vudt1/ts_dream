@@ -1,4 +1,4 @@
 // Golden scenario (ticket 23, Ch9)
+// A solo mover receives no frames back: C# `Walked` → `SendToAllClientMapid`
+// skips the walk's own subject, and there are no peers on the map (P1 fix).
 <<F44407000601026400C800
-
->>F4440B000601E1930400026400C800
