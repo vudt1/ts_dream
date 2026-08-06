@@ -76,23 +76,3 @@ pub async fn redeem(
         count: row.count,
     }))
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn redeems_compile_with_expected_timescale() {
-        // `chrono::Utc::now().timestamp()` is i64 unix seconds; matches the
-        // migration's `used_at BIGINT`. A compile-time invariant guard.
-        let _: i64 = chrono::Utc::now().timestamp();
-        assert!(
-            Redeem {
-                item_id: 1,
-                count: 1
-            }
-            .count
-                == 1
-        );
-    }
-}

@@ -144,27 +144,25 @@ pub async fn handle_account_mgmt(ctx: &mut OpcodeCtx<'_>) {
             let code_str = String::from_utf8_lossy(code).into_owned();
             let pass_str = String::from_utf8_lossy(password).into_owned();
 
-            let reward = match ctx.env.pool {
-                Some(pool) => crate::db::item_code::redeem(
-                    pool,
-                    i64::from(conn.session.id),
-                    &code_str,
-                    &pass_str,
-                )
-                .await
-                .ok()
-                .flatten(),
-                None => {
-                    // Golden replay (no live DB): a deterministic demo gift.
-                    Some(crate::db::item_code::Redeem {
-                        item_id: 20002,
-                        count: 1,
-                    })
+            // MySQL is mandatory for redeem (Ch5 §5.5): no no-DB degrade branch.
+            // Without a live pool the handler is a no-op (golden replay has no
+            // item_code source); a real DB error is distinguishable from an
+            // invalid/used code instead of being swallowed as "invalid".
+            let redeem = match ctx.env.pool {
+                Some(pool) => {
+                    crate::db::item_code::redeem(
+                        pool,
+                        i64::from(conn.session.id),
+                        &code_str,
+                        &pass_str,
+                    )
+                    .await
                 }
+                None => Ok(None),
             };
 
-            match reward {
-                Some(r) => {
+            match redeem {
+                Ok(Some(r)) => {
                     let gift = InventoryItem {
                         slot: 0,
                         id: r.item_id as u16,
@@ -177,10 +175,13 @@ pub async fn handle_account_mgmt(ctx: &mut OpcodeCtx<'_>) {
                     out.send(sys_msg_frame("Nhan ma qua tang thanh cong!"));
                     out.send(conn.session.dump_homdo());
                 }
-                None => {
+                Ok(None) => {
                     out.send(sys_msg_frame(
                         "Ma qua tang khong hop le hoac da duoc su dung!",
                     ));
+                }
+                Err(_) => {
+                    out.send(sys_msg_frame("Loi he thong khi nhan ma qua tang!"));
                 }
             }
         }
