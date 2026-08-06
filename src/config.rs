@@ -84,7 +84,7 @@ impl Config {
         Ok(cfg)
     }
 
-    /// Resolve the runtime static-data directory (Chapter 3 §3.0).
+    /// Resolve the runtime static-data directory (Chapter 8 Config / §8.3).
     ///
     /// Returns the first existing candidate:
     /// 1. the configured `data_dir` as-is (absolute, or relative to the CWD —

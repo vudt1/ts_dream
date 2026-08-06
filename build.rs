@@ -1,7 +1,7 @@
 //! Package the bundled static `Data/` next to the produced binary.
 //!
-//! A `cargo build` must ship the game data with the executable (Chapter 3
-//! §3.0): the runtime resolves the directory via `Config::resolve_data_dir`,
+//! A `cargo build` must ship the game data with the executable (Chapter 8
+//! Config): the runtime resolves the directory via `Config::resolve_data_dir`,
 //! preferring the CWD `./Data`, then the bundle beside the current executable.
 //!
 //! Cargo places the final binary in `<target>/<profile>/`, while `OUT_DIR` is
