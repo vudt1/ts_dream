@@ -22,8 +22,11 @@ pub const SERVER_NAME: &str = "TSVN";
 /// Maximum level (Data.cs:72).
 pub const MAX_LEVEL: i64 = 200;
 
-/// Server/admin id threshold (Client.cs): ids below are treated as admin.
-pub const ADMIN_ID_THRESHOLD: u32 = 300012;
+// (Disabled — the admin role was removed; every account is a player. C#
+// `Client.isAdmin()` (Client.cs:10163-10170) treated ids below 300012 as
+// server/admin. Account ids start at 300000 (`AUTO_INCREMENT`). Kept only as
+// reference; do not re-enable without reintroducing a role system.)
+// pub const ADMIN_ID_THRESHOLD: u32 = 300012;
 
 pub mod codec;
 pub mod encoder;

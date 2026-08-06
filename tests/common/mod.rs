@@ -152,14 +152,6 @@ pub fn all_scenarios() -> Vec<Scenario<'static>> {
             },
         ),
         Scenario::new(
-            "11-warp",
-            game_data(),
-            vec!["F4440D0002022F77617270203132303031".to_string()],
-            |c| {
-                c.session.id = 300001;
-            },
-        ),
-        Scenario::new(
             "12-quest-h6",
             quest_data(),
             vec!["F444040014010100".to_string(), "F4440300140600".to_string()],
