@@ -162,5 +162,10 @@ async fn login_db(
     conn.session.authed = true;
     let seq = spawn::build_logined_sequence_session(&conn.session);
     out.outgoing.extend(seq);
+    // C# Logined1 purges the basic `Skill` rows (Id 0..9) at its tail
+    // (Client.cs:8193, §5.6); the shared schema requires the `player_id`
+    // predicate (§5.4 note 2). Runs after the stats frame is built so the
+    // Logined1 skill list still matches the pre-purge C# output.
+    db::persist::delete_system_skills(Some(pool), conn.session.id).await;
     Ok(())
 }

@@ -205,6 +205,34 @@ pub async fn delete_reborn_skills(pool: Option<&MySqlPool>, player_id: u32) {
     }
 }
 
+/// Scoped login-time skill purge (see [`delete_system_skills`]). The `player_id`
+/// predicate is mandatory in the shared schema (§5.4 note 2) — a verbatim C#
+/// port (`DELETE FROM Skill WHERE Id >= 0 AND Id <= 9`) would wipe every player.
+pub const DELETE_SYSTEM_SKILLS_SQL: &str =
+    "DELETE FROM skill WHERE player_id = ? AND Id >= 0 AND Id <= 9";
+
+/// Purges the system/basic `Skill` rows (`Id 0..9`) at the tail of every login,
+/// mirroring C# `Logined1` (`Client.cs:8193` — "DELETE FROM Skill WHERE
+/// Id >= 0 AND Id <= 9", §5.4 note 2 / §5.6). These rows are transient UI/system
+/// skills that get re-derived on the next read; in the shared MySQL schema the
+/// DELETE must be scoped by `player_id` (per-file cleanup became per-row).
+///
+/// Ordering matches C#: the DELETE runs *after* the Logined1 stats frame is
+/// built (which still shows the pre-purge skill list), so the handler calls
+/// this at the very end of the successful login path.
+///
+/// No-op when `pool` is `None` (golden replay never touches the DB).
+pub async fn delete_system_skills(pool: Option<&MySqlPool>, player_id: u32) {
+    let Some(pool) = pool else { return };
+    if let Err(e) = sqlx::query(DELETE_SYSTEM_SKILLS_SQL)
+        .bind(i64::from(player_id))
+        .execute(pool)
+        .await
+    {
+        tracing::warn!("delete_system_skills(player {player_id}) failed: {e}");
+    }
+}
+
 /// Upserts a pet entry in MySQL `pet` table.
 pub async fn upsert_pet(
     pool: Option<&MySqlPool>,
@@ -257,5 +285,25 @@ pub async fn upsert_pet(
         .await
     {
         tracing::warn!("upsert_pet(stt {}) failed: {e}", pet.stt);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// §5.4 note 2: every ported DELETE over the 9 gameplay tables must carry a
+    /// `player_id` predicate — the C# verbatim (`WHERE Id >= 0 AND Id <= 9`)
+    /// would clear every player's basic skills in the shared schema.
+    #[test]
+    fn delete_system_skills_is_player_scoped() {
+        assert!(
+            DELETE_SYSTEM_SKILLS_SQL.contains("player_id = ?"),
+            "skill purge must be player-scoped: {DELETE_SYSTEM_SKILLS_SQL}"
+        );
+        assert!(
+            DELETE_SYSTEM_SKILLS_SQL.contains("Id >= 0 AND Id <= 9"),
+            "must mirror the C# Logined1 predicate: {DELETE_SYSTEM_SKILLS_SQL}"
+        );
     }
 }
