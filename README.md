@@ -48,7 +48,7 @@ cargo build --release
 
 | Biến | Mặc định | Ý nghĩa |
 | --- | --- | --- |
-| `TS_GAME_PORT` | `6414` | Port TCP game server |
+| `TS_GAME_PORT` | `6414` | Port TCP game server - không được thay đổi|
 | `TS_WEB_PORT` | `8090` | Port web admin dashboard |
 | `TS_DATA_DIR` | `./Data` | Thư mục dữ liệu tĩnh (`ts_server_old/Data/`) |
 | `TS_DATABASE_URL` | `mysql://user:pass@localhost:3306/ts_dream` | Chuỗi kết nối MySQL |
