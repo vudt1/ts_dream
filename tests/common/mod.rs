@@ -61,6 +61,25 @@ pub fn use_item_data() -> GameData {
     data
 }
 
+/// Data fixture with a learnable player skill (element 1, point 1).
+pub fn skill_data() -> GameData {
+    let mut data = GameData::default();
+    data.skills.insert(
+        10001,
+        ts_dream::data::tables::Skill {
+            id: 10001,
+            name: "Earth Skill".to_string(),
+            sp: 1,
+            point: 1,
+            thuoctinh: 1,
+            lv_max: 10,
+            reborn: 0,
+            ..Default::default()
+        },
+    );
+    data
+}
+
 fn create_char_frame() -> String {
     let mut payload = vec![0u8; 26];
     payload[0] = 1; // sex
@@ -207,13 +226,24 @@ pub fn all_scenarios() -> Vec<Scenario<'static>> {
                 c.session.hpx = 0;
             },
         ),
-        Scenario::new(
+Scenario::new(
             "17-hotkey",
             game_data(),
             // C2S op 0x28 sub 0x01: data[7..8]=skill (0x2711), data[9]=slot 3.
             vec!["F4440600280100112703".to_string()],
             |c| {
                 c.session.id = 300001;
+            },
+        ),
+        Scenario::new(
+            "18-skill-learn",
+            skill_data(),
+            // C2S op 0x1C sub 1: pair {skill le16, target lv} → learn 10001 to 1.
+            vec!["F44405001C01112701".to_string()],
+            |c| {
+                c.session.id = 300001;
+                c.session.skill_point = 5;
+                c.session.thuoctinh = 1; // Earth
             },
         ),
     ]

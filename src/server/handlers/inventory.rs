@@ -8,6 +8,7 @@ use crate::server::handler::{hex_of, HandleOutcome, OpcodeCtx};
 use crate::server::handlers::stats::build_stat_update;
 use crate::server::map_drops;
 use crate::server::session::{Conn, InventoryItem};
+use std::sync::Arc;
 
 /// Pickup range (C# `Update_H17` case 2: `-150 <= dx <= 150`, same for dy).
 const PICKUP_RANGE: i32 = 150;
@@ -34,7 +35,7 @@ pub async fn handle_inventory(ctx: &mut OpcodeCtx<'_>) {
         // Sub 15: Use item
         15 => handle_use_item(conn, payload, out, pool, ctx.data).await,
         // Sub 46: Player reborn
-        46 => handle_reborn(conn, payload, out, pool).await,
+        46 => handle_reborn(conn, payload, out, ctx.data, pool).await,
         _ => {}
     }
 }
@@ -390,6 +391,7 @@ async fn handle_reborn(
     conn: &mut Conn,
     payload: &[u8],
     out: &mut HandleOutcome,
+    data: &crate::data::loader::GameData,
     pool: Option<&sqlx::MySqlPool>,
 ) {
     // Requires no equipment in trangbi slots 1..6
@@ -477,6 +479,33 @@ async fn handle_reborn(
     persist::delete_reborn_skills(pool, conn.session.id).await;
 
     out.send("F44402002C01");
+
+    // C# reborn tail (Client.cs:5730-5752): replay the current talk's OnWin,
+    // bump quest step 59411 to 2, send the reborn dialog packet, then the
+    // character "dies" (socket closed) — `BattleQuestWin` / `QuestUpdateDataNpc`.
+    let idtalking = conn.session.idtalking;
+    if idtalking > 0 {
+        let mut frames = Vec::new();
+        let mut member =
+            |_mem: i64| -> Option<Arc<tokio::sync::RwLock<crate::server::session::Session>>> {
+                None
+            };
+        crate::server::handlers::quest::battle_quest_win_talk(
+            &mut conn.session,
+            idtalking,
+            data,
+            &mut frames,
+            &mut member,
+        );
+        for f in frames {
+            out.send(f);
+        }
+    }
+    conn.session.quest_steps.retain(|(n, _)| *n != 59411);
+    conn.session.quest_steps.push((59411, 2));
+    conn.session.select_menu = 40;
+    out.send("F4441100140100000001010302000000000000F476");
+    out.shutdown = true;
 }
 #[cfg(test)]
 mod tests {
@@ -732,5 +761,11 @@ mod tests {
         assert_eq!(conn.session.skills.len(), 1);
         assert_eq!(conn.session.skills[0], (10016, 10)); // special skill retained
         assert!(out.outgoing.contains(&"F44402002C01".to_string()));
+        assert!(
+            out.outgoing
+                .contains(&"F4441100140100000001010302000000000000F476".to_string())
+        );
+        assert!(out.shutdown, "reborn closes the socket (death, Client.cs:5751)");
+        assert_eq!(conn.session.quest_steps, vec![(59411, 2)]);
     }
 }

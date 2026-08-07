@@ -1,0 +1,12 @@
+// Golden scenario (ticket 10, Ch2 §2.3.6)
+// Stat allocation op 0x08 sub 1. C# `Update_H8`/`PlayerUpdateDataId`: each
+// allocation emits Point (Type_Status 0x26) then the allocated stat packet.
+// Case 27 (Int): Point + Int. Case 31 (Hpx): Point + Hpx — the Hpmax recompute
+// updates in-memory only, no packet (C# Data.cs:275-278).
+<<F4440600080100001B02
+
+<<F4440600080100001F02
+>>F4440C00080126010800000000000000
+>>F4440C0008011B010200000000000000
+>>F4440C00080126010600000000000000
+>>F4440C0008011F010200000000000000

@@ -99,10 +99,36 @@ pub fn battle_quest_win(
     if idtalking <= 0 {
         return false;
     }
-    let key = format!("{}:NPC:{}:0", session.map_id, idtalking);
-    let quest = match data.talks.get(&key) {
-        Some(q) => q,
-        None => return false,
+    let quest = data.talks.get(&format!("{}:NPC:{}:0", session.map_id, idtalking));
+    battle_quest_win_impl(session, data, frames, member, quest)
+}
+
+/// Same OnWin runner as [`battle_quest_win`], but resolved against the *current
+/// talk* NPC (`idtalking`) — the C# `BattleQuestWin(Client, Key_Talk)` entry
+/// used by the player-reborn flow (Client.cs:5730-5744 / Data.cs:5812).
+pub fn battle_quest_win_talk(
+    session: &mut Session,
+    idtalking: i32,
+    data: &GameData,
+    frames: &mut Vec<String>,
+    member: &mut dyn FnMut(i64) -> Option<Arc<tokio::sync::RwLock<Session>>>,
+) -> bool {
+    if idtalking <= 0 {
+        return false;
+    }
+    let quest = data.talks.get(&format!("{}:NPC:{}:0", session.map_id, idtalking));
+    battle_quest_win_impl(session, data, frames, member, quest)
+}
+
+fn battle_quest_win_impl(
+    session: &mut Session,
+    data: &GameData,
+    frames: &mut Vec<String>,
+    member: &mut dyn FnMut(i64) -> Option<Arc<tokio::sync::RwLock<Session>>>,
+    quest: Option<&crate::data::tables::QuestDef>,
+) -> bool {
+    let Some(quest) = quest else {
+        return false;
     };
     let result = &quest.on_win;
 

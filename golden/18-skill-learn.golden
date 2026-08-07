@@ -1,0 +1,9 @@
+// Golden scenario (ticket 13, Ch2 §2.3.17)
+// Player skill learn op 0x1C sub 1: learn skill 10001 (element 1) to level 1
+// with SkillPoint=5. C# `Update_H1C` case 1 (Client.cs:7138-7243): each
+// success emits `F4440C0008016E01`+le32(lv)+le32(skill), then the final
+// `SendSkillPointtoClient` frame with the remaining SkillPoint (4).
+<<F44405001C01112701
+
+>>F4440C0008016E010100000011270000
+>>F4440C00080125010400000000000000

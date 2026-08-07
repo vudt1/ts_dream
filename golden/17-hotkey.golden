@@ -1,0 +1,4 @@
+// Golden scenario (ticket 10, Ch2 §2.3.25)
+// Hotkey / skill bar op 0x28 sub 0x01. C# `Update_H28`: data[7..8]=skill,
+// data[9]=slot → SkillSaveUpdateId; NO response frame (Client.cs:7669-7684).
+<<F4440600280100112703

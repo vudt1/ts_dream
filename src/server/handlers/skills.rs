@@ -1,5 +1,7 @@
 //! Learn / upgrade skills (Opcode 0x1C) & Pet Reborn (Opcode 0x2C) handlers.
 
+use crate::battle::rng::DotNetRandom;
+use crate::data::tables::Npc;
 use crate::db::persist;
 use crate::protocol::encoder;
 use crate::server::handler::{HandleOutcome, OpcodeCtx};
@@ -28,6 +30,55 @@ pub fn get_point_skill_add(player_element: u8, skill_element: i64, base_point: i
     } else {
         base_point as u16
     }
+}
+
+/// A pet base stat the reborn bonus points can land on.
+#[derive(Clone, Copy, PartialEq)]
+enum PetStatKind {
+    Int,
+    Atk,
+    Def,
+    Hpx,
+    Spx,
+    Agi,
+}
+
+/// Weighted random stat pick — C# `Data.GetRandomPointPet` (Data.cs:98-155).
+///
+/// Consumes 7 `.NET` draws per call in the exact C# order: 6 tie-break
+/// `Next(1,999)` (one per stat, Int→Agi) + 1 selection `Next(1,1000)`.
+fn random_point_stat(rng: &mut DotNetRandom, npc: &Npc) -> PetStatKind {
+    let raw = [
+        (npc.int1, PetStatKind::Int),
+        (npc.atk, PetStatKind::Atk),
+        (npc.def, PetStatKind::Def),
+        (npc.hpx, PetStatKind::Hpx),
+        (npc.spx, PetStatKind::Spx),
+        (npc.agi, PetStatKind::Agi),
+    ];
+    let total: i64 = raw.iter().map(|(v, _)| *v).sum();
+    if total <= 0 {
+        return PetStatKind::Atk; // C# default `result = "Atk"`
+    }
+    let mut rows: Vec<(i64, i64, PetStatKind)> = raw
+        .into_iter()
+        .map(|(v, kind)| {
+            let w = ((v as f64 / total as f64) * 1000.0).round() as i64;
+            let r = i64::from(rng.next_range(1, 999));
+            (w, r, kind)
+        })
+        .collect();
+    // Sort `Point ASC, Random DESC` (Data.cs:122).
+    rows.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| b.1.cmp(&a.1)));
+    let num7 = rng.next_range(1, 1000);
+    let mut acc = 0i64;
+    for (w, _, kind) in &rows {
+        if i64::from(num7) <= acc + *w {
+            return *kind;
+        }
+        acc += *w;
+    }
+    rows.last().map(|(_, _, k)| *k).unwrap_or(PetStatKind::Atk)
 }
 
 /// Dispatch Opcode 0x1C — Learn / upgrade skills.
@@ -222,6 +273,7 @@ async fn handle_pet_skill_upgrade(
 /// Handle Opcode 0x2C — Pet Reborn.
 pub async fn handle_pet_reborn(ctx: &mut OpcodeCtx<'_>) {
     let pool = ctx.env.pool;
+    let hub = ctx.env.hub;
     let data = ctx.data;
     let conn = &mut ctx.conn;
     let out = &mut ctx.out;
@@ -292,27 +344,39 @@ pub async fn handle_pet_reborn(ctx: &mut OpcodeCtx<'_>) {
 
     let bonus_points = (u16::from(pet_lv).saturating_sub(u16::from(threshold))) / 5;
 
+    // C# `RebornPet` snapshots the NPC base stats (Client.cs:9893-9895) BEFORE
+    // the bonus distribution and derives HpMax/SpMax from them (Data.cs:9958-9959);
+    // the boosted values are stored to the stat columns after.
+    let base_hpx = new_npc.hpx as u16;
+    let base_spx = new_npc.spx as u16;
     let mut int_val = new_npc.int1 as u16;
     let mut atk_val = new_npc.atk as u16;
     let mut def_val = new_npc.def as u16;
-    let mut hpx_val = new_npc.hpx as u16;
-    let mut spx_val = new_npc.spx as u16;
+    let mut hpx_val = base_hpx;
+    let mut spx_val = base_spx;
     let mut agi_val = new_npc.agi as u16;
 
-    // Distribute bonus points
-    for i in 0..bonus_points {
-        match i % 6 {
-            0 => int_val += 1,
-            1 => atk_val += 1,
-            2 => def_val += 1,
-            3 => hpx_val += 1,
-            4 => spx_val += 1,
-            _ => agi_val += 1,
+    // Distribute bonus points via the weighted `GetRandomPointPet` draw
+    // (Data.cs:9961-9990), NOT a fixed rotation. Fresh time-seeded RNG mirrors
+    // the C# global `Data.random_0` (non-deterministic, so not golden-covered).
+    let mut rng = DotNetRandom::time_seeded();
+    for _ in 0..bonus_points {
+        match random_point_stat(&mut rng, new_npc) {
+            PetStatKind::Int => int_val += 1,
+            PetStatKind::Atk => atk_val += 1,
+            PetStatKind::Def => def_val += 1,
+            PetStatKind::Hpx => hpx_val += 1,
+            PetStatKind::Spx => spx_val += 1,
+            PetStatKind::Agi => agi_val += 1,
         }
     }
 
-    let hp_max = crate::battle::engine::get_hp_max(new_npc.reborn, 0, 1, i64::from(hpx_val)) as u16;
-    let sp_max = crate::battle::engine::get_sp_max(new_npc.reborn, 0, 1, i64::from(spx_val)) as u16;
+    // Pet HpMax/SpMax map the reborn level onto the player formula:
+    // `getPetHpMax/getPetSpMax` (Data.cs:5569-5603): rb 0/1 → getXmax(0), rb 2 →
+    // getXmax(1), all at level 1 and from the BASE stats.
+    let rb_map = if new_npc.reborn == 2 { 1 } else { 0 };
+    let hp_max = crate::battle::engine::get_hp_max(rb_map, 0, 1, i64::from(base_hpx)) as u16;
+    let sp_max = crate::battle::engine::get_sp_max(rb_map, 0, 1, i64::from(base_spx)) as u16;
 
     let pet = &mut conn.session.pets[pet_pos];
     pet.id = new_npc.id as u16;
@@ -347,39 +411,22 @@ pub async fn handle_pet_reborn(ctx: &mut OpcodeCtx<'_>) {
     let player_id_le = encoder::le32(conn.session.id);
     let pet_id_le = encoder::le32(pet.id as u32);
 
-    out.send(format!("F44407000F02{}{:02X}", player_id_le, stt));
-    out.send(format!(
-        "F4440C000F01{}{:02X}{}01",
-        player_id_le, stt, pet_id_le
-    ));
+    // Map broadcasts first (C# `Server.SendToAllMapid` includes the sender, so
+    // `07000F02` / `0C000F01` go to the player AND the map — the latter via
+    // `broadcast_except`). Client.cs:9993-9995.
+    let f_0f02 = format!("F44407000F02{}{:02X}", player_id_le, stt);
+    let f_0f01 = format!("F4440C000F01{}{:02X}{}01", player_id_le, stt, pet_id_le);
+    out.send(f_0f02.clone());
+    out.send(f_0f01.clone());
+    if let Some(hub) = hub {
+        hub.broadcast_except(conn.session.id, &f_0f02).await;
+        hub.broadcast_except(conn.session.id, &f_0f01).await;
+    }
 
-    // Send Pet Status Packet
-    let pet_name = &pet.name;
-    let mut status_body = String::new();
-    status_body.push_str(&format!("{:02X}", stt));
-    status_body.push_str(&encoder::le16(pet.id));
-    status_body.push_str(&encoder::le32(pet.texp));
-    status_body.push_str(&format!("{:02X}", pet.level));
-    status_body.push_str(&encoder::le16(pet.hp));
-    status_body.push_str(&encoder::le16(pet.sp));
-    status_body.push_str(&encoder::le16(pet.int1));
-    status_body.push_str(&encoder::le16(pet.atk));
-    status_body.push_str(&encoder::le16(pet.def));
-    status_body.push_str(&encoder::le16(pet.agi));
-    status_body.push_str(&encoder::le16(pet.hpx));
-    status_body.push_str(&encoder::le16(pet.spx));
-    status_body.push_str(&encoder::le16(pet.skill_point));
-    status_body.push_str(&format!("{:02X}", pet_name.len()));
-    status_body.push_str(&crate::server::handler::hex_of(pet_name));
-    status_body.push_str(&format!(
-        "{:02X}{:02X}{:02X}{:02X}",
-        pet.skills[0].1, pet.skills[1].1, pet.skills[2].1, pet.skills[3].1
-    ));
-    status_body.push_str("0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
-
-    out.send(crate::protocol::frame("0F08", &status_body));
-    out.send(format!("F44404000F14{:02X}0000", stt));
-    out.send("F44402000F0A");
+    // Pet status + trailer (C# `Data.SendStatusPet`, Data.cs:2212-2278).
+    for f in crate::server::spawn::pet_status_single(&conn.session, stt) {
+        out.send(f);
+    }
 
     out.send(format!("F44406001301{}", pet_id_le));
     out.send("F44402002C01");

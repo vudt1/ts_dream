@@ -250,68 +250,91 @@ pub fn store_frame(point: u32) -> String {
 /// per-pet stat entries, the `0F14` slot summary, and the fixed stable-open
 /// trailer — byte-for-byte the C# layout (Client.cs / Data.SendStatusAllPet).
 pub fn pet_summary(s: &Session) -> Vec<String> {
-    let mut stats = String::new();
-    let mut slots = String::new();
-
     let active: Vec<&crate::server::session::PetState> = s
         .pets
         .iter()
         .filter(|p| (1..=4).contains(&p.stt) && p.id > 0)
         .collect();
 
-    for p in active {
-        let stt = p.stt;
-        let lv_skill = [
-            p.skills.first().map(|x| x.1).unwrap_or(0),
-            p.skills.get(1).map(|x| x.1).unwrap_or(0),
-            p.skills.get(2).map(|x| x.1).unwrap_or(0),
-            p.skills.get(3).map(|x| x.1).unwrap_or(0),
-        ];
-        stats.push_str(&format!("{:02X}", stt));
-        stats.push_str(&encoder::le32(u32::from(p.id)));
-        stats.push_str(&encoder::le32(p.texp));
-        stats.push_str(&format!("{:02X}", p.level));
-        stats.push_str(&encoder::le16(p.hp));
-        stats.push_str(&encoder::le16(p.sp));
-        stats.push_str(&encoder::le16(p.int1));
-        stats.push_str(&encoder::le16(p.atk));
-        stats.push_str(&encoder::le16(p.def));
-        stats.push_str(&encoder::le16(p.agi));
-        stats.push_str(&encoder::le16(p.hpx));
-        stats.push_str(&encoder::le16(p.spx));
-        stats.push_str("00"); // reserved byte
-        stats.push_str(&format!("{:02X}{:02X}", p.fai, p.quest));
-        stats.push_str(&encoder::le16(p.skill_point));
-        stats.push_str(&format!("{:02X}", p.name.len()));
-        stats.push_str(&encoder::strhex(&p.name));
-        stats.push_str(&format!("{:02X}{:02X}{:02X}", lv_skill[0], lv_skill[1], lv_skill[2]));
-        // 6 pet-equipment slots (Trangbi rows `stt*10+1..=stt*10+6`), each
-        // `le32(id) + 000000000000`.
-        for sub in 1..=6u16 {
-            let slot = (stt as u16) * 10 + sub;
-            let eq_id = s
-                .trangbi
-                .iter()
-                .find(|i| u16::from(i.slot) == slot)
-                .map(|i| i.id)
-                .unwrap_or(0);
-            stats.push_str(&encoder::le32(u32::from(eq_id)));
-            stats.push_str("000000000000");
-        }
-        stats.push_str("00000000000000"); // 7 reserved bytes
-        stats.push_str(&format!("{:02X}", lv_skill[3]));
-        stats.push_str("00000000"); // 4 reserved bytes
-
-        slots.push_str(&format!("{:02X}0000", stt));
-    }
-
-    if stats.is_empty() {
+    if active.is_empty() {
         return Vec::new();
     }
+
+    let stats: String = active.iter().map(|p| pet_stat_entry(s, p)).collect();
+    let slots: String = active.iter().map(|p| pet_slot_entry(p)).collect();
 
     vec![
         crate::protocol::frame("0F08", &stats),
         crate::protocol::frame("0F14", &slots),
+        "F44402000F0A".to_string(),
+        "F44405000F12010000".to_string(),
+        "F44405000F12020000".to_string(),
+        "F44405000F12030000".to_string(),
+        "F44405000F12040000".to_string(),
+        "F44404000F130100".to_string(),
+    ]
+}
+
+/// Per-pet `0F08` stat body — the exact C# `Data.SendStatusPet` layout
+/// (Data.cs:2270, mirrored by `Data.SendStatusAllPet`).
+fn pet_stat_entry(s: &Session, p: &crate::server::session::PetState) -> String {
+    let stt = p.stt;
+    let lv_skill = [
+        p.skills.first().map(|x| x.1).unwrap_or(0),
+        p.skills.get(1).map(|x| x.1).unwrap_or(0),
+        p.skills.get(2).map(|x| x.1).unwrap_or(0),
+        p.skills.get(3).map(|x| x.1).unwrap_or(0),
+    ];
+    let mut stats = String::new();
+    stats.push_str(&format!("{:02X}", stt));
+    stats.push_str(&encoder::le32(u32::from(p.id)));
+    stats.push_str(&encoder::le32(p.texp));
+    stats.push_str(&format!("{:02X}", p.level));
+    stats.push_str(&encoder::le16(p.hp));
+    stats.push_str(&encoder::le16(p.sp));
+    stats.push_str(&encoder::le16(p.int1));
+    stats.push_str(&encoder::le16(p.atk));
+    stats.push_str(&encoder::le16(p.def));
+    stats.push_str(&encoder::le16(p.agi));
+    stats.push_str(&encoder::le16(p.hpx));
+    stats.push_str(&encoder::le16(p.spx));
+    stats.push_str("00"); // reserved byte
+    stats.push_str(&format!("{:02X}{:02X}", p.fai, p.quest));
+    stats.push_str(&encoder::le16(p.skill_point));
+    stats.push_str(&format!("{:02X}", p.name.len()));
+    stats.push_str(&encoder::strhex(&p.name));
+    stats.push_str(&format!("{:02X}{:02X}{:02X}", lv_skill[0], lv_skill[1], lv_skill[2]));
+    for sub in 1..=6u16 {
+        let slot = (stt as u16) * 10 + sub;
+        let eq_id = s
+            .trangbi
+            .iter()
+            .find(|i| u16::from(i.slot) == slot)
+            .map(|i| i.id)
+            .unwrap_or(0);
+        stats.push_str(&encoder::le32(u32::from(eq_id)));
+        stats.push_str("000000000000");
+    }
+    stats.push_str("00000000000000"); // 7 reserved bytes
+    stats.push_str(&format!("{:02X}", lv_skill[3]));
+    stats.push_str("00000000"); // 4 reserved bytes
+    stats
+}
+
+/// Per-pet `0F14` slot entry.
+fn pet_slot_entry(p: &crate::server::session::PetState) -> String {
+    format!("{:02X}0000", p.stt)
+}
+
+/// Single-pet status + trailer (C# `Data.SendStatusPet`, Data.cs:2212-2278).
+/// Returns an empty vector when the pet does not exist or has id 0.
+pub fn pet_status_single(s: &Session, stt: u8) -> Vec<String> {
+    let Some(p) = s.pets.iter().find(|p| p.stt == stt && p.id > 0) else {
+        return Vec::new();
+    };
+    vec![
+        crate::protocol::frame("0F08", &pet_stat_entry(s, p)),
+        crate::protocol::frame("0F14", &pet_slot_entry(p)),
         "F44402000F0A".to_string(),
         "F44405000F12010000".to_string(),
         "F44405000F12020000".to_string(),

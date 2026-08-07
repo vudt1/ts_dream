@@ -49,6 +49,29 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 ### Skill bar / Hotkey (Thanh kỹ năng) — opcode 0x28
 - **Định nghĩa**: Bản đồ slot 1..10 gán một kỹ năng vào thanh phím tắt của nhân vật. Nhận dữ liệu client → lưu `SkillSave`; **không phản hồi** (C# chỉ `SkillSaveUpdateId`). Slot 0 = clear (no-op).
 
+### Learn / Upgrade Skill (Học / nâng cấp kỹ năng) — opcode 0x1C
+- **Định nghĩa**: Hành động chi `SkillPoint` để học mới hoặc nâng level một kỹ năng, áp dụng cho cả Nhân vật (sub 1) và Sủng vật (sub 2).
+- **Ràng buộc (Invariants)**:
+  - Kỹ năng mới: cần đủ element (không học kỹ năng khắc chế), đủ prereq `IdDK1..6` (tất cả 0 hoặc ≥1 đã học), và chi phí `GetPointSkillAdd(element, point) + (lv-1)`.
+  - Nâng cấp slot đã tồn tại: chi phí chênh lệch level, chỉ nâng khi `lv_target > lv_hiện tại`.
+  - Linh giới `lv <= LvMax` và `Reborn kỹ năng <= Reborn hiện tại`.
+  - Mỗi success phát `F4440C0008016E01`+le32(lv)+le32(skill); kết thúc phát `SendSkillPointtoClient`.
+
+### Reborn / Rebirth (Đổi nghề) — opcode 0x17 sub 46
+- **Định nghĩa**: Nhân vật đạt ngưỡng (≥120) đổi nghề, đặt lại level/stats, giữ các kỹ năng đặc thù và pack nghề. Là quá trình "chết" (server đóng socket để ép đăng nhập lại).
+- **Ràng buộc (Invariants)**:
+  - Không được mặc trang bị ở slot ≤ 6.
+  - Nhân vật mới: `Lv=1`, `Point/SkillPoint = base + (Lv-120)/5`, `Hp/Sp=181`, stats=0, `Texp=13`; `Reborn` tăng, `Job` đổi theo menu (reborn 2).
+  - Chỉ giữ kỹ năng đặc biệt (10016-19, 11016-19, 12016-19, 13015-18); `DELETE FROM Skill` scope theo `player_id`.
+  - Tail: replay `OnWin` quest hiện tại, cập nhật quest step NPC 59411, gửi `F444…F476`, rồi đóng socket.
+
+### Pet Reborn (Hồi sinh Sủng vật) — opcode 0x2C
+- **Định nghĩa**: Tiêu 1 đơn vị vật phẩm `RbPetFrom→RbPetTo` để biến đổi Sủng vật về NPC mới: level 1, skill từ NPC (skill 10016/11016/12016/13015 lv 10), bonus theo mốc 30/60.
+- **Ràng buộc (Invariants)**:
+  - Bonus point `(lv - threshold)/5` phân bổ theo **weighted random** `GetRandomPointPet` (theo 6 stat NPC, 7 lần `.NET` draw/điểm) — không deterministic.
+  - `HpMax/Spmax` tính từ stat **gốc** (trước bonus) với mapping `getPetHpMax` (rb 0/1→`getHpMax(0)`, rb 2→`getHpMax(1)`).
+  - Phát broadcast map `0F02`/`0F01` + `SendStatusPet` + `06001301` + `2C01`; guards fail → silent.
+
 ### Max HP (HpMax)
 - **Định nghĩa**: Thuật ngữ chuẩn chỉ HP tối đa. Lưu ý: codebase dùng nhiều cách viết — C# in-memory `_My_HpMax`, hằng DB `_Hpmax`, Rust `hp_max` — tất cả đều là **Max HP (HpMax)**.
 
