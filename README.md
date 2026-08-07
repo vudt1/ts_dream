@@ -62,33 +62,6 @@ export TS_DB_AUTO_CREATE="false"
 ./target/release/ts_dream
 ```
 
-## Cấu trúc thư mục
-
-```text
-ts_dream/
-├── Cargo.toml
-├── migrations/
-│   └── 0001_init.sql           # Schema MySQL 8: players, accounts, 9 bảng gameplay, item_code
-├── templates/                  # HTML cho Web Dashboard (Askama)
-├── docs/                       # rust_porting_spec.md, agents/...
-├── golden/                     # Packet "vàng" để diffing khi test
-├── tests/                      # Integration tests (golden diffing, data, battle, web)
-└── src/
-    ├── main.rs                 # Entry point: Config -> MySQL bootstrap -> Web + TCP
-    ├── config.rs               # Cấu hình (port, db URL, env TS_*)
-    ├── db/                     # Repository layer (tất cả SQL tập trung)
-    │   ├── pool.rs             # Pool + auto-create DB + migration
-    │   ├── accounts.rs         # Truy vấn accounts
-    │   ├── players.rs          # Truy vấn/transaction players + 9 bảng gameplay + item_code
-    │   ├── persist.rs          # Ghi-through players/skills/items/pets
-    │   ├── item_code.rs        # Nhận mã quà (item_code)
-    ├── server/                 # TCP server, session, handler, spawning
-    ├── protocol/               # XOR 0xAD, frame F4 44
-    ├── battle/                 # Battle engine
-    ├── web/                    # Web admin dashboard (Axum + SSE)
-    └── data/                   # Loader dữ liệu tĩnh
-```
-
 ## Giao thức (tóm tắt)
 
 - Frame: header `F4 44` + length LE u16 + opcode + sub + payload
