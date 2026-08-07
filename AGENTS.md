@@ -91,7 +91,12 @@ ts_dream/
     │       ├── battle.rs       # Battle handler (input, commands, rewards)
     │       ├── quest.rs        # Nhiệm vụ (quest) + hội thoại H6
     │       ├── inventory.rs    # Túi đồ / sắp xếp / thả vật phẩm
-    │       ├── use_item.rs     # Sử dụng vật phẩm (sách, thuốc)
+    │       ├── use_item/       # Sử dụng vật phẩm (op 0x17 sub 15) — full C# case-15 parity
+    │       │   ├── mod.rs      # Dispatcher & helper chung (gate, consume, potion, warp, add-pet, sleep)
+    │       │   ├── rewards.rs  # Lucky-box random rewards + fixed multi-item packs
+    │       │   ├── books.rs    # Sách skill/Texp/god/pet-stat/HP-store
+    │       │   ├── misc.rs     # Doll summon, dice, special frames, no-op ids, full-heal
+    │       │   └── reborn.rs   # Reborn-by-item (46170/46247-50) + close socket
     │       ├── shops.rs        # Cửa hàng NPC & người chơi (shop/mall buy)
     │       ├── trade_storage.rs# Giao dịch & kho (storage)
     │       ├── pet_actions.rs  # Hành động thú nuôi

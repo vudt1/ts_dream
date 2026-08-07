@@ -36,6 +36,9 @@ fn player_column(col: &str) -> Option<&'static str> {
         "Texp" => "Texp",
         "Gold" => "Gold",
         "God" => "God",
+        "HP_Store" => "HP_Store",
+        "SP_Store" => "SP_Store",
+        "tanthu" => "tanthu",
         _ => return None,
     })
 }

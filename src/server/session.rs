@@ -172,6 +172,8 @@ pub struct Session {
     pub god: u32,
     pub hp_store: u32,
     pub sp_store: u32,
+    /// `.NET` counter field (`tanthu`), incremented by item 46238.
+    pub tanthu: u32,
     /// Equipped-colour hex string (`_My_Color`), e.g. `"0000000000000000"`.
     pub color: String,
 
@@ -277,6 +279,7 @@ impl Default for Session {
             god: 0,
             hp_store: 10000,
             sp_store: 10000,
+            tanthu: 0,
             color: "0000000000000000".to_string(),
 
             skills: Vec::new(),

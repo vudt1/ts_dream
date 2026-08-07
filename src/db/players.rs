@@ -260,6 +260,7 @@ struct PlayerRow {
     tham_chien: i64,
     sp_store: i64,
     hp_store: i64,
+    tanthu: i64,
 }
 
 impl PlayerRow {
@@ -273,7 +274,7 @@ impl PlayerRow {
              Job AS job, Sex AS sex, Hair AS hair, Thuoctinh AS thuoctinh, \
              God AS god, HEX(Color) AS color_hex, Gold AS gold, Tiengtam AS tiengtam, \
              Gocnhin AS gocnhin, SttPetXuatchien AS stt_pet, Pk AS pk, ThamChien AS tham_chien, \
-             SP_Store AS sp_store, HP_Store AS hp_store \
+             SP_Store AS sp_store, HP_Store AS hp_store, tanthu AS tanthu \
              FROM players WHERE player_id = ?",
         )
         .bind(player_id)
@@ -327,6 +328,7 @@ impl PlayerRow {
         s.tham_chien = self.tham_chien as u8;
         s.sp_store = self.sp_store as u32;
         s.hp_store = self.hp_store as u32;
+        s.tanthu = self.tanthu as u32;
     }
 }
 
