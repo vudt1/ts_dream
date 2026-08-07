@@ -410,7 +410,10 @@ mod tests {
         assert_eq!(conn.session.gocnhin, 2);
         // The walk is a map broadcast — never echoed to the mover itself (C#
         // `SendToAllClientMapid` skips `client._My_Id == subject`).
-        assert!(out.outgoing.is_empty(), "mover must not receive its own walk");
+        assert!(
+            out.outgoing.is_empty(),
+            "mover must not receive its own walk"
+        );
         assert_eq!(out.map_broadcast.len(), 1);
         assert_eq!(out.map_broadcast[0].subject, 300001, "subject is the mover");
         assert!(out.map_broadcast[0].frame.starts_with("F4440B000601"));
@@ -450,14 +453,23 @@ mod tests {
         )
         .await;
         // Leader + 2 members → 3 map-broadcast walks; none echoed to the mover.
-        assert!(out.outgoing.is_empty(), "mover must not receive its own walk");
+        assert!(
+            out.outgoing.is_empty(),
+            "mover must not receive its own walk"
+        );
         assert_eq!(out.map_broadcast.len(), 3);
         assert_eq!(out.map_broadcast[0].subject, 300001);
         assert_eq!(out.map_broadcast[1].subject, 300002);
         assert_eq!(out.map_broadcast[2].subject, 300003);
-        assert!(out.map_broadcast[0].frame.starts_with("F4440B000601E1930400"));
-        assert!(out.map_broadcast[1].frame.starts_with("F4440B000601E2930400")); // member 300002
-        assert!(out.map_broadcast[2].frame.starts_with("F4440B000601E3930400")); // member 300003
+        assert!(out.map_broadcast[0]
+            .frame
+            .starts_with("F4440B000601E1930400"));
+        assert!(out.map_broadcast[1]
+            .frame
+            .starts_with("F4440B000601E2930400")); // member 300002
+        assert!(out.map_broadcast[2]
+            .frame
+            .starts_with("F4440B000601E3930400")); // member 300003
     }
 
     #[tokio::test]
@@ -535,7 +547,11 @@ mod tests {
         .await;
         assert!(out.outgoing.is_empty());
         assert!(out.map_broadcast.is_empty());
-        assert_eq!(conn.session.map_x, Session::new().map_x, "position untouched");
+        assert_eq!(
+            conn.session.map_x,
+            Session::new().map_x,
+            "position untouched"
+        );
     }
 
     #[tokio::test]
@@ -585,8 +601,8 @@ mod tests {
     async fn dispatch_stat_allocation_and_hotkey() {
         let mut conn = Conn::new();
         conn.session.point = 10;
-        // Op 0x08 sub 1: stat_id 27 (Int), points 3 -> hex: F444 0400 0801 1B03
-        let decoded = encoder::bytes("F444040008011B03").unwrap();
+        // Op 0x08 sub 1: stat_id 27 (Int), points 3 -> hex: F444 0600 0801 0000 1B03
+        let decoded = encoder::bytes("F4440600080100001B03").unwrap();
         let out = dispatch(
             &mut conn,
             &decoded,
@@ -600,7 +616,7 @@ mod tests {
         assert_eq!(out.outgoing.len(), 2);
 
         // Op 0x28 sub 1: skill 10001 (0x2711), slot 5 -> hex: F444 0400 2801 1127 05
-        let decoded_hotkey = encoder::bytes("F4440500280100112705").unwrap();
+        let decoded_hotkey = encoder::bytes("F4440600280100112705").unwrap();
         let out_hk = dispatch(
             &mut conn,
             &decoded_hotkey,

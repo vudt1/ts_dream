@@ -36,7 +36,23 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 ### Pet / Companion (Sủng vật / Đậu đậu)
 - **Định nghĩa**: Nhân vật phi người chơi (NPC) có thể thu phục hoặc chiêu mộ đồng hành cùng Nhân vật người chơi trong các trận đấu và di chuyển.
 
-### Item & Inventory (Vật phẩm & Túi đồ)
+### Stat Allocation (Phân bổ chỉ số) — opcode 0x08
+- **Định nghĩa**: Hành động người chơi tiêu Point để tăng một chỉ số cơ bản (Int, Atk, Def, Agi, Hpx, Spx) hoặc tái tính Hpmax/Spmax. Mỗi thay đổi phát 1 packet stat `F4440C000801` (Type_Status + dấu + giá trị tuyệt đối).
+- **Ràng buộc (Invariants)**:
+  - Điều kiện gate: `Point >= points && points > 0`, ngoài chiến đấu.
+  - Cap 400: chỉ áp dụng cho Int/Atk/Def/Agi/Hpx/Spx (id 27–32); Hpmax/Spmax (25/26) không tăng chỉ số và **không trừ Point**.
+  - Max HP/SP (Hpmax/Spmax): khi cập nhật trong phân bổ Hpx/Spx chỉ cập nhật in-memory — **không phát packet nào** cho Max (C# `PlayerUpdateDataId` nhánh `_Hpmax`/`_Spmax`).
+
+### Point / Skill Point (Điểm chỉ số)
+- **Định nghĩa**: Điểm có thể phân bổ (allocatable) để tăng chỉ số; `Point` (query trong DB/game) phân biệt với `SkillPoint` (điểm học kỹ năng). Cả hai đều cập nhật dưới dạng opcode 0x08 packet type `0x26` (Point).
+
+### Skill bar / Hotkey (Thanh kỹ năng) — opcode 0x28
+- **Định nghĩa**: Bản đồ slot 1..10 gán một kỹ năng vào thanh phím tắt của nhân vật. Nhận dữ liệu client → lưu `SkillSave`; **không phản hồi** (C# chỉ `SkillSaveUpdateId`). Slot 0 = clear (no-op).
+
+### Max HP (HpMax)
+- **Định nghĩa**: Thuật ngữ chuẩn chỉ HP tối đa. Lưu ý: codebase dùng nhiều cách viết — C# in-memory `_My_HpMax`, hằng DB `_Hpmax`, Rust `hp_max` — tất cả đều là **Max HP (HpMax)**.
+
+### Item / Inventory (Vật phẩm & Túi đồ)
 - **Định nghĩa**: Trang bị, vật phẩm tiêu hao hoặc nguyên liệu do Nhân vật sở hữu trong túi đồ (Inventory) hoặc rương lưu trữ (Storage).
 
 ### Map & Spatial Position (Bản đồ & Tọa độ)

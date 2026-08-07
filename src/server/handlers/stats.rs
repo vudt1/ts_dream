@@ -35,13 +35,13 @@ pub async fn handle_stat_allocation(ctx: &mut OpcodeCtx<'_>) {
         return;
     }
 
-    let (stat_id, points) = if payload.len() >= 4 && payload[2] != 0 {
-        (payload[2], payload[3])
-    } else if payload.len() >= 2 {
-        (payload[0], payload[1])
-    } else {
+    // C# reads `packet[8]` = stat id and `packet[9]` = points (Client.cs:1071-1072);
+    // payload is `data[6..]`, so stat id/slot live at `payload[2]`/`payload[3]`.
+    if payload.len() < 4 {
         return;
-    };
+    }
+    let stat_id = payload[2];
+    let points = payload[3];
 
     let pts = points as u16;
     if pts == 0 || conn.session.point < pts {
@@ -136,7 +136,6 @@ pub async fn handle_stat_allocation(ctx: &mut OpcodeCtx<'_>) {
                 persist::update_player(pool, player_id, "HpMax", i64::from(conn.session.hp_max))
                     .await;
                 out.send(build_stat_update(0x26, conn.session.point as i32));
-                out.send(build_stat_update(0x19, conn.session.hp_max as i32));
                 out.send(build_stat_update(0x1F, conn.session.hpx as i32));
             }
         }
@@ -152,7 +151,6 @@ pub async fn handle_stat_allocation(ctx: &mut OpcodeCtx<'_>) {
                 persist::update_player(pool, player_id, "SpMax", i64::from(conn.session.sp_max))
                     .await;
                 out.send(build_stat_update(0x26, conn.session.point as i32));
-                out.send(build_stat_update(0x1A, conn.session.sp_max as i32));
                 out.send(build_stat_update(0x20, conn.session.spx as i32));
             }
         }
@@ -242,7 +240,11 @@ mod tests {
             before_max,
             conn.session.hp_max
         );
-        assert_eq!(out.outgoing.len(), 3);
+        assert_eq!(out.outgoing.len(), 2);
+        // C# case 31 emits only Point then Hpx — the Hpmax recompute updates
+        // in-memory only (Data.cs:275-278), no packet for the new max.
+        assert_eq!(out.outgoing[0], build_stat_update(0x26, 8));
+        assert_eq!(out.outgoing[1], build_stat_update(0x1F, 5));
     }
 
     #[tokio::test]

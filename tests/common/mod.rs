@@ -192,6 +192,30 @@ pub fn all_scenarios() -> Vec<Scenario<'static>> {
                 c.session.gold = 100000;
             },
         ),
+        Scenario::new(
+            "16-stat-alloc",
+            game_data(),
+            vec![
+                // C2S op 0x08 sub 1: data[8]=stat id, data[9]=points.
+                // (Int=0x1B, points=2) then (Hpx=0x1F, points=2).
+                "F4440600080100001B02".to_string(),
+                "F4440600080100001F02".to_string(),
+            ],
+            |c| {
+                c.session.point = 10;
+                c.session.int1 = 0;
+                c.session.hpx = 0;
+            },
+        ),
+        Scenario::new(
+            "17-hotkey",
+            game_data(),
+            // C2S op 0x28 sub 0x01: data[7..8]=skill (0x2711), data[9]=slot 3.
+            vec!["F4440600280100112703".to_string()],
+            |c| {
+                c.session.id = 300001;
+            },
+        ),
     ]
 }
 
