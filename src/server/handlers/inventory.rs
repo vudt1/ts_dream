@@ -22,7 +22,7 @@ pub async fn handle_inventory(ctx: &mut OpcodeCtx<'_>) {
     let decoded = ctx.decoded;
     match sub {
         // Sub 2: Pick up map drop
-        2 => handle_pickup(conn, payload, out, pool).await,
+        2 => handle_pickup(conn, payload, out, pool, hub).await,
         // Sub 3: Drop item
         3 => handle_drop(conn, payload, out, pool, hub).await,
         // Sub 10: Move / stack item (echo raw packet back on success)
@@ -62,13 +62,14 @@ async fn handle_pickup(
     payload: &[u8],
     out: &mut HandleOutcome,
     pool: Option<&sqlx::MySqlPool>,
+    hub: Option<&crate::web::server_control::ServerControl>,
 ) {
     if conn.session.battle_id > 0 || payload.is_empty() {
         return;
     }
     let map_id = conn.session.map_id;
     let slot = payload[0];
-    let Some(drop) = map_drops::take(map_id, slot) else {
+    let Some(drop) = map_drops::get(map_id, slot) else {
         return; // nothing on that map slot
     };
     // Distance gate (C# case 2): within ±150 map units of the player.
@@ -77,21 +78,37 @@ async fn handle_pickup(
     if !(-PICKUP_RANGE..=PICKUP_RANGE).contains(&dx)
         || !(-PICKUP_RANGE..=PICKUP_RANGE).contains(&dy)
     {
-        // Out of range: put the drop back.
-        map_drops::drop(map_id, slot, drop.item.clone(), drop.map_x, drop.map_y);
+        return; // out of range: the drop stays on the map
+    }
+    // A full bag must leave the drop untouched and reply with nothing (C#
+    // `PickupItemOnMap`, Data.cs:3788-3872) — probe on a copy first.
+    let mut probe = conn.session.homdo.clone();
+    if crate::server::inventory::add_item(&mut probe, drop.item.clone()).is_empty() {
         return;
     }
-    let item = drop.item;
-    if let Some(homdo_slot) = conn.session.add_homdo_item(item.clone()) {
-        if let Some(added) = conn.session.homdo.iter().find(|i| i.slot == homdo_slot) {
+    let Some(drop) = map_drops::take(map_id, slot) else {
+        return;
+    };
+    let affected = conn.session.add_homdo_item(drop.item.clone());
+    // Persist every slot the (possibly straddling) add touched so the merge
+    // increment into an existing stack is not lost on reload.
+    for hslot in &affected {
+        if let Some(added) = conn.session.homdo.iter().find(|i| i.slot == *hslot) {
             persist::upsert_item(pool, conn.session.id, "homdo", added).await;
         }
-        // C# `PickupItemOnMap` acks: 1702 pickup, 1706 item, then the dump.
-        out.send(format!("F44405001702{:02X}01", slot));
-        out.send(item_added_frame(&item));
-        out.send(conn.session.dump_homdo());
-    } else {
-        out.send("F44403001B0102"); // Inventory full
+    }
+    {
+        // C# `PickupItemOnMap` acks: 1702 (2-byte LE slot) + 1706 to the picker,
+        // and a `04001702` removal broadcast to the map. No dump is emitted.
+        out.send(format!("F44405001702{}01", encoder::le16(u16::from(slot))));
+        out.send(item_added_frame(&drop.item));
+        if let Some(hub) = hub {
+            hub.broadcast_except(
+                conn.session.id,
+                &format!("F44404001702{}", encoder::le16(u16::from(slot))),
+            )
+            .await;
+        }
     }
 }
 
@@ -117,11 +134,20 @@ async fn handle_drop(
     let map_id = conn.session.map_id;
     let x = conn.session.map_x;
     let y = conn.session.map_y;
-    // Place the drop under the (map, homdo slot) key; the client uses that
-    // slot in the subsequent pickup (op 0x17 sub 2).
-    map_drops::drop(map_id, hdslot, item.clone(), x, y);
+    // The drop is placed under a per-map allocated slot (1..=255), NOT the homdo
+    // slot, so two players can drop onto the same map without colliding (C#
+    // `HomdoDropItem`, Data.cs:3511-3562). The client correlates it by (x,y) and
+    // echoes that slot back on the pickup. On a full map we refuse silently: the
+    // item stays in the bag (C# `num3 > 255` return).
+    let mut dropped = item.clone();
+    dropped.count = count.min(255) as u8;
+    // The map slot is deliberately unused here: the client correlates the drop
+    // by (x,y), not by the slot number (the wire carries no slot).
+    let Some(_drop_slot) = map_drops::allocate(map_id, dropped.clone(), x, y) else {
+        return;
+    };
 
-    let rem = item.count - count.min(255) as u8;
+    let rem = item.count - dropped.count;
     if rem > 0 {
         conn.session.homdo[pos].count = rem;
     } else {
@@ -648,10 +674,30 @@ mod tests {
         conn.session.homdo.push(bag_item(3, 1001, 5, 0));
         let out = run(&mut conn, 3, &[3, 2]).await;
         assert_eq!(conn.session.homdo[0].count, 3, "dropped 2 of 5");
-        let drop = crate::server::map_drops::get(12011, 3).expect("drop on map");
+        // The drop lands under a freshly allocated per-map slot (first free = 1),
+        // not under the homdo slot, and carries the dropped count (2).
+        let drop = crate::server::map_drops::get(12011, 1).expect("drop on map");
         assert_eq!(drop.item.id, 1001);
-        assert_eq!(drop.item.count, 5);
+        assert_eq!(drop.item.count, 2);
         assert!(out.outgoing.iter().any(|f| f.contains("17090303")));
+        crate::server::map_drops::clear_all();
+    }
+
+    #[tokio::test]
+    async fn drop_refuses_when_map_full_keeps_item() {
+        crate::server::map_drops::clear_all();
+        let mut conn = Conn::new();
+        conn.session.map_id = 12012;
+        conn.session.map_x = 400;
+        conn.session.map_y = 500;
+        conn.session.homdo.push(bag_item(3, 1001, 5, 0));
+        // Fill every map slot 1..=255.
+        for slot in 1..=255u8 {
+            crate::server::map_drops::drop(12012, slot, bag_item(slot, 7000, 1, 0), 0, 0);
+        }
+        let out = run(&mut conn, 3, &[3, 2]).await;
+        assert_eq!(conn.session.homdo[0].count, 5, "full map: item kept");
+        assert!(out.outgoing.is_empty(), "full map: silent, no frames");
         crate::server::map_drops::clear_all();
     }
 

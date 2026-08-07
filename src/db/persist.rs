@@ -130,14 +130,18 @@ pub async fn upsert_item(
         let q = format!(
             "INSERT INTO {table} (\
              player_id, Slot, Id, `Count`, DoBen, Int1, Atk1, Def1, Hpx1, Spx1, Agi1, \
-             Fai1, `Long`, GiatriLong, Khang, Thuoctinh, Loai, Texp) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
+             Fai1, Int2, Atk2, Def2, Hpx2, Spx2, Agi2, Fai2, `Long`, GiatriLong, Khang, \
+             Thuoctinh, GiatriThuoctinh, Loai, Texp) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
              ON DUPLICATE KEY UPDATE Id = VALUES(Id), `Count` = VALUES(`Count`), \
              DoBen = VALUES(DoBen), Int1 = VALUES(Int1), Atk1 = VALUES(Atk1), \
              Def1 = VALUES(Def1), Hpx1 = VALUES(Hpx1), Spx1 = VALUES(Spx1), \
-             Agi1 = VALUES(Agi1), Fai1 = VALUES(Fai1), `Long` = VALUES(`Long`), \
-             GiatriLong = VALUES(GiatriLong), Khang = VALUES(Khang), \
-             Thuoctinh = VALUES(Thuoctinh), Loai = VALUES(Loai), Texp = VALUES(Texp)"
+             Agi1 = VALUES(Agi1), Fai1 = VALUES(Fai1), Int2 = VALUES(Int2), \
+             Atk2 = VALUES(Atk2), Def2 = VALUES(Def2), Hpx2 = VALUES(Hpx2), \
+             Spx2 = VALUES(Spx2), Agi2 = VALUES(Agi2), Fai2 = VALUES(Fai2), \
+             `Long` = VALUES(`Long`), GiatriLong = VALUES(GiatriLong), \
+             Khang = VALUES(Khang), Thuoctinh = VALUES(Thuoctinh), \
+             GiatriThuoctinh = VALUES(GiatriThuoctinh), Loai = VALUES(Loai), Texp = VALUES(Texp)"
         );
         sqlx::query(&q)
             .bind(player_id)
@@ -152,10 +156,18 @@ pub async fn upsert_item(
             .bind(i64::from(item.spx1))
             .bind(i64::from(item.agi1))
             .bind(i64::from(item.fai1))
+            .bind(i64::from(item.int2))
+            .bind(i64::from(item.atk2))
+            .bind(i64::from(item.def2))
+            .bind(i64::from(item.hpx2))
+            .bind(i64::from(item.spx2))
+            .bind(i64::from(item.agi2))
+            .bind(i64::from(item.fai2))
             .bind(i64::from(item.long_val))
             .bind(i64::from(item.giatri_long))
             .bind(i64::from(item.khang))
             .bind(i64::from(item.thuoctinh))
+            .bind(i64::from(item.giatri_thuoctinh))
             .bind(i64::from(item.loai))
             .bind(i64::from(item.texp))
             .execute(pool)

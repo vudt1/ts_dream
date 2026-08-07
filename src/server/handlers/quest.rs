@@ -9,7 +9,7 @@ use crate::protocol::encoder;
 use crate::server::handler::HandleOutcome;
 use crate::server::handlers::stats::build_stat_update;
 use crate::server::handlers::talk::{end_talk, talk_messages};
-use crate::server::session::{Conn, InventoryItem, Session};
+use crate::server::session::{Conn, Session};
 use crate::server::spawn::sys_msg_frame;
 use std::sync::Arc;
 
@@ -153,23 +153,19 @@ pub fn battle_quest_win(
         if item_id <= 0 || count <= 0 {
             continue;
         }
-        let _ = session.add_homdo_item(InventoryItem {
-            id: item_id as u16,
-            count: count.min(255) as u8,
-            doben: 100,
-            loai: 1,
-            ..Default::default()
+        let _ = session.add_homdo_item({
+            let mut it = crate::server::inventory::from_template(data, item_id as u16, count.min(255) as u8);
+            it.doben = 100;
+            it
         });
         if share > 0 {
             for mem in session.id_mem.iter().filter(|m| **m > 0) {
                 if let Some(m) = member(i64::from(*mem)) {
                     if let Ok(mut s) = m.try_write() {
-                        let _ = s.add_homdo_item(InventoryItem {
-                            id: item_id as u16,
-                            count: count.min(255) as u8,
-                            doben: 100,
-                            loai: 1,
-                            ..Default::default()
+                        let _ = s.add_homdo_item({
+                            let mut it = crate::server::inventory::from_template(data, item_id as u16, count.min(255) as u8);
+                            it.doben = 100;
+                            it
                         });
                     }
                 }
@@ -734,7 +730,7 @@ mod tests {
         session.map_id = 10916;
         session.talking_battle = 1;
         // Seed a use-item requirement into inventory
-        session.add_homdo_item(InventoryItem {
+        session.add_homdo_item(crate::server::session::InventoryItem {
             id: 19001,
             count: 3,
             loai: 1,

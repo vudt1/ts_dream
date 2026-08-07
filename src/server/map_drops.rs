@@ -36,6 +36,28 @@ pub fn drop(map_id: u16, slot: u8, item: InventoryItem, x: u16, y: u16) {
     );
 }
 
+/// Allocate a free drop slot (1..=255) for a map, mirroring C# `HomdoDropItem`
+/// (`Data.cs:3511-3562`) which scans ascending and takes the first empty slot.
+/// Returns `None` when the map has no free slot (the drop is refused and the
+/// item stays in the player's bag, matching the C# `num3 > 255` return).
+pub fn allocate(map_id: u16, item: InventoryItem, x: u16, y: u16) -> Option<u8> {
+    let mut reg = registry().lock().unwrap();
+    for slot in 1..=255u8 {
+        use std::collections::hash_map::Entry;
+        let entry = reg.entry((map_id, slot));
+        let Entry::Vacant(v) = entry else {
+            continue;
+        };
+        v.insert(DropItem {
+            map_x: x,
+            map_y: y,
+            item,
+        });
+        return Some(slot);
+    }
+    None
+}
+
 /// Look up a drop slot on a map.
 pub fn get(map_id: u16, slot: u8) -> Option<DropItem> {
     registry().lock().unwrap().get(&(map_id, slot)).cloned()

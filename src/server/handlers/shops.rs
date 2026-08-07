@@ -171,6 +171,7 @@ pub async fn handle_npc_shop(ctx: &mut OpcodeCtx<'_>) {
     let conn = &mut ctx.conn;
     let out = &mut ctx.out;
     let pool = ctx.env.pool;
+    let data = ctx.data;
     // C# `num2 = packet[6]` (menu), `num3 = packet[7]` (sell count).
     let menu = ctx.payload.first().copied().unwrap_or(0);
     let count = ctx.payload.get(1).copied().unwrap_or(0);
@@ -194,12 +195,7 @@ pub async fn handle_npc_shop(ctx: &mut OpcodeCtx<'_>) {
     if idtalking == 7 && map_id == 9999 {
         out.send(red_message("Khách quan mua hàng thành công"));
         for (item_id, n) in [(18001u16, 1u8), (27156, 50), (52015, 50)] {
-            let item = InventoryItem {
-                slot: 0,
-                id: item_id,
-                count: n,
-                ..Default::default()
-            };
+            let item = crate::server::inventory::from_template(data, item_id, n);
             let _ = conn.session.add_homdo_item(item);
         }
         return;
@@ -209,12 +205,7 @@ pub async fn handle_npc_shop(ctx: &mut OpcodeCtx<'_>) {
     if let Some((item_id, price)) = get_npc_shop_price(idtalking, map_id, menu) {
         if conn.session.gold >= price {
             conn.session.gold -= price;
-            let item = InventoryItem {
-                slot: 0,
-                id: item_id,
-                count: 1,
-                ..Default::default()
-            };
+            let item = crate::server::inventory::from_template(data, item_id, 1);
             let _ = conn.session.add_homdo_item(item);
             persist::update_player(pool, conn.session.id, "Gold", conn.session.gold as i64).await;
             out.send(red_message("Khách quan mua hàng thành công"));

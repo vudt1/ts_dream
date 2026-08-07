@@ -25,8 +25,52 @@ pub struct InventoryItem {
     pub spx1: i16,
     pub agi1: i16,
     pub fai1: i16,
+    /// Elemental `_2` stat fields (C# `_Int2.._Agi2/_Fai2`, Items.txt cols 12..19).
+    pub int2: i16,
+    pub atk2: i16,
+    pub def2: i16,
+    pub hpx2: i16,
+    pub spx2: i16,
+    pub agi2: i16,
+    pub fai2: i16,
     pub loai: u8,
+    /// Item element (`_Thuoctinh`, Items.txt `element`).
     pub thuoctinh: u8,
+    /// Elemental stat bonus (`_GiatriThuoctinh`, Items.txt `elem_val`).
+    pub giatri_thuoctinh: u8,
+}
+
+impl InventoryItem {
+    /// Materialise an inventory instance from the static item template
+    /// (`Data.Item`, Items.txt), copying the base `_1`/`_2` stats, the element,
+    /// and the elemental bonus. Mirrors the C# `HomdoAddItem` item-constructor
+    /// (`Data.cs:3191`), which copies the full stat set from `Data_Items`. Slot
+    /// and per-instance dynamic fields (doben/long/khang/texp) are left defaulted.
+    pub fn from_template(def: &crate::data::tables::Item, count: u8) -> Self {
+        InventoryItem {
+            id: def.id as u16,
+            count,
+            lv: def.level as u8,
+            int1: def.int1 as i16,
+            atk1: def.atk1 as i16,
+            def1: def.def1 as i16,
+            hpx1: def.hpx1 as i16,
+            spx1: def.spx1 as i16,
+            agi1: def.agi1 as i16,
+            fai1: def.fai1 as i16,
+            int2: def.int2 as i16,
+            atk2: def.atk2 as i16,
+            def2: def.def2 as i16,
+            hpx2: def.hpx2 as i16,
+            spx2: def.spx2 as i16,
+            agi2: def.agi2 as i16,
+            fai2: def.fai2 as i16,
+            loai: def.loai as u8,
+            thuoctinh: def.thuoctinh as u8,
+            giatri_thuoctinh: def.value as u8,
+            ..Default::default()
+        }
+    }
 }
 
 /// One pet entry owned by player.
@@ -278,6 +322,7 @@ impl Session {
             i64::from(self.level),
             i64::from(self.hpx),
             i64::from(self.spx),
+            self.thuoctinh,
             &self.trangbi,
         );
         self.int2 = sheet.gear.int2;
@@ -367,10 +412,11 @@ impl Session {
         }
     }
 
-    /// Add an item to Homdo. Returns slot index (1..25) on success, None if full.
-    pub fn add_homdo_item(&mut self, item: InventoryItem) -> Option<u8> {
-        crate::server::inventory::add_item(&mut self.homdo, item)
-    }
+/// Add an item to Homdo. Returns the slot(s) written (a capped merge can touch
+/// two slots); empty when the bag is full.
+pub fn add_homdo_item(&mut self, item: InventoryItem) -> Vec<u8> {
+    crate::server::inventory::add_item(&mut self.homdo, item)
+}
 
     /// Remove up to `count` of `item_id` from inventory; returns the removed count.
     pub fn remove_homdo_item(&mut self, item_id: u16, count: u32) -> u32 {

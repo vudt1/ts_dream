@@ -78,7 +78,7 @@ pub fn handle_gm_shop(ctx: &mut OpcodeCtx) {
                         loai: 1,
                         ..Default::default()
                     };
-                    if conn.session.add_homdo_item(item).is_some() {
+                    if !conn.session.add_homdo_item(item).is_empty() {
                         out.send(format!(
                             "F44406004202{}0100",
                             encoder::le16(conn.session.shop_point as u16)

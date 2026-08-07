@@ -4,7 +4,7 @@ use crate::data::loader::GameData;
 use crate::protocol::encoder;
 use crate::server::handler::{HandleOutcome, OpcodeCtx};
 use crate::server::handlers::stats::build_stat_update;
-use crate::server::session::{Conn, InventoryItem};
+use crate::server::session::Conn;
 
 /// Helper: EndTalk packet + reset talk state.
 pub fn end_talk(conn: &mut Conn, out: &mut HandleOutcome) {
@@ -156,14 +156,8 @@ fn handle_talk_continue(
                 out.send("F44411001401000000010603010000000000000100");
             }
             33 => {
-                let item = InventoryItem {
-                    slot: 0,
-                    id: 46016,
-                    count: 2,
-                    doben: 100,
-                    loai: 1,
-                    ..Default::default()
-                };
+                let mut item = crate::server::inventory::from_template(data, 46016, 2);
+                item.doben = 100;
                 let _ = conn.session.add_homdo_item(item);
                 end_talk(conn, out);
             }
@@ -183,14 +177,8 @@ fn handle_talk_continue(
             }
             32 => out.send("F44411001401000000010603010000000000000200"),
             33 => {
-                let item = InventoryItem {
-                    slot: 0,
-                    id: 46016,
-                    count: 2,
-                    doben: 100,
-                    loai: 1,
-                    ..Default::default()
-                };
+                let mut item = crate::server::inventory::from_template(data, 46016, 2);
+                item.doben = 100;
                 let _ = conn.session.add_homdo_item(item);
                 end_talk(conn, out);
             }

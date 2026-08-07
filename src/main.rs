@@ -30,8 +30,18 @@ fn seed_static_drops(data: &GameData) {
             spx1: drop.spx1 as i16,
             agi1: drop.agi1 as i16,
             fai1: drop.fai1 as i16,
+            int2: drop.int2 as i16,
+            atk2: drop.atk2 as i16,
+            def2: drop.def2 as i16,
+            hpx2: drop.hpx2 as i16,
+            spx2: drop.spx2 as i16,
+            agi2: drop.agi2 as i16,
+            fai2: drop.fai2 as i16,
             loai: drop.loai as u8,
             thuoctinh: drop.thuoctinh as u8,
+            giatri_thuoctinh: drop.giatri_thuoctinh as u8,
+            long_val: drop.long_val as u8,
+            giatri_long: drop.giatri_long as u8,
             ..Default::default()
         };
         ts_dream::server::map_drops::drop(

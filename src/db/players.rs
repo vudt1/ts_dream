@@ -387,6 +387,70 @@ async fn load_pets(pool: &MySqlPool, s: &mut Session) -> Result<(), sqlx::Error>
     Ok(())
 }
 
+/// One item-table row (all five tables share this column layout, Ch5 §5.4).
+#[derive(Debug, Clone, FromRow)]
+struct ItemRow {
+    slot: i64,
+    id: i64,
+    cnt: i64,
+    lv: i64,
+    doben: i64,
+    int1: i64,
+    atk1: i64,
+    def1: i64,
+    hpx1: i64,
+    spx1: i64,
+    agi1: i64,
+    fai1: i64,
+    int2: i64,
+    atk2: i64,
+    def2: i64,
+    hpx2: i64,
+    spx2: i64,
+    agi2: i64,
+    fai2: i64,
+    longv: i64,
+    glong: i64,
+    khang: i64,
+    thuoctinh: i64,
+    gth: i64,
+    loai: i64,
+    texp: i64,
+}
+
+impl From<ItemRow> for InventoryItem {
+    fn from(r: ItemRow) -> Self {
+        InventoryItem {
+            slot: r.slot as u8,
+            id: r.id as u16,
+            count: r.cnt as u8,
+            lv: r.lv as u8,
+            doben: r.doben as u8,
+            int1: r.int1 as i16,
+            atk1: r.atk1 as i16,
+            def1: r.def1 as i16,
+            hpx1: r.hpx1 as i16,
+            spx1: r.spx1 as i16,
+            agi1: r.agi1 as i16,
+            fai1: r.fai1 as i16,
+            int2: r.int2 as i16,
+            atk2: r.atk2 as i16,
+            def2: r.def2 as i16,
+            hpx2: r.hpx2 as i16,
+            spx2: r.spx2 as i16,
+            agi2: r.agi2 as i16,
+            fai2: r.fai2 as i16,
+            long_val: r.longv as u8,
+            giatri_long: r.glong as u8,
+            khang: r.khang as u8,
+            thuoctinh: r.thuoctinh as u8,
+            giatri_thuoctinh: r.gth as u8,
+            loai: r.loai as u8,
+            texp: r.texp as u32,
+        }
+    }
+}
+
 async fn load_items(
     pool: &MySqlPool,
     player_id: i64,
@@ -395,28 +459,19 @@ async fn load_items(
     // The five item tables share the same columns (verified against 0001_init.sql).
     let sql = format!(
         "SELECT Slot AS slot, Id AS id, `Count` AS cnt, Lv AS lv, DoBen AS doben, \
-         `Long` AS longv, GiatriLong AS glong, Khang AS khang, Texp AS texp FROM {table} WHERE player_id = ?"
+         Int1 AS int1, Atk1 AS atk1, Def1 AS def1, Hpx1 AS hpx1, Spx1 AS spx1, Agi1 AS agi1, \
+         Fai1 AS fai1, Int2 AS int2, Atk2 AS atk2, Def2 AS def2, Hpx2 AS hpx2, Spx2 AS spx2, \
+         Agi2 AS agi2, Fai2 AS fai2, `Long` AS longv, GiatriLong AS glong, Khang AS khang, \
+         Thuoctinh AS thuoctinh, GiatriThuoctinh AS gth, Loai AS loai, Texp AS texp \
+         FROM {table} WHERE player_id = ?"
     );
     Ok(
-        sqlx::query_as::<_, (i64, i64, i64, i64, i64, i64, i64, i64, i64)>(&sql)
+        sqlx::query_as::<_, ItemRow>(&sql)
             .bind(player_id)
             .fetch_all(pool)
             .await?
             .into_iter()
-            .map(
-                |(slot, id, count, lv, doben, longv, glong, khang, texp)| InventoryItem {
-                    slot: slot as u8,
-                    id: id as u16,
-                    count: count as u8,
-                    lv: lv as u8,
-                    doben: doben as u8,
-                    long_val: longv as u8,
-                    giatri_long: glong as u8,
-                    khang: khang as u8,
-                    texp: texp as u32,
-                    ..Default::default()
-                },
-            )
+            .map(InventoryItem::from)
             .collect(),
     )
 }
