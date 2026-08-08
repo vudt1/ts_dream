@@ -253,6 +253,7 @@ struct PlayerRow {
     god: i64,
     color_hex: Option<String>,
     gold: i64,
+    bank_gold: i64,
     tiengtam: i64,
     gocnhin: i64,
     stt_pet: i64,
@@ -272,7 +273,7 @@ impl PlayerRow {
              Atk2 AS atk2, Def2 AS def2, Hpx2 AS hpx2, Spx2 AS spx2, Agi2 AS agi2, \
              Texp AS texp, MapId AS map_id, MapX AS map_x, MapY AS map_y, Reborn AS reborn, \
              Job AS job, Sex AS sex, Hair AS hair, Thuoctinh AS thuoctinh, \
-             God AS god, HEX(Color) AS color_hex, Gold AS gold, Tiengtam AS tiengtam, \
+              God AS god, HEX(Color) AS color_hex, Gold AS gold, BankGold AS bank_gold, Tiengtam AS tiengtam, \
              Gocnhin AS gocnhin, SttPetXuatchien AS stt_pet, Pk AS pk, ThamChien AS tham_chien, \
              SP_Store AS sp_store, HP_Store AS hp_store, tanthu AS tanthu \
              FROM players WHERE player_id = ?",
@@ -321,6 +322,7 @@ impl PlayerRow {
             s.color = hex;
         }
         s.gold = self.gold as u32;
+        s.bank_gold = self.bank_gold as u32;
         s.tiengtam = self.tiengtam as u16;
         s.gocnhin = self.gocnhin as u8;
         s.active_pet_stt = self.stt_pet as u8;
@@ -361,24 +363,98 @@ async fn load_hotkeys(pool: &MySqlPool, s: &mut Session) -> Result<(), sqlx::Err
     Ok(())
 }
 
+#[derive(FromRow)]
+struct PetRow {
+    stt: i64,
+    id: i64,
+    name_hex: Option<String>,
+    lv: i64,
+    thuoctinh: i64,
+    reborn: i64,
+    hp: i64,
+    hp_max: i64,
+    sp: i64,
+    sp_max: i64,
+    int1: i64,
+    atk: i64,
+    def: i64,
+    hpx: i64,
+    spx: i64,
+    agi: i64,
+    fai: i64,
+    texp: i64,
+    int2: i64,
+    atk2: i64,
+    def2: i64,
+    hpx2: i64,
+    spx2: i64,
+    agi2: i64,
+    thd: i64,
+    skill_point: i64,
+    quest: i64,
+    skill1: i64,
+    skill1_lv: i64,
+    skill2: i64,
+    skill2_lv: i64,
+    skill3: i64,
+    skill3_lv: i64,
+    skill4: i64,
+    skill4_lv: i64,
+}
+
 async fn load_pets(pool: &MySqlPool, s: &mut Session) -> Result<(), sqlx::Error> {
     let id = i64::from(s.id);
-    s.pets = sqlx::query_as::<_, (i64, i64, Option<String>, i64)>(
-        "SELECT Stt AS stt, Id AS id, HEX(Name) AS name_hex, Quest AS quest \
+    s.pets = sqlx::query_as::<_, PetRow>(
+        "SELECT Stt AS stt, Id AS id, HEX(Name) AS name_hex, Lv AS lv, Thuoctinh AS thuoctinh, \
+         Reborn AS reborn, Hp AS hp, HpMax AS hp_max, Sp AS sp, SpMax AS sp_max, `Int` AS int1, \
+         Atk AS atk, Def AS def, Hpx AS hpx, Spx AS spx, Agi AS agi, Fai AS fai, Texp AS texp, \
+         Int2 AS int2, Atk2 AS atk2, Def2 AS def2, Hpx2 AS hpx2, Spx2 AS spx2, Agi2 AS agi2, \
+         Thd AS thd, SkillPoint AS skill_point, Quest AS quest, Idskill1 AS skill1, \
+         LvSkill1 AS skill1_lv, IdSkill2 AS skill2, LvSkill2 AS skill2_lv, IdSkill3 AS skill3, \
+         LvSkill3 AS skill3_lv, IdSkill4 AS skill4, LvSkill4 AS skill4_lv \
          FROM pet WHERE player_id = ?",
     )
     .bind(id)
     .fetch_all(pool)
     .await?
     .into_iter()
-    .map(|(stt, pet_id, name_hex, quest)| {
+    .map(|r| {
         let mut p = PetState {
-            stt: stt as u8,
-            id: pet_id as u16,
-            quest: quest as u8,
+            stt: r.stt as u8,
+            id: r.id as u16,
+            level: r.lv as u8,
+            thuoctinh: r.thuoctinh as u8,
+            reborn: r.reborn as u8,
+            hp: r.hp as u16,
+            hp_max: r.hp_max as u16,
+            sp: r.sp as u16,
+            sp_max: r.sp_max as u16,
+            int1: r.int1 as u16,
+            atk: r.atk as u16,
+            def: r.def as u16,
+            hpx: r.hpx as u16,
+            spx: r.spx as u16,
+            agi: r.agi as u16,
+            fai: r.fai as u16,
+            texp: r.texp as u32,
+            int2: r.int2 as u16,
+            atk2: r.atk2 as u16,
+            def2: r.def2 as u16,
+            hpx2: r.hpx2 as u16,
+            spx2: r.spx2 as u16,
+            agi2: r.agi2 as u16,
+            thd: r.thd as u16,
+            skill_point: r.skill_point as u16,
+            quest: r.quest as u8,
+            skills: [
+                (r.skill1 as u16, r.skill1_lv as u8),
+                (r.skill2 as u16, r.skill2_lv as u8),
+                (r.skill3 as u16, r.skill3_lv as u8),
+                (r.skill4 as u16, r.skill4_lv as u8),
+            ],
             ..Default::default()
         };
-        if let Some(h) = name_hex {
+        if let Some(h) = r.name_hex {
             if let Some(bytes) = encoder::bytes(&h) {
                 p.name = bytes;
             }
@@ -411,6 +487,8 @@ struct ItemRow {
     spx2: i64,
     agi2: i64,
     fai2: i64,
+    item_hp: i64,
+    item_sp: i64,
     longv: i64,
     glong: i64,
     khang: i64,
@@ -442,6 +520,8 @@ impl From<ItemRow> for InventoryItem {
             spx2: r.spx2 as i16,
             agi2: r.agi2 as i16,
             fai2: r.fai2 as i16,
+            item_hp: r.item_hp as i16,
+            item_sp: r.item_sp as i16,
             long_val: r.longv as u8,
             giatri_long: r.glong as u8,
             khang: r.khang as u8,
@@ -463,19 +543,17 @@ async fn load_items(
         "SELECT Slot AS slot, Id AS id, `Count` AS cnt, Lv AS lv, DoBen AS doben, \
          Int1 AS int1, Atk1 AS atk1, Def1 AS def1, Hpx1 AS hpx1, Spx1 AS spx1, Agi1 AS agi1, \
          Fai1 AS fai1, Int2 AS int2, Atk2 AS atk2, Def2 AS def2, Hpx2 AS hpx2, Spx2 AS spx2, \
-         Agi2 AS agi2, Fai2 AS fai2, `Long` AS longv, GiatriLong AS glong, Khang AS khang, \
+         Agi2 AS agi2, Fai2 AS fai2, Hp AS item_hp, Sp AS item_sp, `Long` AS longv, GiatriLong AS glong, Khang AS khang, \
          Thuoctinh AS thuoctinh, GiatriThuoctinh AS gth, Loai AS loai, Texp AS texp \
          FROM {table} WHERE player_id = ?"
     );
-    Ok(
-        sqlx::query_as::<_, ItemRow>(&sql)
-            .bind(player_id)
-            .fetch_all(pool)
-            .await?
-            .into_iter()
-            .map(InventoryItem::from)
-            .collect(),
-    )
+    Ok(sqlx::query_as::<_, ItemRow>(&sql)
+        .bind(player_id)
+        .fetch_all(pool)
+        .await?
+        .into_iter()
+        .map(InventoryItem::from)
+        .collect())
 }
 
 #[cfg(test)]
@@ -489,8 +567,22 @@ mod tests {
         assert_eq!(
             starter_rows(),
             vec![
-                StarterRow { table: "homdo", slot: 1, id: 32012, count: 4, agi1: 0, loai: 0 },
-                StarterRow { table: "trangbi", slot: 2, id: 19737, count: 1, agi1: 1, loai: 2 },
+                StarterRow {
+                    table: "homdo",
+                    slot: 1,
+                    id: 32012,
+                    count: 4,
+                    agi1: 0,
+                    loai: 0
+                },
+                StarterRow {
+                    table: "trangbi",
+                    slot: 2,
+                    id: 19737,
+                    count: 1,
+                    agi1: 1,
+                    loai: 2
+                },
             ]
         );
     }
@@ -498,7 +590,11 @@ mod tests {
     #[test]
     fn starter_tables_are_whitelisted_for_insert() {
         for row in starter_rows() {
-            assert!(item_table(row.table).is_some(), "{} not whitelisted", row.table);
+            assert!(
+                item_table(row.table).is_some(),
+                "{} not whitelisted",
+                row.table
+            );
         }
         assert!(item_table("tientrang").is_none());
     }

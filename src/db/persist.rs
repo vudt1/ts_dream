@@ -35,6 +35,7 @@ fn player_column(col: &str) -> Option<&'static str> {
         "Agi2" => "Agi2",
         "Texp" => "Texp",
         "Gold" => "Gold",
+        "BankGold" => "BankGold",
         "God" => "God",
         "HP_Store" => "HP_Store",
         "SP_Store" => "SP_Store",
@@ -132,16 +133,16 @@ pub async fn upsert_item(
     } else {
         let q = format!(
             "INSERT INTO {table} (\
-             player_id, Slot, Id, `Count`, DoBen, Int1, Atk1, Def1, Hpx1, Spx1, Agi1, \
-             Fai1, Int2, Atk2, Def2, Hpx2, Spx2, Agi2, Fai2, `Long`, GiatriLong, Khang, \
+             player_id, Slot, Id, `Count`, Lv, DoBen, Int1, Atk1, Def1, Hpx1, Spx1, Agi1, \
+             Fai1, Int2, Atk2, Def2, Hpx2, Spx2, Agi2, Fai2, Hp, Sp, `Long`, GiatriLong, Khang, \
              Thuoctinh, GiatriThuoctinh, Loai, Texp) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
              ON DUPLICATE KEY UPDATE Id = VALUES(Id), `Count` = VALUES(`Count`), \
-             DoBen = VALUES(DoBen), Int1 = VALUES(Int1), Atk1 = VALUES(Atk1), \
+             Lv = VALUES(Lv), DoBen = VALUES(DoBen), Int1 = VALUES(Int1), Atk1 = VALUES(Atk1), \
              Def1 = VALUES(Def1), Hpx1 = VALUES(Hpx1), Spx1 = VALUES(Spx1), \
              Agi1 = VALUES(Agi1), Fai1 = VALUES(Fai1), Int2 = VALUES(Int2), \
              Atk2 = VALUES(Atk2), Def2 = VALUES(Def2), Hpx2 = VALUES(Hpx2), \
-             Spx2 = VALUES(Spx2), Agi2 = VALUES(Agi2), Fai2 = VALUES(Fai2), \
+             Spx2 = VALUES(Spx2), Agi2 = VALUES(Agi2), Fai2 = VALUES(Fai2), Hp = VALUES(Hp), Sp = VALUES(Sp), \
              `Long` = VALUES(`Long`), GiatriLong = VALUES(GiatriLong), \
              Khang = VALUES(Khang), Thuoctinh = VALUES(Thuoctinh), \
              GiatriThuoctinh = VALUES(GiatriThuoctinh), Loai = VALUES(Loai), Texp = VALUES(Texp)"
@@ -151,6 +152,7 @@ pub async fn upsert_item(
             .bind(i64::from(item.slot))
             .bind(i64::from(item.id))
             .bind(i64::from(item.count))
+            .bind(i64::from(item.lv))
             .bind(i64::from(item.doben))
             .bind(i64::from(item.int1))
             .bind(i64::from(item.atk1))
@@ -166,6 +168,8 @@ pub async fn upsert_item(
             .bind(i64::from(item.spx2))
             .bind(i64::from(item.agi2))
             .bind(i64::from(item.fai2))
+            .bind(i64::from(item.item_hp))
+            .bind(i64::from(item.item_sp))
             .bind(i64::from(item.long_val))
             .bind(i64::from(item.giatri_long))
             .bind(i64::from(item.khang))
@@ -220,6 +224,140 @@ pub async fn persist_shop_transaction(
     }
 }
 
+/// Persist the state of one or two players as one InnoDB transaction.  This is
+/// used by operations whose in-memory mutation spans more than one table (bank,
+/// trade, and storage).  `None` is the protocol-replay path and succeeds.
+pub async fn persist_sessions_transaction(
+    pool: Option<&MySqlPool>,
+    sessions: &[&crate::server::session::Session],
+    tables: &[&str],
+) -> bool {
+    let Some(pool) = pool else { return true };
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            tracing::warn!("begin session transaction failed: {e}");
+            return false;
+        }
+    };
+    let result = async {
+        for session in sessions {
+            sqlx::query("UPDATE players SET Gold = ?, BankGold = ? WHERE player_id = ?")
+                .bind(i64::from(session.gold))
+                .bind(i64::from(session.bank_gold))
+                .bind(i64::from(session.id))
+                .execute(&mut *tx)
+                .await?;
+            for table in tables {
+                let items = match *table {
+                    "homdo" => &session.homdo,
+                    "tientrang" => &session.tientrang,
+                    "luulang" => &session.luulang,
+                    "pet" => {
+                        replace_pets_tx(&mut tx, session.id, &session.pets).await?;
+                        continue;
+                    }
+                    _ => continue,
+                };
+                replace_item_table_tx(&mut tx, session.id, table, items).await?;
+            }
+        }
+        Ok::<(), sqlx::Error>(())
+    }
+    .await;
+    match result {
+        Ok(()) => tx.commit().await.is_ok(),
+        Err(e) => {
+            tracing::warn!("session transaction rolled back: {e}");
+            let _ = tx.rollback().await;
+            false
+        }
+    }
+}
+
+async fn replace_pets_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::MySql>,
+    player_id: u32,
+    pets: &[crate::server::session::PetState],
+) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM pet WHERE player_id = ?")
+        .bind(i64::from(player_id))
+        .execute(&mut **tx)
+        .await?;
+    for pet in pets.iter().filter(|p| p.id > 0) {
+        sqlx::query("INSERT INTO pet (player_id, Stt, Id, Name, Lv, Thuoctinh, Reborn, Hp, HpMax, Sp, SpMax, `Int`, Atk, Def, Hpx, Spx, Agi, Fai, Texp, Int2, Atk2, Def2, Hpx2, Spx2, Agi2, Thd, SkillPoint, Quest, Idskill1, LvSkill1, IdSkill2, LvSkill2, IdSkill3, LvSkill3, IdSkill4, LvSkill4) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+            .bind(i64::from(player_id)).bind(i64::from(pet.stt)).bind(i64::from(pet.id))
+            .bind(pet.name.as_slice()).bind(i64::from(pet.level)).bind(i64::from(pet.thuoctinh))
+            .bind(i64::from(pet.reborn)).bind(i64::from(pet.hp)).bind(i64::from(pet.hp_max))
+            .bind(i64::from(pet.sp)).bind(i64::from(pet.sp_max)).bind(i64::from(pet.int1))
+            .bind(i64::from(pet.atk)).bind(i64::from(pet.def)).bind(i64::from(pet.hpx))
+            .bind(i64::from(pet.spx)).bind(i64::from(pet.agi)).bind(i64::from(pet.fai))
+            .bind(i64::from(pet.texp)).bind(i64::from(pet.int2)).bind(i64::from(pet.atk2))
+            .bind(i64::from(pet.def2)).bind(i64::from(pet.hpx2)).bind(i64::from(pet.spx2))
+            .bind(i64::from(pet.agi2)).bind(i64::from(pet.thd)).bind(i64::from(pet.skill_point)).bind(i64::from(pet.quest))
+            .bind(i64::from(pet.skills[0].0)).bind(i64::from(pet.skills[0].1))
+            .bind(i64::from(pet.skills[1].0)).bind(i64::from(pet.skills[1].1))
+            .bind(i64::from(pet.skills[2].0)).bind(i64::from(pet.skills[2].1))
+            .bind(i64::from(pet.skills[3].0)).bind(i64::from(pet.skills[3].1))
+            .execute(&mut **tx).await?;
+    }
+    Ok(())
+}
+
+async fn replace_item_table_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::MySql>,
+    player_id: u32,
+    table: &str,
+    items: &[InventoryItem],
+) -> Result<(), sqlx::Error> {
+    let Some(table) = item_table(table) else {
+        return Ok(());
+    };
+    let delete = format!("DELETE FROM {table} WHERE player_id = ?");
+    sqlx::query(&delete)
+        .bind(i64::from(player_id))
+        .execute(&mut **tx)
+        .await?;
+    let insert = format!(
+        "INSERT INTO {table} (player_id, Slot, Id, `Count`, Lv, DoBen, Int1, Atk1, Def1, Hpx1, Spx1, Agi1, Fai1, Int2, Atk2, Def2, Hpx2, Spx2, Agi2, Fai2, Hp, Sp, `Long`, GiatriLong, Khang, Thuoctinh, GiatriThuoctinh, Loai, Texp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    );
+    for item in items.iter().filter(|i| i.id > 0 && i.count > 0) {
+        sqlx::query(&insert)
+            .bind(i64::from(player_id))
+            .bind(i64::from(item.slot))
+            .bind(i64::from(item.id))
+            .bind(i64::from(item.count))
+            .bind(i64::from(item.lv))
+            .bind(i64::from(item.doben))
+            .bind(i64::from(item.int1))
+            .bind(i64::from(item.atk1))
+            .bind(i64::from(item.def1))
+            .bind(i64::from(item.hpx1))
+            .bind(i64::from(item.spx1))
+            .bind(i64::from(item.agi1))
+            .bind(i64::from(item.fai1))
+            .bind(i64::from(item.int2))
+            .bind(i64::from(item.atk2))
+            .bind(i64::from(item.def2))
+            .bind(i64::from(item.hpx2))
+            .bind(i64::from(item.spx2))
+            .bind(i64::from(item.agi2))
+            .bind(i64::from(item.fai2))
+            .bind(i64::from(item.item_hp))
+            .bind(i64::from(item.item_sp))
+            .bind(i64::from(item.long_val))
+            .bind(i64::from(item.giatri_long))
+            .bind(i64::from(item.khang))
+            .bind(i64::from(item.thuoctinh))
+            .bind(i64::from(item.giatri_thuoctinh))
+            .bind(i64::from(item.loai))
+            .bind(i64::from(item.texp))
+            .execute(&mut **tx)
+            .await?;
+    }
+    Ok(())
+}
+
 async fn update_shop_player(
     tx: &mut sqlx::Transaction<'_, sqlx::MySql>,
     player_id: u32,
@@ -238,26 +376,7 @@ async fn replace_homdo_tx(
     player_id: u32,
     items: &[InventoryItem],
 ) -> Result<(), sqlx::Error> {
-    sqlx::query("DELETE FROM homdo WHERE player_id = ?")
-        .bind(i64::from(player_id))
-        .execute(&mut **tx)
-        .await?;
-    for item in items.iter().filter(|item| item.id > 0 && item.count > 0) {
-        sqlx::query(
-            "INSERT INTO homdo (player_id, Slot, Id, `Count`, DoBen, Int1, Atk1, Def1, Hpx1, Spx1, Agi1, Fai1, Int2, Atk2, Def2, Hpx2, Spx2, Agi2, Fai2, `Long`, GiatriLong, Khang, Thuoctinh, GiatriThuoctinh, Loai, Texp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        )
-        .bind(i64::from(player_id)).bind(i64::from(item.slot)).bind(i64::from(item.id))
-        .bind(i64::from(item.count)).bind(i64::from(item.doben)).bind(i64::from(item.int1))
-        .bind(i64::from(item.atk1)).bind(i64::from(item.def1)).bind(i64::from(item.hpx1))
-        .bind(i64::from(item.spx1)).bind(i64::from(item.agi1)).bind(i64::from(item.fai1))
-        .bind(i64::from(item.int2)).bind(i64::from(item.atk2)).bind(i64::from(item.def2))
-        .bind(i64::from(item.hpx2)).bind(i64::from(item.spx2)).bind(i64::from(item.agi2))
-        .bind(i64::from(item.fai2))
-        .bind(i64::from(item.long_val)).bind(i64::from(item.giatri_long)).bind(i64::from(item.khang))
-        .bind(i64::from(item.thuoctinh)).bind(i64::from(item.giatri_thuoctinh)).bind(i64::from(item.loai))
-        .bind(i64::from(item.texp)).execute(&mut **tx).await?;
-    }
-    Ok(())
+    replace_item_table_tx(tx, player_id, "homdo", items).await
 }
 
 /// Upserts a player skill entry into MySQL `skill` table.
@@ -334,15 +453,16 @@ pub async fn upsert_pet(
     pet: &crate::server::session::PetState,
 ) {
     let Some(pool) = pool else { return };
-    let name_str = String::from_utf8_lossy(&pet.name);
     let q = "INSERT INTO pet (player_id, Stt, Id, Name, Lv, Thuoctinh, Reborn, Hp, HpMax, Sp, SpMax, \
              `Int`, Atk, Def, Hpx, Spx, Agi, Fai, Texp, Int2, Atk2, Def2, Hpx2, Spx2, Agi2, Thd, \
              SkillPoint, Quest, Idskill1, LvSkill1, IdSkill2, LvSkill2, IdSkill3, LvSkill3, IdSkill4, LvSkill4) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
              ON DUPLICATE KEY UPDATE Id = VALUES(Id), Name = VALUES(Name), Lv = VALUES(Lv), \
              Thuoctinh = VALUES(Thuoctinh), Reborn = VALUES(Reborn), Hp = VALUES(Hp), HpMax = VALUES(HpMax), \
              Sp = VALUES(Sp), SpMax = VALUES(SpMax), `Int` = VALUES(`Int`), Atk = VALUES(Atk), Def = VALUES(Def), \
-             Hpx = VALUES(Hpx), Spx = VALUES(Spx), Agi = VALUES(Agi), Fai = VALUES(Fai), Texp = VALUES(Texp), \
+              Hpx = VALUES(Hpx), Spx = VALUES(Spx), Agi = VALUES(Agi), Fai = VALUES(Fai), Texp = VALUES(Texp), \
+              Int2 = VALUES(Int2), Atk2 = VALUES(Atk2), Def2 = VALUES(Def2), Hpx2 = VALUES(Hpx2), \
+              Spx2 = VALUES(Spx2), Agi2 = VALUES(Agi2), Thd = VALUES(Thd), Quest = VALUES(Quest), \
              SkillPoint = VALUES(SkillPoint), Idskill1 = VALUES(Idskill1), LvSkill1 = VALUES(LvSkill1), \
              IdSkill2 = VALUES(IdSkill2), LvSkill2 = VALUES(LvSkill2), IdSkill3 = VALUES(IdSkill3), \
              LvSkill3 = VALUES(LvSkill3), IdSkill4 = VALUES(IdSkill4), LvSkill4 = VALUES(LvSkill4)";
@@ -350,7 +470,7 @@ pub async fn upsert_pet(
         .bind(i64::from(player_id))
         .bind(i64::from(pet.stt))
         .bind(i64::from(pet.id))
-        .bind(name_str.as_ref())
+        .bind(pet.name.as_slice())
         .bind(i64::from(pet.level))
         .bind(i64::from(pet.thuoctinh))
         .bind(i64::from(pet.reborn))
@@ -366,7 +486,15 @@ pub async fn upsert_pet(
         .bind(i64::from(pet.agi))
         .bind(i64::from(pet.fai))
         .bind(i64::from(pet.texp))
+        .bind(i64::from(pet.int2))
+        .bind(i64::from(pet.atk2))
+        .bind(i64::from(pet.def2))
+        .bind(i64::from(pet.hpx2))
+        .bind(i64::from(pet.spx2))
+        .bind(i64::from(pet.agi2))
+        .bind(i64::from(pet.thd))
         .bind(i64::from(pet.skill_point))
+        .bind(i64::from(pet.quest))
         .bind(i64::from(pet.skills[0].0))
         .bind(i64::from(pet.skills[0].1))
         .bind(i64::from(pet.skills[1].0))

@@ -33,6 +33,8 @@ pub struct InventoryItem {
     pub spx2: i16,
     pub agi2: i16,
     pub fai2: i16,
+    pub item_hp: i16,
+    pub item_sp: i16,
     pub loai: u8,
     /// Item element (`_Thuoctinh`, Items.txt `element`).
     pub thuoctinh: u8,
@@ -93,6 +95,13 @@ pub struct PetState {
     pub spx: u16,
     pub agi: u16,
     pub fai: u16,
+    pub int2: u16,
+    pub atk2: u16,
+    pub def2: u16,
+    pub hpx2: u16,
+    pub spx2: u16,
+    pub agi2: u16,
+    pub thd: u16,
     pub texp: u32,
     pub skill_point: u16,
     pub quest: u8,
@@ -416,11 +425,11 @@ impl Session {
         }
     }
 
-/// Add an item to Homdo. Returns the slot(s) written (a capped merge can touch
-/// two slots); empty when the bag is full.
-pub fn add_homdo_item(&mut self, item: InventoryItem) -> Vec<u8> {
-    crate::server::inventory::add_item(&mut self.homdo, item)
-}
+    /// Add an item to Homdo. Returns the slot(s) written (a capped merge can touch
+    /// two slots); empty when the bag is full.
+    pub fn add_homdo_item(&mut self, item: InventoryItem) -> Vec<u8> {
+        crate::server::inventory::add_item(&mut self.homdo, item)
+    }
 
     /// Remove up to `count` of `item_id` from inventory; returns the removed count.
     pub fn remove_homdo_item(&mut self, item_id: u16, count: u32) -> u32 {
@@ -492,24 +501,21 @@ mod player_operation_lock_tests {
     #[tokio::test]
     async fn player_locks_block_same_player_but_not_unrelated_player() {
         let held = lock_player_operations([388_881]).await;
-        assert!(tokio::time::timeout(
-            Duration::from_millis(50),
-            lock_player_operations([388_882])
-        )
-        .await
-        .is_ok());
-        assert!(tokio::time::timeout(
-            Duration::from_millis(20),
-            lock_player_operations([388_881])
-        )
-        .await
-        .is_err());
+        assert!(
+            tokio::time::timeout(Duration::from_millis(50), lock_player_operations([388_882]))
+                .await
+                .is_ok()
+        );
+        assert!(
+            tokio::time::timeout(Duration::from_millis(20), lock_player_operations([388_881]))
+                .await
+                .is_err()
+        );
         drop(held);
-        assert!(tokio::time::timeout(
-            Duration::from_millis(50),
-            lock_player_operations([388_881])
-        )
-        .await
-        .is_ok());
+        assert!(
+            tokio::time::timeout(Duration::from_millis(50), lock_player_operations([388_881]))
+                .await
+                .is_ok()
+        );
     }
 }

@@ -175,13 +175,15 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         0x17 => {
             if (30..=33).contains(&ctx.sub) {
                 shops::handle_player_shop(ctx).await;
+            } else if matches!(ctx.sub, 51 | 52) {
+                trade_storage::handle_storage_transfer(ctx).await;
             } else {
                 inventory::handle_inventory(ctx).await;
             }
         }
 
         // Op 0x19 — Trade
-        0x19 => trade_storage::handle_trade(ctx),
+        0x19 => trade_storage::handle_trade(ctx).await,
 
         // Op 0x1B — NPC shop buy/sell
         0x1B => shops::handle_npc_shop(ctx).await,
@@ -190,10 +192,10 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         0x1C => skills::handle_skills(ctx).await,
 
         // Op 0x1D — Bank gold
-        0x1D => trade_storage::handle_bank_gold(ctx),
+        0x1D => trade_storage::handle_bank_gold(ctx).await,
 
         // Op 0x1E — Storage transfer (TienTrang)
-        0x1E => trade_storage::handle_storage_transfer(ctx),
+        0x1E => trade_storage::handle_storage_transfer(ctx).await,
 
         // Op 0x1F — Pet stable menu
         0x1F => pet_actions::handle_pet_stable(ctx),
@@ -701,8 +703,8 @@ mod tests {
         conn.session.gold = 5000;
         conn.session.bank_gold = 2000;
 
-        // Op 0x1D sub 1: withdraw 1000 gold -> F444 0400 1D01 E803
-        let bank_decoded = encoder::bytes("F44404001D01E803").unwrap();
+        // Op 0x1D sub 1: withdraw 1000 gold (LE32 request).
+        let bank_decoded = encoder::bytes("F44406001D01E8030000").unwrap();
         let out_bank = dispatch(
             &mut conn,
             &bank_decoded,
@@ -713,7 +715,10 @@ mod tests {
         .await;
         assert_eq!(conn.session.gold, 6000);
         assert_eq!(conn.session.bank_gold, 1000);
-        assert_eq!(out_bank.outgoing.len(), 3);
+        assert_eq!(
+            out_bank.outgoing,
+            vec!["F44406001D02E8030000", "F44406001A01E8030000"]
+        );
 
         // Op 0x21 sub 1: set PK = 1 -> F444 0300 2101 01
         let pk_decoded = encoder::bytes("F4440300210101").unwrap();

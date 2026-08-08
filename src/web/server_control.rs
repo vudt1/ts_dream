@@ -337,6 +337,17 @@ async fn handle_client_connection(
                             if decoded.get(4) == Some(&0x17) && decoded.get(5) == Some(&33) {
                                 operation_ids.push(conn.session.open_shop_id);
                             }
+                            if decoded.get(4) == Some(&0x19) {
+                                let sub = decoded.get(5).copied().unwrap_or(0);
+                                let partner = if matches!(sub, 1 | 10) {
+                                    decoded.get(6..10).and_then(|p| p.try_into().ok()).map(u32::from_le_bytes).unwrap_or(0)
+                                } else if sub == 20 {
+                                    decoded.get(10..14).and_then(|p| p.try_into().ok()).map(u32::from_le_bytes).unwrap_or(0)
+                                } else {
+                                    conn.session.trade.partner_id
+                                };
+                                operation_ids.push(partner);
+                            }
                             let _operation_guards =
                                 crate::server::session::lock_player_operations(operation_ids).await;
                             let env = ServerEnv {
@@ -394,8 +405,7 @@ async fn handle_client_connection(
     }
 
     if logined_id > 0 {
-        let _operation_guards =
-            crate::server::session::lock_player_operations([logined_id]).await;
+        let _operation_guards = crate::server::session::lock_player_operations([logined_id]).await;
         // Ch2 §2.1: a logged-in disconnect broadcasts the leave-battle +
         // offline hide frame to the map, then drops registration.
         control.disconnect_player(logined_id).await;
@@ -544,10 +554,7 @@ mod tests {
         .await;
 
         // Same-map peer 300002: gets leader's walk, NOT its own walk.
-        assert_eq!(
-            rx2.try_recv().unwrap(),
-            "F4440B000601E1930400026400C800"
-        );
+        assert_eq!(rx2.try_recv().unwrap(), "F4440B000601E1930400026400C800");
         assert_eq!(
             rx2.try_recv(),
             Err(mpsc::error::TryRecvError::Empty),
