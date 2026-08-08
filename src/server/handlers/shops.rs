@@ -33,11 +33,14 @@ fn try_sell_range(conn: &mut Conn, item_range: std::ops::RangeInclusive<u16>, co
             .session
             .homdo
             .iter()
-            .any(|i| i.id == item_id && i.count > 0)
+            .filter(|i| i.id == item_id)
+            .map(|i| u32::from(i.count))
+            .sum::<u32>()
+            >= u32::from(count)
         {
             let removed = conn.session.remove_homdo_item(item_id, u32::from(count));
-            conn.session.gold = conn.session.gold.saturating_add(removed);
-            return removed > 0;
+            conn.session.gold = conn.session.gold.saturating_add(u32::from(count));
+            return removed == u32::from(count);
         }
     }
     false
@@ -195,8 +198,8 @@ pub async fn handle_npc_shop(ctx: &mut OpcodeCtx<'_>) {
             conn.session = before_sell;
             tracing::warn!("NPC sell persistence failed for player {}", conn.session.id);
         } else {
-            out.send(gold_frame(conn.session.gold));
             out.send(red_message("Khách quan bán hàng thành công"));
+            out.send(gold_frame(conn.session.gold));
         }
         return;
     }
@@ -430,7 +433,6 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
                 return;
             }
             let name_bytes = payload[1..1 + name_len].to_vec();
-            let name = String::from_utf8_lossy(&name_bytes).to_string();
             let mut listings = Vec::new();
             let mut seen_slots = std::collections::HashSet::new();
             let mut items_hex = String::new();
@@ -465,7 +467,7 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
                 cursor += 5;
             }
             conn.session.shop.active = true;
-            conn.session.shop.name = name.clone();
+            conn.session.shop.name = name_bytes.clone();
             conn.session.shop.items = listings;
 
             // Self catalog (171E) + broadcast open (171F) to other map clients.
@@ -760,7 +762,7 @@ mod tests {
         handle_player_shop(&mut ctx).await;
 
         assert!(conn.session.shop.active);
-        assert_eq!(conn.session.shop.name, "TEST");
+        assert_eq!(conn.session.shop.name, b"TEST");
         assert_eq!(conn.session.shop.items.len(), 1);
         assert_eq!(conn.session.shop.items[0].slot, 1);
         assert_eq!(conn.session.shop.items[0].price, 1000);
@@ -770,6 +772,29 @@ mod tests {
             .any(|f| f.starts_with("F4440C00171E") && f.contains("045445535401E8030000")));
         assert_eq!(out.map_broadcast.len(), 1);
         assert!(out.map_broadcast[0].frame.contains("171F"));
+    }
+
+    #[tokio::test]
+    async fn player_shop_name_preserves_viscii_bytes() {
+        let mut conn = Conn::new();
+        conn.session.id = 300001;
+        conn.session.homdo.push(InventoryItem {
+            slot: 1,
+            id: 20001,
+            count: 1,
+            ..Default::default()
+        });
+        let data = GameData::default();
+        let service = BattleService::new(Arc::new(GameData::default()));
+        let name = [0xE1, 0xF2, 0x80];
+        let payload = [vec![name.len() as u8], name.to_vec(), vec![0]].concat();
+        let mut out = HandleOutcome::default();
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 30, &payload);
+
+        handle_player_shop(&mut ctx).await;
+
+        assert_eq!(conn.session.shop.name, name);
+        assert!(out.outgoing[0].contains("03E1F280"));
     }
 
     #[tokio::test]
@@ -814,7 +839,7 @@ mod tests {
         let mut conn = Conn::new();
         conn.session.id = 300001;
         conn.session.shop.active = true;
-        conn.session.shop.name = "TEST".to_string();
+        conn.session.shop.name = b"TEST".to_vec();
 
         let data = GameData::default();
         let service = BattleService::new(Arc::new(GameData::default()));
@@ -1086,6 +1111,31 @@ mod tests {
         assert_eq!(item.count, 1);
         let gold_frame = format!("F4440A001A04{}00000000", encoder::le32(12));
         assert!(out.outgoing.iter().any(|f| f == &gold_frame));
+    }
+
+    #[tokio::test]
+    async fn npc_sell_rejects_request_larger_than_owned_stack() {
+        let mut conn = Conn::new();
+        conn.session.id = 300001;
+        conn.session.map_id = 12001;
+        conn.session.idnpctalking = 16005;
+        conn.session.gold = 10;
+        conn.session.homdo.push(InventoryItem {
+            slot: 1,
+            id: 26001,
+            count: 2,
+            ..Default::default()
+        });
+        let data = GameData::default();
+        let service = BattleService::new(Arc::new(GameData::default()));
+        let mut out = HandleOutcome::default();
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 0, &[0, 3]);
+
+        handle_npc_shop(&mut ctx).await;
+
+        assert_eq!(conn.session.gold, 10);
+        assert_eq!(conn.session.homdo[0].count, 2);
+        assert!(out.outgoing.is_empty());
     }
 
     /// Op 0x1B sell: idnpctalking 16002 scans 27001..27165.

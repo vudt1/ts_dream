@@ -333,6 +333,12 @@ async fn handle_client_connection(
                                 tracing::warn!("dropping frame without F4 44 magic from {peer_ip}");
                                 continue;
                             }
+                            let mut operation_ids = vec![logined_id];
+                            if decoded.get(4) == Some(&0x17) && decoded.get(5) == Some(&33) {
+                                operation_ids.push(conn.session.open_shop_id);
+                            }
+                            let _operation_guards =
+                                crate::server::session::lock_player_operations(operation_ids).await;
                             let env = ServerEnv {
                                 pool: pool.as_ref(),
                                 hub: Some(&control),
@@ -350,7 +356,10 @@ async fn handle_client_connection(
                             let out = handler::dispatch(&mut conn, &decoded, &data, &service, &env).await;
                             let id = conn.session.id;
                             if logined_id > 0 {
-                                online_sessions().lock().unwrap().insert(logined_id, conn.session.clone());
+                                online_sessions()
+                                    .lock()
+                                    .unwrap()
+                                    .insert(logined_id, conn.session.clone());
                             }
                             for f in &out.outgoing {
                                 let _ = tx.send(f.clone());
@@ -385,6 +394,8 @@ async fn handle_client_connection(
     }
 
     if logined_id > 0 {
+        let _operation_guards =
+            crate::server::session::lock_player_operations([logined_id]).await;
         // Ch2 §2.1: a logged-in disconnect broadcasts the leave-battle +
         // offline hide frame to the map, then drops registration.
         control.disconnect_player(logined_id).await;

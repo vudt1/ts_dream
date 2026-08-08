@@ -74,3 +74,11 @@ Nếu tách follow-up, thứ tự đề xuất là: (1) exhaustive table + gener
 - `cargo check`: passed.
 - `cargo test -- --test-threads=1`: **258 unit tests + all integration/golden/web tests passed**.
 - Unit tests cover all 89 C# NPC buy branches, inventory preflight, exact listing-slot removal, player-shop active seller/self-buy/invalid listing paths, and `MapBroadcast` output. Live MySQL service integration remains environment-dependent; transaction SQL is exercised by compile/type checks but requires a configured MySQL instance for an end-to-end DB test.
+
+### Hardening follow-up (2026-08-08)
+
+- Player-shop names now remain raw VISCII bytes end-to-end instead of passing through UTF-8-lossy conversion (`src/server/session.rs`, `src/server/handlers/shops.rs`). Regression test: `player_shop_name_preserves_viscii_bytes`.
+- The live connection loop now uses ordered per-player operation locks from authoritative snapshot load through handler completion and registry publish. Shop purchases lock buyer+seller, ordinary frames/disconnects lock only the affected player, preventing lost updates without blocking unrelated sessions (`src/server/session.rs`, `src/web/server_control.rs`).
+- Failed DB persistence restores the buyer snapshot; seller mutations are not published unless the atomic persistence transaction commits.
+- NPC sell now requires the full requested count, credits exactly `data[7]`, and emits the C# packet order (success message before gold update).
+- Validation: `cargo check` passed; `cargo test server::handlers::shops -- --nocapture` passed 20/20; `cargo test -- --test-threads=1` passed 261 unit tests plus all battle/data/golden/web integration tests (one golden-regeneration test intentionally ignored).

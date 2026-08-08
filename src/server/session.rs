@@ -112,7 +112,8 @@ pub struct ShopItem {
 #[derive(Debug, Clone, Default)]
 pub struct PlayerShopState {
     pub active: bool,
-    pub name: String,
+    /// Raw VISCII bytes used by the wire protocol.
+    pub name: Vec<u8>,
     pub items: Vec<ShopItem>,
 }
 
@@ -442,11 +443,73 @@ pub fn online_sessions() -> &'static std::sync::Mutex<std::collections::HashMap<
     ONLINE.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
 }
 
+/// Locks player operations in stable id order. A shop purchase locks buyer and
+/// seller; ordinary frames and disconnects lock only their own player. This
+/// prevents cross-player lost updates without blocking unrelated sessions.
+pub async fn lock_player_operations(
+    player_ids: impl IntoIterator<Item = u32>,
+) -> Vec<tokio::sync::OwnedMutexGuard<()>> {
+    type PlayerLock = std::sync::Arc<tokio::sync::Mutex<()>>;
+    static LOCKS: std::sync::OnceLock<
+        std::sync::Mutex<std::collections::HashMap<u32, PlayerLock>>,
+    > = std::sync::OnceLock::new();
+    let locks = LOCKS.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+    let mut ids: Vec<u32> = player_ids.into_iter().filter(|id| *id > 0).collect();
+    ids.sort_unstable();
+    ids.dedup();
+    let selected: Vec<PlayerLock> = {
+        let mut registry = locks.lock().unwrap();
+        ids.into_iter()
+            .map(|id| {
+                registry
+                    .entry(id)
+                    .or_insert_with(|| std::sync::Arc::new(tokio::sync::Mutex::new(())))
+                    .clone()
+            })
+            .collect()
+    };
+    let mut guards = Vec::with_capacity(selected.len());
+    for lock in selected {
+        guards.push(lock.lock_owned().await);
+    }
+    guards
+}
+
 impl Conn {
     pub fn new() -> Self {
         Self {
             decoder: Decoder::new(),
             session: Session::new(),
         }
+    }
+}
+
+#[cfg(test)]
+mod player_operation_lock_tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[tokio::test]
+    async fn player_locks_block_same_player_but_not_unrelated_player() {
+        let held = lock_player_operations([388_881]).await;
+        assert!(tokio::time::timeout(
+            Duration::from_millis(50),
+            lock_player_operations([388_882])
+        )
+        .await
+        .is_ok());
+        assert!(tokio::time::timeout(
+            Duration::from_millis(20),
+            lock_player_operations([388_881])
+        )
+        .await
+        .is_err());
+        drop(held);
+        assert!(tokio::time::timeout(
+            Duration::from_millis(50),
+            lock_player_operations([388_881])
+        )
+        .await
+        .is_ok());
     }
 }
