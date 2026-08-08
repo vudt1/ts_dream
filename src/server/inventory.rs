@@ -19,7 +19,11 @@ pub fn from_template(data: &crate::data::loader::GameData, id: u16, count: u8) -
     data.items
         .get(&i64::from(id))
         .map(|def| InventoryItem::from_template(def, count))
-        .unwrap_or_else(|| InventoryItem { id, count, ..Default::default() })
+        .unwrap_or_else(|| InventoryItem {
+            id,
+            count,
+            ..Default::default()
+        })
 }
 
 /// Find the first free slot in `1..=HOMDO_SLOTS`, or `None` when full.
@@ -65,6 +69,23 @@ pub fn add_item(bag: &mut Vec<InventoryItem>, mut item: InventoryItem) -> Vec<u8
         }
     }
     affected
+}
+
+/// Check that adding the complete item will not silently drop any remainder.
+pub fn can_add_item(bag: &[InventoryItem], item: &InventoryItem) -> bool {
+    let before: u32 = bag
+        .iter()
+        .filter(|existing| existing.id == item.id)
+        .map(|existing| u32::from(existing.count))
+        .sum();
+    let mut trial = bag.to_vec();
+    add_item(&mut trial, item.clone());
+    let after: u32 = trial
+        .iter()
+        .filter(|existing| existing.id == item.id)
+        .map(|existing| u32::from(existing.count))
+        .sum();
+    after.saturating_sub(before) == u32::from(item.count)
 }
 
 /// Remove up to `count` of `item_id` from a homdo-style bag; returns the number
@@ -132,6 +153,18 @@ mod tests {
             })
             .collect();
         assert!(add_item(&mut bag, item(999, 1)).is_empty());
+        assert!(!can_add_item(&bag, &item(999, 1)));
+    }
+
+    #[test]
+    fn can_add_item_accepts_existing_stack() {
+        let bag = vec![InventoryItem {
+            slot: 1,
+            id: 999,
+            count: 1,
+            ..Default::default()
+        }];
+        assert!(can_add_item(&bag, &item(999, 1)));
     }
 
     #[test]

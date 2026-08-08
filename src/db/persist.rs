@@ -181,6 +181,85 @@ pub async fn upsert_item(
     }
 }
 
+/// Persist one shop transaction atomically. `None` pool is the in-memory
+/// golden path and is treated as successful.
+pub async fn persist_shop_transaction(
+    pool: Option<&MySqlPool>,
+    buyer_id: u32,
+    buyer_gold: u32,
+    buyer_items: &[InventoryItem],
+    seller_id: Option<u32>,
+    seller_gold: Option<u32>,
+    seller_items: Option<&[InventoryItem]>,
+) -> bool {
+    let Some(pool) = pool else { return true };
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            tracing::warn!("begin shop transaction failed: {e}");
+            return false;
+        }
+    };
+    let result = async {
+        update_shop_player(&mut tx, buyer_id, buyer_gold).await?;
+        replace_homdo_tx(&mut tx, buyer_id, buyer_items).await?;
+        if let (Some(id), Some(gold), Some(items)) = (seller_id, seller_gold, seller_items) {
+            update_shop_player(&mut tx, id, gold).await?;
+            replace_homdo_tx(&mut tx, id, items).await?;
+        }
+        Ok::<(), sqlx::Error>(())
+    }
+    .await;
+    match result {
+        Ok(()) => tx.commit().await.is_ok(),
+        Err(e) => {
+            tracing::warn!("shop transaction rolled back: {e}");
+            let _ = tx.rollback().await;
+            false
+        }
+    }
+}
+
+async fn update_shop_player(
+    tx: &mut sqlx::Transaction<'_, sqlx::MySql>,
+    player_id: u32,
+    gold: u32,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE players SET Gold = ? WHERE player_id = ?")
+        .bind(i64::from(gold))
+        .bind(i64::from(player_id))
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
+}
+
+async fn replace_homdo_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::MySql>,
+    player_id: u32,
+    items: &[InventoryItem],
+) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM homdo WHERE player_id = ?")
+        .bind(i64::from(player_id))
+        .execute(&mut **tx)
+        .await?;
+    for item in items.iter().filter(|item| item.id > 0 && item.count > 0) {
+        sqlx::query(
+            "INSERT INTO homdo (player_id, Slot, Id, `Count`, DoBen, Int1, Atk1, Def1, Hpx1, Spx1, Agi1, Fai1, Int2, Atk2, Def2, Hpx2, Spx2, Agi2, Fai2, `Long`, GiatriLong, Khang, Thuoctinh, GiatriThuoctinh, Loai, Texp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        )
+        .bind(i64::from(player_id)).bind(i64::from(item.slot)).bind(i64::from(item.id))
+        .bind(i64::from(item.count)).bind(i64::from(item.doben)).bind(i64::from(item.int1))
+        .bind(i64::from(item.atk1)).bind(i64::from(item.def1)).bind(i64::from(item.hpx1))
+        .bind(i64::from(item.spx1)).bind(i64::from(item.agi1)).bind(i64::from(item.fai1))
+        .bind(i64::from(item.int2)).bind(i64::from(item.atk2)).bind(i64::from(item.def2))
+        .bind(i64::from(item.hpx2)).bind(i64::from(item.spx2)).bind(i64::from(item.agi2))
+        .bind(i64::from(item.fai2))
+        .bind(i64::from(item.long_val)).bind(i64::from(item.giatri_long)).bind(i64::from(item.khang))
+        .bind(i64::from(item.thuoctinh)).bind(i64::from(item.giatri_thuoctinh)).bind(i64::from(item.loai))
+        .bind(i64::from(item.texp)).execute(&mut **tx).await?;
+    }
+    Ok(())
+}
+
 /// Upserts a player skill entry into MySQL `skill` table.
 pub async fn upsert_skill(
     pool: Option<&MySqlPool>,

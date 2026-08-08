@@ -2,7 +2,7 @@
 
 use crate::db::persist;
 use crate::protocol::encoder;
-use crate::server::handler::{HandleOutcome, OpcodeCtx};
+use crate::server::handler::OpcodeCtx;
 use crate::server::session::{Conn, InventoryItem};
 
 /// `F4440A001A04` + gold + `00000000` — the gold-update frame C# sends after
@@ -24,12 +24,7 @@ fn red_message(msg: &str) -> String {
 /// Sell the first item in `item_range` present in inventory: remove up to
 /// `count` of it and credit that many gold (C# `Update_H1B` megi bán branches,
 /// Client.cs:7095–7122). Returns true when something was sold.
-fn try_sell_range(
-    conn: &mut Conn,
-    out: &mut HandleOutcome,
-    item_range: std::ops::RangeInclusive<u16>,
-    count: u8,
-) -> bool {
+fn try_sell_range(conn: &mut Conn, item_range: std::ops::RangeInclusive<u16>, count: u8) -> bool {
     if count == 0 {
         return false;
     }
@@ -42,9 +37,7 @@ fn try_sell_range(
         {
             let removed = conn.session.remove_homdo_item(item_id, u32::from(count));
             conn.session.gold = conn.session.gold.saturating_add(removed);
-            out.send(gold_frame(conn.session.gold));
-            out.send(red_message("Khách quan bán hàng thành công"));
-            return true;
+            return removed > 0;
         }
     }
     false
@@ -179,35 +172,89 @@ pub async fn handle_npc_shop(ctx: &mut OpcodeCtx<'_>) {
     let idnpctalking = conn.session.idnpctalking;
     let map_id = conn.session.map_id;
 
+    let before_sell = conn.session.clone();
     let sold = if map_id > 10000 && (idnpctalking == 16005 || idnpctalking == 99999) {
-        try_sell_range(conn, out, 26001..=26455, count)
+        try_sell_range(conn, 26001..=26455, count)
     } else if map_id > 10000 && (idnpctalking == 16002 || idnpctalking == 99999) {
-        try_sell_range(conn, out, 27001..=27165, count)
+        try_sell_range(conn, 27001..=27165, count)
     } else {
         false
     };
     if sold {
-        persist::update_player(pool, conn.session.id, "Gold", conn.session.gold as i64).await;
+        let persisted = persist::persist_shop_transaction(
+            pool,
+            conn.session.id,
+            conn.session.gold,
+            &conn.session.homdo,
+            None,
+            None,
+            None,
+        )
+        .await;
+        if !persisted {
+            conn.session = before_sell;
+            tracing::warn!("NPC sell persistence failed for player {}", conn.session.id);
+        } else {
+            out.send(gold_frame(conn.session.gold));
+            out.send(red_message("Khách quan bán hàng thành công"));
+        }
         return;
     }
 
     // Free starter bundle (C# `num4 == 7 && my_MapId == 9999`).
     if idtalking == 7 && map_id == 9999 {
-        out.send(red_message("Khách quan mua hàng thành công"));
+        let before = conn.session.clone();
         for (item_id, n) in [(18001u16, 1u8), (27156, 50), (52015, 50)] {
             let item = crate::server::inventory::from_template(data, item_id, n);
-            let _ = conn.session.add_homdo_item(item);
+            if !crate::server::inventory::can_add_item(&conn.session.homdo, &item)
+                || conn.session.add_homdo_item(item).is_empty()
+            {
+                conn.session = before;
+                return;
+            }
         }
+        if !persist::persist_shop_transaction(
+            pool,
+            conn.session.id,
+            conn.session.gold,
+            &conn.session.homdo,
+            None,
+            None,
+            None,
+        )
+        .await
+        {
+            conn.session = before;
+            return;
+        }
+        out.send(red_message("Khách quan mua hàng thành công"));
         return;
     }
 
     // Buy from the transcribed (map, menu) shelf.
     if let Some((item_id, price)) = get_npc_shop_price(idtalking, map_id, menu) {
         if conn.session.gold >= price {
-            conn.session.gold -= price;
             let item = crate::server::inventory::from_template(data, item_id, 1);
-            let _ = conn.session.add_homdo_item(item);
-            persist::update_player(pool, conn.session.id, "Gold", conn.session.gold as i64).await;
+            if !crate::server::inventory::can_add_item(&conn.session.homdo, &item) {
+                return;
+            }
+            let before = conn.session.clone();
+            conn.session.gold -= price;
+            if conn.session.add_homdo_item(item).is_empty()
+                || !persist::persist_shop_transaction(
+                    pool,
+                    conn.session.id,
+                    conn.session.gold,
+                    &conn.session.homdo,
+                    None,
+                    None,
+                    None,
+                )
+                .await
+            {
+                conn.session = before;
+                return;
+            }
             out.send(red_message("Khách quan mua hàng thành công"));
             out.send(gold_frame(conn.session.gold));
         }
@@ -271,7 +318,7 @@ pub fn complete_shop_buy(
     shop_index: usize,
     count: u8,
 ) -> Result<ShopBuyResult, ShopBuyError> {
-    if seller.shop.items.is_empty() {
+    if !seller.shop.active || seller.shop.items.is_empty() {
         return Err(ShopBuyError::ShopClosed);
     }
     let listing = seller
@@ -289,7 +336,10 @@ pub fn complete_shop_buy(
         .find(|i| i.slot == listing.slot && i.id > 0)
         .cloned()
         .ok_or(ShopBuyError::NotEnoughStock)?;
-    if seller_item.count < count {
+    if listing.item_id != 0 && listing.item_id != seller_item.id {
+        return Err(ShopBuyError::NotEnoughStock);
+    }
+    if seller_item.count < count || (listing.count > 0 && listing.count < count) {
         return Err(ShopBuyError::NotEnoughStock);
     }
 
@@ -301,7 +351,11 @@ pub fn complete_shop_buy(
     }
 
     let equip = (1..=6).contains(&seller_item.loai);
-    if equip && crate::server::inventory::free_slot(&buyer.homdo).is_none() {
+    let mut purchase_item = seller_item.clone();
+    purchase_item.count = count;
+    if (equip && crate::server::inventory::free_slot(&buyer.homdo).is_none())
+        || (!equip && !crate::server::inventory::can_add_item(&buyer.homdo, &purchase_item))
+    {
         return Err(ShopBuyError::NoFreeSlot);
     }
 
@@ -309,9 +363,16 @@ pub fn complete_shop_buy(
     buyer.gold -= total;
     seller.gold = (u64::from(seller.gold).saturating_add(u64::from(total))).min(9_999_999) as u32;
 
-    let removed =
-        crate::server::inventory::remove_item(&mut seller.homdo, seller_item.id, u32::from(count));
-    let moved = removed.min(u32::from(count)) as u8;
+    let seller_pos = seller
+        .homdo
+        .iter()
+        .position(|item| item.slot == listing.slot && item.id == seller_item.id)
+        .ok_or(ShopBuyError::NotEnoughStock)?;
+    seller.homdo[seller_pos].count -= count;
+    let moved = count;
+    if seller.homdo[seller_pos].count == 0 {
+        seller.homdo.remove(seller_pos);
+    }
 
     if equip {
         let slot = crate::server::inventory::free_slot(&buyer.homdo).unwrap();
@@ -358,16 +419,22 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
     match sub {
         // Sub 30: Open player shop — parse name + (slot, price) listings.
         30 => {
-            let name_len = payload.first().copied().unwrap_or(0) as usize;
-            let name_bytes = payload.get(1..1 + name_len).unwrap_or(&[]).to_vec();
+            let Some(name_len) = payload.first().copied().map(usize::from) else {
+                return;
+            };
+            let listings_start = name_len + 2;
+            if name_len == 0
+                || listings_start > payload.len()
+                || (payload.len() - listings_start) % 5 != 0
+            {
+                return;
+            }
+            let name_bytes = payload[1..1 + name_len].to_vec();
             let name = String::from_utf8_lossy(&name_bytes).to_string();
-
-            conn.session.shop.active = true;
-            conn.session.shop.name = name.clone();
-            conn.session.shop.items.clear();
-
+            let mut listings = Vec::new();
+            let mut seen_slots = std::collections::HashSet::new();
             let mut items_hex = String::new();
-            let mut cursor = 2 + name_len; // payload[name_len + 2]
+            let mut cursor = listings_start;
             while cursor + 5 <= payload.len() {
                 let slot = payload[cursor];
                 let price = encoder::u32_le(
@@ -376,18 +443,30 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
                     payload[cursor + 3],
                     payload[cursor + 4],
                 );
-                conn.session
-                    .shop
-                    .items
-                    .push(crate::server::session::ShopItem {
-                        slot,
-                        price,
-                        ..Default::default()
-                    });
+                let Some(item) = conn
+                    .session
+                    .homdo
+                    .iter()
+                    .find(|item| item.slot == slot && item.id > 0)
+                else {
+                    return;
+                };
+                if price == 0 || !seen_slots.insert(slot) {
+                    return;
+                }
+                listings.push(crate::server::session::ShopItem {
+                    slot,
+                    item_id: item.id,
+                    count: item.count,
+                    price,
+                });
                 items_hex.push_str(&format!("{:02X}", slot));
                 items_hex.push_str(&encoder::le32(price));
                 cursor += 5;
             }
+            conn.session.shop.active = true;
+            conn.session.shop.name = name.clone();
+            conn.session.shop.items = listings;
 
             // Self catalog (171E) + broadcast open (171F) to other map clients.
             let body = format!(
@@ -397,18 +476,16 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
                 items_hex
             );
             out.send(crate::protocol::frame("171E", &body));
-            if let Some(hub) = hub {
-                let bcast = crate::protocol::frame(
-                    "171F",
-                    &format!(
-                        "{}{:02X}{}",
-                        encoder::le32(id),
-                        name_len,
-                        encoder::strhex(&name_bytes)
-                    ),
-                );
-                hub.broadcast_except(id, &bcast).await;
-            }
+            let bcast = crate::protocol::frame(
+                "171F",
+                &format!(
+                    "{}{:02X}{}",
+                    encoder::le32(id),
+                    name_len,
+                    encoder::strhex(&name_bytes)
+                ),
+            );
+            out.broadcast(id, bcast);
         }
         // Sub 31: Close player shop — self + broadcast 1720.
         31 => {
@@ -417,23 +494,24 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
             conn.session.shop.items.clear();
             let close = format!("F44406001720{}", encoder::le32(id));
             out.send(&close);
-            if let Some(hub) = hub {
-                hub.broadcast_except(id, &close).await;
-            }
+            out.broadcast(id, close);
         }
         // Sub 32: View another player's shop catalog.
         32 => {
             if payload.len() >= 4 {
                 let target = encoder::u32_le(payload[0], payload[1], payload[2], payload[3]);
-                conn.session.open_shop_id = target;
                 let seller = crate::server::session::online_sessions()
                     .lock()
                     .unwrap()
                     .get(&target)
                     .cloned();
                 match seller {
-                    Some(s) => out.send(player_shop_catalog_frame(&s)),
+                    Some(s) if target != id && s.shop.active && !s.shop.items.is_empty() => {
+                        conn.session.open_shop_id = target;
+                        out.send(player_shop_catalog_frame(&s));
+                    }
                     None => out.send(red_message("Người bán đang offline")),
+                    _ => out.send(red_message("Cửa hàng đã đóng cửa")),
                 }
             }
         }
@@ -443,6 +521,10 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
                 return;
             }
             let seller_id = conn.session.open_shop_id;
+            if seller_id == 0 || seller_id == id {
+                out.send(red_message("Không thể mua từ cửa hàng này"));
+                return;
+            }
             let shop_index = payload[4] as usize;
             let count = payload[5];
 
@@ -456,17 +538,28 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
                 return;
             };
 
+            let buyer_before = conn.session.clone();
             match complete_shop_buy(&mut conn.session, &mut seller_session, shop_index, count) {
                 Ok(res) => {
+                    if !persist::persist_shop_transaction(
+                        pool,
+                        conn.session.id,
+                        conn.session.gold,
+                        &conn.session.homdo,
+                        Some(seller_id),
+                        Some(seller_session.gold),
+                        Some(&seller_session.homdo),
+                    )
+                    .await
+                    {
+                        conn.session = buyer_before;
+                        out.send(red_message("Giao dịch không thành công"));
+                        return;
+                    }
                     crate::server::session::online_sessions()
                         .lock()
                         .unwrap()
                         .insert(seller_id, seller_session.clone());
-                    persist::update_player(pool, conn.session.id, "Gold", conn.session.gold as i64)
-                        .await;
-                    persist::update_player(pool, seller_id, "Gold", seller_session.gold as i64)
-                        .await;
-
                     out.send(gold_frame(conn.session.gold));
                     // Refresh the buyer's view of the seller's catalog.
                     out.send(player_shop_catalog_frame(&seller_session));
@@ -543,6 +636,7 @@ mod tests {
             price: 58800,
             ..Default::default()
         });
+        seller.shop.active = true;
 
         let frame = player_shop_catalog_frame(&seller);
         assert_eq!(
@@ -575,6 +669,7 @@ mod tests {
             price: 58800,
             ..Default::default()
         });
+        seller.shop.active = true;
 
         let res = complete_shop_buy(&mut buyer, &mut seller, 0, 1).unwrap();
         assert_eq!(res.total, 58800);
@@ -606,6 +701,7 @@ mod tests {
             price: 58800,
             ..Default::default()
         });
+        seller.shop.active = true;
 
         let err = complete_shop_buy(&mut buyer, &mut seller, 0, 1).unwrap_err();
         assert!(matches!(err, ShopBuyError::NotEnoughGold { total: 58800 }));
@@ -633,6 +729,7 @@ mod tests {
             price: 58800,
             ..Default::default()
         });
+        seller.shop.active = true;
 
         let err = complete_shop_buy(&mut buyer, &mut seller, 0, 5).unwrap_err();
         assert!(matches!(err, ShopBuyError::NotEnoughStock));
@@ -645,6 +742,12 @@ mod tests {
     async fn player_shop_sub30_open_parses_and_emits_171e() {
         let mut conn = Conn::new();
         conn.session.id = 300001;
+        conn.session.homdo.push(InventoryItem {
+            slot: 1,
+            id: 20023,
+            count: 1,
+            ..Default::default()
+        });
         // payload: name_len(4) "TEST" pad slot price(1000)
         let payload = [
             4u8, b'T', b'E', b'S', b'T', 0x00, 0x01, 0xE8, 0x03, 0x00, 0x00,
@@ -665,6 +768,44 @@ mod tests {
             .outgoing
             .iter()
             .any(|f| f.starts_with("F4440C00171E") && f.contains("045445535401E8030000")));
+        assert_eq!(out.map_broadcast.len(), 1);
+        assert!(out.map_broadcast[0].frame.contains("171F"));
+    }
+
+    #[tokio::test]
+    async fn player_shop_rejects_duplicate_or_unknown_listing_slots() {
+        let mut conn = Conn::new();
+        conn.session.id = 300001;
+        let data = GameData::default();
+        let service = BattleService::new(Arc::new(GameData::default()));
+        let mut out = HandleOutcome::default();
+        let payload = [
+            4u8, b'T', b'E', b'S', b'T', 0, 1, 0xE8, 3, 0, 0, 1, 1, 0, 0, 0,
+        ];
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 30, &payload);
+        handle_player_shop(&mut ctx).await;
+        assert!(!conn.session.shop.active);
+        assert!(out.outgoing.is_empty());
+    }
+
+    #[tokio::test]
+    async fn player_shop_rejects_self_buy() {
+        let mut conn = Conn::new();
+        conn.session.id = 300001;
+        conn.session.open_shop_id = 300001;
+        let data = GameData::default();
+        let service = BattleService::new(Arc::new(GameData::default()));
+        let mut out = HandleOutcome::default();
+        let mut ctx = test_ctx(
+            &mut conn,
+            &data,
+            &service,
+            &mut out,
+            33,
+            &[0, 0, 0, 0, 0, 1],
+        );
+        handle_player_shop(&mut ctx).await;
+        assert!(out.outgoing.iter().any(|frame| frame.contains("020B")));
     }
 
     /// Sub 31: close clears the shop and emits 1720 + player id.
@@ -685,6 +826,8 @@ mod tests {
         assert!(conn.session.shop.items.is_empty());
         let close = format!("F44406001720{}", encoder::le32(300001));
         assert!(out.outgoing.iter().any(|f| f == &close));
+        assert_eq!(out.map_broadcast.len(), 1);
+        assert_eq!(out.map_broadcast[0].frame, close);
     }
 
     /// Sub 32 + 33: open a seller's shop then buy from it (C# `_Open_Shop_Id`).
@@ -713,6 +856,7 @@ mod tests {
             price: 58800,
             ..Default::default()
         });
+        seller.shop.active = true;
         online_sessions().lock().unwrap().insert(300002, seller);
 
         let data = GameData::default();
@@ -772,6 +916,84 @@ mod tests {
         assert_eq!(get_npc_shop_price(1, 19241, 4), Some((26028, 10)));
         // Unknown (map, menu) → not on the shelf.
         assert_eq!(get_npc_shop_price(5, 60000, 0), None);
+    }
+
+    #[test]
+    fn npc_price_table_has_every_csharp_branch() {
+        let shelves = [
+            (1, 12223, 4),
+            (1, 19241, 5),
+            (4, 12002, 3),
+            (16, 12002, 15),
+            (15, 12002, 16),
+            (8, 12990, 8),
+            (1, 12201, 4),
+            (3, 12244, 4),
+            (1, 12007, 4),
+            (1, 12204, 3),
+            (2, 12204, 8),
+            (7, 12001, 3),
+            (2, 20001, 4),
+            (26, 11011, 8),
+        ];
+        let mut rows = 0;
+        for (idtalking, map_id, menu_count) in shelves {
+            for menu in 0..menu_count {
+                assert!(
+                    get_npc_shop_price(idtalking, map_id, menu).is_some(),
+                    "missing C# shop row ({idtalking}, {map_id}, {menu})"
+                );
+                rows += 1;
+            }
+            assert_eq!(get_npc_shop_price(idtalking, map_id, menu_count), None);
+        }
+        assert_eq!(rows, 89, "Client.cs:6472-7094 contains 89 buy branches");
+    }
+
+    #[test]
+    fn player_shop_removes_the_listed_slot_not_an_equal_id_stack() {
+        use crate::server::session::Session;
+        let mut buyer = Session::new();
+        buyer.gold = 100;
+        let mut seller = Session::new();
+        seller.shop.active = true;
+        seller.homdo.push(InventoryItem {
+            slot: 1,
+            id: 26041,
+            count: 5,
+            ..Default::default()
+        });
+        seller.homdo.push(InventoryItem {
+            slot: 2,
+            id: 26041,
+            count: 3,
+            ..Default::default()
+        });
+        seller.shop.items.push(crate::server::session::ShopItem {
+            slot: 2,
+            item_id: 26041,
+            count: 3,
+            price: 1,
+        });
+        complete_shop_buy(&mut buyer, &mut seller, 0, 2).unwrap();
+        assert_eq!(
+            seller
+                .homdo
+                .iter()
+                .find(|item| item.slot == 1)
+                .unwrap()
+                .count,
+            5
+        );
+        assert_eq!(
+            seller
+                .homdo
+                .iter()
+                .find(|item| item.slot == 2)
+                .unwrap()
+                .count,
+            1
+        );
     }
 
     /// Op 0x1B buy: `idtalking` 16 + map 12002 + menu 0 → item 20023 (58800).
