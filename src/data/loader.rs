@@ -513,6 +513,7 @@ impl GameData {
         }
 
         // [REQUIRES] — entry conditions (C# Data.cs:4612-4619).
+        let mut required_items: Option<Vec<(i64, i64, i64)>> = None;
         if ini.has_section("REQUIRES") {
             let rm = ini.get("REQUIRES", "SelectMenu");
             q.require_select_menu = if rm == NOTHING || rm.trim().is_empty() {
@@ -531,10 +532,16 @@ impl GameData {
             q.require_quests = parse_quest_tuples(&ini.get("REQUIRES", "Quests"), &file)?;
             q.require_wears = parse_wear_tuples(&ini.get("REQUIRES", "Wears"), &file)?;
             // Items consumed on win (`_RequireItems`): itemId-count-remove.
-            q.on_win.require_items = parse_tuples(&ini.get("REQUIRES", "Items"), &file)?;
+            required_items = Some(parse_tuples(&ini.get("REQUIRES", "Items"), &file)?);
         }
 
+        // `parse_result` rebuilds `OnWin` and would clobber `require_items`
+        // (ticket 19 #4: the C# AST owns them under [OnWin] although the INI
+        // writes them under [REQUIRES]) — re-apply after.
         q.on_win = self.parse_result(&ini, "OnWin", &file)?;
+        if let Some(items) = required_items {
+            q.on_win.require_items = items;
+        }
         // SaveLeaderQuests / SaveMemberQuests need map_id/type/id/step for AUTO.
         let win_qs = ini.get("ONWIN", "SaveLeaderQuests");
         if win_qs != NOTHING {
@@ -963,5 +970,27 @@ mod tests {
         assert_eq!(d.item_drop_on_map[&(10965, 1)].delay, 999_999);
         assert_eq!(d.item_drop_on_map[&(10965, 2)].map_x, 10);
         assert_eq!(d.item_drop_on_map[&(10965, 255)].item_id, 0);
+    }
+
+    #[test]
+    fn require_items_survive_onwin_rebuild() {
+        // Ticket 19 #4: `[REQUIRES].Items` must not be clobbered when
+        // `parse_result("OnWin")` rebuilds `quest.on_win`.
+        let dir = tempfile::tempdir().unwrap();
+        write_dataset(dir.path());
+        std::fs::write(
+            dir.path().join("Quests/q.ini"),
+            b"[BASE]\nMapId=1\nType=NPC\nId=2\nStep=0\nDialogs=0\n\
+             [REQUIRES]\nSelectMenu=30\nLevel=5\t1\nItems=31044-1-0\n\
+             [ONWIN]\nDialogs=0\nRewards=46001-1-0\n\
+             [DESCRIPTION]\nTitle=t\n",
+        )
+        .unwrap();
+        let q = GameData::default()
+            .parse_quest_ini(&dir.path().join("Quests/q.ini"))
+            .expect("parse quest ini");
+        assert_eq!(q.require_select_menu, 30);
+        assert_eq!(q.on_win.require_items, vec![(31044, 1, 0)]);
+        assert_eq!(q.on_win.rewards, vec![(46001, 1, 0)]);
     }
 }

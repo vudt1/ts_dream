@@ -56,6 +56,12 @@ pub struct MapBroadcast {
 #[derive(Debug, Default, Clone)]
 pub struct HandleOutcome {
     pub outgoing: Vec<String>,
+    /// Per-frame inter-send delay in milliseconds (parallel to `outgoing`).
+    /// `0` = send immediately. The connection loop sleeps this long before the
+    /// matching frame (`TalkMessages` sends dialog fragments 500 ms apart, C#
+    /// `FTalk.TalkMessages`). Golden replay ignores pacing — the frame order is
+    /// unchanged and byte-parity holds.
+    pub pacing_ms: Vec<u64>,
     pub shutdown: bool,
     /// If set, a TEAMDEF battle should be triggered after processing.
     pub battle_trigger: Option<crate::server::handlers::quest::BattleTrigger>,
@@ -65,6 +71,14 @@ pub struct HandleOutcome {
 impl HandleOutcome {
     pub fn send(&mut self, frame: impl Into<String>) {
         self.outgoing.push(frame.into());
+        self.pacing_ms.push(0);
+    }
+
+    /// Send `frame` after `delay_ms` (non-blocking). The first paced fragment
+    /// is delayed too, matching C# splitting each dialog line 500 ms apart.
+    pub fn send_delayed(&mut self, frame: impl Into<String>, delay_ms: u64) {
+        self.outgoing.push(frame.into());
+        self.pacing_ms.push(delay_ms);
     }
 
     /// Queue a map-scoped broadcast frame owned by `subject`. The fan-out is
@@ -161,12 +175,11 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
 
         // Op 0x0C — Teleport confirm
         0x0C => system::handle_teleport_confirm(ctx),
-
         // Op 0x0F — Pet actions (release, store, mount, rename, take, swap)
-        0x0F => pet_actions::handle_pet_actions(ctx),
+        0x0F => pet_actions::handle_pet_actions(ctx).await,
 
         // Op 0x13 — Pet summon / recall
-        0x13 => pet_actions::handle_pet_summon(ctx),
+        0x13 => pet_actions::handle_pet_summon(ctx).await,
 
         // Op 0x14 — Action / Talk
         0x14 => talk::handle_talk(ctx),
@@ -198,13 +211,13 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         0x1E => trade_storage::handle_storage_transfer(ctx).await,
 
         // Op 0x1F — Pet stable menu
-        0x1F => pet_actions::handle_pet_stable(ctx),
+        0x1F => pet_actions::handle_pet_stable(ctx).await,
 
         // Op 0x20 — Expressions
         0x20 => expressions::handle_expressions(ctx),
 
         // Op 0x21 — PK / War mode
-        0x21 => system::handle_pk_war(ctx),
+        0x21 => system::handle_pk_war(ctx).await,
 
         // Op 0x22 — Game points / God panel
         0x22 => system::handle_game_points(ctx),
@@ -225,7 +238,7 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         0x41 => system::handle_rank(ctx),
 
         // Op 0x42 — GM / Mall shop
-        0x42 => system::handle_gm_shop(ctx),
+        0x42 => system::handle_gm_shop(ctx).await,
 
         _ => {
             // Not yet ported / unknown: silently ignored.
@@ -733,17 +746,28 @@ mod tests {
         assert_eq!(conn.session.pk, 1);
         assert_eq!(out_pk.outgoing[0], "F444040021020100");
 
-        // Op 0x14 sub 1: talk start banker 16080 (0x3ED0) -> F444 0400 1401 D03E
-        let talk_decoded = encoder::bytes("F44404001401D03E").unwrap();
+        // Op 0x14 sub 1: talk start — map object 10 (the map's banker entry)
+        // resolves to template 16080 via NpcOnMap -> F444 0400 1401 0A00.
+        let mut data = dummy_data();
+        data.npc_on_map.push(crate::data::tables::NpcOnMap {
+            map_id: i64::from(conn.session.map_id),
+            id: 10,
+            npc_id: 16080,
+            x: 401,
+            y: 501,
+            ..Default::default()
+        });
+        let talk_decoded = encoder::bytes("F444040014010A00").unwrap();
         let out_talk = dispatch(
             &mut conn,
             &talk_decoded,
-            &dummy_data(),
+            &data,
             &dummy_service(),
             &ServerEnv::none(),
         )
         .await;
-        assert_eq!(conn.session.idtalking, 16080);
+        assert_eq!(conn.session.idtalking, 10);
+        assert_eq!(conn.session.idnpctalking, 16080);
         assert_eq!(out_talk.outgoing.len(), 2);
     }
 }

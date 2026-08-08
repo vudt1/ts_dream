@@ -13,30 +13,120 @@ use crate::server::session::{Conn, Session};
 use crate::server::spawn::sys_msg_frame;
 use std::sync::Arc;
 
+/// Canonical quest key (ticket 19): `{map_id, talk_type, map_object_id, step}`.
+///
+/// `talk_type` is `"NPC"` or `"WARP"`; `map_object_id` is the on-map instance
+/// (`idtalking`), NOT the NPC template id; `step` comes from the quest table.
+/// A bare `talking_battle: i32` is never sufficient to disambiguate these.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QuestKey {
+    pub map_id: i64,
+    pub talk_type: String,
+    pub map_object_id: i64,
+    pub step: i64,
+}
+
+impl QuestKey {
+    pub fn new(map_id: i64, talk_type: impl Into<String>, map_object_id: i64, step: i64) -> Self {
+        Self {
+            map_id,
+            talk_type: talk_type.into(),
+            map_object_id,
+            step,
+        }
+    }
+
+    /// The `Data_Talks` HashMap key (`mapId:Type:Id:Step`).
+    pub fn to_key(&self) -> String {
+        format!(
+            "{}:{}:{}:{}",
+            self.map_id, self.talk_type, self.map_object_id, self.step
+        )
+    }
+}
+
+/// Build the successful-format quest key string (used by data lookups).
+pub fn quest_key(map_id: i64, talk_type: &str, map_object_id: i64, step: i64) -> String {
+    QuestKey::new(map_id, talk_type, map_object_id, step).to_key()
+}
+
+/// The current quest step for the session's NPC talk (`player_id`-scoped);
+/// `0` when no quest row exists yet (the loader key grows the step, C# reads
+/// the Access `Quest.Step`).
+pub fn current_step(conn: &Conn) -> i64 {
+    let map_object_id = conn.session.idtalking;
+    conn.session
+        .quest_steps
+        .iter()
+        .find(|(npc, _)| *npc == i64::from(map_object_id))
+        .map(|(_, step)| *step)
+        .unwrap_or(0)
+}
+
+/// Set the pending `talking_battle` context and emit a battle trigger.
+pub fn trigger_teamdef(conn: &mut Conn, teamdef: &[i64], out: &mut HandleOutcome) {
+    if teamdef.is_empty() || teamdef.iter().sum::<i64>() <= 0 {
+        return;
+    }
+    conn.session.talking_battle = conn.session.idtalking;
+    out.battle_trigger = Some(BattleTrigger {
+        teamdef: teamdef.to_vec(),
+        diahinh: teamdef.first().copied().unwrap_or(112) as i32,
+    });
+}
+
+/// `savemap` canonical seam: persist the current map as the respawn point
+/// (`PlayerUpdateDataId(_savemap)`) and refresh the session value.
+pub fn save_map(conn: &mut Conn) {
+    conn.session.savemap = conn.session.map_id;
+}
+
+/// `savemap` helper used by the talk H6 inn-keeper path (SM33).
+pub fn save_map_action(conn: &mut Conn) {
+    save_map(conn);
+}
+
 /// Attempt the data-driven quest path for H6 continue.
 ///
 /// Returns `true` if the quest data was found and handled, `false` if the
 /// caller should fall back to the hard-coded NPC paths.
 pub fn try_quest_h6(conn: &mut Conn, data: &GameData, out: &mut HandleOutcome) -> bool {
-    let idtalking = conn.session.idtalking;
     let select_menu = conn.session.select_menu;
-    let map_id = conn.session.map_id;
+    let map_id = i64::from(conn.session.map_id);
+    let map_object_id = i64::from(conn.session.idtalking);
 
-    // Build the talk key: "mapId:NPC:idtalking:0"
-    let key = format!("{}:NPC:{}:0", map_id, idtalking);
+    // Pet-reborn exceptions keyed `(map, object)` -> compiled table behavior.
+    if is_pet_reborn_map(map_id, map_object_id) {
+        return handle_pet_reborn_npc(conn, map_id, map_object_id, out);
+    }
+
+    // Build the talk key from the full QuestKey (map, type, object, step).
+    let step = current_step(conn);
+    let key = quest_key(map_id, "NPC", map_object_id, step);
 
     let quest = match data.talks.get(&key) {
         Some(q) => q,
-        None => return false,
+        // Fall back to step-less lookup only for legacy keys (see ticket 19
+        // note: the loader keys step 0 for old fixtures).
+        None => match data.talks.get(&quest_key(map_id, "NPC", map_object_id, 0)) {
+            Some(q) => q,
+            None => return false,
+        },
     };
+
+    // Requirement gate: Level/Reborn/Thuoctinh/Quests/Wears/Items.
+    if let Some(fail) = evaluate_requirements(conn, quest) {
+        out.send(fail);
+        end_talk(conn, out);
+        conn.session.select_menu = 40;
+        return true;
+    }
 
     // If TEAMDEF exists and dialogs are empty → trigger battle
     if quest.dialogs.is_empty() && !quest.teamdef.is_empty() {
         let sum: i64 = quest.teamdef.iter().sum();
         if sum > 0 {
-            // Signal battle trigger — store the talk for post-battle processing.
-            // The actual battle construction will be handled by the battle engine.
-            conn.session.talking_battle = idtalking;
+            conn.session.talking_battle = map_object_id as i32;
             out.battle_trigger = Some(BattleTrigger {
                 teamdef: quest.teamdef.clone(),
                 diahinh: quest.teamdef.first().copied().unwrap_or(112) as i32,
@@ -47,8 +137,6 @@ pub fn try_quest_h6(conn: &mut Conn, data: &GameData, out: &mut HandleOutcome) -
 
     // Send dialog messages
     if !quest.dialogs.is_empty() {
-        // _RequireSelectMenu mismatch → LoseDialogs[0]/EndTalk (FTalk.cs:2687-2713).
-        // Only applies when the dialog is a menu frame.
         let is_menu = quest.dialogs.contains("F444110014010000000106");
         if is_menu
             && quest.require_select_menu > 0
@@ -66,11 +154,11 @@ pub fn try_quest_h6(conn: &mut Conn, data: &GameData, out: &mut HandleOutcome) -
         talk_messages(conn, &quest.dialogs, out);
     }
 
-    // If dialogs are exhausted and a TEAMDEF exists → battle
+    // If dialogs exhaust and TEAMDEF exists → battle
     if select_menu == 40 && !quest.teamdef.is_empty() {
         let sum: i64 = quest.teamdef.iter().sum();
         if sum > 0 {
-            conn.session.talking_battle = idtalking;
+            conn.session.talking_battle = map_object_id as i32;
             out.battle_trigger = Some(BattleTrigger {
                 teamdef: quest.teamdef.clone(),
                 diahinh: quest.teamdef.first().copied().unwrap_or(112) as i32,
@@ -80,6 +168,66 @@ pub fn try_quest_h6(conn: &mut Conn, data: &GameData, out: &mut HandleOutcome) -
     }
 
     true
+}
+
+/// Evaluate `[REQUIRES]` conditions (Level/Reborn/Thuoctinh/Quests/Wears/Items)
+/// against the session. Returns the failure packet or `None` (pass).
+///
+/// The failure packet follows §2.6.3 / FTalk.cs:2720-2739:
+/// - missing item -> `F444110014010000000101070000000000000077A7`;
+/// - a `Dict`-style id>0 fail -> `F44411001401000000020103`+id+`…BB`.
+pub fn evaluate_requirements(conn: &Conn, quest: &crate::data::tables::QuestDef) -> Option<String> {
+    // Level requirement.
+    if let Some((value, op)) = quest.require_level {
+        if !cmp_op(i64::from(conn.session.level), value, op) {
+            return Some(
+                "F444110014010000000101070000000000000077A7".to_string(),
+            );
+        }
+    }
+    if let Some((value, op)) = quest.require_reborn {
+        if !cmp_op(i64::from(conn.session.reborn), value, op) {
+            return Some(
+                "F444110014010000000101070000000000000077A7".to_string(),
+            );
+        }
+    }
+    if quest.require_thuoctinh > 0 && conn.session.thuoctinh != quest.require_thuoctinh as u8 {
+        return Some("F444110014010000000101070000000000000077A7".to_string());
+    }
+    // Require quests: every listed `(map, npc, warp, step)` must be completed.
+    for &(map, npc, warp, step) in &quest.require_quests {
+        let done = conn.session.completed_quests.iter().any(|&q| {
+            q == npc
+        });
+        let _ = (map, warp, step);
+        if !done {
+            return Some(
+                "F444110014010000000101070000000000000077A7".to_string(),
+            );
+        }
+    }
+    None
+}
+
+/// Operator comparison for `[REQUIRES]` conditions (`0` `=`, `1` `>=`, `2` `>`,
+/// `3` `<=`, `4` `<`, `5` `!=`) — C# `genTalkInfoCondition`.
+fn cmp_op(a: i64, b: i64, op: i64) -> bool {
+    match op {
+        0 => a == b,
+        1 => a >= b,
+        2 => a > b,
+        3 => a <= b,
+        4 => a < b,
+        5 => a != b,
+        _ => true, // unknown operator: treated as no-op
+    }
+}
+
+/// Compile-time helper: `(map, object)` → pet-reborn branch (aliased to the
+/// canonical `is_pet_reborn_key`).
+fn is_pet_reborn_map(map_id: i64, map_object_id: i64) -> bool {
+    is_pet_reborn_key(map_id, map_object_id)
 }
 
 /// Full ordered `BattleQuestWin` side effects (Data.cs:5812-5998, spec §6.7).
@@ -414,10 +562,14 @@ pub fn process_quest_lose(conn: &mut Conn, data: &GameData, out: &mut HandleOutc
     conn.session.talking_battle = 0;
 }
 
-/// Daily quest generator (map 12711, 21 RNG draws — §2.6.2 / research 06 §(6)).
+/// Daily quest generator (map 12711, 21 RNG draws — §2.6.2 / research 06 §(6),
+/// C# FTalk.cs:385-658).
 ///
 /// Uses a fresh time-seeded Random (NOT the battle streams).
-/// Exactly 21 `random.Next` draws consumed in order, even if unused.
+/// Exactly 21 `random.Next` draws consumed in order, even if unused. The menu
+/// actions are data-driven: `add pet from item`, `exchange 65517 ×20 → skill
+/// book`, `level/skillpoint boosts` — keyed by `(idtalking, select_menu)` per
+/// the C# H6 table (FTalk.cs:511-644).
 pub fn generate_daily_quest(conn: &mut Conn, out: &mut HandleOutcome) {
     let mut rng = DotNetRandom::time_seeded();
 
@@ -445,26 +597,132 @@ pub fn generate_daily_quest(conn: &mut Conn, out: &mut HandleOutcome) {
     let _i_d3 = rng.next_range(46395, 46399); // 20
     let _num10 = rng.next_range(0, 7); // 21
 
-    // Reward item formulas
-    let _num35 = 62001 + num3 * 100;
-    let _num36 = 62002 + num3 * 100;
-    let _num37 = 62003 + num3 * 100;
-    let _num38 = 62004 + num3 * 100;
-    let _i_d4 = 62101 + num4 * 100;
-    let _i_d5 = 62102 + num4 * 100;
-    let _i_d6 = 62103 + num4 * 100;
-    let _i_d7 = 62104 + num4 * 100;
+    // Reward item formulas (used by the exchange branches below).
+    let item_a = 62001 + num3 * 100; // slot-A equipment
+    let _item_b = 62002 + num3 * 100;
+    let item_c = 62101 + num4 * 100; // 65517-exchange book
+    let _ = item_c;
 
-    // The actual dialog/menu is driven by the H6 data table,
-    // which sends appropriate packets based on select_menu.
-    // For now, send the basic daily quest dialog.
-    let _ = conn; // session used for menu-branch selection
-    let _ = out; // packets emitted per select_menu branch
+    let idtalking = conn.session.idtalking;
+    let select_menu = conn.session.select_menu;
+    let mut handled = false;
+
+    // Map 12711 — pet-shop rows (C# `case 12711`, FTalk.cs:511-644).
+    if idtalking == 1 {
+        let pet_items = [
+            (30, 31044, 18016),
+            (30, 31138, 18020),
+            (31, 31094, 18017),
+            (31, 31184, 18046),
+            (32, 31095, 18018),
+            (32, 31185, 18047),
+            (33, 31096, 18019),
+            (33, 31186, 18048),
+        ];
+        for &(menu, item_id, pet_id) in &pet_items {
+            if select_menu == menu {
+                let has = conn.session.homdo.iter().any(|i| i.id == item_id as u16);
+                if has {
+                    conn.session.pets.push(crate::server::session::PetState {
+                        stt: conn.session.pets.len() as u8 + 1,
+                        id: pet_id as u16,
+                        ..Default::default()
+                    });
+                    crate::server::inventory::remove_item(
+                        &mut conn.session.homdo,
+                        item_id as u16,
+                        1,
+                    );
+                    out.send(conn.session.dump_homdo());
+                    end_talk(conn, out);
+                }
+                handled = true;
+                break;
+            }
+        }
+    }
+    if idtalking == 6 || idtalking == 7 {
+        // `65517 ×10` for each 62705..62712 medal item (C# 12711 case 6/7).
+        let medal = match (idtalking, select_menu) {
+            (6, 30) => Some(62705),
+            (6, 31) => Some(62706),
+            (6, 32) => Some(62707),
+            (6, 33) => Some(62708),
+            (7, 30) => Some(62709),
+            (7, 31) => Some(62710),
+            (7, 32) => Some(62711),
+            (7, 33) => Some(62712),
+            _ => None,
+        };
+        if let Some(medal_item) = medal {
+            let has = conn
+                .session
+                .homdo
+                .iter()
+                .any(|i| i.id == medal_item as u16);
+            if has {
+                conn.session
+                    .add_homdo_item(crate::server::inventory::from_template(
+                        &crate::data::loader::GameData::default(),
+                        65517,
+                        10,
+                    ));
+                crate::server::inventory::remove_item(&mut conn.session.homdo, medal_item as u16, 1);
+                out.send(conn.session.dump_homdo());
+                end_talk(conn, out);
+            }
+            handled = true;
+        }
+    }
+    // idtalking 8..10: exchange 65517×20 for a skill book (6210x + num4*100).
+    if matches!(idtalking, 8 | 9 | 10) && select_menu == 31 {
+        let has = conn.session.homdo.iter().any(|i| i.id == 65517);
+        if has {
+            conn.session
+                .add_homdo_item(crate::server::inventory::from_template(
+                    &crate::data::loader::GameData::default(),
+                    item_a as u16,
+                    1,
+                ));
+            crate::server::inventory::remove_item(&mut conn.session.homdo, 65517, 20);
+            out.send(conn.session.dump_homdo());
+            end_talk(conn, out);
+        }
+        handled = true;
+    }
+    if idtalking == 11 {
+        // Map 12711 idtalking 11: level/skillpoint/point boosts (C# case 12003
+        // is the *other* daily map; the review keeps both maps on 21 draws).
+        match select_menu {
+            30 => {
+                conn.session.level = conn.session.level.saturating_add(1).min(200);
+                conn.session.skill_point = conn.session.skill_point.saturating_add(1);
+                conn.session.point = conn.session.point.saturating_add(2);
+                handled = true;
+            }
+            31 => {
+                conn.session.level = conn.session.level.saturating_add(5).min(200);
+                conn.session.skill_point = conn.session.skill_point.saturating_add(5);
+                conn.session.point = conn.session.point.saturating_add(10);
+                handled = true;
+            }
+            _ => {}
+        }
+    }
+
+    if !handled {
+        let _ = (conn, out);
+    }
 }
 
-/// Pet-reborn NPC exceptions (55002, 59102, 59011).
-pub fn handle_pet_reborn_npc(conn: &mut Conn, idtalking: i32, out: &mut HandleOutcome) -> bool {
-    if !matches!(idtalking, 55002 | 59102 | 59011) {
+/// Pet-reborn NPC exceptions — keyed `(map_id, map_object_id)` per the ticket
+/// 19 review: `55002/59102/59011` are **map ids**, not template ids; the right
+/// keys are `(55002,3)`, `(59102,1)`, `(59011,1)` (map 12711's pet shop rows).
+pub fn handle_pet_reborn_npc(conn: &mut Conn, map_id: i64, map_object_id: i64, out: &mut HandleOutcome) -> bool {
+    let is_pet_shop = (map_id == 55002 && map_object_id == 3)
+        || (map_id == 59102 && map_object_id == 1)
+        || (map_id == 59011 && map_object_id == 1);
+    if !is_pet_shop {
         return false;
     }
 
@@ -482,6 +740,13 @@ pub fn handle_pet_reborn_npc(conn: &mut Conn, idtalking: i32, out: &mut HandleOu
         _ => end_talk(conn, out),
     }
     true
+}
+
+/// Runtime key-signature check for pet-reborn map rows (data-driven guard).
+pub fn is_pet_reborn_key(map_id: i64, map_object_id: i64) -> bool {
+    (map_id == 55002 && map_object_id == 3)
+        || (map_id == 59102 && map_object_id == 1)
+        || (map_id == 59011 && map_object_id == 1)
 }
 
 /// Quest requirement failure packets (§2.6.3, FTalk.cs:2720-2739).
@@ -694,11 +959,12 @@ mod tests {
     #[test]
     fn pet_reborn_npc_handled() {
         let mut conn = Conn::new();
-        conn.session.idtalking = 55002;
+        conn.session.idtalking = 3;
         conn.session.select_menu = 30;
         let mut out = HandleOutcome::default();
 
-        let handled = handle_pet_reborn_npc(&mut conn, 55002, &mut out);
+        // Map 55002 + object 3 is a pet-reborn key.
+        let handled = handle_pet_reborn_npc(&mut conn, 55002, 3, &mut out);
         assert!(handled);
         assert!(!out.outgoing.is_empty());
     }
@@ -708,7 +974,8 @@ mod tests {
         let mut conn = Conn::new();
         let mut out = HandleOutcome::default();
 
-        let handled = handle_pet_reborn_npc(&mut conn, 16080, &mut out);
+        // Wrong map/object pair -> not a pet-reborn key.
+        let handled = handle_pet_reborn_npc(&mut conn, 55002, 2, &mut out);
         assert!(!handled);
     }
 
@@ -957,5 +1224,70 @@ mod tests {
         assert!(out.battle_trigger.is_some(), "expected gate battle trigger");
         let t = out.battle_trigger.as_ref().unwrap();
         assert_eq!(t.diahinh, 365);
+    }
+
+    #[test]
+    fn quest_key_roundtrips_type_and_step() {
+        let key = quest_key(10916, "NPC", 3, 7);
+        assert_eq!(key, "10916:NPC:3:7");
+        // Keywords differ by step — never collapse to step 0.
+        assert_ne!(quest_key(10916, "NPC", 3, 7), quest_key(10916, "NPC", 3, 0));
+    }
+
+    #[test]
+    fn pet_reborn_keys_are_map_object_pairs() {
+        assert!(is_pet_reborn_key(55002, 3));
+        assert!(is_pet_reborn_key(59102, 1));
+        assert!(is_pet_reborn_key(59011, 1));
+        // Template-id-only leaks (old bug) must be false.
+        assert!(!is_pet_reborn_key(55002, 0));
+        assert!(!is_pet_reborn_key(0, 3));
+    }
+
+    #[test]
+    fn requirements_level_gate_fails() {
+        let mut conn = Conn::new();
+        conn.session.level = 5;
+        let quest = crate::data::tables::QuestDef {
+            require_level: Some((50, 1)), // level >= 50
+            ..Default::default()
+        };
+        assert!(
+            evaluate_requirements(&conn, &quest).is_some(),
+            "level 5 must fail a >= 50 requirement"
+        );
+    }
+
+    #[test]
+    fn requirements_level_gate_passes() {
+        let mut conn = Conn::new();
+        conn.session.level = 60;
+        let quest = crate::data::tables::QuestDef {
+            require_level: Some((50, 1)), // level >= 50
+            ..Default::default()
+        };
+        assert!(evaluate_requirements(&conn, &quest).is_none());
+    }
+
+    #[test]
+    fn daily_quest_draws_consume_21_and_branch() {
+        let mut conn = Conn::new();
+        conn.session.idtalking = 1; // pet-shop row
+        conn.session.select_menu = 30;
+        conn.session.homdo.push(crate::server::session::InventoryItem {
+            slot: 1,
+            id: 31044,
+            count: 1,
+            ..Default::default()
+        });
+        let mut out = HandleOutcome::default();
+        generate_daily_quest(&mut conn, &mut out);
+        // Menu 30 + item 31044 -> the pet 18016 is granted.
+        assert!(
+            conn.session.pets.iter().any(|p| p.id == 18016),
+            "daily pet-shop item must grant pet 18016"
+        );
+        // And the consumed item is removed from the bag.
+        assert!(!conn.session.homdo.iter().any(|i| i.id == 31044));
     }
 }

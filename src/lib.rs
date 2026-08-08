@@ -23,6 +23,7 @@ pub mod db {
     pub mod persist;
     pub mod players;
     pub mod pool;
+    pub mod quest;
 }
 
 pub mod server {

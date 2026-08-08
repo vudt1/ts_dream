@@ -40,6 +40,11 @@ fn player_column(col: &str) -> Option<&'static str> {
         "HP_Store" => "HP_Store",
         "SP_Store" => "SP_Store",
         "tanthu" => "tanthu",
+        "Pk" => "Pk",
+        "ThamChien" => "ThamChien",
+        "ShopPoint" => "ShopPoint",
+        "SttPetXuatchien" => "SttPetXuatchien",
+        "savemap" => "savemap",
         _ => return None,
     })
 }
@@ -253,6 +258,15 @@ pub async fn persist_sessions_transaction(
                     "homdo" => &session.homdo,
                     "tientrang" => &session.tientrang,
                     "luulang" => &session.luulang,
+                    "quest" => {
+                        let rows: Vec<(i64, i64)> = session
+                            .quest_steps
+                            .iter()
+                            .map(|(npc, step)| (*npc, *step))
+                            .collect();
+                        replace_quest_tx(&mut tx, session.id, &rows).await?;
+                        continue;
+                    }
                     "pet" => {
                         replace_pets_tx(&mut tx, session.id, &session.pets).await?;
                         continue;
@@ -273,6 +287,36 @@ pub async fn persist_sessions_transaction(
             false
         }
     }
+}
+
+/// Replace the player's `quest` rows with the current step snapshot (scoped by
+/// `player_id`). `rows` are `(npc_id, step)` pairs (the loaded key).
+async fn replace_quest_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::MySql>,
+    player_id: u32,
+    rows: &[(i64, i64)],
+) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM quest WHERE player_id = ?")
+        .bind(i64::from(player_id))
+        .execute(&mut **tx)
+        .await?;
+    for (npc_id, step) in rows {
+        if *npc_id <= 0 {
+            continue;
+        }
+        sqlx::query(
+            "INSERT INTO quest (player_id, QuestId, MapId, NpcId, WarpId, Step) \
+             VALUES (?, ?, ?, ?, 0, ?)",
+        )
+        .bind(i64::from(player_id))
+        .bind(npc_id)
+        .bind(0i64)
+        .bind(npc_id)
+        .bind(step)
+        .execute(&mut **tx)
+        .await?;
+    }
+    Ok(())
 }
 
 async fn replace_pets_tx(
@@ -366,6 +410,98 @@ async fn update_shop_player(
     sqlx::query("UPDATE players SET Gold = ? WHERE player_id = ?")
         .bind(i64::from(gold))
         .bind(i64::from(player_id))
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
+}
+
+/// Persist a mall purchase atomically: deduct `ShopPoint` and upsert the
+/// granted `homdo` row in one InnoDB transaction (Ticket 16, op 0x42). `None`
+/// pool is the protocol-replay path and succeeds.
+pub async fn persist_shop_point_and_item(
+    pool: Option<&MySqlPool>,
+    player_id: u32,
+    points: u32,
+    item: &InventoryItem,
+) -> bool {
+    let Some(pool) = pool else { return true };
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            tracing::warn!("begin mall purchase transaction failed: {e}");
+            return false;
+        }
+    };
+    let result = async {
+        sqlx::query("UPDATE players SET ShopPoint = ? WHERE player_id = ?")
+            .bind(i64::from(points))
+            .bind(i64::from(player_id))
+            .execute(&mut *tx)
+            .await?;
+        upsert_item_tx(&mut tx, player_id, item).await?;
+        Ok::<(), sqlx::Error>(())
+    }
+    .await;
+    match result {
+        Ok(()) => tx.commit().await.is_ok(),
+        Err(e) => {
+            tracing::warn!("mall purchase transaction rolled back: {e}");
+            let _ = tx.rollback().await;
+            false
+        }
+    }
+}
+
+/// Upsert one `homdo` row inside an open transaction (Ticket 16 helpers).
+async fn upsert_item_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::MySql>,
+    player_id: u32,
+    item: &InventoryItem,
+) -> Result<(), sqlx::Error> {
+    let q = "INSERT INTO homdo (\
+             player_id, Slot, Id, `Count`, Lv, DoBen, Int1, Atk1, Def1, Hpx1, Spx1, Agi1, \
+             Fai1, Int2, Atk2, Def2, Hpx2, Spx2, Agi2, Fai2, Hp, Sp, `Long`, GiatriLong, Khang, \
+             Thuoctinh, GiatriThuoctinh, Loai, Texp) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
+             ON DUPLICATE KEY UPDATE Id = VALUES(Id), `Count` = VALUES(`Count`), \
+             Lv = VALUES(Lv), DoBen = VALUES(DoBen), Int1 = VALUES(Int1), Atk1 = VALUES(Atk1), \
+             Def1 = VALUES(Def1), Hpx1 = VALUES(Hpx1), Spx1 = VALUES(Spx1), \
+             Agi1 = VALUES(Agi1), Fai1 = VALUES(Fai1), Int2 = VALUES(Int2), \
+             Atk2 = VALUES(Atk2), Def2 = VALUES(Def2), Hpx2 = VALUES(Hpx2), \
+             Spx2 = VALUES(Spx2), Agi2 = VALUES(Agi2), Fai2 = VALUES(Fai2), Hp = VALUES(Hp), Sp = VALUES(Sp), \
+             `Long` = VALUES(`Long`), GiatriLong = VALUES(GiatriLong), \
+             Khang = VALUES(Khang), Thuoctinh = VALUES(Thuoctinh), \
+             GiatriThuoctinh = VALUES(GiatriThuoctinh), Loai = VALUES(Loai), Texp = VALUES(Texp)";
+    sqlx::query(&q)
+        .bind(i64::from(player_id))
+        .bind(i64::from(item.slot))
+        .bind(i64::from(item.id))
+        .bind(i64::from(item.count))
+        .bind(i64::from(item.lv))
+        .bind(i64::from(item.doben))
+        .bind(i64::from(item.int1))
+        .bind(i64::from(item.atk1))
+        .bind(i64::from(item.def1))
+        .bind(i64::from(item.hpx1))
+        .bind(i64::from(item.spx1))
+        .bind(i64::from(item.agi1))
+        .bind(i64::from(item.fai1))
+        .bind(i64::from(item.int2))
+        .bind(i64::from(item.atk2))
+        .bind(i64::from(item.def2))
+        .bind(i64::from(item.hpx2))
+        .bind(i64::from(item.spx2))
+        .bind(i64::from(item.agi2))
+        .bind(i64::from(item.fai2))
+        .bind(i64::from(item.item_hp))
+        .bind(i64::from(item.item_sp))
+        .bind(i64::from(item.long_val))
+        .bind(i64::from(item.giatri_long))
+        .bind(i64::from(item.khang))
+        .bind(i64::from(item.thuoctinh))
+        .bind(i64::from(item.giatri_thuoctinh))
+        .bind(i64::from(item.loai))
+        .bind(i64::from(item.texp))
         .execute(&mut **tx)
         .await?;
     Ok(())

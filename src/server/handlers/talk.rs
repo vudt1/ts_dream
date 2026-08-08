@@ -1,4 +1,13 @@
 //! Action / Talk handler (Opcode 0x14): H1 start talk, H6 menus, H4 end talk, H8 warp talk, H9 select menu.
+//!
+//! Identity rules (ticket 18 review):
+//! - **Map Object ID** (`map_object_id` = `idtalking`): the on-map instance
+//!   from the H1 request (LE16). It keys `Data_Talks`/quests and is embedded in
+//!   the special NPC packets (C# writes `idtalking.ToString("X2")`).
+//! - **NPC Template ID** (`npc_id`): resolved `(map, map_object_id) →
+//!   NpcOnMap.NpcId`. The H1/H6 **special** branches (banker/inn/`16012`) are
+//!   selected on this id, never on the object id.
+//! - A **Talk Context** tracks `{talk_type, map_object_id, talk_count, select_menu}`.
 
 use crate::data::loader::GameData;
 use crate::protocol::encoder;
@@ -6,23 +15,25 @@ use crate::server::handler::{HandleOutcome, OpcodeCtx};
 use crate::server::handlers::stats::build_stat_update;
 use crate::server::session::Conn;
 
-/// Helper: EndTalk packet + reset talk state.
+/// EndTalk packet + reset the whole talk context (C# `EndTalk`, Client.cs:7919-7925).
 pub fn end_talk(conn: &mut Conn, out: &mut HandleOutcome) {
     out.send("F44402001408");
     conn.session.idtalking = 0;
     conn.session.select_menu = 0;
+    conn.session.talk_count = 0;
+    conn.session.warp_finish = false;
 }
 
-/// Helper: Split dialog hex string on literal "F444" and send each fragment.
+/// Split a dialog hex string on `F444` and emit each fragment 500 ms apart
+/// (C# `TalkMessages`, FTalk.cs:3439-3454). Frame order is preserved.
 pub fn talk_messages(conn: &mut Conn, talk_string: &str, out: &mut HandleOutcome) {
-    let parts: Vec<&str> = talk_string.split("F444").collect();
-    for part in parts {
+    for part in talk_string.split("F444") {
         if !part.is_empty() {
             let frame = format!("F444{part}");
             if frame == "F44402001408" {
                 conn.session.select_menu = 40;
             }
-            out.send(frame);
+            out.send_delayed(frame, 500);
         }
     }
 }
@@ -34,18 +45,31 @@ pub fn handle_talk(ctx: &mut OpcodeCtx) {
     let data = ctx.data;
     let (sub, payload) = (ctx.sub, ctx.payload);
     match sub {
-        // Sub 1: Start talk (H1)
         1 => handle_talk_start(conn, payload, data, out),
-        // Sub 4: End talk (H4)
         4 => end_talk(conn, out),
-        // Sub 6: Menu / Continue engine (H6)
         6 => handle_talk_continue(conn, payload, data, out),
-        // Sub 8: Warp talk (H8)
         8 => handle_talk_warp(conn, payload, data, out),
-        // Sub 9: Set SelectMenu (H9)
         9 => handle_talk_select_menu(conn, payload),
         _ => end_talk(conn, out),
     }
+}
+
+/// H1 identity + distance gate (FTalk.cs:69-112).
+///
+/// When the `(map, object)` row exists, its NPC template id drives the special
+/// branches and the ±150 distance test decides whether the talk opens. When the
+/// on-map row is absent the talk still opens with template id `0` (the generic
+/// NPC path, `Data.GetDataNpcOnMap` returns 0) — only the data talk key decides.
+fn resolve_npc(data: &GameData, conn: &Conn, map_object_id: i32) -> (i32, bool) {
+    let Some(npc) = data.npc_on_map.iter().find(|n| {
+        n.map_id == i64::from(conn.session.map_id) && n.id == i64::from(map_object_id)
+    }) else {
+        return (0, true);
+    };
+    let dx = i64::from(conn.session.map_x) - npc.x;
+    let dy = i64::from(conn.session.map_y) - npc.y;
+    let in_range = (-150..=150).contains(&dx) && (-150..=150).contains(&dy);
+    (npc.npc_id as i32, in_range)
 }
 
 fn handle_talk_start(conn: &mut Conn, payload: &[u8], data: &GameData, out: &mut HandleOutcome) {
@@ -53,50 +77,70 @@ fn handle_talk_start(conn: &mut Conn, payload: &[u8], data: &GameData, out: &mut
         end_talk(conn, out);
         return;
     }
-    let idtalking = encoder::u16_le(payload[0], payload[1]) as i32;
-    conn.session.idtalking = idtalking;
-    // Resolve the real NPC id from the on-map index (C# FTalk.H1:19) — the
-    // NPC-shop sell path keys on it.
-    conn.session.idnpctalking = data
-        .npc_on_map
-        .iter()
-        .find(|n| n.map_id == i64::from(conn.session.map_id) && n.id == i64::from(idtalking))
-        .map(|n| n.npc_id as i32)
-        .unwrap_or(0);
+    let map_object_id = encoder::u16_le(payload[0], payload[1]) as i32;
+    conn.session.idtalking = map_object_id;
+    conn.session.talk_type = "NPC".to_string();
+    conn.session.talk_count = 0;
 
-    // Special NPC IDs
-    match idtalking {
-        16080 | 16004 | 16011 | 16015 => {
-            out.send("F44402000602");
-            out.send(format!(
-                "F44411001401000000010603{:02X}0000000000000100",
-                idtalking
-            ));
+    let (template_id, in_range) = resolve_npc(data, conn, map_object_id);
+    conn.session.idnpctalking = template_id;
+
+    // Special template ids embed the map object id (`idtalking.ToString("X2")`).
+    // Distance gate applies before the special payload (FTalk.cs:77-102).
+    if matches!(template_id, 16080 | 16004 | 16011 | 16015) {
+        if !in_range {
+            end_talk(conn, out);
+            return;
         }
-        15002 | 16001 | 16016 => {
-            out.send("F44402000602");
-            out.send(format!(
-                "F44411001401000000010603{:02X}0000000000000200",
-                idtalking
-            ));
+        out.send("F44402000602");
+        out.send(format!(
+            "F44411001401000000010603{:02X}0000000000000100",
+            map_object_id
+        ));
+        return;
+    }
+    if matches!(template_id, 15002 | 16001 | 16016) {
+        if !in_range {
+            end_talk(conn, out);
+            return;
         }
-        16012 => {
-            // Silent
+        out.send("F44402000602");
+        out.send(format!(
+            "F44411001401000000010603{:02X}0000000000000200",
+            map_object_id
+        ));
+        return;
+    }
+    if template_id == 16012 {
+        return;
+    }
+
+    // Generic dialog: distance still required when the on-map row exists
+    // (FTalk.cs:69-112); an absent row opens anyway (template id 0).
+    if !in_range {
+        end_talk(conn, out);
+        return;
+    }
+    let key = crate::server::handlers::quest::quest_key(
+        i64::from(conn.session.map_id),
+        "NPC",
+        i64::from(map_object_id),
+        crate::server::handlers::quest::current_step(conn),
+    );
+    if let Some(talk) = data.talks.get(&key) {
+        out.send("F44402000602");
+        let sum: i64 = talk.teamdef.iter().sum();
+        if talk.dialogs.is_empty() && sum > 0 {
+            crate::server::handlers::quest::trigger_teamdef(conn, &talk.teamdef, out);
+            return;
         }
-        _ => {
-            // Generic dialog lookup in GameData
-            let key = format!("{}:NPC:{}:0", conn.session.map_id, idtalking);
-            if let Some(talk) = data.talks.get(&key) {
-                out.send("F44402000602");
-                talk_messages(conn, &talk.dialogs, out);
-            } else {
-                out.send("F44402000602");
-                out.send(format!(
-                    "F44411001401000000010103{:02X}000000000000C830",
-                    idtalking
-                ));
-            }
-        }
+        talk_messages(conn, &talk.dialogs, out);
+    } else {
+        out.send("F44402000602");
+        out.send(format!(
+            "F44411001401000000010103{:02X}000000000000C830",
+            map_object_id
+        ));
     }
 }
 
@@ -106,29 +150,31 @@ fn handle_talk_continue(
     data: &GameData,
     out: &mut HandleOutcome,
 ) {
-    let idtalking = conn.session.idtalking;
-    let select_menu = conn.session.select_menu;
-
-    // Pet-reborn NPC exceptions (55002/59102/59011)
-    if crate::server::handlers::quest::handle_pet_reborn_npc(conn, idtalking, out) {
+    // H6 pre-dispatch guards (FTalk.cs:272-294).
+    if conn.session.warp_finish {
+        out.send("F44402000504");
+        out.send("F44402001408");
+        conn.session.warp_finish = false;
+        conn.session.talk_count = 0;
+        conn.session.idtalking = 0;
+        return;
+    }
+    if conn.session.idtalking == 0 && conn.session.select_menu == 40 {
+        end_talk(conn, out);
+        return;
+    }
+    if conn.session.idtalking <= 0 {
         return;
     }
 
-    // Daily quest (map 12711)
-    if conn.session.map_id == 12711 {
-        crate::server::handlers::quest::generate_daily_quest(conn, out);
-        return;
-    }
+    let template = conn.session.idnpctalking;
 
-    match idtalking {
-        // Banker / Store NPCs
-        16080 | 16004 | 16011 | 16023 => match select_menu {
+    // Banker / Store NPCs (branch on template id).
+    if matches!(template, 16080 | 16004 | 16011 | 16023) {
+        match conn.session.select_menu {
             30 => {
                 out.send("F44403001D0900");
-                out.send(format!(
-                    "F44406001D04{}",
-                    encoder::le32(conn.session.bank_gold)
-                ));
+                out.send(format!("F44406001D04{}", encoder::le32(conn.session.bank_gold)));
                 out.send("F44402001D05");
                 out.send("F44402001409");
             }
@@ -138,13 +184,14 @@ fn handle_talk_continue(
             }
             40 => end_talk(conn, out),
             _ => end_talk(conn, out),
-        },
+        }
+        return;
+    }
 
-        // Inn / Hotel NPCs
-        15002 | 16001 | 16016 | 15118 => match select_menu {
-            30 => {
-                out.send("F44411001401000000010603010000000000000100");
-            }
+    // Inn / hotel NPCs.
+    if matches!(template, 15002 | 16001 | 16016 | 15118) {
+        match conn.session.select_menu {
+            30 => out.send("F44411001401000000010603010000000000000100"),
             31 => {
                 conn.session.hp = conn.session.hp_max;
                 conn.session.sp = conn.session.sp_max;
@@ -152,21 +199,23 @@ fn handle_talk_continue(
                 out.send(build_stat_update(0x1A, conn.session.sp as i32));
                 end_talk(conn, out);
             }
-            32 => {
-                out.send("F44411001401000000010603010000000000000100");
-            }
+            32 => out.send("F44411001401000000010603010000000000000100"),
             33 => {
-                let mut item = crate::server::inventory::from_template(data, 46016, 2);
-                item.doben = 100;
+                crate::server::handlers::quest::save_map(conn);
+                let item = crate::server::inventory::from_template(data, 46016, 2);
                 let _ = conn.session.add_homdo_item(item);
+                out.send(conn.session.dump_homdo());
                 end_talk(conn, out);
             }
             40 => end_talk(conn, out),
             _ => end_talk(conn, out),
-        },
+        }
+        return;
+    }
 
-        // NPC 16015
-        16015 => match select_menu {
+    // NPC 16015 — inn + `method_2(10)` gift.
+    if template == 16015 {
+        match conn.session.select_menu {
             30 => out.send("F44411001401000000010603010000000000000200"),
             31 => {
                 conn.session.hp = conn.session.hp_max;
@@ -177,29 +226,35 @@ fn handle_talk_continue(
             }
             32 => out.send("F44411001401000000010603010000000000000200"),
             33 => {
-                let mut item = crate::server::inventory::from_template(data, 46016, 2);
-                item.doben = 100;
+                crate::server::handlers::quest::save_map(conn);
+                let item = crate::server::inventory::from_template(data, 46016, 2);
                 let _ = conn.session.add_homdo_item(item);
+                out.send(conn.session.dump_homdo());
                 end_talk(conn, out);
             }
             40 => end_talk(conn, out),
             _ => end_talk(conn, out),
-        },
-
-        // Silent NPC
-        16012 => {}
-
-        // Generic NPC continuation — try data-driven quest path
-        _ => {
-            if !crate::server::handlers::quest::try_quest_h6(conn, data, out) {
-                end_talk(conn, out);
-            }
         }
+        return;
+    }
+
+    if template == 16012 {
+        return;
+    }
+
+    // Daily quest map 12711 owns the whole context (21 RNG draws).
+    if conn.session.map_id == 12711 {
+        crate::server::handlers::quest::generate_daily_quest(conn, out);
+        return;
+    }
+
+    // Generic data-driven quest path.
+    if !crate::server::handlers::quest::try_quest_h6(conn, data, out) {
+        end_talk(conn, out);
     }
 }
 
 fn handle_talk_warp(conn: &mut Conn, payload: &[u8], data: &GameData, out: &mut HandleOutcome) {
-    // C# H8 reads the warp id directly from the packet (bytes 6-7).
     if payload.len() >= 2 {
         conn.session.idtalking = encoder::u16_le(payload[0], payload[1]) as i32;
     }
@@ -216,54 +271,67 @@ fn handle_talk_select_menu(conn: &mut Conn, payload: &[u8]) {
 mod tests {
     use super::*;
     use crate::battle::service::BattleService;
+    use crate::data::tables::NpcOnMap;
     use crate::server::handler::test_ctx;
     use std::sync::Arc;
 
-    #[test]
-    fn test_talk_start_banker() {
+    fn talk_fixture(npc_id: i64) -> (Conn, GameData, BattleService) {
         let mut conn = Conn::new();
-        let data = GameData::default();
-        let service = BattleService::new(Arc::new(GameData::default()));
-        let mut out = HandleOutcome::default();
+        conn.session.id = 300001;
+        conn.session.map_id = 10817;
+        conn.session.map_x = 400;
+        conn.session.map_y = 500;
+        let mut data = GameData::default();
+        data.npc_on_map.push(NpcOnMap {
+            map_id: 10817,
+            id: 6,
+            npc_id,
+            x: 401,
+            y: 501,
+            ..Default::default()
+        });
+        (
+            conn,
+            data,
+            BattleService::new(Arc::new(GameData::default())),
+        )
+    }
 
-        // Start talk with banker 16080 (0x3ED0) -> payload: 0xD0, 0x3E
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[0xD0, 0x3E]);
+    #[test]
+    fn test_talk_start_banker_resolves_template() {
+        let (mut conn, data, service) = talk_fixture(16080);
+        let mut out = crate::server::handler::HandleOutcome::default();
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[0x06, 0x00]);
         handle_talk(&mut ctx);
-
-        assert_eq!(conn.session.idtalking, 16080);
-        assert_eq!(out.outgoing.len(), 2);
+        assert_eq!(conn.session.idtalking, 6);
+        assert_eq!(conn.session.idnpctalking, 16080);
         assert_eq!(out.outgoing[0], "F44402000602");
+        assert_eq!(
+            out.outgoing[1],
+            "F44411001401000000010603060000000000000100"
+        );
     }
 
     #[test]
-    fn test_talk_banker_menu_30() {
-        let mut conn = Conn::new();
-        let data = GameData::default();
-        let service = BattleService::new(Arc::new(GameData::default()));
-        conn.session.idtalking = 16080;
-        conn.session.bank_gold = 5000;
-        conn.session.select_menu = 30;
-
-        let mut out = HandleOutcome::default();
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 6, &[]);
+    fn test_talk_out_of_range_ends() {
+        let (mut conn, data, service) = talk_fixture(16080);
+        conn.session.map_x = 999;
+        conn.session.map_y = 999;
+        let mut out = crate::server::handler::HandleOutcome::default();
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[0x06, 0x00]);
         handle_talk(&mut ctx);
-
-        assert_eq!(out.outgoing.len(), 4);
-        assert_eq!(out.outgoing[0], "F44403001D0900");
+        assert_eq!(out.outgoing, vec!["F44402001408"]);
+        assert_eq!(conn.session.idtalking, 0);
     }
 
     #[test]
-    fn test_talk_end() {
-        let mut conn = Conn::new();
-        let data = GameData::default();
-        let service = BattleService::new(Arc::new(GameData::default()));
-        conn.session.idtalking = 16080;
+    fn test_talk_end_resets_context() {
+        let (mut conn, data, service) = talk_fixture(16080);
+        conn.session.idtalking = 6;
         conn.session.select_menu = 30;
-
-        let mut out = HandleOutcome::default();
+        let mut out = crate::server::handler::HandleOutcome::default();
         let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 4, &[]);
         handle_talk(&mut ctx);
-
         assert_eq!(conn.session.idtalking, 0);
         assert_eq!(conn.session.select_menu, 0);
         assert_eq!(out.outgoing, vec!["F44402001408"]);

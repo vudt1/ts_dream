@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS players (
     God               BIGINT DEFAULT 0,
     Color             VARCHAR(16) CHARACTER SET latin1 COLLATE latin1_bin,
     Gold              BIGINT DEFAULT 0,
+    BankGold          BIGINT DEFAULT 0,
     Tiengtam          BIGINT DEFAULT 0,
     Gocnhin           BIGINT DEFAULT 0,
     SttPetXuatchien   BIGINT DEFAULT 0,

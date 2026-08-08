@@ -136,6 +136,12 @@ pub struct Session {
     /// Real NPC database id resolved from the on-map index (`idnpctalking`).
     pub idnpctalking: i32,
     pub select_menu: i32,
+    /// Talk counter (`talkcount`); reset by EndTalk / teleport confirm.
+    pub talk_count: i32,
+    /// Teleport-confirm state (`warpfinish`); reset by the 0x0C confirmation.
+    pub warp_finish: bool,
+    /// Talk kind: `"NPC"` or `"WARP"` (`Typetalk`).
+    pub talk_type: String,
     pub battle_id: i32,
     pub pending_pass: Vec<u8>,
     pub pending_new_char_name: Vec<u8>,
@@ -184,6 +190,8 @@ pub struct Session {
     pub sp_store: u32,
     /// `.NET` counter field (`tanthu`), incremented by item 46238.
     pub tanthu: u32,
+    /// Respawn-map flag (`savemap`), set by inn-keepers (H6 SM33).
+    pub savemap: u16,
     /// Equipped-colour hex string (`_My_Color`), e.g. `"0000000000000000"`.
     pub color: String,
 
@@ -245,6 +253,9 @@ impl Default for Session {
             idtalking: 0,
             idnpctalking: 0,
             select_menu: 0,
+            talk_count: 0,
+            warp_finish: false,
+            talk_type: "NPC".to_string(),
             battle_id: 0,
             pending_pass: Vec::new(),
             pending_new_char_name: Vec::new(),
@@ -290,6 +301,7 @@ impl Default for Session {
             hp_store: 10000,
             sp_store: 10000,
             tanthu: 0,
+            savemap: 0,
             color: "0000000000000000".to_string(),
 
             skills: Vec::new(),

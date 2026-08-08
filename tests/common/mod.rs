@@ -61,6 +61,21 @@ pub fn use_item_data() -> GameData {
     data
 }
 
+/// Data fixture with a mall catalog item (op 0x42). The golden request reads
+/// the item from **raw packet bytes 9..10** (id `0x2711`, price `0xC8`) per C#
+/// `ShoppingMall` — so the fixture must own that item for the corrected offsets.
+pub fn mall_data() -> GameData {
+    let mut data = GameData::default();
+    data.items.insert(
+        0x2711,
+        ts_dream::data::tables::Item {
+            id: 0x2711,
+            ..Default::default()
+        },
+    );
+    data
+}
+
 /// Data fixture with a learnable player skill (element 1, point 1).
 pub fn skill_data() -> GameData {
     let mut data = GameData::default();
@@ -149,9 +164,14 @@ pub fn all_scenarios() -> Vec<Scenario<'static>> {
         ),
         Scenario::new(
             "09-mall-buy",
-            game_data(),
-            vec!["F4440600420100001127C800".to_string()],
-            |_| {},
+            mall_data(),
+            // C2S op 0x42 sub 1: item id at raw packet bytes 9..10 (`0x2711`),
+            // price at raw 11..12 (`0x00C8`). payload = raw[6..], so item is
+            // payload[3..5] and price payload[5..7].
+            vec!["F444090042010000001127C800".to_string()],
+            |c| {
+                c.session.shop_point = 1000;
+            },
         ),
         Scenario::new(
             "10-use-item",
@@ -191,7 +211,11 @@ pub fn all_scenarios() -> Vec<Scenario<'static>> {
         Scenario::new(
             "14-pet",
             game_data(),
-            vec!["F44404001301993A".to_string(), "F4440300130200".to_string()],
+            // Summon 15001 (0x3A99) via LE32 pet id (C# smethod_10, packet[6..9]).
+            vec![
+                "F44406001301993A0000".to_string(),
+                "F4440300130200".to_string(),
+            ],
             |c| {
                 c.session.pets.push(PetState {
                     stt: 1,

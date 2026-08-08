@@ -54,6 +54,10 @@ struct BattleSinkImpl {
     /// Player ids currently in a battle (receive `broadcast`/`Out::Broadcast`).
     members: Arc<Mutex<HashSet<i64>>>,
     data: Arc<GameData>,
+    /// Optional MySQL pool used for post-battle persistence (quest/homdo).
+    /// Shared (same Arc) with the owning [`BattleService`] so `with_pool` can
+    /// set it after construction, before any battle starts.
+    pool: Arc<std::sync::Mutex<Option<sqlx::MySqlPool>>>,
 }
 
 impl BattleSink for BattleSinkImpl {
@@ -181,7 +185,20 @@ impl BattleSink for BattleSinkImpl {
                     for f in frames {
                         let _ = p.frames.send(f);
                     }
-                }
+                    // Persist the quest-step + item mutations arising from OnWin
+                    // (scoped by player_id) so a crash after battle never loses
+                    // the granted rewards / advanced steps.
+                    if let Some(pool) = self.pool.lock().unwrap().clone() {
+                        let session = s.clone();
+                        tokio::spawn(async move {
+                            crate::db::persist::persist_sessions_transaction(
+                                Some(&pool),
+                                &[&session],
+                                &["quest", "homdo", "trangbi"],
+                            )
+                            .await;
+                        });
+                    }                }
                 let _ = player;
             }
         }
@@ -259,6 +276,9 @@ pub struct BattleService {
     pub data: Arc<GameData>,
     sink: Arc<BattleSinkImpl>,
     online: Arc<tokio::sync::RwLock<OnlineMap>>,
+    /// Optional MySQL pool used for post-battle persistence (quest/homdo);
+    /// shared with the sink via `Arc` so `with_pool` is visible to battles.
+    pool: Option<Arc<std::sync::Mutex<Option<sqlx::MySqlPool>>>>,
     /// Synchronous handle registry for sync handler access (op 0x32, join).
     handles: Mutex<HashMap<i32, BattleHandle>>,
     /// Pre-rendered join cell records per battle id (the C# join loop renders
@@ -279,22 +299,39 @@ impl Default for BattleService {
 impl BattleService {
     pub fn new(data: Arc<GameData>) -> Self {
         let online = Arc::new(tokio::sync::RwLock::new(HashMap::new()));
+        let pool = Arc::new(std::sync::Mutex::new(None));
         let sink = Arc::new(BattleSinkImpl {
             online: Arc::clone(&online),
             members: Arc::new(Mutex::new(HashSet::new())),
             data: Arc::clone(&data),
+            pool: Arc::clone(&pool),
         });
         BattleService {
             manager: Arc::new(BattleManager::new()),
             data,
             sink,
             online,
+            pool: Some(pool),
             handles: Mutex::new(HashMap::new()),
             join_cells: Mutex::new(HashMap::new()),
             per_exp: 1,
             next_battle: AtomicI32::new(1),
             input_timeout: std::time::Duration::from_secs(21),
         }
+    }
+
+    /// Attach the MySQL pool used for post-battle persistence.
+    pub fn with_pool(self, pool: sqlx::MySqlPool) -> Self {
+        if let Some(p) = &self.pool {
+            *p.lock().unwrap() = Some(pool);
+        }
+        self
+    }
+
+    /// The configured post-battle persistence pool (best-effort setter used by
+    /// tests); `None` when no DB is attached.
+    pub fn pool(&self) -> Option<sqlx::MySqlPool> {
+        self.pool.as_ref().and_then(|p| p.lock().unwrap().clone())
     }
 
     /// Override the per-turn input wait (tests use a short window).

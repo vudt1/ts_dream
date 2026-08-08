@@ -307,7 +307,13 @@ async fn handle_client_connection(
         .push_log("system", format!("Client connected from {peer_ip}"));
 
     let data = data.unwrap_or_else(|| Arc::new(GameData::default()));
-    let service = BattleService::new(Arc::clone(&data));
+    let service = {
+        let mut svc = BattleService::new(Arc::clone(&data));
+        if let Some(pool) = pool.as_ref() {
+            svc = svc.with_pool(pool.clone());
+        }
+        svc
+    };
 
     let (mut read_half, mut write_half) = stream.into_split();
     let (tx, mut rx) = mpsc::unbounded_channel::<String>();
@@ -372,7 +378,15 @@ async fn handle_client_connection(
                                     .unwrap()
                                     .insert(logined_id, conn.session.clone());
                             }
-                            for f in &out.outgoing {
+                            for (i, f) in out.outgoing.iter().enumerate() {
+                                // Dialog fragments are paced (C# sleeps 500 ms
+                                // between `TalkMessages` splits); honor it on the
+                                // live connection, never blocking the runtime.
+                                if let Some(ms) = out.pacing_ms.get(i) {
+                                    if *ms > 0 {
+                                        tokio::time::sleep(Duration::from_millis(*ms)).await;
+                                    }
+                                }
                                 let _ = tx.send(f.clone());
                             }
                             if !out.map_broadcast.is_empty() {

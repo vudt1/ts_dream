@@ -26,6 +26,7 @@ pub async fn load(pool: &MySqlPool, s: &mut Session) -> Result<bool, sqlx::Error
         assign_items(s, table, load_items(pool, id, table).await?);
     }
     load_pets(pool, s).await?;
+    load_quests(pool, s).await?;
     Ok(true)
 }
 
@@ -39,6 +40,55 @@ fn assign_items(s: &mut Session, table: &str, items: Vec<InventoryItem>) {
         "luulang" => s.luulang = items,
         _ => {}
     }
+}
+
+/// Delete a character and all of its per-player gameplay rows in one
+/// transaction (C# `PlayerDeleteDataId` + the per-table deletes, op 0x23 sub 2).
+///
+/// Every statement is scoped by `player_id`. The `players` row and the nine
+/// gameplay tables (`homdo`, `trangbi`, `tientrang`, `tuideo`, `luulang`,
+/// `pet`, `quest`, `skill`, `skillsave`) are removed; the `accounts` row is
+/// **not** touched (account identity outlives the character). Returns `false`
+/// when the character row did not exist.
+pub async fn delete_character(pool: &MySqlPool, player_id: i64) -> Result<bool, sqlx::Error> {
+    const TABLES: [&str; 9] = [
+        "homdo",
+        "trangbi",
+        "tientrang",
+        "tuideo",
+        "luulang",
+        "pet",
+        "quest",
+        "skill",
+        "skillsave",
+    ];
+    let mut tx = pool.begin().await?;
+    for table in TABLES {
+        let q = format!("DELETE FROM {table} WHERE player_id = ?");
+        sqlx::query(&q)
+            .bind(player_id)
+            .execute(&mut *tx)
+            .await?;
+    }
+    let res = sqlx::query("DELETE FROM players WHERE player_id = ?")
+        .bind(player_id)
+        .execute(&mut *tx)
+        .await?;
+    let existed = res.rows_affected() == 1;
+    tx.commit().await?;
+    Ok(existed)
+}
+
+/// Load quest steps into `s.quest_steps` scoped by `player_id` (`(npc_id, step)`
+/// pairs keyed by the quest NPC — the runtime quest bookkeeping snapshot).
+async fn load_quests(pool: &MySqlPool, s: &mut Session) -> Result<(), sqlx::Error> {
+    let id = i64::from(s.id);
+    let rows = crate::db::quest::list(pool, id).await?;
+    s.quest_steps = rows
+        .into_iter()
+        .map(|r| (r.npc_id, r.step))
+        .collect();
+    Ok(())
 }
 
 /// Is `name` (VISCII bytes) already taken? Compared byte-for-byte via HEX so
@@ -262,6 +312,7 @@ struct PlayerRow {
     sp_store: i64,
     hp_store: i64,
     tanthu: i64,
+    shop_point: i64,
 }
 
 impl PlayerRow {
@@ -275,7 +326,8 @@ impl PlayerRow {
              Job AS job, Sex AS sex, Hair AS hair, Thuoctinh AS thuoctinh, \
               God AS god, HEX(Color) AS color_hex, Gold AS gold, BankGold AS bank_gold, Tiengtam AS tiengtam, \
              Gocnhin AS gocnhin, SttPetXuatchien AS stt_pet, Pk AS pk, ThamChien AS tham_chien, \
-             SP_Store AS sp_store, HP_Store AS hp_store, tanthu AS tanthu \
+             SP_Store AS sp_store, HP_Store AS hp_store, tanthu AS tanthu, \
+             ShopPoint AS shop_point \
              FROM players WHERE player_id = ?",
         )
         .bind(player_id)
@@ -331,6 +383,7 @@ impl PlayerRow {
         s.sp_store = self.sp_store as u32;
         s.hp_store = self.hp_store as u32;
         s.tanthu = self.tanthu as u32;
+        s.shop_point = self.shop_point as u32;
     }
 }
 
