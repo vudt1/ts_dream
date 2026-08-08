@@ -161,8 +161,6 @@ CREATE TABLE IF NOT EXISTS pet (
     Atk       BIGINT DEFAULT 0,
     Def       BIGINT DEFAULT 0,
     Hpx       BIGINT DEFAULT 0,
-    Hpx       BIGINT DEFAULT 0,
-    Hpx       BIGINT DEFAULT 0,
     Spx       BIGINT DEFAULT 0,
     Agi       BIGINT DEFAULT 0,
     Fai       BIGINT DEFAULT 0,
