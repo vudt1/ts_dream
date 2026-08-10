@@ -22,17 +22,13 @@
 use crate::db;
 use crate::protocol::encoder;
 use crate::server::handler::OpcodeCtx;
+use crate::server::pet_box::{ACTIVE_SLOTS, STABLE_SLOTS};
 use crate::server::session::{Conn, PetState};
 use sqlx::MySqlPool;
 
-/// Stable-slot scan bound (C# scans `5..10`, `Client.cs:1825`); the invariant
-/// is set once here and used by every stable operation.
-const STABLE_MIN: u8 = 5;
-const STABLE_MAX: u8 = 10;
-
 /// True when `stt` lies in the player's fight roster (`1..=4`).
 fn is_roster(stt: u8) -> bool {
-    (1..=4).contains(&stt)
+    ACTIVE_SLOTS.contains(&stt)
 }
 
 /// The next free slot in `[lo..=hi]`, mirroring the C# first-fit scans.
@@ -57,6 +53,54 @@ fn move_pet_slot(conn: &mut Conn, from: u8, to: u8) {
             .position(|i| u16::from(i.slot) == src_slot)
         {
             conn.session.trangbi[pos].slot = to;
+        }
+    }
+}
+
+/// Swap two pet slots + their pet equipment atomically (C# `Data.SwitchPet`).
+///
+/// When both slots hold a pet the two composite `(player_id, stt)` identities
+/// exchange (a one-way move would leave two pets sharing one `stt`); when only
+/// one side is populated the pet moves to the other slot. The six `trangbi`
+/// slots (`stt*10+1..6`) relocate along with their owner.
+fn swap_pet_slots(conn: &mut Conn, a: u8, b: u8) {
+    if a == b {
+        return;
+    }
+    let pa = conn.session.pets.iter().position(|p| p.stt == a);
+    let pb = conn.session.pets.iter().position(|p| p.stt == b);
+    match (pa, pb) {
+        (Some(i), Some(j)) => {
+            let sa = conn.session.pets[i].stt;
+            conn.session.pets[i].stt = conn.session.pets[j].stt;
+            conn.session.pets[j].stt = sa;
+        }
+        (Some(i), None) => conn.session.pets[i].stt = b,
+        (None, Some(j)) => conn.session.pets[j].stt = a,
+        (None, None) => {}
+    }
+    for sub in 1..=6u16 {
+        let ta = u16::from(a) * 10 + sub;
+        let tb = u16::from(b) * 10 + sub;
+        let ia = conn
+            .session
+            .trangbi
+            .iter()
+            .position(|i| u16::from(i.slot) == ta);
+        let ib = conn
+            .session
+            .trangbi
+            .iter()
+            .position(|i| u16::from(i.slot) == tb);
+        match (ia, ib) {
+            (Some(ia), Some(ib)) => {
+                let s = conn.session.trangbi[ia].slot;
+                conn.session.trangbi[ia].slot = conn.session.trangbi[ib].slot;
+                conn.session.trangbi[ib].slot = s;
+            }
+            (Some(ia), None) => conn.session.trangbi[ia].slot = tb as u8,
+            (None, Some(ib)) => conn.session.trangbi[ib].slot = ta as u8,
+            (None, None) => {}
         }
     }
 }
@@ -101,7 +145,11 @@ pub async fn handle_pet_actions(ctx: &mut OpcodeCtx<'_>) {
         3 => {
             let src_stable = payload[0];
             let source_stt = src_stable + 4; // stable slot (client index + 4)
-            let Some(free) = find_free(&ctx.conn.session.pets, 1, 4) else {
+            let Some(free) = find_free(
+                &ctx.conn.session.pets,
+                *ACTIVE_SLOTS.start(),
+                *ACTIVE_SLOTS.end(),
+            ) else {
                 ctx.out.send("F44402001F09"); // roster full -> close menu
                 return;
             };
@@ -140,7 +188,11 @@ pub async fn handle_pet_actions(ctx: &mut OpcodeCtx<'_>) {
                 ctx.out.send("F44402001F09");
                 return;
             }
-            let Some(free) = find_free(&ctx.conn.session.pets, STABLE_MIN, STABLE_MAX) else {
+            let Some(free) = find_free(
+                &ctx.conn.session.pets,
+                *STABLE_SLOTS.start(),
+                *STABLE_SLOTS.end(),
+            ) else {
                 ctx.out.send("F44402001F09"); // stable full
                 return;
             };
@@ -167,7 +219,7 @@ pub async fn handle_pet_actions(ctx: &mut OpcodeCtx<'_>) {
                 return;
             }
             let stable_stt = stable_idx + 4;
-            move_pet_slot(ctx.conn, stable_stt, roster_stt);
+            swap_pet_slots(ctx.conn, stable_stt, roster_stt);
             let pet_id = ctx
                 .conn
                 .session
@@ -287,7 +339,7 @@ pub async fn handle_pet_summon(ctx: &mut OpcodeCtx<'_>) {
             if payload.len() < 4 {
                 return;
             }
-            let pet_id = u32_le(payload[0], payload[1], payload[2], payload[3]);
+            let pet_id = encoder::u32_le(payload[0], payload[1], payload[2], payload[3]);
             if ctx.conn.session.horse_pet_id == pet_id as u16 {
                 return;
             }
@@ -325,18 +377,13 @@ pub async fn handle_pet_summon(ctx: &mut OpcodeCtx<'_>) {
     }
 }
 
-/// LE32 read of the four payload bytes.
-fn u32_le(p0: u8, p1: u8, p2: u8, p3: u8) -> u32 {
-    u32::from_le_bytes([p0, p1, p2, p3])
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::battle::service::BattleService;
     use crate::data::loader::GameData;
     use crate::server::handler::{test_ctx, HandleOutcome};
-    use crate::server::session::Conn;
+    use crate::server::session::{Conn, InventoryItem, PetState};
     use std::sync::Arc;
 
     fn fixture() -> (Conn, GameData, BattleService) {
@@ -447,5 +494,47 @@ mod tests {
         handle_pet_summon(&mut ctx).await;
         assert_eq!(conn.session.active_pet_stt, 1);
         assert!(out.outgoing[0].contains("1301"));
+    }
+
+    #[tokio::test]
+    async fn sub8_swap_exchanges_occupied_slots() {
+        // Both the stable slot (5) and the roster slot (1) hold a pet: the swap
+        // must exchange the composite `(player_id, stt)` identities — never
+        // leave two pets sharing one `stt` (ticket 17 review, C# SwitchPet).
+        let (mut conn, data, service) = fixture(); // stt 1 = 18001, stt 5 = 18002
+        conn.session.trangbi.push(InventoryItem {
+            slot: 11,
+            id: 9001,
+            ..Default::default()
+        });
+        conn.session.trangbi.push(InventoryItem {
+            slot: 51,
+            id: 9002,
+            ..Default::default()
+        });
+        let mut out = HandleOutcome::default();
+        // payload: stable index 1 (-> stt 5), roster slot 1.
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 8, &[1, 1]);
+        handle_pet_actions(&mut ctx).await;
+
+        let at_roster = conn.session.pets.iter().find(|p| p.stt == 1).map(|p| p.id);
+        let at_stable = conn.session.pets.iter().find(|p| p.stt == 5).map(|p| p.id);
+        assert_eq!(at_roster, Some(18002), "stable pet moved into the roster");
+        assert_eq!(at_stable, Some(18001), "roster pet moved into the stable");
+        // Equipment relocated with their owners.
+        let eq = |slot: u8| {
+            conn.session
+                .trangbi
+                .iter()
+                .find(|i| i.slot == slot)
+                .map(|i| i.id)
+        };
+        assert_eq!(eq(51), Some(9001), "roster pet's gear moved to pet stt 5");
+        assert_eq!(eq(11), Some(9002), "stable pet's gear moved to pet stt 1");
+        // No two pets share one `stt`.
+        let mut stts: Vec<u8> = conn.session.pets.iter().map(|p| p.stt).collect();
+        stts.sort_unstable();
+        stts.dedup();
+        assert_eq!(stts.len(), conn.session.pets.len());
     }
 }

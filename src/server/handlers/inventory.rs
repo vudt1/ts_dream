@@ -760,11 +760,14 @@ mod tests {
         assert_eq!(conn.session.skill_point, 25); // 24 + (125-120)/5 = 25
         assert_eq!(conn.session.skills.len(), 1);
         assert_eq!(conn.session.skills[0], (10016, 10)); // special skill retained
-        assert!(out.outgoing.contains(&"F44402002C01".to_string()));
-        assert!(
-            out.outgoing
-                .contains(&"F4441100140100000001010302000000000000F476".to_string())
-        );
+        assert!(out
+            .outgoing
+            .iter()
+            .any(|f| f.frame == "F44402002C01"));
+        assert!(out
+            .outgoing
+            .iter()
+            .any(|f| f.frame == "F4441100140100000001010302000000000000F476"));
         assert!(out.shutdown, "reborn closes the socket (death, Client.cs:5751)");
         assert_eq!(conn.session.quest_steps, vec![(59411, 2)]);
     }

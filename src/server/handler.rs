@@ -52,16 +52,74 @@ pub struct MapBroadcast {
     pub frame: String,
 }
 
+/// One outgoing server→client frame and its optional pacing delay.
+///
+/// The pacing and the frame travel as one unit (previously two parallel
+/// vectors that callers had to re-index in lockstep — a data clump). `delay_ms`
+/// is hinted for `TalkMessages` (500 ms between dialog fragments); golden
+/// replay ignores pacing — the frame order is unchanged and byte-parity holds.
+#[derive(Debug, Clone)]
+pub struct OutFrame {
+    pub frame: String,
+    pub delay_ms: u64,
+}
+
+impl OutFrame {
+    pub fn new(frame: impl Into<String>) -> Self {
+        Self {
+            frame: frame.into(),
+            delay_ms: 0,
+        }
+    }
+
+    pub fn with_delay(frame: impl Into<String>, delay_ms: u64) -> Self {
+        Self {
+            frame: frame.into(),
+            delay_ms,
+        }
+    }
+
+    pub fn contains(&self, pat: &str) -> bool {
+        self.frame.contains(pat)
+    }
+
+    pub fn starts_with(&self, pat: &str) -> bool {
+        self.frame.starts_with(pat)
+    }
+
+    pub fn ends_with(&self, pat: &str) -> bool {
+        self.frame.ends_with(pat)
+    }
+}
+
+impl PartialEq<str> for OutFrame {
+    fn eq(&self, other: &str) -> bool {
+        self.frame == other
+    }
+}
+
+impl PartialEq<&str> for OutFrame {
+    fn eq(&self, other: &&str) -> bool {
+        self.frame == *other
+    }
+}
+
+impl PartialEq<String> for OutFrame {
+    fn eq(&self, other: &String) -> bool {
+        self.frame == *other
+    }
+}
+
+impl PartialEq<&String> for OutFrame {
+    fn eq(&self, other: &&String) -> bool {
+        self.frame == **other
+    }
+}
+
 /// Result of handling one decoded frame.
 #[derive(Debug, Default, Clone)]
 pub struct HandleOutcome {
-    pub outgoing: Vec<String>,
-    /// Per-frame inter-send delay in milliseconds (parallel to `outgoing`).
-    /// `0` = send immediately. The connection loop sleeps this long before the
-    /// matching frame (`TalkMessages` sends dialog fragments 500 ms apart, C#
-    /// `FTalk.TalkMessages`). Golden replay ignores pacing — the frame order is
-    /// unchanged and byte-parity holds.
-    pub pacing_ms: Vec<u64>,
+    pub outgoing: Vec<OutFrame>,
     pub shutdown: bool,
     /// If set, a TEAMDEF battle should be triggered after processing.
     pub battle_trigger: Option<crate::server::handlers::quest::BattleTrigger>,
@@ -70,15 +128,13 @@ pub struct HandleOutcome {
 
 impl HandleOutcome {
     pub fn send(&mut self, frame: impl Into<String>) {
-        self.outgoing.push(frame.into());
-        self.pacing_ms.push(0);
+        self.outgoing.push(OutFrame::new(frame));
     }
 
     /// Send `frame` after `delay_ms` (non-blocking). The first paced fragment
     /// is delayed too, matching C# splitting each dialog line 500 ms apart.
     pub fn send_delayed(&mut self, frame: impl Into<String>, delay_ms: u64) {
-        self.outgoing.push(frame.into());
-        self.pacing_ms.push(delay_ms);
+        self.outgoing.push(OutFrame::with_delay(frame, delay_ms));
     }
 
     /// Queue a map-scoped broadcast frame owned by `subject`. The fan-out is
@@ -182,7 +238,7 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         0x13 => pet_actions::handle_pet_summon(ctx).await,
 
         // Op 0x14 — Action / Talk
-        0x14 => talk::handle_talk(ctx),
+        0x14 => talk::handle_talk(ctx).await,
 
         // Op 0x17 — Inventory base, use item, player shop, reborn
         0x17 => {

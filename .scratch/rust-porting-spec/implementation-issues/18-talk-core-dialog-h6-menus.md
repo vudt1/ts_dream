@@ -80,3 +80,22 @@ Implemented core talk plumbing with the identity rules the review demanded:
 - **TalkMessages pacing**: fragments emitted 500 ms apart via new `HandleOutcome::send_delayed` + connection-loop pacing; frame order unchanged (golden replay ignores pacing).
 
 Provenance: `Client.cs:7919-7925`, `Data.cs:553-600`; `FTalk.cs:10-384`; review matrix in this ticket.
+
+## Review-fix followup (2026-08-10)
+
+Two-axis review followup — resolved without changing wire behavior:
+
+- Missing on-map instance is now **rejected with EndTalk** (review: "reject
+  missing/out-of-range before any packet"): `resolve_npc` returns `Option` and
+  the absent branch closes the talk. The `12-quest-h6` golden fixture
+  (`tests/common/mod.rs` `quest_data`) now registers `NpcOnMap` object 1 within
+  talk distance so H1 still opens — golden bytes unchanged.
+- `savemap` persistence is wired end-to-end: the column is loaded on login
+  (`db/players.rs`) and the inn-keeper SM33 branches persist it through
+  `update_player("savemap", …)`. `handle_talk`/`handle_talk_continue` are now
+  async to reach the pool (dispatch + unit tests updated).
+- `generate_daily_quest` receives the loaded `GameData` instead of
+  `GameData::default()` (stat-bearing items, no fabricated template).
+
+Remaining per the review: `16012`/absent-NPC body-flavor and full NPC-body
+dispatch are outside this pass; H6 compiled-table behavior stays with ticket 19.

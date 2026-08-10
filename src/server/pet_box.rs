@@ -1,12 +1,12 @@
-//! Pet roster rules: slot (`stt`) assignment — active 1..4, stable 5..8 — and
+//! Pet roster rules: slot (`stt`) assignment — active 1..4, stable 5..10 — and
 //! ownership invariants (one entry per pet id).
 
 use crate::server::session::PetState;
 
 /// Active (fight) pet slots.
 pub const ACTIVE_SLOTS: std::ops::RangeInclusive<u8> = 1..=4;
-/// Stable (stored) pet slots.
-pub const STABLE_SLOTS: std::ops::RangeInclusive<u8> = 5..=8;
+/// Stable (stored) pet slots — the C# `Client.cs:1825` scan bound (5..10).
+pub const STABLE_SLOTS: std::ops::RangeInclusive<u8> = 5..=10;
 
 /// The next free active slot, or `None` when all four are taken.
 pub fn next_active_slot(pets: &[PetState]) -> Option<u8> {
@@ -73,5 +73,8 @@ mod tests {
         let pets: Vec<PetState> = (1..=4).map(|s| pet(s, 2000 + u16::from(s))).collect();
         assert_eq!(next_active_slot(&pets), None);
         assert_eq!(next_stable_slot(&pets), Some(5));
+        // Stable bound is the C# scan 5..10 (Client.cs:1825).
+        let full: Vec<PetState> = (5..=10).map(|s| pet(s, 3000 + u16::from(s))).collect();
+        assert_eq!(next_stable_slot(&full), None);
     }
 }

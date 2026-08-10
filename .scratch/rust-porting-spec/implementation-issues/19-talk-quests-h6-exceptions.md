@@ -83,3 +83,31 @@ Implemented the quest engine seams + the review's concrete gaps:
 - **OnWin pipeline** (rewards/random/share/use-items/save-leader-quests/enhance/add-skill/pet) already exercised by the suite; `battle_quest_win`/`battle_quest_win_talk` resolve through the full key.
 
 Provenance: `FTalk.cs:385-805-3457`; `Data.cs:5812-5998`; `data/loader.rs` `parse_quest_ini`; review matrix + failure-packet list in this ticket.
+
+## Review-fix followup (2026-08-10)
+
+Two-axis review followup — resolved without changing wire behavior:
+
+- `battle_quest_win` / `battle_quest_win_talk` resolve through the full
+  QuestKey: `resolve_quest_for_session` builds `{map, talk_type, object, step}`
+  (step from `step_for_object`, the `player_id`-scoped quest snapshot) with a
+  step-0 fallback for legacy fixtures — no more hard-coded `:NPC::0`.
+- `completed_quests` is a `Vec<(map, object)>` populated on battle win
+  (`mark_quest_done`), and `[REQUIRES] Quests` now uses all four tuple fields
+  (NPC key `(map,npc)` or WARP key `(map,warp)`) — nothing is silently dropped.
+- `evaluate_requirements` additionally evaluates `[REQUIRES] Wears` (equipped
+  `trangbi`) and `[ONWIN].RequireItems` possession.
+- PlayerLose now reaches OnLose: `battle_ended` runs `quest_lose_frames`
+  (lose dialogs + EndTalk, full-key) for every `talking_battle > 0` session
+  (previously the sink returned on any non-win).
+- `generate_daily_quest` takes the real `GameData`; dead code removed
+  (`save_map_action`, `is_pet_reborn_map` alias, unused `db/quest.rs`
+  wrappers, the `handled` no-op tail, the legacy item_code `redeem()`).
+- `db::persist::upsert_item_tx` is the single shared homdo upsert; the
+  post-battle persistence pool moved to `tokio::sync::RwLock`.
+
+Remaining boundary (recorded, not closed): the compiled H6 table
+(≈45 maps / 228 branches / 176 packets) is still blocked on the missing
+addendum referenced by `docs/rust_porting_spec.md:505-509,1150-1158` — the
+hard-coded pre-dispatch + `try_quest_h6` remain; reconstruct the addendum from
+`FTalk.cs:268-3241` with line provenance before transcribing the table.

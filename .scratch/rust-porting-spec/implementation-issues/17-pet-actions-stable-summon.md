@@ -80,3 +80,23 @@ Implemented end-to-end; subcode semantics follow the C# review correction, NOT t
 - Slot moves are the composite `(player_id, stt)` op incl. relocating pet equipment (`trangbi` slots `stt*10+1..6`); persisted via `persist_sessions_transaction(["pet","trangbi"])`.
 
 Provenance: `Client.cs:1776-2074`, `:6002-6097`; `Data.cs:2215-2346,5605-5695`; `golden/14-pet.golden` re-encoded to the LE32 summon layout.
+
+## Review-fix followup (2026-08-10)
+
+Two-axis review followup — resolved without changing wire behavior:
+
+- Stable-slot invariant unified: `pet_box::STABLE_SLOTS` is now `5..=10` (C#
+  `Client.cs:1825`) and `pet_actions` references it (single source; the split
+  `5..8`/`5..10` discrepancy is gone). The add-pet gate in
+  `use_item/mod.rs` now checks `pet_box::next_active_slot` (roster slot free)
+  instead of `pets.len() < 4`.
+- `0x0F sub 8` / `0x1F sub 4` swap is now a true two-way `SwitchPet`:
+  `swap_pet_slots` exchanges both composite `(player_id, stt)` identities and
+  relocates each pet's six `trangbi` slots so no two pets ever share one `stt`
+  (regression test `sub8_swap_exchanges_occupied_slots`).
+- Local `u32_le` helper removed — `encoder::u32_le` is the single LE32 reader.
+
+Remaining boundary (recorded, not closed): in-battle summon/recall
+(`battle_id != 0`) stays quiet because the battle task is the only authority
+over the grid; the C# `ChangedWar`-type-4 + `warPacket` path belongs to the
+ticket 17/20 seam and is not implemented in this pass.

@@ -313,6 +313,7 @@ struct PlayerRow {
     hp_store: i64,
     tanthu: i64,
     shop_point: i64,
+    savemap: i64,
 }
 
 impl PlayerRow {
@@ -327,7 +328,7 @@ impl PlayerRow {
               God AS god, HEX(Color) AS color_hex, Gold AS gold, BankGold AS bank_gold, Tiengtam AS tiengtam, \
              Gocnhin AS gocnhin, SttPetXuatchien AS stt_pet, Pk AS pk, ThamChien AS tham_chien, \
              SP_Store AS sp_store, HP_Store AS hp_store, tanthu AS tanthu, \
-             ShopPoint AS shop_point \
+             ShopPoint AS shop_point, savemap AS savemap \
              FROM players WHERE player_id = ?",
         )
         .bind(player_id)
@@ -384,6 +385,7 @@ impl PlayerRow {
         s.hp_store = self.hp_store as u32;
         s.tanthu = self.tanthu as u32;
         s.shop_point = self.shop_point as u32;
+        s.savemap = self.savemap as u16;
     }
 }
 

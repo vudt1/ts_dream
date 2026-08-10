@@ -14,7 +14,7 @@ use std::sync::Arc;
 use ts_dream::battle::runner::BattleCommand;
 use ts_dream::battle::service::BattleService;
 use ts_dream::data::loader::GameData;
-use ts_dream::data::tables::{Npc, QuestResult, Skill};
+use ts_dream::data::tables::{Npc, NpcOnMap, QuestResult, Skill};
 use ts_dream::harness::scenario::Scenario;
 use ts_dream::harness::Golden;
 use ts_dream::server::session::{Conn, InventoryItem, PetState};
@@ -29,6 +29,17 @@ pub fn game_data() -> GameData {
 /// Data fixture for the FTalk.H6 quest scenario (map 10916, NPC 1).
 pub fn quest_data() -> GameData {
     let mut data = GameData::default();
+    // H1 must resolve the instance (ticket 18: missing on-map rows are
+    // rejected), so register object 1 within talking distance of the default
+    // spawn position (400, 500).
+    data.npc_on_map.push(NpcOnMap {
+        map_id: 10916,
+        id: 1,
+        npc_id: 1,
+        x: 401,
+        y: 501,
+        ..Default::default()
+    });
     data.talks.insert(
         "10916:NPC:1:0".to_string(),
         ts_dream::data::tables::QuestDef {

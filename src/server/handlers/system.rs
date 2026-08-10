@@ -377,6 +377,26 @@ async fn delete_character_flow(ctx: &mut OpcodeCtx<'_>) {
     let id = ctx.conn.session.id;
     // Leave battle (clears battle_id/membership).
     ctx.service.leave_battle(&mut ctx.conn.session);
+    // GiaiTanParty: drop the player's own membership, then scrub this id from
+    // every other online session that still lists it as leader/member.
+    ctx.conn.session.id_leader = 0;
+    ctx.conn.session.id_mem = [0; 4];
+    {
+        let mut online = crate::server::session::online_sessions().lock().unwrap();
+        for s in online.values_mut() {
+            if s.id_leader == id {
+                s.id_leader = 0;
+            }
+            for mem in s.id_mem.iter_mut() {
+                if *mem == id {
+                    *mem = 0;
+                }
+            }
+        }
+    }
+    // Map-removal broadcast: clients on the character's map drop it.
+    ctx.out
+        .broadcast(id, crate::battle::packets::hide_from_map(id));
     // Delete the character data in one transaction.
     if let Some(pool) = ctx.env.pool {
         let _ = db::players::delete_character(pool, i64::from(id)).await;
@@ -511,6 +531,66 @@ mod tests {
         // Order: item-add `1706` before the points frame.
         assert!(out.outgoing[0].contains("1706"));
         assert!(out.outgoing.iter().any(|f| f.contains("4202")));
+    }
+
+    #[test]
+    fn test_rank_frames() {
+        let mut conn = Conn::new();
+        let data = GameData::default();
+        let service = BattleService::new(Arc::new(GameData::default()));
+
+        let mut out = HandleOutcome::default();
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[]);
+        handle_rank(&mut ctx);
+        assert_eq!(out.outgoing, vec!["F44402004101"]);
+
+        let mut out2 = HandleOutcome::default();
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out2, 2, &[]);
+        handle_rank(&mut ctx);
+        assert_eq!(out2.outgoing, vec!["F44402004102"]);
+    }
+
+    #[test]
+    fn test_teleport_confirm_leader_resets_state() {
+        let mut conn = Conn::new();
+        conn.session.id = 300001;
+        conn.session.map_id = 12001;
+        conn.session.warp_finish = true;
+        conn.session.talk_count = 3;
+        conn.session.idtalking = 6;
+
+        let data = GameData::default();
+        let service = BattleService::new(Arc::new(GameData::default()));
+
+        let mut out = HandleOutcome::default();
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[]);
+        handle_teleport_confirm(&mut ctx);
+        assert_eq!(out.outgoing, vec!["F44402000504F44402001408"]);
+        // Leader/solo branch resets the warp/talk state (Client.cs:1439-1455).
+        assert!(!conn.session.warp_finish);
+        assert_eq!(conn.session.talk_count, 0);
+        assert_eq!(conn.session.idtalking, 0);
+    }
+
+    #[test]
+    fn test_teleport_confirm_member_returns_early() {
+        let mut conn = Conn::new();
+        conn.session.id = 300001;
+        conn.session.id_leader = 300002; // somebody else is the leader
+        conn.session.warp_finish = true;
+        conn.session.talk_count = 3;
+        conn.session.idtalking = 6;
+
+        let data = GameData::default();
+        let service = BattleService::new(Arc::new(GameData::default()));
+
+        let mut out = HandleOutcome::default();
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[]);
+        handle_teleport_confirm(&mut ctx);
+        assert_eq!(out.outgoing, vec!["F44402000504F44402001408"]);
+        // Member branch: the two confirmation frames only, state untouched.
+        assert!(conn.session.warp_finish);
+        assert_eq!(conn.session.talk_count, 3);
     }
 
     #[test]

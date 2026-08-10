@@ -378,16 +378,15 @@ async fn handle_client_connection(
                                     .unwrap()
                                     .insert(logined_id, conn.session.clone());
                             }
-                            for (i, f) in out.outgoing.iter().enumerate() {
+                            for frame in &out.outgoing {
                                 // Dialog fragments are paced (C# sleeps 500 ms
                                 // between `TalkMessages` splits); honor it on the
                                 // live connection, never blocking the runtime.
-                                if let Some(ms) = out.pacing_ms.get(i) {
-                                    if *ms > 0 {
-                                        tokio::time::sleep(Duration::from_millis(*ms)).await;
-                                    }
+                                if frame.delay_ms > 0 {
+                                    tokio::time::sleep(Duration::from_millis(frame.delay_ms))
+                                        .await;
                                 }
-                                let _ = tx.send(f.clone());
+                                let _ = tx.send(frame.frame.clone());
                             }
                             if !out.map_broadcast.is_empty() {
                                 control.broadcast_map(id, &out.map_broadcast).await;

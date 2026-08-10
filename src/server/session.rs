@@ -219,7 +219,9 @@ pub struct Session {
     pub horse_pet_id: u16,
     pub trade: TradeState,
     pub talking_battle: i32,
-    pub completed_quests: Vec<i64>,
+    /// Completed `(map, object/warp)` quest keys — the `[REQUIRES] Quests` gate
+    /// source, populated on battle win (`quest::mark_quest_done`).
+    pub completed_quests: Vec<(i64, i64)>,
     /// `[OnWin] ClickNpcId` — NPC that opens a follow-up dialog after quest win.
     pub click_npc_id: i32,
     /// Party members (`_My_IdMem1..4`), 0 = empty.

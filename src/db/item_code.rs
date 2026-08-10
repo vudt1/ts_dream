@@ -11,14 +11,7 @@
 //! rolls back, so a used code never "disappears" while the reward was lost.
 
 use crate::server::session::InventoryItem;
-use sqlx::{MySql, MySqlPool, Transaction};
-
-/// The reward granted a successful redeem.
-#[derive(Debug, Clone)]
-pub struct Redeem {
-    pub item_id: i64,
-    pub count: i64,
-}
+use sqlx::MySqlPool;
 
 /// One unused `item_code` row (the reward a code grants).
 #[derive(sqlx::FromRow)]
@@ -37,59 +30,6 @@ pub enum RedeemOutcome {
     InvalidOrUsed,
     /// The once-only `TSVN123/TSVN456` gift was already claimed.
     AlreadyGifted,
-}
-
-const HOMDO_COLS: &str = "(player_id, Slot, Id, `Count`, Lv, DoBen, Int1, Atk1, Def1, Hpx1, Spx1, Agi1, \
-     Fai1, Int2, Atk2, Def2, Hpx2, Spx2, Agi2, Fai2, Hp, Sp, `Long`, GiatriLong, Khang, \
-     Thuoctinh, GiatriThuoctinh, Loai, Texp)";
-const HOMDO_PLACEHOLDERS: &str = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-
-/// Insert one inventory row into `homdo` inside `tx` (same column layout as
-/// [`crate::db::persist::upsert_item`], but operating on an open transaction so
-/// the redeem + grant are atomic).
-async fn insert_homdo_tx(
-    tx: &mut Transaction<'_, MySql>,
-    player_id: i64,
-    slot: i64,
-    item: &InventoryItem,
-) -> Result<(), sqlx::Error> {
-    let q = format!(
-        "INSERT INTO homdo {HOMDO_COLS} VALUES {HOMDO_PLACEHOLDERS} \
-         ON DUPLICATE KEY UPDATE Id = VALUES(Id), `Count` = VALUES(`Count`)"
-    );
-    sqlx::query(&q)
-        .bind(player_id)
-        .bind(slot)
-        .bind(i64::from(item.id))
-        .bind(i64::from(item.count))
-        .bind(i64::from(item.lv))
-        .bind(i64::from(item.doben))
-        .bind(i64::from(item.int1))
-        .bind(i64::from(item.atk1))
-        .bind(i64::from(item.def1))
-        .bind(i64::from(item.hpx1))
-        .bind(i64::from(item.spx1))
-        .bind(i64::from(item.agi1))
-        .bind(i64::from(item.fai1))
-        .bind(i64::from(item.int2))
-        .bind(i64::from(item.atk2))
-        .bind(i64::from(item.def2))
-        .bind(i64::from(item.hpx2))
-        .bind(i64::from(item.spx2))
-        .bind(i64::from(item.agi2))
-        .bind(i64::from(item.fai2))
-        .bind(i64::from(item.item_hp))
-        .bind(i64::from(item.item_sp))
-        .bind(i64::from(item.long_val))
-        .bind(i64::from(item.giatri_long))
-        .bind(i64::from(item.khang))
-        .bind(i64::from(item.thuoctinh))
-        .bind(i64::from(item.giatri_thuoctinh))
-        .bind(i64::from(item.loai))
-        .bind(i64::from(item.texp))
-        .execute(&mut **tx)
-        .await?;
-    Ok(())
 }
 
 /// Redeem `code`/`password` and grant the reward atomically.
@@ -146,7 +86,7 @@ pub async fn redeem_and_grant(
     }
 
     // Same transaction: grant the item (failure rolls everything back).
-    insert_homdo_tx(&mut tx, player_id, slot, item).await?;
+    crate::db::persist::upsert_item_tx(&mut tx, player_id, slot as u8, item).await?;
 
     tx.commit().await?;
     Ok(RedeemOutcome::Granted {
@@ -201,7 +141,7 @@ pub async fn redeem_special_gift(
         .execute(&mut *tx)
         .await?;
     for (i, item) in items.iter().enumerate() {
-        insert_homdo_tx(&mut tx, player_id, (i as i64) + 1, item).await?;
+        crate::db::persist::upsert_item_tx(&mut tx, player_id, (i as u8) + 1, item).await?;
     }
 
     tx.commit().await?;
@@ -230,53 +170,4 @@ pub async fn reward_for(
     .fetch_optional(pool)
     .await?;
     Ok(row)
-}
-
-/// Legacy reservation-only redeem: flips the code to used without granting an
-/// item in the same transaction. Prefer [`redeem_and_grant`] for op 0x23 sub 3;
-/// this keeps the old `SELECT`/`UPDATE` semantics for any caller that needs it.
-pub async fn redeem(
-    pool: &MySqlPool,
-    player_id: i64,
-    code: &str,
-    password: &str,
-) -> Result<Option<Redeem>, sqlx::Error> {
-    let mut tx = pool.begin().await?;
-
-    let row = sqlx::query_as::<_, CodeRow>(
-        "SELECT item_id, `count` FROM item_code \
-         WHERE code = ? AND password = ? AND player_id = 0 \
-         FOR UPDATE",
-    )
-    .bind(code)
-    .bind(password)
-    .fetch_optional(&mut *tx)
-    .await?;
-
-    let Some(row) = row else {
-        return Ok(None);
-    };
-
-    let used_at = chrono::Utc::now().timestamp();
-    let res = sqlx::query(
-        "UPDATE item_code \
-         SET player_id = ?, used_at = ? \
-         WHERE code = ? AND password = ? AND player_id = 0",
-    )
-    .bind(player_id)
-    .bind(used_at)
-    .bind(code)
-    .bind(password)
-    .execute(&mut *tx)
-    .await?;
-
-    if res.rows_affected() != 1 {
-        return Ok(None);
-    }
-
-    tx.commit().await?;
-    Ok(Some(Redeem {
-        item_id: row.item_id,
-        count: row.count,
-    }))
 }

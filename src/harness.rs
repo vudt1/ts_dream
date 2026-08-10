@@ -381,8 +381,8 @@ pub mod scenario {
                     &handler::ServerEnv::none(),
                 )
                 .await;
-                for frame in out.outgoing {
-                    s2c.push(frame);
+                for frame in &out.outgoing {
+                    s2c.push(frame.frame.clone());
                 }
             }
             if self.now_override.is_some() {

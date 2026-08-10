@@ -438,7 +438,7 @@ pub async fn persist_shop_point_and_item(
             .bind(i64::from(player_id))
             .execute(&mut *tx)
             .await?;
-        upsert_item_tx(&mut tx, player_id, item).await?;
+        upsert_item_tx(&mut tx, i64::from(player_id), item.slot, item).await?;
         Ok::<(), sqlx::Error>(())
     }
     .await;
@@ -452,10 +452,15 @@ pub async fn persist_shop_point_and_item(
     }
 }
 
-/// Upsert one `homdo` row inside an open transaction (Ticket 16 helpers).
-async fn upsert_item_tx(
+/// Upsert one `homdo` row inside an open transaction — the single shared
+/// 29-column `INSERT … ON DUPLICATE KEY UPDATE` used by the mall purchase
+/// (op 0x42), the `item_code` redeem grant (op 0x23 sub 3) and the special
+/// gift. All callers pass the same column layout and bind order, so the
+/// statement lives here once instead of being re-inlined per caller.
+pub(crate) async fn upsert_item_tx(
     tx: &mut sqlx::Transaction<'_, sqlx::MySql>,
-    player_id: u32,
+    player_id: i64,
+    slot: u8,
     item: &InventoryItem,
 ) -> Result<(), sqlx::Error> {
     let q = "INSERT INTO homdo (\
@@ -473,8 +478,8 @@ async fn upsert_item_tx(
              Khang = VALUES(Khang), Thuoctinh = VALUES(Thuoctinh), \
              GiatriThuoctinh = VALUES(GiatriThuoctinh), Loai = VALUES(Loai), Texp = VALUES(Texp)";
     sqlx::query(&q)
-        .bind(i64::from(player_id))
-        .bind(i64::from(item.slot))
+        .bind(player_id)
+        .bind(i64::from(slot))
         .bind(i64::from(item.id))
         .bind(i64::from(item.count))
         .bind(i64::from(item.lv))

@@ -298,7 +298,11 @@ async fn dispatch(ctx: &mut UseCtx<'_>) {
             ctx.red("Ban da co pet nay roi");
             return;
         }
-        if ctx.conn.session.pets.len() < 4 {
+        if crate::server::pet_box::next_active_slot(&ctx.conn.session.pets).is_none() {
+            ctx.red("Pet box full");
+            return;
+        }
+        {
             let stt = (1..=4)
                 .find(|s| !ctx.conn.session.pets.iter().any(|p| p.stt == *s))
                 .unwrap_or(1);
@@ -315,8 +319,6 @@ async fn dispatch(ctx: &mut UseCtx<'_>) {
             ctx.consume().await;
             return;
         }
-        ctx.red("Pet box full");
-        return;
     }
 
     // --- 3. Leader-only sleep item (C# 46167). ---

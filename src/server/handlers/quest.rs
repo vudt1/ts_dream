@@ -50,17 +50,20 @@ pub fn quest_key(map_id: i64, talk_type: &str, map_object_id: i64, step: i64) ->
     QuestKey::new(map_id, talk_type, map_object_id, step).to_key()
 }
 
-/// The current quest step for the session's NPC talk (`player_id`-scoped);
-/// `0` when no quest row exists yet (the loader key grows the step, C# reads
-/// the Access `Quest.Step`).
-pub fn current_step(conn: &Conn) -> i64 {
-    let map_object_id = conn.session.idtalking;
-    conn.session
-        .quest_steps
+/// The current quest step for a given talk object id (the `player_id`-scoped
+/// quest snapshot); `0` when no quest row exists yet.
+pub fn step_for_object(conn: &Session, map_object_id: i64) -> i64 {
+    conn.quest_steps
         .iter()
-        .find(|(npc, _)| *npc == i64::from(map_object_id))
+        .find(|(npc, _)| *npc == map_object_id)
         .map(|(_, step)| *step)
         .unwrap_or(0)
+}
+
+/// The current quest step for the session's NPC talk (`player_id`-scoped);
+/// `0` when no quest row exists yet.
+pub fn current_step(conn: &Conn) -> i64 {
+    step_for_object(&conn.session, i64::from(conn.session.idtalking))
 }
 
 /// Set the pending `talking_battle` context and emit a battle trigger.
@@ -76,14 +79,11 @@ pub fn trigger_teamdef(conn: &mut Conn, teamdef: &[i64], out: &mut HandleOutcome
 }
 
 /// `savemap` canonical seam: persist the current map as the respawn point
-/// (`PlayerUpdateDataId(_savemap)`) and refresh the session value.
+/// (`PlayerUpdateDataId(_savemap)`) and refresh the session value. The actual
+/// MySQL write-through happens at the inn-keeper (H6 SM33) call site via
+/// [`save_map`] + `update_player("savemap", …)`.
 pub fn save_map(conn: &mut Conn) {
     conn.session.savemap = conn.session.map_id;
-}
-
-/// `savemap` helper used by the talk H6 inn-keeper path (SM33).
-pub fn save_map_action(conn: &mut Conn) {
-    save_map(conn);
 }
 
 /// Attempt the data-driven quest path for H6 continue.
@@ -96,7 +96,7 @@ pub fn try_quest_h6(conn: &mut Conn, data: &GameData, out: &mut HandleOutcome) -
     let map_object_id = i64::from(conn.session.idtalking);
 
     // Pet-reborn exceptions keyed `(map, object)` -> compiled table behavior.
-    if is_pet_reborn_map(map_id, map_object_id) {
+    if is_pet_reborn_key(map_id, map_object_id) {
         return handle_pet_reborn_npc(conn, map_id, map_object_id, out);
     }
 
@@ -195,13 +195,47 @@ pub fn evaluate_requirements(conn: &Conn, quest: &crate::data::tables::QuestDef)
     if quest.require_thuoctinh > 0 && conn.session.thuoctinh != quest.require_thuoctinh as u8 {
         return Some("F444110014010000000101070000000000000077A7".to_string());
     }
-    // Require quests: every listed `(map, npc, warp, step)` must be completed.
-    for &(map, npc, warp, step) in &quest.require_quests {
-        let done = conn.session.completed_quests.iter().any(|&q| {
-            q == npc
-        });
-        let _ = (map, warp, step);
+    // Require quests: every listed `(map, npc, warp, step)` must be completed
+    // (a WARP-tagged quest is satisfied by its warp id; an NPC one by its
+    // object id — both scoped to the map). `completed_quests` is populated on
+    // battle win in `battle_quest_win_impl`.
+    for &(map, npc, warp, _step) in &quest.require_quests {
+        let done = conn.session.completed_quests.contains(&(map, npc))
+            || (warp > 0 && conn.session.completed_quests.contains(&(map, warp)));
         if !done {
+            return Some(
+                "F444110014010000000101070000000000000077A7".to_string(),
+            );
+        }
+    }
+    // Require wears: one equipped item (`trangbi`) per `(itemId, playerOrPet)`;
+    // the equip table is the same registered-gear source for both targets.
+    for &(item_id, _target) in &quest.require_wears {
+        let worn = conn
+            .session
+            .trangbi
+            .iter()
+            .any(|i| i.id == item_id as u16 && i.count > 0);
+        if !worn {
+            return Some(
+                "F444110014010000000101070000000000000077A7".to_string(),
+            );
+        }
+    }
+    // Require items to possess at entry (C# `genTalkInfoReQuireItem`): the
+    // `[OnWin] RequireItems` tuples read from the `[REQUIRES].Items` line.
+    for &(item_id, count, _remove) in &quest.on_win.require_items {
+        if item_id <= 0 || count <= 0 {
+            continue;
+        }
+        let have: u32 = conn
+            .session
+            .homdo
+            .iter()
+            .filter(|i| i.id == item_id as u16)
+            .map(|i| u32::from(i.count))
+            .sum();
+        if have < count as u32 {
             return Some(
                 "F444110014010000000101070000000000000077A7".to_string(),
             );
@@ -224,12 +258,6 @@ fn cmp_op(a: i64, b: i64, op: i64) -> bool {
     }
 }
 
-/// Compile-time helper: `(map, object)` → pet-reborn branch (aliased to the
-/// canonical `is_pet_reborn_key`).
-fn is_pet_reborn_map(map_id: i64, map_object_id: i64) -> bool {
-    is_pet_reborn_key(map_id, map_object_id)
-}
-
 /// Full ordered `BattleQuestWin` side effects (Data.cs:5812-5998, spec §6.7).
 ///
 /// Runs when a quest/TeamDef battle ends with a player win and the leader has
@@ -247,7 +275,7 @@ pub fn battle_quest_win(
     if idtalking <= 0 {
         return false;
     }
-    let quest = data.talks.get(&format!("{}:NPC:{}:0", session.map_id, idtalking));
+    let quest = resolve_quest_for_session(session, i64::from(idtalking), data);
     battle_quest_win_impl(session, data, frames, member, quest)
 }
 
@@ -264,8 +292,28 @@ pub fn battle_quest_win_talk(
     if idtalking <= 0 {
         return false;
     }
-    let quest = data.talks.get(&format!("{}:NPC:{}:0", session.map_id, idtalking));
+    let quest = resolve_quest_for_session(session, i64::from(idtalking), data);
     battle_quest_win_impl(session, data, frames, member, quest)
+}
+
+/// Resolve the `Data_Talks` entry for a battle outcome from the session's full
+/// quest key `{map_id, talk_type, map_object_id, step}` — never a bare
+/// integer. A step-aware lookup is tried first, then the step-0 fallback used
+/// by legacy fixtures.
+fn resolve_quest_for_session<'a>(
+    session: &Session,
+    map_object_id: i64,
+    data: &'a GameData,
+) -> Option<&'a crate::data::tables::QuestDef> {
+    let map_id = i64::from(session.map_id);
+    let step = step_for_object(session, map_object_id);
+    let typed = quest_key(map_id, &session.talk_type, map_object_id, step);
+    let npc0 = quest_key(map_id, "NPC", map_object_id, 0);
+    let warp = format!("{}:WARP:{}:{}", map_id, map_object_id, step);
+    data.talks
+        .get(&typed)
+        .or_else(|| data.talks.get(&npc0))
+        .or_else(|| data.talks.get(&warp))
 }
 
 fn battle_quest_win_impl(
@@ -288,6 +336,7 @@ fn battle_quest_win_impl(
             }
         }
         frames.push("F44402001408".to_string()); // EndTalk after dialogs
+        mark_quest_done(session);
         clear_quest_talk(session);
         return true;
     }
@@ -465,8 +514,22 @@ fn battle_quest_win_impl(
         frames.push("F44402001408".to_string());
     }
 
+    mark_quest_done(session);
     clear_quest_talk(session);
     true
+}
+
+/// Record `(map, object)` as a completed quest — the `[REQUIRES] Quests` gate
+/// source. A WARP talk's object id is the warp id, so the same pair satisfies
+/// both an NPC and a WARP requirement on that map.
+fn mark_quest_done(session: &mut Session) {
+    if session.talking_battle <= 0 {
+        return;
+    }
+    let key = (i64::from(session.map_id), i64::from(session.talking_battle));
+    if !session.completed_quests.contains(&key) {
+        session.completed_quests.push(key);
+    }
 }
 
 fn add_pet_to_quest(session: &mut Session, pet_id: u16) {
@@ -534,32 +597,28 @@ fn clear_quest_talk(session: &mut Session) {
     session.select_menu = 0;
 }
 
-/// Compat wrapper: the pre-ticket win processing (see `battle_quest_win`).
-pub fn process_quest_win(conn: &mut Conn, data: &GameData, out: &mut HandleOutcome) {
-    let mut frames = Vec::new();
-    battle_quest_win(&mut conn.session, data, &mut frames, &mut |_| None);
-    for f in frames {
-        out.send(f);
-    }
-}
-
-/// Process quest lose rewards.
-pub fn process_quest_lose(conn: &mut Conn, data: &GameData, out: &mut HandleOutcome) {
-    let idtalking = conn.session.talking_battle;
-    if idtalking <= 0 {
+/// Emit the OnLose dialog progression for a battle defeat (frames vector form
+/// used by the battle sink; the request-time path is `end_talk` free).
+///
+/// Scope (ticket 19 review #8): OnLose is dialog progression + EndTalk — not
+/// the WinRewards pipeline. The key is resolved through the session's full
+/// QuestKey (map/type/object/step).
+pub fn quest_lose_frames(session: &mut Session, data: &GameData, frames: &mut Vec<String>) {
+    let object = session.talking_battle;
+    if object <= 0 {
         return;
     }
-
-    let key = format!("{}:NPC:{}:0", conn.session.map_id, idtalking);
-    if let Some(quest) = data.talks.get(&key) {
-        // Send OnLose dialogs if present
+    if let Some(quest) = resolve_quest_for_session(session, i64::from(object), data) {
         if !quest.on_lose.dialogs.is_empty() {
-            talk_messages(conn, &quest.on_lose.dialogs, out);
+            for part in quest.on_lose.dialogs.split("F444") {
+                if !part.is_empty() {
+                    frames.push(format!("F444{part}"));
+                }
+            }
         }
     }
-
-    end_talk(conn, out);
-    conn.session.talking_battle = 0;
+    frames.push("F44402001408".to_string());
+    clear_quest_talk(session);
 }
 
 /// Daily quest generator (map 12711, 21 RNG draws — §2.6.2 / research 06 §(6),
@@ -570,7 +629,7 @@ pub fn process_quest_lose(conn: &mut Conn, data: &GameData, out: &mut HandleOutc
 /// actions are data-driven: `add pet from item`, `exchange 65517 ×20 → skill
 /// book`, `level/skillpoint boosts` — keyed by `(idtalking, select_menu)` per
 /// the C# H6 table (FTalk.cs:511-644).
-pub fn generate_daily_quest(conn: &mut Conn, out: &mut HandleOutcome) {
+pub fn generate_daily_quest(conn: &mut Conn, data: &GameData, out: &mut HandleOutcome) {
     let mut rng = DotNetRandom::time_seeded();
 
     // 21 draws in exact order
@@ -605,7 +664,6 @@ pub fn generate_daily_quest(conn: &mut Conn, out: &mut HandleOutcome) {
 
     let idtalking = conn.session.idtalking;
     let select_menu = conn.session.select_menu;
-    let mut handled = false;
 
     // Map 12711 — pet-shop rows (C# `case 12711`, FTalk.cs:511-644).
     if idtalking == 1 {
@@ -636,8 +694,6 @@ pub fn generate_daily_quest(conn: &mut Conn, out: &mut HandleOutcome) {
                     out.send(conn.session.dump_homdo());
                     end_talk(conn, out);
                 }
-                handled = true;
-                break;
             }
         }
     }
@@ -663,7 +719,7 @@ pub fn generate_daily_quest(conn: &mut Conn, out: &mut HandleOutcome) {
             if has {
                 conn.session
                     .add_homdo_item(crate::server::inventory::from_template(
-                        &crate::data::loader::GameData::default(),
+                        data,
                         65517,
                         10,
                     ));
@@ -671,7 +727,6 @@ pub fn generate_daily_quest(conn: &mut Conn, out: &mut HandleOutcome) {
                 out.send(conn.session.dump_homdo());
                 end_talk(conn, out);
             }
-            handled = true;
         }
     }
     // idtalking 8..10: exchange 65517×20 for a skill book (6210x + num4*100).
@@ -680,7 +735,7 @@ pub fn generate_daily_quest(conn: &mut Conn, out: &mut HandleOutcome) {
         if has {
             conn.session
                 .add_homdo_item(crate::server::inventory::from_template(
-                    &crate::data::loader::GameData::default(),
+                    data,
                     item_a as u16,
                     1,
                 ));
@@ -688,7 +743,6 @@ pub fn generate_daily_quest(conn: &mut Conn, out: &mut HandleOutcome) {
             out.send(conn.session.dump_homdo());
             end_talk(conn, out);
         }
-        handled = true;
     }
     if idtalking == 11 {
         // Map 12711 idtalking 11: level/skillpoint/point boosts (C# case 12003
@@ -698,20 +752,14 @@ pub fn generate_daily_quest(conn: &mut Conn, out: &mut HandleOutcome) {
                 conn.session.level = conn.session.level.saturating_add(1).min(200);
                 conn.session.skill_point = conn.session.skill_point.saturating_add(1);
                 conn.session.point = conn.session.point.saturating_add(2);
-                handled = true;
             }
             31 => {
                 conn.session.level = conn.session.level.saturating_add(5).min(200);
                 conn.session.skill_point = conn.session.skill_point.saturating_add(5);
                 conn.session.point = conn.session.point.saturating_add(10);
-                handled = true;
             }
             _ => {}
         }
-    }
-
-    if !handled {
-        let _ = (conn, out);
     }
 }
 
@@ -719,10 +767,7 @@ pub fn generate_daily_quest(conn: &mut Conn, out: &mut HandleOutcome) {
 /// 19 review: `55002/59102/59011` are **map ids**, not template ids; the right
 /// keys are `(55002,3)`, `(59102,1)`, `(59011,1)` (map 12711's pet shop rows).
 pub fn handle_pet_reborn_npc(conn: &mut Conn, map_id: i64, map_object_id: i64, out: &mut HandleOutcome) -> bool {
-    let is_pet_shop = (map_id == 55002 && map_object_id == 3)
-        || (map_id == 59102 && map_object_id == 1)
-        || (map_id == 59011 && map_object_id == 1);
-    if !is_pet_shop {
+    if !is_pet_reborn_key(map_id, map_object_id) {
         return false;
     }
 
@@ -880,7 +925,7 @@ mod tests {
         // Verify that exactly 21 RNG draws are consumed
         let mut conn = Conn::new();
         let mut out = HandleOutcome::default();
-        generate_daily_quest(&mut conn, &mut out);
+        generate_daily_quest(&mut conn, &GameData::default(), &mut out);
         // No crash = all 21 draws succeeded
     }
 
@@ -1281,7 +1326,7 @@ mod tests {
             ..Default::default()
         });
         let mut out = HandleOutcome::default();
-        generate_daily_quest(&mut conn, &mut out);
+        generate_daily_quest(&mut conn, &GameData::default(), &mut out);
         // Menu 30 + item 31044 -> the pet 18016 is granted.
         assert!(
             conn.session.pets.iter().any(|p| p.id == 18016),

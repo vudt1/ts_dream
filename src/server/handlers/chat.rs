@@ -667,7 +667,7 @@ mod tests {
         assert_eq!(conn.session.sp, 50);
         assert_eq!(conn.session.pets[0].hp, 90);
         assert_eq!(conn.session.pets[0].sp, 40);
-        let joined = out.outgoing.join("");
+        let joined: String = out.outgoing.iter().map(|f| f.frame.as_str()).collect();
         assert!(joined.contains("1F0A"));
         assert!(joined.contains("080204")); // pet Hp/Sp stat frames
         assert!(joined.contains("1F0100")); // sleep done
@@ -714,7 +714,7 @@ mod tests {
             b"/openhotel",
         );
         handle_chat(&mut ctx).await;
-        let joined = out.outgoing.join("");
+        let joined: String = out.outgoing.iter().map(|f| f.frame.as_str()).collect();
         assert!(joined.contains("1F06"));
         assert!(joined.contains("504554")); // hex of "PET"
         assert!(joined.ends_with("1F07"));

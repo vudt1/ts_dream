@@ -14,6 +14,7 @@ use crate::protocol::encoder;
 use crate::server::handler::{HandleOutcome, OpcodeCtx};
 use crate::server::handlers::stats::build_stat_update;
 use crate::server::session::Conn;
+use sqlx::MySqlPool;
 
 /// EndTalk packet + reset the whole talk context (C# `EndTalk`, Client.cs:7919-7925).
 pub fn end_talk(conn: &mut Conn, out: &mut HandleOutcome) {
@@ -39,15 +40,16 @@ pub fn talk_messages(conn: &mut Conn, talk_string: &str, out: &mut HandleOutcome
 }
 
 /// Dispatch Opcode 0x14 — Action / Talk.
-pub fn handle_talk(ctx: &mut OpcodeCtx) {
+pub async fn handle_talk(ctx: &mut OpcodeCtx<'_>) {
     let conn = &mut ctx.conn;
     let out = &mut ctx.out;
     let data = ctx.data;
+    let pool = ctx.env.pool;
     let (sub, payload) = (ctx.sub, ctx.payload);
     match sub {
         1 => handle_talk_start(conn, payload, data, out),
         4 => end_talk(conn, out),
-        6 => handle_talk_continue(conn, payload, data, out),
+        6 => handle_talk_continue(conn, payload, data, pool, out).await,
         8 => handle_talk_warp(conn, payload, data, out),
         9 => handle_talk_select_menu(conn, payload),
         _ => end_talk(conn, out),
@@ -56,20 +58,18 @@ pub fn handle_talk(ctx: &mut OpcodeCtx) {
 
 /// H1 identity + distance gate (FTalk.cs:69-112).
 ///
-/// When the `(map, object)` row exists, its NPC template id drives the special
-/// branches and the ±150 distance test decides whether the talk opens. When the
-/// on-map row is absent the talk still opens with template id `0` (the generic
-/// NPC path, `Data.GetDataNpcOnMap` returns 0) — only the data talk key decides.
-fn resolve_npc(data: &GameData, conn: &Conn, map_object_id: i32) -> (i32, bool) {
-    let Some(npc) = data.npc_on_map.iter().find(|n| {
+/// The `(map, object)` row MUST exist (its NPC template id drives the special
+/// branches and its position the ±150 distance test); a talk to a missing
+/// on-map instance is rejected with EndTalk (ticket 18 review: "reject
+/// missing/out-of-range before any packet").
+fn resolve_npc(data: &GameData, conn: &Conn, map_object_id: i32) -> Option<(i32, bool)> {
+    let npc = data.npc_on_map.iter().find(|n| {
         n.map_id == i64::from(conn.session.map_id) && n.id == i64::from(map_object_id)
-    }) else {
-        return (0, true);
-    };
+    })?;
     let dx = i64::from(conn.session.map_x) - npc.x;
     let dy = i64::from(conn.session.map_y) - npc.y;
     let in_range = (-150..=150).contains(&dx) && (-150..=150).contains(&dy);
-    (npc.npc_id as i32, in_range)
+    Some((npc.npc_id as i32, in_range))
 }
 
 fn handle_talk_start(conn: &mut Conn, payload: &[u8], data: &GameData, out: &mut HandleOutcome) {
@@ -82,7 +82,10 @@ fn handle_talk_start(conn: &mut Conn, payload: &[u8], data: &GameData, out: &mut
     conn.session.talk_type = "NPC".to_string();
     conn.session.talk_count = 0;
 
-    let (template_id, in_range) = resolve_npc(data, conn, map_object_id);
+    let Some((template_id, in_range)) = resolve_npc(data, conn, map_object_id) else {
+        end_talk(conn, out); // missing on-map instance -> reject
+        return;
+    };
     conn.session.idnpctalking = template_id;
 
     // Special template ids embed the map object id (`idtalking.ToString("X2")`).
@@ -115,8 +118,7 @@ fn handle_talk_start(conn: &mut Conn, payload: &[u8], data: &GameData, out: &mut
         return;
     }
 
-    // Generic dialog: distance still required when the on-map row exists
-    // (FTalk.cs:69-112); an absent row opens anyway (template id 0).
+    // Generic dialog: the distance gate still applies (FTalk.cs:69-112).
     if !in_range {
         end_talk(conn, out);
         return;
@@ -144,10 +146,11 @@ fn handle_talk_start(conn: &mut Conn, payload: &[u8], data: &GameData, out: &mut
     }
 }
 
-fn handle_talk_continue(
+async fn handle_talk_continue(
     conn: &mut Conn,
     _payload: &[u8],
     data: &GameData,
+    pool: Option<&MySqlPool>,
     out: &mut HandleOutcome,
 ) {
     // H6 pre-dispatch guards (FTalk.cs:272-294).
@@ -202,6 +205,13 @@ fn handle_talk_continue(
             32 => out.send("F44411001401000000010603010000000000000100"),
             33 => {
                 crate::server::handlers::quest::save_map(conn);
+                crate::db::persist::update_player(
+                    pool,
+                    conn.session.id,
+                    "savemap",
+                    i64::from(conn.session.savemap),
+                )
+                .await;
                 let item = crate::server::inventory::from_template(data, 46016, 2);
                 let _ = conn.session.add_homdo_item(item);
                 out.send(conn.session.dump_homdo());
@@ -227,6 +237,13 @@ fn handle_talk_continue(
             32 => out.send("F44411001401000000010603010000000000000200"),
             33 => {
                 crate::server::handlers::quest::save_map(conn);
+                crate::db::persist::update_player(
+                    pool,
+                    conn.session.id,
+                    "savemap",
+                    i64::from(conn.session.savemap),
+                )
+                .await;
                 let item = crate::server::inventory::from_template(data, 46016, 2);
                 let _ = conn.session.add_homdo_item(item);
                 out.send(conn.session.dump_homdo());
@@ -244,7 +261,7 @@ fn handle_talk_continue(
 
     // Daily quest map 12711 owns the whole context (21 RNG draws).
     if conn.session.map_id == 12711 {
-        crate::server::handlers::quest::generate_daily_quest(conn, out);
+        crate::server::handlers::quest::generate_daily_quest(conn, data, out);
         return;
     }
 
@@ -297,12 +314,12 @@ mod tests {
         )
     }
 
-    #[test]
-    fn test_talk_start_banker_resolves_template() {
+    #[tokio::test]
+    async fn test_talk_start_banker_resolves_template() {
         let (mut conn, data, service) = talk_fixture(16080);
         let mut out = crate::server::handler::HandleOutcome::default();
         let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[0x06, 0x00]);
-        handle_talk(&mut ctx);
+        handle_talk(&mut ctx).await;
         assert_eq!(conn.session.idtalking, 6);
         assert_eq!(conn.session.idnpctalking, 16080);
         assert_eq!(out.outgoing[0], "F44402000602");
@@ -312,26 +329,39 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_talk_out_of_range_ends() {
+    #[tokio::test]
+    async fn test_talk_out_of_range_ends() {
         let (mut conn, data, service) = talk_fixture(16080);
         conn.session.map_x = 999;
         conn.session.map_y = 999;
         let mut out = crate::server::handler::HandleOutcome::default();
         let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[0x06, 0x00]);
-        handle_talk(&mut ctx);
+        handle_talk(&mut ctx).await;
         assert_eq!(out.outgoing, vec!["F44402001408"]);
         assert_eq!(conn.session.idtalking, 0);
     }
 
-    #[test]
-    fn test_talk_end_resets_context() {
+    #[tokio::test]
+    async fn test_talk_missing_instance_rejected() {
+        // A talk to an on-map id that has NO row is rejected (EndTalk), per the
+        // ticket 18 review "reject missing/out-of-range" rule.
+        let (mut conn, data, service) = talk_fixture(16080);
+        // Object id 99 is not in `npc_on_map` (only object 6 is registered).
+        let mut out = crate::server::handler::HandleOutcome::default();
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[0x63, 0x00]);
+        handle_talk(&mut ctx).await;
+        assert_eq!(conn.session.idtalking, 0);
+        assert_eq!(out.outgoing, vec!["F44402001408"]);
+    }
+
+    #[tokio::test]
+    async fn test_talk_end_resets_context() {
         let (mut conn, data, service) = talk_fixture(16080);
         conn.session.idtalking = 6;
         conn.session.select_menu = 30;
         let mut out = crate::server::handler::HandleOutcome::default();
         let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 4, &[]);
-        handle_talk(&mut ctx);
+        handle_talk(&mut ctx).await;
         assert_eq!(conn.session.idtalking, 0);
         assert_eq!(conn.session.select_menu, 0);
         assert_eq!(out.outgoing, vec!["F44402001408"]);

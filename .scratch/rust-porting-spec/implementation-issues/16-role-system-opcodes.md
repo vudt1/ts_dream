@@ -83,3 +83,30 @@ Implemented end-to-end; all review contract corrections applied:
 Also touched: `golden/09-mall-buy.golden` + scenario fixture corrected to the raw-offset layout (Rust-generated smoke re-capture; still needs a real C# capture for live parity).
 
 Provenance: `Client.cs:7349-7661`, `:7852-7917`; `Data.cs:3191-3277`; `docs/rust_porting_spec.md:388-390`; ticket review matrix above.
+
+## Review-fix followup (2026-08-10)
+
+Two-axis review followup — resolved without changing wire behavior:
+
+- Redeem grant now shares the single 29-column `homdo` upsert
+  (`db::persist::upsert_item_tx`, `pub(crate)`), replacing the duplicated
+  statement + the reservation-only legacy `db::item_code::redeem()` (removed —
+  no caller existed). `redeem_and_grant`/`redeem_special_gift` call it inside
+  their own transactions (operation: `item_code.rs:88-89`, `:155`).
+- `delete_character_flow` now performs the C# `GiaiTanParty` (clears the
+  player's `id_leader`/`id_mem` and scrubs this id from every other online
+  session) and broadcasts `battle::packets::hide_from_map` on the current map
+  before the transactional delete (`system.rs`). `accounts` row still
+  preserved.
+- Byte-parity unit tests added for `0x41` rank and the `0x0C` leader/member
+  teleport-confirm branches (`system.rs` tests).
+- `migrations/0002_bank_gold.sql` restored and `BankGold` removed from
+  `0001_init.sql` — the migration layout returns to the pre-change scheme
+  (scope-creep reverted; sqlx checksums for deployed DBs stay valid).
+- `savemap` whitelist entry is now wired: loaded into the session on login
+  (`db/players.rs` `PlayerRow.savemap`) and persisted on inn-keeper SM33
+  (`talk.rs`).
+
+Remaining per the review: `0x42` response width (C# LE32 `Shoppoin` malformed
+header) still needs a real C# capture before golden-locking; existing
+Rust-generated mall golden stays non-authoritative.

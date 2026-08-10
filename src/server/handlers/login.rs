@@ -73,7 +73,7 @@ pub async fn handle_login(ctx: &mut OpcodeCtx<'_>) {
                     conn.session.name = conn.session.pending_new_char_name.clone();
                 }
                 let seq = spawn::build_logined_sequence_session(&conn.session);
-                out.outgoing.extend(seq);
+                out.outgoing.extend(seq.into_iter().map(crate::server::handler::OutFrame::new));
             }
         }
     }
@@ -113,7 +113,7 @@ pub async fn handle_enter_game(ctx: &mut OpcodeCtx<'_>) {
                     conn.session.name = conn.session.pending_new_char_name.clone();
                 }
                 let seq = spawn::build_logined_sequence_session(&conn.session);
-                out.outgoing.extend(seq);
+                out.outgoing.extend(seq.into_iter().map(crate::server::handler::OutFrame::new));
             }
         }
     }
@@ -161,7 +161,7 @@ async fn login_db(
     conn.session.logined = true;
     conn.session.authed = true;
     let seq = spawn::build_logined_sequence_session(&conn.session);
-    out.outgoing.extend(seq);
+    out.outgoing.extend(seq.into_iter().map(crate::server::handler::OutFrame::new));
     // C# Logined1 purges the basic `Skill` rows (Id 0..9) at its tail
     // (Client.cs:8193, §5.6); the shared schema requires the `player_id`
     // predicate (§5.4 note 2). Runs after the stats frame is built so the
