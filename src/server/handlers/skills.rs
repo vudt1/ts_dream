@@ -4,7 +4,7 @@ use crate::battle::rng::DotNetRandom;
 use crate::data::tables::Npc;
 use crate::db::persist;
 use crate::protocol::encoder;
-use crate::server::handler::{HandleOutcome, OpcodeCtx};
+use crate::server::dispatcher::{HandleOutcome, OpcodeCtx};
 use crate::server::session::Conn;
 
 pub fn can_learn_element(player_element: u8, skill_element: i64) -> bool {
@@ -438,7 +438,7 @@ mod tests {
     use crate::battle::service::BattleService;
     use crate::data::loader::GameData;
     use crate::data::tables::{Item, Npc, Skill};
-    use crate::server::handler::{test_ctx, HandleOutcome};
+    use crate::server::dispatcher::{test_ctx, HandleOutcome};
     use crate::server::session::{Conn, InventoryItem, PetState};
     use std::sync::Arc;
 

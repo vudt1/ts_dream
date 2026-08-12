@@ -28,7 +28,7 @@
   cd /mnt/d/VUDT/GIT_PCC/ts_dream && cargo test --lib shops::tests 2>&1 | tail -30
   ```
 
-- **Test kết hợp các module chính (Ví dụ: `shops.rs` & `handler.rs`):**
+- **Test kết hợp các module chính (Ví dụ: `shops.rs` & `dispatcher.rs`):**
   ```bash
   cd /mnt/d/VUDT/GIT_PCC/ts_dream && cargo test --lib "shops::tests" 2>&1 | tail -8 && cargo test --lib "handler::tests" 2>&1 | tail -8
   ```
@@ -93,7 +93,7 @@
 
 - **Lọc Clippy warning theo danh sách file vừa chỉnh sửa:**
   ```bash
-  cd /mnt/d/VUDT/GIT_PCC/ts_dream && cargo clippy --all-targets 2>&1 | grep -A3 "shops.rs\|session.rs\|talk.rs\|server_control.rs\|handler.rs" | grep -E "warning|-->|shops\.rs|session\.rs|talk\.rs|server_control\.rs|handler\.rs" | head -40
+  cd /mnt/d/VUDT/GIT_PCC/ts_dream && cargo clippy --all-targets 2>&1 | grep -A3 "shops.rs\|session.rs\|talk.rs\|server_control.rs\|dispatcher.rs" | grep -E "warning|-->|shops\.rs|session\.rs|talk\.rs|server_control\.rs|handler\.rs" | head -40
   ```
 
 - **Soi chi tiết warning tại vị trí dòng code cụ thể:**

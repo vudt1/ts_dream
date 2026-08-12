@@ -7,7 +7,7 @@ use crate::battle::service::BattleService;
 use crate::data::loader::GameData;
 use crate::protocol::encoder;
 use crate::protocol::frame;
-use crate::server::handler::{self, ServerEnv};
+use crate::server::dispatcher::{self, ServerEnv};
 use crate::server::session::{online_sessions, Conn};
 use crate::server::spawn::announce_frame;
 use crate::state::AppState;
@@ -238,7 +238,7 @@ impl ServerControl {
     /// Scope keys on the origin's map (not each subject's map): in the party
     /// follow flow members are co-located with the leader, so the two sets are
     /// identical; a member warped to another map leaves the party.
-    pub async fn broadcast_map(&self, from_id: u32, frames: &[handler::MapBroadcast]) {
+    pub async fn broadcast_map(&self, from_id: u32, frames: &[dispatcher::MapBroadcast]) {
         let same_map_ids: Vec<u32> = {
             let sessions = online_sessions().lock().unwrap();
             let Some(from) = sessions.get(&from_id) else {
@@ -370,7 +370,7 @@ async fn handle_client_connection(
                                     conn.session = snapshot;
                                 }
                             }
-                            let out = handler::dispatch(&mut conn, &decoded, &data, &service, &env).await;
+                            let out = dispatcher::dispatch(&mut conn, &decoded, &data, &service, &env).await;
                             let id = conn.session.id;
                             if logined_id > 0 {
                                 online_sessions()
@@ -554,11 +554,11 @@ mod tests {
         c.broadcast_map(
             300001,
             &[
-                handler::MapBroadcast {
+                dispatcher::MapBroadcast {
                     subject: 300001,
                     frame: "F4440B000601E1930400026400C800".into(),
                 },
-                handler::MapBroadcast {
+                dispatcher::MapBroadcast {
                     subject: 300002,
                     frame: "F4440B000601E2930400026400C800".into(),
                 },
@@ -611,7 +611,7 @@ mod tests {
 
         c.broadcast_map(
             300001,
-            &[handler::MapBroadcast {
+            &[dispatcher::MapBroadcast {
                 subject: 300001,
                 frame: "F4440B000601E1930400026400C800".into(),
             }],

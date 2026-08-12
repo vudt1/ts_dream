@@ -15,7 +15,7 @@ use crate::battle::rng::DotNetRandom;
 use crate::data::loader::GameData;
 use crate::db::persist;
 use crate::protocol::encoder;
-use crate::server::handler::HandleOutcome;
+use crate::server::dispatcher::HandleOutcome;
 use crate::server::session::Conn;
 
 mod books;

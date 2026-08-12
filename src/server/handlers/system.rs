@@ -2,7 +2,7 @@
 
 use crate::db;
 use crate::protocol::encoder;
-use crate::server::handler::OpcodeCtx;
+use crate::server::dispatcher::OpcodeCtx;
 use crate::server::session::InventoryItem;
 use crate::server::spawn::{store_frame, sys_msg_frame};
 
@@ -448,7 +448,7 @@ mod tests {
     use super::*;
     use crate::battle::service::BattleService;
     use crate::data::loader::GameData;
-    use crate::server::handler::{test_ctx, HandleOutcome};
+    use crate::server::dispatcher::{test_ctx, HandleOutcome};
     use crate::server::session::Conn;
     use std::sync::Arc;
 

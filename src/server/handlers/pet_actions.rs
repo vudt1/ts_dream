@@ -21,7 +21,7 @@
 
 use crate::db;
 use crate::protocol::encoder;
-use crate::server::handler::OpcodeCtx;
+use crate::server::dispatcher::OpcodeCtx;
 use crate::server::pet_box::{ACTIVE_SLOTS, STABLE_SLOTS};
 use crate::server::session::{Conn, PetState};
 use sqlx::MySqlPool;
@@ -382,7 +382,7 @@ mod tests {
     use super::*;
     use crate::battle::service::BattleService;
     use crate::data::loader::GameData;
-    use crate::server::handler::{test_ctx, HandleOutcome};
+    use crate::server::dispatcher::{test_ctx, HandleOutcome};
     use crate::server::session::{Conn, InventoryItem, PetState};
     use std::sync::Arc;
 

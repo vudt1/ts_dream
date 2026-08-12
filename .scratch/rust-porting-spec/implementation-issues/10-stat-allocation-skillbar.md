@@ -34,7 +34,7 @@
 | DB write-through `update_player` (whitelist cột: Point/Int/Atk/Def/Agi/Hpx/Spx/Hp/Sp/HpMax/SpMax) | `src/db/persist.rs:44-59` |
 | DB write-through `update_skillsave` | `src/db/persist.rs:63-75` |
 | Login dump hotkey/skill bar `dump_hotkeys` (`F444`+`len`+`2801`+`02`+le16+slot; empty → `F4440300280102`) | `src/server/session.rs:355-368` |
-| Handlers routed trong dispatcher | `src/server/handler.rs:154` (0x08), `src/server/handler.rs:214` (0x28) |
+| Handlers routed trong dispatcher | `src/server/dispatcher.rs:154` (0x08), `src/server/dispatcher.rs:214` (0x28) |
 | Login dump build `build_logined_sequence_session` (step 20: `dump_hotkeys`) | `src/server/spawn.rs:327` / `445` |
 | Unit tests | `src/server/handlers/stats.rs:190-285` |
 

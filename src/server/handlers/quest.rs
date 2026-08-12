@@ -6,7 +6,7 @@ use crate::battle::packets;
 use crate::battle::rng::DotNetRandom;
 use crate::data::loader::GameData;
 use crate::protocol::encoder;
-use crate::server::handler::HandleOutcome;
+use crate::server::dispatcher::HandleOutcome;
 use crate::server::handlers::stats::build_stat_update;
 use crate::server::handlers::talk::{end_talk, talk_messages};
 use crate::server::session::{Conn, Session};

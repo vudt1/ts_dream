@@ -2,7 +2,7 @@
 
 use crate::db::persist;
 use crate::protocol::{encoder, frame};
-use crate::server::handler::OpcodeCtx;
+use crate::server::dispatcher::OpcodeCtx;
 use crate::server::inventory;
 use crate::server::session::{online_sessions, InventoryItem, PetState, Session, TradeState};
 
@@ -851,7 +851,7 @@ mod tests {
     use super::*;
     use crate::battle::service::BattleService;
     use crate::data::loader::GameData;
-    use crate::server::handler::{test_ctx, HandleOutcome};
+    use crate::server::dispatcher::{test_ctx, HandleOutcome};
     use crate::server::session::Conn;
     use std::sync::Arc;
 

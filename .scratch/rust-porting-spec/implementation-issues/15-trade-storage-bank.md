@@ -22,7 +22,7 @@
 
 ### Rust provenance
 
-- Dispatcher đã route `0x19`, `0x1D`, `0x1E` tới handler tại `src/server/handler.rs:183-196`.
+- Dispatcher đã route `0x19`, `0x1D`, `0x1E` tới handler tại `src/server/dispatcher.rs:183-196`.
 - Trade scaffold tại `src/server/handlers/trade_storage.rs:7-72`: sub 1 chỉ mutate local session và gửi packet local; sub 2 chỉ lưu gold, không parse item slots; sub 3 chỉ set local accepted/cancel; sub 10/11/12 là response stubs; sub 20 không move item/recipient, chỉ gửi `1706` placeholder và dump Homdo.
 - Storage scaffold tại `src/server/handlers/trade_storage.rs:74-121`: sub 1 remove trước khi biết Homdo còn slot, bỏ qua kết quả `add_homdo_item`; chỉ gửi dump + end, thiếu per-move detail. Sub 2 dùng `len()+1`, thiếu capacity/rollback/persistence. Chưa có LuuLang handling trong handler. Sub 8 mới set `select_menu=40`.
 - Bank scaffold tại `src/server/handlers/trade_storage.rs:124-165`: đọc amount bằng LE16 từ 2 byte (`:129-132`) thay vì request LE32; withdraw có cap gold nhưng deposit thiếu cap bank; amount 0 được chấp nhận; không có persistence.
@@ -80,7 +80,7 @@ Phần audit ở trên mô tả trạng thái trước implementation attempt. T
 
 ### Đã thay đổi
 
-- Dispatcher gọi ba handler ticket #15 theo async tại `src/server/handler.rs:183-196`.
+- Dispatcher gọi ba handler ticket #15 theo async tại `src/server/dispatcher.rs:183-196`.
 - Bank request đã parse LE32 và reject payload ngắn/amount 0 tại `src/server/handlers/trade_storage.rs:125-136`.
 - Withdraw đã có gate `bank >= amount` và `gold + amount <= 9_999_999`; deposit đã có gate đủ gold và cap bank bằng `saturating_add` tại `trade_storage.rs:138-197`.
 - Bank response amount hiện encode LE32 theo C# `smethod_12`, không còn LE16 như scaffold cũ (`trade_storage.rs:160-165`, `:191-196`). Ticket line 15 ghi `le16` là shorthand cũ và không còn là width implementation mục tiêu.
@@ -132,7 +132,7 @@ Mục này thay thế kết luận trạng thái tại phần `10:18 +07`; phầ
 - `cargo check`: **passed** sau code-review fixes.
 - `cargo test --lib server::handlers::trade_storage -- --nocapture`: **6/6 passed**.
 - `cargo test --lib db:: -- --nocapture`: **6/6 passed**.
-- `cargo test --lib server::handler::tests::dispatch_trade_bank_pk_and_pets -- --exact`: **passed**.
+- `cargo test --lib server::dispatcher::tests::dispatch_trade_bank_pk_and_pets -- --exact`: **passed**.
 - Full suite được chạy một lần trước review fixes: **264/265 passed**; failure duy nhất là expectation bank cũ đòi packet thứ ba. Expectation đã sửa theo C# và targeted regression sau sửa đã pass. Full suite không được chạy lại lần hai, nên không ghi nhận full-suite green sau commit.
 - `/code-review` được chạy nhiều vòng. Các finding High về rollback, packet storage/sub20, migration checksum, persistence loss, gold/pet UI synchronization đã được xử lý trước commit.
 

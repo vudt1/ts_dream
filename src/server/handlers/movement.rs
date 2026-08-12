@@ -1,7 +1,7 @@
 //! Movement & map position handlers (Opcode 0x05, 0x06).
 
 use crate::protocol::encoder;
-use crate::server::handler::OpcodeCtx;
+use crate::server::dispatcher::OpcodeCtx;
 use crate::server::spawn;
 
 /// Op 0x05 / 0x06 — Move.

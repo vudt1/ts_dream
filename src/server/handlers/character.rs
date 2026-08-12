@@ -10,7 +10,7 @@
 
 use crate::db;
 use crate::protocol::encoder;
-use crate::server::handler::OpcodeCtx;
+use crate::server::dispatcher::OpcodeCtx;
 use crate::server::session::{InventoryItem, Session};
 
 /// Parsed create-character payload (C# `Update_H9` layout).

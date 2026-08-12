@@ -11,7 +11,7 @@
 
 use crate::data::loader::GameData;
 use crate::protocol::encoder;
-use crate::server::handler::{HandleOutcome, OpcodeCtx};
+use crate::server::dispatcher::{HandleOutcome, OpcodeCtx};
 use crate::server::handlers::stats::build_stat_update;
 use crate::server::session::Conn;
 use sqlx::MySqlPool;
@@ -289,7 +289,7 @@ mod tests {
     use super::*;
     use crate::battle::service::BattleService;
     use crate::data::tables::NpcOnMap;
-    use crate::server::handler::test_ctx;
+    use crate::server::dispatcher::test_ctx;
     use std::sync::Arc;
 
     fn talk_fixture(npc_id: i64) -> (Conn, GameData, BattleService) {
@@ -317,7 +317,7 @@ mod tests {
     #[tokio::test]
     async fn test_talk_start_banker_resolves_template() {
         let (mut conn, data, service) = talk_fixture(16080);
-        let mut out = crate::server::handler::HandleOutcome::default();
+        let mut out = crate::server::dispatcher::HandleOutcome::default();
         let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[0x06, 0x00]);
         handle_talk(&mut ctx).await;
         assert_eq!(conn.session.idtalking, 6);
@@ -334,7 +334,7 @@ mod tests {
         let (mut conn, data, service) = talk_fixture(16080);
         conn.session.map_x = 999;
         conn.session.map_y = 999;
-        let mut out = crate::server::handler::HandleOutcome::default();
+        let mut out = crate::server::dispatcher::HandleOutcome::default();
         let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[0x06, 0x00]);
         handle_talk(&mut ctx).await;
         assert_eq!(out.outgoing, vec!["F44402001408"]);
@@ -347,7 +347,7 @@ mod tests {
         // ticket 18 review "reject missing/out-of-range" rule.
         let (mut conn, data, service) = talk_fixture(16080);
         // Object id 99 is not in `npc_on_map` (only object 6 is registered).
-        let mut out = crate::server::handler::HandleOutcome::default();
+        let mut out = crate::server::dispatcher::HandleOutcome::default();
         let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[0x63, 0x00]);
         handle_talk(&mut ctx).await;
         assert_eq!(conn.session.idtalking, 0);
@@ -359,7 +359,7 @@ mod tests {
         let (mut conn, data, service) = talk_fixture(16080);
         conn.session.idtalking = 6;
         conn.session.select_menu = 30;
-        let mut out = crate::server::handler::HandleOutcome::default();
+        let mut out = crate::server::dispatcher::HandleOutcome::default();
         let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 4, &[]);
         handle_talk(&mut ctx).await;
         assert_eq!(conn.session.idtalking, 0);

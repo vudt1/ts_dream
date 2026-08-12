@@ -45,7 +45,7 @@
 
 1. **`0x22` ticket line 10 sai width.** C# `method_0` dùng `smethod_12` = LE32 và 12 byte zero. Dạng đúng theo `docs/rust_porting_spec.md:388-390` là `F44412002304 + le32(gold) + 12x00`, chỉ cho sub 1. Rust đang phát `le16 + 24x00` dưới header length `0x0012` (`system.rs:41-45`).
 2. **Password wire order theo C# là `oldPass1, newPass1, oldPass2, newPass2`.** C# so field 1 với pass1, field 3 với pass2 rồi ghi field 2/4 (`Client.cs:7400-7443`). Ticket hiện mô tả thứ tự khác; capture nên khóa thứ tự này trước golden.
-3. **`0x42` raw offsets không mơ hồ:** C# và spec dùng item `[9..10]`, price `[11..12]`. Vì `OpcodeCtx.payload` bắt đầu ở raw byte 6 (`src/server/handler.rs:115-118`), Rust phải đọc payload `[3..4]` và `[5..6]`; code hiện đọc `[2..3]`/`[4..5]` (`system.rs:67-69`).
+3. **`0x42` raw offsets không mơ hồ:** C# và spec dùng item `[9..10]`, price `[11..12]`. Vì `OpcodeCtx.payload` bắt đầu ở raw byte 6 (`src/server/dispatcher.rs:115-118`), Rust phải đọc payload `[3..4]` và `[5..6]`; code hiện đọc `[2..3]`/`[4..5]` (`system.rs:67-69`).
 4. **`0x42` response còn một mâu thuẫn wire cần capture:** C# `Shoppoin` dùng LE32 với header length `0x0006` malformed (`Client.cs:7914-7917`), còn ticket/spec chọn normalized LE16. Chưa được đánh dấu parity cho đến khi capture thật chốt bug-compatible hay normalized.
 
 ### Vấn đề và giải pháp bắt buộc

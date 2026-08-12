@@ -1,6 +1,6 @@
 //! Expressions and emotion action handler (Opcode 0x20).
 
-use crate::server::handler::OpcodeCtx;
+use crate::server::dispatcher::OpcodeCtx;
 use crate::server::spawn;
 
 /// Op 0x20 — Expressions.

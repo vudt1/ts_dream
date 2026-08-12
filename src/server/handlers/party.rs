@@ -6,7 +6,7 @@
 //! is out of scope; `Session.id_mem` is the source of the eligible members.
 
 use crate::protocol::encoder;
-use crate::server::handler::OpcodeCtx;
+use crate::server::dispatcher::OpcodeCtx;
 
 /// Dispatch Opcode 0x0D — Party ops. Only the quan-su sub-ops are ported.
 pub fn handle_party(ctx: &mut OpcodeCtx) {
@@ -63,7 +63,7 @@ mod tests {
     use super::*;
     use crate::battle::service::BattleService;
     use crate::data::loader::GameData;
-    use crate::server::handler::{test_ctx, HandleOutcome};
+    use crate::server::dispatcher::{test_ctx, HandleOutcome};
     use crate::server::session::Conn;
 
     #[test]

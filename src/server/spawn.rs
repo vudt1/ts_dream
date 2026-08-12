@@ -4,7 +4,7 @@
 //! The 22-step `Logined1` sequence and the login gate responses live here.
 
 use crate::protocol::encoder;
-use crate::server::handler::HandleOutcome;
+use crate::server::dispatcher::HandleOutcome;
 use crate::server::session::Session;
 use std::sync::atomic::{AtomicI64, Ordering};
 

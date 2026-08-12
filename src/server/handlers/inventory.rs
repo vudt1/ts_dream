@@ -4,7 +4,7 @@
 
 use crate::db::persist;
 use crate::protocol::encoder;
-use crate::server::handler::{hex_of, HandleOutcome, OpcodeCtx};
+use crate::server::dispatcher::{hex_of, HandleOutcome, OpcodeCtx};
 use crate::server::handlers::stats::build_stat_update;
 use crate::server::map_drops;
 use crate::server::session::{Conn, InventoryItem};
@@ -411,7 +411,7 @@ async fn handle_reborn(
         conn.session.hair = u16::from(payload[0]);
     }
     if payload.len() >= 9 {
-        conn.session.color = crate::server::handler::hex_of(&payload[1..9]);
+        conn.session.color = crate::server::dispatcher::hex_of(&payload[1..9]);
     }
 
     let (point_base, skill_point_base, new_reborn, new_job) = if conn.session.reborn == 0 {
@@ -512,7 +512,7 @@ mod tests {
     use super::*;
     use crate::battle::service::BattleService;
     use crate::data::loader::GameData;
-    use crate::server::handler::{test_ctx, HandleOutcome};
+    use crate::server::dispatcher::{test_ctx, HandleOutcome};
     use crate::server::session::Conn;
     use std::sync::Arc;
 

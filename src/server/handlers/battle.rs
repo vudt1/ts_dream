@@ -8,7 +8,7 @@ use crate::battle::runner::BattleCommand;
 use crate::battle::service::BattleService;
 use crate::data::loader::GameData;
 use crate::protocol::encoder;
-use crate::server::handler::{HandleOutcome, OpcodeCtx};
+use crate::server::dispatcher::{HandleOutcome, OpcodeCtx};
 use crate::server::session::{Conn, Session};
 
 /// Dispatch Opcode 0x0B — Battle control (Ch2 §2.3.8).
@@ -234,7 +234,7 @@ mod tests {
     use super::*;
     use crate::battle::service::BattleService;
     use crate::data::tables::Npc;
-    use crate::server::handler::test_ctx;
+    use crate::server::dispatcher::test_ctx;
     use crate::server::session::{Conn, InventoryItem, Session};
 
     fn service() -> BattleService {

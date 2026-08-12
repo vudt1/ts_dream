@@ -22,7 +22,7 @@ The findings below record the pre-fix audit; the implementation status and verif
 
 | Tiêu chí | Rust hiện tại | C# ground truth / spec | Đánh giá |
 |---|---|---|---|
-| Dispatcher | `src/server/handler.rs:174-187` route op `0x17` sub `30..33` và op `0x1B` | `ts_server_old/Server_TS_Online/Client.cs:859-957`, `Client.cs:2101-2106` | Đạt route cơ bản |
+| Dispatcher | `src/server/dispatcher.rs:174-187` route op `0x17` sub `30..33` và op `0x1B` | `ts_server_old/Server_TS_Online/Client.cs:859-957`, `Client.cs:2101-2106` | Đạt route cơ bản |
 | NPC price table | `src/server/handlers/shops.rs:53-164`, hiện chỉ là tập mapping hardcoded hữu hạn | `Client.cs:6428-6471`, các nhánh buy `Client.cs:6472-7094`; contract tại `research/01-protocol-reference.md:324-326` | **Chưa đạt exhaustive**; cần chứng minh/port toàn bộ mapping C# |
 | NPC buy | `shops.rs:204-213` | `Client.cs:6472-7094` | Gate gold và packet có; nhưng gọi `add_homdo_item` rồi bỏ qua slots affected/empty trước khi trừ gold, nên bag-full có thể mất tính nhất quán |
 | NPC sell | `shops.rs:24-51`, `182-191` | `Client.cs:7095-7122` | Range và count có; Rust chỉ persist Gold, chưa persist các Homdo row đã giảm/xóa |

@@ -319,7 +319,7 @@ pub mod scenario {
     use crate::battle::service::BattleService;
     use crate::data::loader::GameData;
     use crate::protocol::encoder;
-    use crate::server::handler;
+    use crate::server::dispatcher;
     use crate::server::session::Conn;
     use std::path::Path;
 
@@ -373,12 +373,12 @@ pub mod scenario {
                 let Some(decoded) = encoder::bytes(c2s) else {
                     panic!("scenario `{}`: bad c2s hex `{c2s}`", self.name);
                 };
-                let out = handler::dispatch(
+                let out = dispatcher::dispatch(
                     &mut conn,
                     &decoded,
                     &self.data,
                     &service,
-                    &handler::ServerEnv::none(),
+                    &dispatcher::ServerEnv::none(),
                 )
                 .await;
                 for frame in &out.outgoing {

@@ -2,7 +2,7 @@
 
 use crate::db::persist;
 use crate::protocol::encoder;
-use crate::server::handler::OpcodeCtx;
+use crate::server::dispatcher::OpcodeCtx;
 use crate::server::session::{Conn, InventoryItem};
 
 /// `F4440A001A04` + gold + `00000000` — the gold-update frame C# sends after
@@ -610,7 +610,7 @@ mod tests {
     use super::*;
     use crate::battle::service::BattleService;
     use crate::data::loader::GameData;
-    use crate::server::handler::{test_ctx, HandleOutcome};
+    use crate::server::dispatcher::{test_ctx, HandleOutcome};
     use crate::server::session::Conn;
     use std::sync::Arc;
 

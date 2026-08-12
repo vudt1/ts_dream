@@ -28,7 +28,7 @@ pub mod db {
 
 pub mod server {
     pub mod character_sheet;
-    pub mod handler;
+    pub mod dispatcher;
     pub mod handlers;
     pub mod inventory;
     pub mod map_drops;

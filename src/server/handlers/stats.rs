@@ -3,7 +3,7 @@
 use crate::battle::engine::{get_hp_max, get_sp_max};
 use crate::db::persist;
 use crate::protocol::encoder;
-use crate::server::handler::OpcodeCtx;
+use crate::server::dispatcher::OpcodeCtx;
 
 /// Build stat update frame `F4440C000801` + type + sign + le32(val) + `00000000`.
 pub fn build_stat_update(stat_type: u8, val: i32) -> String {
@@ -190,7 +190,7 @@ mod tests {
     use super::*;
     use crate::battle::service::BattleService;
     use crate::data::loader::GameData;
-    use crate::server::handler::{test_ctx, HandleOutcome};
+    use crate::server::dispatcher::{test_ctx, HandleOutcome};
     use crate::server::session::Conn;
     use std::sync::Arc;
 

@@ -73,7 +73,7 @@ ts_dream/
     │   ├── codec.rs            # Codec XOR 0xAD & opcode/subcode
     │   └── encoder.rs          # Đóng gói/buffer packet đi
     ├── server/                 # TCP Server listener (Port 6414), Session management & Spawner
-    │   ├── handler.rs          # Phân luồng opcode chính (dispatcher match 70+ opcode)
+    │   ├── dispatcher.rs          # Phân luồng opcode chính (dispatcher match 70+ opcode)
     │   ├── session.rs          # Quản lý phiên kết nối (InventoryItem, offline state)
     │   ├── spawn.rs            # Spawner quản lý đối tượng/entity trong map
     │   ├── character_sheet.rs  # Bảng chỉ số nhân vật
