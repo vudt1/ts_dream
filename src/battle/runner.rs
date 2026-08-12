@@ -9,11 +9,12 @@
 use crate::battle::construction::Battle;
 use crate::battle::damage;
 use crate::battle::engine::WarInfo;
+use crate::battle::npc_world::NpcWorld;
 use crate::battle::packets;
 use crate::battle::packets::{attack_status, miss_status, troi_byte, troi_end_byte};
 use crate::battle::rng::DotNetRandom;
 use crate::battle::targeting::{self, CellInfo, GridPos};
-use crate::data::tables::{Item, Npc, NpcOnMap, Skill};
+use crate::data::tables::{Item, Npc, Skill};
 use crate::protocol::encoder;
 use std::collections::HashMap;
 
@@ -40,10 +41,13 @@ pub struct BattleData<'a> {
     pub items: &'a HashMap<i64, Item>,
     /// Per-player pet slot ids `[stt1..stt4]` (0 = empty), used by catch.
     pub pet_slots: &'a HashMap<i64, [i64; 4]>,
-    /// Map NPC instance for post-flee respawn coordinates (optional).
-    pub npc_on_map: Option<&'a NpcOnMap>,
-    /// The `_My_TalkingBattle` npc id (for flee respawn).
+    /// The shared map-NPC world (ticket 20 G2) — post-battle respawn reads
+    /// `_Delay` and rewrites the entry. `None` (golden replay) disables it.
+    pub world: Option<&'a std::sync::RwLock<NpcWorld>>,
+    /// The battle-triggering npc id (`_My_TalkingBattle`; 0 = no map npc).
     pub talking_battle: i64,
+    /// The battle-initiating leader's map id (respawn lookup scope).
+    pub map_id: i64,
     /// Per-player DB stat snapshot for end-of-battle rewards.
     pub players: &'a HashMap<i64, PlayerSnapshot>,
     /// The cumulative Texps thresholds (`Data.Texps[]`).
@@ -70,16 +74,18 @@ impl<'a> BattleData<'a> {
         pet_slots: &'a HashMap<i64, [i64; 4]>,
         players: &'a HashMap<i64, PlayerSnapshot>,
         texps: &'a [crate::data::tables::TexpRow],
-        npc_on_map: Option<&'a NpcOnMap>,
+        world: Option<&'a std::sync::RwLock<NpcWorld>>,
         talking_battle: i64,
+        map_id: i64,
     ) -> BattleData<'a> {
         BattleData {
             npcs,
             skills,
             items,
             pet_slots,
-            npc_on_map,
+            world,
             talking_battle,
+            map_id,
             players,
             texps,
         }
@@ -141,7 +147,12 @@ pub enum Out {
     /// A party member fled; restore HP/pets and exit battle for `player`.
     Fled { player: i64 },
     /// Respawn the battle-triggering map npc at the given position.
-    Respawn { npc_id: i64, x: i64, y: i64 },
+    Respawn {
+        npc_id: i64,
+        map_id: i64,
+        x: i64,
+        y: i64,
+    },
     /// Pet exp grant at battle end (`Data.PetUpdateData(_Texp, ...)`).
     PetExp { owner: i64, stt: i64, exp: i64 },
 }
@@ -222,8 +233,13 @@ impl Battle {
             return outcome;
         }
 
-        // Leader SP regen (`IL_caac`, TheBattle.cs:4147-4247) — only for
-        // join-in-progress (ListQS) leaders, which this port does not model.
+        // Leader SP regen (`IL_caac`, TheBattle.cs:4146-4247): when the
+        // battle-initiating leader has a designated quan-su (`_My_IdQS`), the
+        // leader's and every party-member's Sp regen by
+        // `Round((QS.Int + QS.Int2) / 15.0)` per turn, capped at SpMax, both
+        // the player cells and their pet cells, with DB writes.
+        self.leader_sp_regen(out);
+
         if self.count_enemies_alive() == 0 {
             return Outcome::PlayerWin;
         }
@@ -2440,6 +2456,64 @@ impl Battle {
 
     // ---- HP/SP DB write helpers ------------------------------------------
 
+    /// Leader SP regen block (`IL_caac`, TheBattle.cs:4146-4247).
+    ///
+    /// When the battle's initiating leader has a designated quan-su member
+    /// (`leader_id_qs > 0`), the leader cell, the leader's pet cell
+    /// (`row ^ 1`, `col`), and every party-member cell + pet cell regen Sp by
+    /// `Round((qs.Int + qs.Int2) / 15.0)` capped at SpMax, with DB writes.
+    fn leader_sp_regen(&mut self, out: &mut Vec<Out>) {
+        let qs = self.leader_id_qs;
+        if qs <= 0 {
+            return;
+        }
+        let num109 = damage::banker_round(self.leader_qs_int as f64 / 15.0) as i64;
+        if num109 <= 0 {
+            return;
+        }
+        // The leader cell is the player cell whose id equals its own leader id.
+        let leader_row = self
+            .list_war
+            .values()
+            .filter(|c| c.typ == 2 && c.id > 0 && c.id == c.leader_id)
+            .map(|c| c.row)
+            .next()
+            .unwrap_or(3);
+        // Regen each living player cell on the leader's row + its pet cell.
+        for col in 0..5u8 {
+            let Some(cell) = self.cell(leader_row, col).cloned() else {
+                continue;
+            };
+            if cell.id <= 0 || cell.typ != 2 {
+                continue;
+            }
+            let new_sp = (cell.sp + num109).min(cell.sp_max);
+            if new_sp != cell.sp {
+                let mut c = cell;
+                c.sp = new_sp;
+                self.write_sp(&c, new_sp, out);
+                if let Some(cell_ref) = self.cell_mut(leader_row, col) {
+                    cell_ref.sp = new_sp;
+                }
+            }
+            // Pet cell directly in front of this player cell (row ^ 1, col).
+            let pet_row = leader_row ^ 1;
+            if let Some(pet) = self.cell(pet_row, col).cloned() {
+                if pet.id > 0 {
+                    let pet_sp = (pet.sp + num109).min(pet.sp_max);
+                    if pet_sp != pet.sp {
+                        let mut p = pet;
+                        p.sp = pet_sp;
+                        self.write_sp(&p, pet_sp, out);
+                        if let Some(pet_ref) = self.cell_mut(pet_row, col) {
+                            pet_ref.sp = pet_sp;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fn write_hp(&self, c: &WarInfo, value: i64, out: &mut Vec<Out>) {
         if !matches!(c.typ, 3 | 7) {
             out.push(Out::Db(DbUpdate {
@@ -2590,27 +2664,49 @@ impl Battle {
         if talking <= 0 {
             return;
         }
-        let Some(npc_map) = data.npc_on_map else {
+        let Some(world) = data.world else {
             return;
         };
-        let lo_x = (npc_map.x - npc_map.coord).max(0);
-        let hi_x = npc_map.x + npc_map.coord;
-        let lo_y = (npc_map.y - npc_map.coord).max(0);
-        let hi_y = npc_map.y + npc_map.coord;
+        // Read `_Delay` BEFORE drawing `random_2` (RNG-ordering, C# reads the
+        // instance at TheBattle.cs:4701 then draws at :4719). A non-zero delay
+        // means the npc is still in respawn cooldown → skip (no RNG draw).
+        let entry = match world.read() {
+            Ok(g) => match g.get(data.map_id, talking) {
+                Some(e) => e.clone(),
+                None => return,
+            },
+            Err(_) => return,
+        };
+        if entry.delay != 0 {
+            return;
+        }
+        let mut lo_x = entry.x_first - entry.coord;
+        if lo_x < 0 {
+            lo_x = entry.x_first;
+        }
+        let hi_x = entry.x_first + entry.coord;
+        let mut lo_y = entry.y_first - entry.coord;
+        if lo_y < 0 {
+            lo_y = entry.y_first;
+        }
+        let hi_y = entry.y_first + entry.coord;
         let x = i64::from(self.rng.random_2.next_range(lo_x as i32, hi_x as i32));
         let y = i64::from(self.rng.random_2.next_range(lo_y as i32, hi_y as i32));
+        // Write the respawn-cooldown marker back (`_Delay = 10`, next walk will
+        // decrement it each 900 ms tick).
+        if let Ok(mut g) = world.write() {
+            if let Some(e) = g.get_mut(data.map_id, talking) {
+                e.x = x;
+                e.y = y;
+                e.delay = 10;
+            }
+        }
         out.push(Out::Respawn {
             npc_id: talking,
+            map_id: data.map_id,
             x,
             y,
         });
-        out.push(Out::Broadcast(format!(
-            "F44406001603{}0A00F44408001605{}{}{}",
-            encoder::le16(talking as u16),
-            encoder::le16(talking as u16),
-            encoder::le16(x as u16),
-            encoder::le16(y as u16)
-        )));
     }
 
     /// End-of-battle: player rewards + cleanup packets (§3.8, TheBattle.cs:4458-4949).
@@ -2618,7 +2714,15 @@ impl Battle {
     /// `per_exp` = `Server.PerEXP` (usually 1). `fled` suppresses exp. Emits the
     /// hide/reposition frames, battle-exit UI packets, player exp Db writes
     /// (with level-up side effects), and `Out::PetExp` for the active pets.
-    pub fn finish(&mut self, data: &BattleData, per_exp: i64, fled: bool, out: &mut Vec<Out>) {
+    /// `won` gates the win-path map-npc respawn (win + flee respawn; lose not).
+    pub fn finish(
+        &mut self,
+        data: &BattleData,
+        per_exp: i64,
+        fled: bool,
+        won: bool,
+        out: &mut Vec<Out>,
+    ) {
         let mut text9 = String::new();
         for col in 0..5u8 {
             let Some(cell) = self.cell(3, col).cloned() else {
@@ -2727,6 +2831,13 @@ impl Battle {
             });
         }
 
+        // Win-path map-npc respawn (C# TheBattle.cs:4689-4724 — same `_Delay==0`
+        // gate + `_Delay=10` write + map-wide `F44406001603`/`F44408001605`).
+        // The flee path already respawned in `apply_flee` (runner.rs:2075);
+        // a defeat (players all dead) does not respawn the npc.
+        if won {
+            self.npc_respawn(data, out);
+        }
         if !text9.is_empty() {
             out.push(Out::Broadcast(text9));
         }
@@ -2854,7 +2965,7 @@ mod tests {
         let players = Box::leak(Box::new(players));
         let texps = crate::data::texps::compute_texps();
         let texps = Box::leak(Box::new(texps));
-        let data = BattleData::new(npcs, skills, items, pets, players, texps, None, 0);
+        let data = BattleData::new(npcs, skills, items, pets, players, texps, None, 0, 0);
         let battle = Battle::with_seeds(1, 112, 1, 2, 3);
         (battle, data)
     }
@@ -3030,7 +3141,7 @@ mod tests {
         let pets = HashMap::new();
         let players = HashMap::new();
         let texps = crate::data::texps::compute_texps();
-        let data = BattleData::new(&npcs, &skills, &items, &pets, &players, &texps, None, 0);
+        let data = BattleData::new(&npcs, &skills, &items, &pets, &players, &texps, None, 0, 0);
 
         let mut cmds = HashMap::new();
         cmds.insert(
@@ -3073,7 +3184,7 @@ mod tests {
         let pets = Box::leak(Box::new(data_with_items.pet_slots.clone()));
         let players = Box::leak(Box::new(data_with_items.players.clone()));
         let texps = Box::leak(Box::new(crate::data::texps::compute_texps()));
-        data_with_items = BattleData::new(npcs, skills, items, pets, players, texps, None, 0);
+        data_with_items = BattleData::new(npcs, skills, items, pets, players, texps, None, 0, 0);
 
         let mut session = crate::server::session::Session::new();
         session.id = 300001;
@@ -3161,7 +3272,7 @@ mod tests {
         let _ = hp;
 
         let mut fin = Vec::new();
-        battle.finish(&data, 1, false, &mut fin);
+        battle.finish(&data, 1, false, true, &mut fin);
         // A Texp write for the player on a type-7 kill.
         assert!(fin.iter().any(|o| matches!(
             o,
@@ -3180,5 +3291,176 @@ mod tests {
             .any(|o| matches!(o, Out::Broadcast(f) if *f == packets::battle_exit_talk())));
         // Player stays alive and unarmed after battle.
         assert!(battle.cell(3, 2).unwrap().hp > 0);
+    }
+
+    #[test]
+    fn leader_sp_regen_restores_leader_and_pet_sp() {
+        let (mut battle, data) = scenario();
+        let mut session = add_player(&mut battle);
+        battle.add_npc(&data.npcs.get(&9001).unwrap(), 1, 0, 2, 3);
+        // Designate a quan-su: QS int 30 → num109 = round(30/15.0) = 2.
+        session.id_qs = 300002;
+        session.int1 = 30;
+        battle.leader_id_qs = 300002;
+        battle.leader_qs_int = 30;
+        // Drain the leader's SP below max so the regen is observable.
+        battle.cell_mut(3, 2).unwrap().sp = 90;
+        battle.cell_mut(3, 2).unwrap().sp_max = 100;
+        let cmds = HashMap::new(); // no commands; the regen still runs.
+        let mut out = Vec::new();
+        let _ = battle.run_turn(&data, &cmds, &mut out);
+        // Leader SP 90 + 2 = 92.
+        assert_eq!(battle.cell(3, 2).unwrap().sp, 92);
+        // A Db Sp write for the leader was emitted.
+        assert!(out.iter().any(|o| matches!(
+            o,
+            Out::Db(DbUpdate {
+                target: DbTarget::Player(300001),
+                stat: Stat::Sp,
+                value: 92,
+            })
+        )));
+    }
+
+    #[test]
+    fn leader_sp_regen_skips_when_no_quan_su() {
+        let (mut battle, data) = scenario();
+        add_player(&mut battle);
+        battle.add_npc(&data.npcs.get(&9001).unwrap(), 1, 0, 2, 3);
+        battle.cell_mut(3, 2).unwrap().sp = 90;
+        let cmds = HashMap::new();
+        let mut out = Vec::new();
+        let _ = battle.run_turn(&data, &cmds, &mut out);
+        // No QS → no regen.
+        assert_eq!(battle.cell(3, 2).unwrap().sp, 90);
+        // The leader's own action may legitimately write Sp (basic attack cost);
+        // the assertion is scoped to the regen: SP must be exactly 90, never
+        // bumped by a +2 quan-su regen.
+        let mut regen_sp = out.iter().filter_map(|o| match o {
+            Out::Db(DbUpdate {
+                target: DbTarget::Player(300001),
+                stat: Stat::Sp,
+                value,
+            }) => Some(*value),
+            _ => None,
+        });
+        assert!(
+            regen_sp.all(|v| v == 90),
+            "SP writes must reflect the un-regened value; got: {:?}",
+            out.iter()
+                .filter_map(|o| match o {
+                    Out::Db(DbUpdate {
+                        target: DbTarget::Player(300001),
+                        stat: Stat::Sp,
+                        value,
+                    }) => Some(*value),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn finish_win_respawns_npc_with_delay_lifecycle() {
+        // G2: the win path must respawn the map npc when its instance exists
+        // and `_Delay == 0`, drawing `random_2` and writing `_Delay = 10`.
+        use crate::battle::npc_world::NpcWorld;
+        use crate::data::tables::NpcOnMap;
+        use std::sync::{Arc, RwLock};
+
+        let rows = vec![NpcOnMap {
+            map_id: 12001,
+            id: 7,
+            npc_id: 9001,
+            x: 400,
+            y: 500,
+            coord: 10,
+            so_luong: 1,
+        }];
+        let world = Arc::new(RwLock::new(NpcWorld::new(&rows)));
+
+        let (mut battle, data) = scenario();
+        let mut session = add_player(&mut battle);
+        session.talking_battle = 7;
+        session.map_id = 12001;
+        battle.add_npc(&data.npcs.get(&9001).unwrap(), 1, 0, 2, 3);
+        let cmds = basic_command();
+        let mut out = Vec::new();
+        let _ = battle.run_battle(&data, &cmds, &mut out);
+        let mut fin = Vec::new();
+        let data2 = BattleData::new(
+            data.npcs,
+            data.skills,
+            data.items,
+            data.pet_slots,
+            data.players,
+            data.texps,
+            Some(world.as_ref()),
+            7,
+            12001,
+        );
+        battle.finish(&data2, 1, false, true, &mut fin);
+        // The npc was respawned: delay set to 10 and a Respawn out produced.
+        let guard = world.read().unwrap();
+        let e = guard.get(12001, 7).unwrap();
+        assert_eq!(e.delay, 10);
+        assert!(fin.iter().any(|o| matches!(
+            o,
+            Out::Respawn {
+                npc_id: 7,
+                map_id: 12001,
+                ..
+            }
+        )));
+    }
+
+    #[test]
+    fn finish_lose_does_not_respawn_npc() {
+        // A defeat (players all dead) must NOT respawn the map npc.
+        use crate::battle::npc_world::NpcWorld;
+        use crate::data::tables::NpcOnMap;
+        use std::sync::{Arc, RwLock};
+
+        let rows = vec![NpcOnMap {
+            map_id: 12001,
+            id: 7,
+            npc_id: 9001,
+            x: 400,
+            y: 500,
+            coord: 10,
+            so_luong: 1,
+        }];
+        let world = Arc::new(RwLock::new(NpcWorld::new(&rows)));
+
+        let (mut battle, data) = scenario();
+        let mut session = add_player(&mut battle);
+        session.talking_battle = 7;
+        session.map_id = 12001;
+        // A far stronger npc: the player dies without a command.
+        let mut npc = data.npcs.get(&9001).unwrap().clone();
+        npc.atk = 50_000;
+        npc.hp = 1_000_000;
+        battle.add_npc(&npc, 1, 0, 2, 3);
+        let cmds = HashMap::new();
+        let mut out = Vec::new();
+        let outcome = battle.run_battle(&data, &cmds, &mut out);
+        assert_eq!(outcome, Outcome::PlayerLose);
+        let mut fin = Vec::new();
+        let data2 = BattleData::new(
+            data.npcs,
+            data.skills,
+            data.items,
+            data.pet_slots,
+            data.players,
+            data.texps,
+            Some(world.as_ref()),
+            7,
+            12001,
+        );
+        battle.finish(&data2, 1, false, false, &mut fin);
+        let guard = world.read().unwrap();
+        let e = guard.get(12001, 7).unwrap();
+        assert_eq!(e.delay, 0, "defeat must not respawn the npc");
+        assert!(!fin.iter().any(|o| matches!(o, Out::Respawn { .. })));
     }
 }

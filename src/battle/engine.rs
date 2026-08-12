@@ -44,6 +44,11 @@ pub struct WarInfo {
     pub attacked: bool,
     pub random: i64,
     pub exp: i64,
+    /// Leader's designated quan-su (`_My_IdQS`) for the SP-regen block.
+    pub id_qs: i64,
+    /// The designated quan-su member's `Int + Int2` sum (C# IL_caac `num108`),
+    /// captured at battle spawn for per-turn leader SP regen.
+    pub qs_int: i64,
 
     // Buff/debuff triplets (id, level, remaining turns)
     pub type3_id: i64,

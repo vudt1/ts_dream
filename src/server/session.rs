@@ -228,6 +228,9 @@ pub struct Session {
     pub id_mem: [u32; 4],
     /// Party leader id (`_My_IdLeader`); 0 = no party follow.
     pub id_leader: u32,
+    /// Quan-su (quartermaster) member id (`_My_IdQS`), set by op 0x0D sub 5
+    /// and cleared by sub 6. Drives the per-turn leader SP regen block.
+    pub id_qs: u32,
     /// Quest step updates recorded by `BattleQuestWin` (`npcId, npcVal`).
     pub quest_steps: Vec<(i64, i64)>,
     /// Warp-step updates recorded by `BattleQuestWin` (`npcId, warpVal`).
@@ -330,6 +333,7 @@ impl Default for Session {
             click_npc_id: 0,
             id_mem: [0; 4],
             id_leader: 0,
+            id_qs: 0,
             quest_steps: Vec::new(),
             warp_steps: Vec::new(),
         }

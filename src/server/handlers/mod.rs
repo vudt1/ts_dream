@@ -7,6 +7,7 @@ pub mod expressions;
 pub mod inventory;
 pub mod login;
 pub mod movement;
+pub mod party;
 pub mod pet_actions;
 pub mod quest;
 pub mod shops;

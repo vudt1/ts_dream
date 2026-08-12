@@ -168,3 +168,116 @@ async fn battle_win_golden_replay() {
     );
     assert_eq!(s.talking_battle, 0);
 }
+
+/// Seeded TeamDef golden replay (ticket 20 "Golden 2"): a low-level TeamDef
+/// battle (DiaHinh 4712, one defender NPC) driven to a win. Asserts the
+/// byte-faithful drop frame `F44408003504`, the exp write, a `{3201}` turn
+/// action, and the BattleQuestWin red-message + EndTalk frames.
+#[tokio::test]
+async fn teamdef_battle_win_golden_replay() {
+    let mut data = game_data();
+    data.npcs.insert(
+        9002,
+        Npc {
+            id: 9002,
+            name: b"Npc9002".to_vec(),
+            lv: 1,
+            hp: 20,
+            sp: 20,
+            thuoctinh: 1,
+            atk: 1,
+            def: 1,
+            agi: 1,
+            int1: 1,
+            skill: [10000, 0, 0, 0],
+            // All six drop bands point at the same item so the drop roll is
+            // deterministic for the golden seeds (DROP_PERCENTS width 76/1000).
+            item: [46003, 46003, 46003, 46003, 46003, 46003],
+            ..Default::default()
+        },
+    );
+    data.talks.insert(
+        "12001:NPC:8:0".to_string(),
+        ts_dream::data::tables::QuestDef {
+            map_id: 12001,
+            id: 8,
+            on_win: QuestResult {
+                rewards: vec![(46002, 3, 0)],
+                message: "TeamDefWin".to_string(),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+    );
+    let mut service = BattleService::new(Arc::new(data));
+    service.set_input_timeout(std::time::Duration::from_millis(50));
+    let service = Arc::new(service);
+
+    let session = strong_session();
+    let mut rx = service.register(300001, Arc::clone(&session));
+
+    {
+        let mut s = session.write().await;
+        s.talking_battle = 8;
+        let trigger = ts_dream::server::handlers::quest::BattleTrigger {
+            teamdef: vec![4712, 0, 0, 9002, 0, 0, 0, 0, 0, 0, 0],
+            diahinh: 4712,
+        };
+        service.start_teamdef_battle_seeded(&mut s, &trigger, 4, 8, 2);
+    }
+    {
+        let cmd = BattleCommand {
+            row: 3,
+            col: 2,
+            skill_id: 10000,
+            skill_lv: 10,
+            row_attack: 0,
+            col_attack: 2,
+            use_item: 0,
+        };
+        let s = session.read().await;
+        service.submit_command(&s, cmd);
+    }
+
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        if service.manager.len().await == 0 {
+            break;
+        }
+        if tokio::time::Instant::now() >= deadline {
+            panic!("teamdef battle did not finish in time");
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    let frames = drain(&mut rx).await;
+
+    // Drop frame (byte-faithful `F44408003504` + LE16 item + coords).
+    assert!(
+        frames.iter().any(|f| f.starts_with("F44408003504")),
+        "drop frame expected: {frames:?}"
+    );
+    // The turn-action `{3201}` frame.
+    assert!(
+        frames.iter().any(|f| f.contains("3201")),
+        "turn action frame expected: {frames:?}"
+    );
+    // BattleQuestWin red message + EndTalk (the on-win `message` text).
+    assert!(
+        frames.iter().any(|f| f.contains("020B")),
+        "quest-win red message expected: {frames:?}"
+    );
+    assert!(
+        frames.iter().any(|f| f.ends_with("F44402001408")),
+        "quest EndTalk frame expected: {frames:?}"
+    );
+
+    // EXP persisted to the leader + quest reward granted.
+    let s = session.read().await;
+    assert!(s.texp > 0, "leader gained exp");
+    assert!(
+        s.homdo.iter().any(|i| i.id == 46002 && i.count == 3),
+        "teamdef quest reward granted: {:?}",
+        s.homdo
+    );
+    assert_eq!(s.talking_battle, 0, "quest talk cleared");
+}

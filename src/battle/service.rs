@@ -18,6 +18,8 @@
 use crate::battle::construction::{Battle, StartPacket};
 use crate::battle::engine::get_hp_max;
 use crate::battle::manager::{BattleHandle, BattleManager, BattleSink};
+use crate::battle::npc_world::{WorldPlayer, WorldSink};
+use crate::battle::npc_world::NpcWorld;
 use crate::battle::packets;
 use crate::battle::runner::{
     BattleCommand, DbTarget, DbUpdate, Out, Outcome, PlayerSnapshot, Stat,
@@ -129,8 +131,28 @@ impl BattleSink for BattleSinkImpl {
         }
     }
 
-    fn apply_respawn(&self, _npc_id: i64, _x: i64, _y: i64) {
-        // Map NPC instance state is not modelled in-memory yet.
+    fn apply_respawn(&self, npc_id: i64, map_id: i64, x: i64, y: i64) {
+        // Map-wide respawn broadcast (C# `Server.SendToAllMapid`,
+        // TheBattle.cs:3209/4722): `F44406001603` + le16(id) + `0A00` +
+        // `F44408001605` + le16(id) + le16(x) + le16(y), to every online
+        // client on the npc's map.
+        let frame = format!(
+            "F44406001603{}0A00F44408001605{}{}{}",
+            encoder::le16(npc_id as u16),
+            encoder::le16(npc_id as u16),
+            encoder::le16(x as u16),
+            encoder::le16(y as u16)
+        );
+        if let Ok(online) = self.online.try_read() {
+            for (id, p) in online.iter() {
+                if let Ok(s) = p.session.try_read() {
+                    if i64::from(s.map_id) == map_id {
+                        let _ = p.frames.send(frame.clone());
+                    }
+                }
+                let _ = id;
+            }
+        }
     }
 
     fn apply_pet_exp(&self, owner: i64, stt: i64, exp: i64) {
@@ -146,7 +168,9 @@ impl BattleSink for BattleSinkImpl {
     }
 
     fn battle_ended(&self, _id: i32, outcome: Outcome) {
-        // Clear battle state for every participant (battle is over).
+        // Clear battle state for every participant (battle is over) and
+        // snapshot their sessions for post-battle persistence.
+        let mut ended_sessions: Vec<Session> = Vec::new();
         if let Ok(mut members) = self.members.lock() {
             let ids: Vec<i64> = members.iter().copied().collect();
             if let Ok(online) = self.online.try_read() {
@@ -154,11 +178,30 @@ impl BattleSink for BattleSinkImpl {
                     if let Some(p) = online.get(&id) {
                         if let Ok(mut s) = p.session.try_write() {
                             s.battle_id = 0;
+                            ended_sessions.push(s.clone());
                         }
                     }
                 }
             }
             members.clear();
+        }
+        // G3 — batch-persist the post-battle player stats (Hp/Sp/Texp/Lv/
+        // HpMax/SpMax/Point/SkillPoint) + pet stats (texp) for every member on
+        // win/lose/flee. `None` pool = no-op (golden replay).
+        if !ended_sessions.is_empty() {
+            if let Ok(pool) = self.pool.try_read() {
+                if let Some(pool) = pool.clone() {
+                    tokio::spawn(async move {
+                        let refs: Vec<&Session> = ended_sessions.iter().collect();
+                        crate::db::persist::persist_sessions_transaction(
+                            Some(&pool),
+                            &refs,
+                            &["stats", "pet"],
+                        )
+                        .await;
+                    });
+                }
+            }
         }
         if outcome != Outcome::PlayerWin {
             // Defeat: run the OnLose dialog progression for every quest-battle
@@ -302,6 +345,8 @@ pub struct BattleService {
     /// Optional MySQL pool used for post-battle persistence (quest/homdo);
     /// shared with the sink via `Arc` so `with_pool` is visible to battles.
     pool: Option<Arc<tokio::sync::RwLock<Option<sqlx::MySqlPool>>>>,
+    /// The shared map-NPC world (ticket 20 G1/G2), built from `npcs_on_map`.
+    world: Option<Arc<std::sync::RwLock<NpcWorld>>>,
     /// Synchronous handle registry for sync handler access (op 0x32, join).
     handles: Mutex<HashMap<i32, BattleHandle>>,
     /// Pre-rendered join cell records per battle id (the C# join loop renders
@@ -309,7 +354,7 @@ pub struct BattleService {
     join_cells: Mutex<HashMap<i32, (i32, String)>>,
     per_exp: i64,
     next_battle: AtomicI32,
-    /// Per-turn input wait (default 21 s, mirrors the C# ≤21 s poll).
+    /// Per-turn input wait (default 21 s, mirrors the C# ≤21s poll).
     input_timeout: std::time::Duration,
 }
 
@@ -323,6 +368,13 @@ impl BattleService {
     pub fn new(data: Arc<GameData>) -> Self {
         let online = Arc::new(tokio::sync::RwLock::new(HashMap::new()));
         let pool = Arc::new(tokio::sync::RwLock::new(None));
+        // The shared world is only built when static NpcOnMap data is present
+        // (golden replay uses an empty GameData → world is None).
+        let world = if data.npc_on_map.is_empty() {
+            None
+        } else {
+            Some(Arc::new(std::sync::RwLock::new(NpcWorld::new(&data.npc_on_map))))
+        };
         let sink = Arc::new(BattleSinkImpl {
             online: Arc::clone(&online),
             members: Arc::new(Mutex::new(HashSet::new())),
@@ -335,6 +387,7 @@ impl BattleService {
             sink,
             online,
             pool: Some(pool),
+            world,
             handles: Mutex::new(HashMap::new()),
             join_cells: Mutex::new(HashMap::new()),
             per_exp: 1,
@@ -519,6 +572,58 @@ impl BattleService {
         )
     }
 
+    /// Seeded TeamDef battle start — deterministic RNG for the golden replay.
+    /// `trigger.teamdef` = `[diahinh, npc1..npc10]`; defenders are placed at
+    /// the TeamDef grid positions (0,0)..(1,4) exactly like `teamdef_battle`.
+    pub fn start_teamdef_battle_seeded(
+        &self,
+        session: &mut Session,
+        trigger: &BattleTrigger,
+        s0: i32,
+        s1: i32,
+        s2: i32,
+    ) -> i32 {
+        let defenders: Vec<_> = trigger
+            .teamdef
+            .iter()
+            .skip(1)
+            .filter_map(|id| self.data.npcs.get(id))
+            .cloned()
+            .collect();
+        if defenders.is_empty() {
+            return 0;
+        }
+        let id = self.next_battle_id();
+        let mut battle = Battle::with_seeds(id, trigger.diahinh, s0, s1, s2);
+        battle.add_player(session, i64::from(session.id), 3, 2);
+        battle.load_leader_pets(session, i64::from(session.id), 3);
+        let positions: [(u8, u8); 10] = [
+            (0, 0),
+            (0, 1),
+            (0, 2),
+            (0, 3),
+            (0, 4),
+            (1, 0),
+            (1, 1),
+            (1, 2),
+            (1, 3),
+            (1, 4),
+        ];
+        for (i, npc) in defenders.iter().enumerate().take(10) {
+            let (r, c) = positions[i];
+            battle.add_npc(npc, (i + 1) as i64, r, c, 7);
+        }
+        let (extra_players, extra_pets) = self.party_snapshots(session);
+        self.spawn_battle(
+            battle,
+            session,
+            extra_players,
+            extra_pets,
+            Vec::new(),
+            Vec::new(),
+        )
+    }
+
     /// Register a player in an existing battle (op 0x0B sub 4 join).
     pub fn join_battle(&self, session: &mut Session, battle_id: i32) -> bool {
         if session.battle_id != 0 || !self.battle_exists(battle_id) {
@@ -637,6 +742,24 @@ impl BattleService {
         Some(s.battle_id)
     }
 
+    /// The designated quan-su member's `Int + Int2` sum (C# `IL_caac` `num108`),
+    /// resolved from the online registry at battle spawn. `0` when no QS is
+    /// designated or the member is offline.
+    fn leader_qs_int(&self, session: &Session) -> i64 {
+        let qs = session.id_qs;
+        if qs == 0 {
+            return 0;
+        }
+        if let Ok(online) = self.online.try_read() {
+            if let Some(p) = online.get(&i64::from(qs)) {
+                if let Ok(s) = p.session.try_read() {
+                    return i64::from(s.int1) + i64::from(s.int2);
+                }
+            }
+        }
+        0
+    }
+
     fn snapshot(&self, session: &Session) -> PlayerSnapshot {
         PlayerSnapshot {
             texp: i64::from(session.texp),
@@ -728,7 +851,7 @@ impl BattleService {
     /// member-style open frames.
     fn spawn_battle(
         &self,
-        battle: Battle,
+        mut battle: Battle,
         session: &mut Session,
         extra_players: HashMap<i64, PlayerSnapshot>,
         extra_pets: HashMap<i64, [i64; 4]>,
@@ -738,6 +861,11 @@ impl BattleService {
         let id = battle.id_battle;
         session.battle_id = id;
         let lid = i64::from(session.id);
+
+        // Snapshot the leader's quan-su designation for the per-turn SP regen
+        // block (C# reads it live from `Server.Clients`; this port snapshots).
+        battle.leader_id_qs = i64::from(session.id_qs);
+        battle.leader_qs_int = self.leader_qs_int(session);
 
         let mut players = HashMap::new();
         let mut pet_slots = HashMap::new();
@@ -763,6 +891,9 @@ impl BattleService {
         let start = battle.npc_battle_start_packets(diahinh);
         let manager = Arc::clone(&self.manager);
         let sink = Arc::clone(&self.sink) as Arc<dyn BattleSink>;
+        let world = self.world.clone();
+        let talking_battle = i64::from(session.talking_battle);
+        let map_id = i64::from(session.map_id);
         let handle = manager.spawn_timeout(
             battle,
             npcs,
@@ -772,6 +903,9 @@ impl BattleService {
             players,
             texps,
             self.per_exp,
+            world,
+            talking_battle,
+            map_id,
             self.input_timeout,
             sink,
         );
@@ -786,6 +920,96 @@ impl BattleService {
             }
         }
         id
+    }
+
+    /// Spawn the 900 ms `NpcOnMapWalk` task (ticket 20 G1) over the shared
+    /// world. The loop re-reads the world through the `RwLock` each tick, so
+    /// the battle engine's `_Delay=10` respawn writes and the walk's countdown
+    /// stay race-free. No-op when the service has no world (golden replay).
+    pub fn spawn_npc_walk(self: &Arc<Self>) {
+        let Some(world) = self.world.clone() else {
+            return;
+        };
+        let this = self.clone();
+        tokio::spawn(async move {
+            let mut tick = 0i64;
+            loop {
+                tokio::time::sleep(std::time::Duration::from_millis(900)).await;
+                tick += 1;
+                let chase = tick >= 3;
+                if let Ok(mut w) = world.write() {
+                    w.walk_tick(chase, this.as_ref());
+                }
+                if chase {
+                    tick = 0;
+                }
+            }
+        });
+    }
+}
+
+impl WorldSink for BattleService {
+    fn players(&self) -> Vec<WorldPlayer> {
+        let Ok(online) = self.online.try_read() else {
+            return Vec::new();
+        };
+        let mut out = Vec::with_capacity(online.len());
+        for (id, p) in online.iter() {
+            if let Ok(s) = p.session.try_read() {
+                out.push(WorldPlayer {
+                    id: *id,
+                    map_id: i64::from(s.map_id),
+                    x: i64::from(s.map_x),
+                    y: i64::from(s.map_y),
+                    battle_id: i64::from(s.battle_id),
+                    leader_id: i64::from(s.id_leader),
+                    logined: s.logined,
+                });
+            }
+        }
+        out
+    }
+
+    fn send_player(&self, player: i64, frame: String) {
+        self.sink.send_to(player, frame);
+    }
+
+    fn send_map(&self, map_id: i64, frame: String) {
+        if let Ok(online) = self.online.try_read() {
+            for (id, p) in online.iter() {
+                if let Ok(s) = p.session.try_read() {
+                    if i64::from(s.map_id) == map_id {
+                        let _ = p.frames.send(frame.clone());
+                    }
+                }
+                let _ = id;
+            }
+        }
+    }
+
+    /// Engage `player` in the SoLuong TeamDef battle (DiaHinh 4712): set their
+    /// `_My_TalkingBattle`, then start the battle through the shared service.
+    fn start_teamdef(&self, player: i64, npc_on_map_id: i64, teamdef: Vec<i64>) {
+        let session = {
+            let online = match self.online.try_read() {
+                Ok(o) => o,
+                Err(_) => return,
+            };
+            match online.get(&player) {
+                Some(p) => p.session.clone(),
+                None => return,
+            }
+        };
+        let mut s = match session.try_write() {
+            Ok(g) => g,
+            Err(_) => return,
+        };
+        s.talking_battle = npc_on_map_id as i32;
+        let trigger = crate::server::handlers::quest::BattleTrigger {
+            teamdef,
+            diahinh: 4712,
+        };
+        self.start_teamdef_battle(&mut s, &trigger);
     }
 }
 #[cfg(test)]

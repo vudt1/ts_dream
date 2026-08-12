@@ -35,6 +35,12 @@ pub struct Battle {
     pub rng: BattleRng,
     /// Spectator/join slots (1..50).
     pub list_qs: HashMap<i32, i32>,
+    /// The battle-initiating leader's designated quan-su id (`_My_IdQS`),
+    /// captured at spawn (C# reads it live; this port snapshots it).
+    pub leader_id_qs: i64,
+    /// The designated quan-su member's `Int + Int2` sum for the per-turn SP
+    /// regen block (C# `IL_caac` `num108`), captured at spawn.
+    pub leader_qs_int: i64,
 }
 
 impl Battle {
@@ -47,6 +53,8 @@ impl Battle {
             keys: Vec::with_capacity(20),
             rng: BattleRng::new(),
             list_qs: HashMap::with_capacity(50),
+            leader_id_qs: 0,
+            leader_qs_int: 0,
         };
 
         // Create 20 cells (row 0..3, col 0..4)
@@ -106,6 +114,7 @@ impl Battle {
             cell.reborn = session.reborn as i64;
             cell.row = row;
             cell.col = col;
+            cell.id_qs = session.id_qs as i64;
         }
     }
 

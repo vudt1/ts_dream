@@ -7,11 +7,12 @@
 //! The grid + RNG live only inside the task, so battle state is race-free.
 
 use crate::battle::construction::Battle;
+use crate::battle::npc_world::NpcWorld;
 use crate::battle::runner::{BattleCommand, BattleData, DbUpdate, Out, Outcome, PlayerSnapshot};
 use crate::data::tables::{Item, Npc, Skill, TexpRow};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI32, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock as StdRwLock};
 use tokio::sync::{mpsc, RwLock};
 
 /// A command submitted by one player for the current turn.
@@ -30,7 +31,7 @@ pub trait BattleSink: Send + Sync + 'static {
     fn apply_drop(&self, drop: crate::battle::runner::Out);
     fn apply_catch(&self, owner: i64, npc_id: i64);
     fn apply_fled(&self, player: i64);
-    fn apply_respawn(&self, npc_id: i64, x: i64, y: i64);
+    fn apply_respawn(&self, npc_id: i64, map_id: i64, x: i64, y: i64);
     fn apply_pet_exp(&self, owner: i64, stt: i64, exp: i64);
     /// The battle task finished (`PlayerWin`/`PlayerLose`/`PlayerFled`).
     fn battle_ended(&self, id: i32, outcome: Outcome);
@@ -103,6 +104,9 @@ impl BattleManager {
         players: Arc<HashMap<i64, PlayerSnapshot>>,
         texps: Arc<Vec<TexpRow>>,
         per_exp: i64,
+        world: Option<Arc<StdRwLock<NpcWorld>>>,
+        talking_battle: i64,
+        map_id: i64,
         sink: Arc<dyn BattleSink>,
     ) -> BattleHandle {
         self.spawn_timeout(
@@ -114,6 +118,9 @@ impl BattleManager {
             players,
             texps,
             per_exp,
+            world,
+            talking_battle,
+            map_id,
             self.default_timeout,
             sink,
         )
@@ -131,6 +138,9 @@ impl BattleManager {
         players: Arc<HashMap<i64, PlayerSnapshot>>,
         texps: Arc<Vec<TexpRow>>,
         per_exp: i64,
+        world: Option<Arc<StdRwLock<NpcWorld>>>,
+        talking_battle: i64,
+        map_id: i64,
         timeout: std::time::Duration,
         sink: Arc<dyn BattleSink>,
     ) -> BattleHandle {
@@ -144,7 +154,15 @@ impl BattleManager {
             let mut rx = rx;
             // Build the per-task data from the tables it now owns.
             let data = BattleData::new(
-                &npcs, &skills, &items, &pet_slots, &players, &texps, None, 0,
+                &npcs,
+                &skills,
+                &items,
+                &pet_slots,
+                &players,
+                &texps,
+                world.as_ref().map(|w| w.as_ref()),
+                talking_battle,
+                map_id,
             );
             let mut out: Vec<Out> = Vec::new();
             loop {
@@ -155,8 +173,9 @@ impl BattleManager {
                 dispatch(&out, sink.as_ref());
                 if outcome != Outcome::Running {
                     let fled = outcome == Outcome::PlayerFled;
+                    let won = outcome == Outcome::PlayerWin;
                     out.clear();
-                    battle.finish(&data, per_exp, fled, &mut out);
+                    battle.finish(&data, per_exp, fled, won, &mut out);
                     dispatch(&out, sink.as_ref());
                     sink.battle_ended(id, outcome);
                     break;
@@ -238,7 +257,12 @@ fn dispatch(out: &[Out], sink: &dyn BattleSink) {
             }),
             Catch { owner, npc_id } => sink.apply_catch(*owner, *npc_id),
             Fled { player } => sink.apply_fled(*player),
-            Respawn { npc_id, x, y } => sink.apply_respawn(*npc_id, *x, *y),
+            Respawn {
+                npc_id,
+                map_id,
+                x,
+                y,
+            } => sink.apply_respawn(*npc_id, *map_id, *x, *y),
             PetExp { owner, stt, exp } => sink.apply_pet_exp(*owner, *stt, *exp),
         }
     }
@@ -261,7 +285,7 @@ mod tests {
         fn apply_drop(&self, _d: Out) {}
         fn apply_catch(&self, _o: i64, _n: i64) {}
         fn apply_fled(&self, _p: i64) {}
-        fn apply_respawn(&self, _n: i64, _x: i64, _y: i64) {}
+        fn apply_respawn(&self, _n: i64, _m: i64, _x: i64, _y: i64) {}
         fn apply_pet_exp(&self, _o: i64, _s: i64, _e: i64) {}
         fn battle_ended(&self, _id: i32, _outcome: Outcome) {}
     }
@@ -340,6 +364,9 @@ mod tests {
             Arc::new(players),
             Arc::new(texps),
             1,
+            None,
+            0,
+            0,
             std::time::Duration::from_millis(50),
             sink,
         );

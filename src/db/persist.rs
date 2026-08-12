@@ -232,6 +232,12 @@ pub async fn persist_shop_transaction(
 /// Persist the state of one or two players as one InnoDB transaction.  This is
 /// used by operations whose in-memory mutation spans more than one table (bank,
 /// trade, and storage).  `None` is the protocol-replay path and succeeds.
+///
+/// `tables` selects the tables rewritten per session:
+/// - `stats`: `players.Hp/Sp/Texp/Lv/HpMax/SpMax/Point/SkillPoint` (battle end)
+/// - `homdo` / `tientrang` / `luulang`: item tables
+/// - `quest`: scoped quest-step rows
+/// - `pet`: full pet rows (delete + reinsert, incl. texp)
 pub async fn persist_sessions_transaction(
     pool: Option<&MySqlPool>,
     sessions: &[&crate::server::session::Session],
@@ -253,6 +259,25 @@ pub async fn persist_sessions_transaction(
                 .bind(i64::from(session.id))
                 .execute(&mut *tx)
                 .await?;
+            if tables.contains(&"stats") {
+                // Battle-end stats write-through (`Data.PlayerUpdateDataId`
+                // for Hp/Sp/Texp/Lv/Hpmax/Spmax/Point/SkillPoint).
+                sqlx::query(
+                    "UPDATE players SET Hp = ?, Sp = ?, Texp = ?, Lv = ?, \
+                     HpMax = ?, SpMax = ?, Point = ?, SkillPoint = ? WHERE player_id = ?",
+                )
+                .bind(i64::from(session.hp))
+                .bind(i64::from(session.sp))
+                .bind(i64::from(session.texp))
+                .bind(i64::from(session.level))
+                .bind(i64::from(session.hp_max))
+                .bind(i64::from(session.sp_max))
+                .bind(i64::from(session.point))
+                .bind(i64::from(session.skill_point))
+                .bind(i64::from(session.id))
+                .execute(&mut *tx)
+                .await?;
+            }
             for table in tables {
                 let items = match *table {
                     "homdo" => &session.homdo,

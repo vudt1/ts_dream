@@ -13,8 +13,8 @@ use crate::data::loader::GameData;
 use crate::error::Result;
 use crate::protocol::encoder;
 use crate::server::handlers::{
-    battle, character, chat, expressions, inventory, login, movement, pet_actions, shops, skills,
-    stats, system, talk, trade_storage,
+    battle, character, chat, expressions, inventory, login, movement, party, pet_actions, shops,
+    skills, stats, system, talk, trade_storage,
 };
 use crate::server::session::Conn;
 use crate::web::server_control::{ClientSender, ServerControl};
@@ -231,6 +231,8 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
 
         // Op 0x0C — Teleport confirm
         0x0C => system::handle_teleport_confirm(ctx),
+        // Op 0x0D — Party ops (quan-su designation, ticket 20 G4)
+        0x0D => party::handle_party(ctx),
         // Op 0x0F — Pet actions (release, store, mount, rename, take, swap)
         0x0F => pet_actions::handle_pet_actions(ctx).await,
 
