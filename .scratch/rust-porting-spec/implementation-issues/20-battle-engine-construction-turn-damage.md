@@ -64,3 +64,13 @@ All four real GAPs + golden 2 were implemented; status moved `ready-for-agent �
 - **Golden 2 — TeamDef**: `start_teamdef_battle_seeded` (DiaHinh 4712, one low-level defender, seeds 4/8/2) — `tests/battle_golden.rs::teamdef_battle_win_golden_replay` asserts drop `F44408003504`, exp write, `{3201}` turn action, and BattleQuestWin red message + EndTalk.
 
 Verification: `cargo test` fully green (294 lib + golden suite + battle goldens + web dashboard); existing `golden/03-battle-win.golden` unchanged.
+
+#### 2026-08-12 — Code-review follow-up (commits 4106774, 509c4b7)
+
+Two-axis review (Standards + Spec) ran against commit 4106774; the fixes in 509c4b7:
+
+- **G2**: `npc_respawn` no longer writes the drawn X/Y into the world entry — C# writes only `_Delay = 10` (TheBattle.cs:4723); coords are broadcast map-wide but not stored.
+- **G1**: `teamdef_for_so_luong` → `Option`; a SoLuong outside 1..=5 chases (frame + map broadcast) but never engages a battle (C# switch has no default case). Test added.
+- Removed dead `WarInfo.id_qs`/`qs_int` cell fields (regen uses the Battle-level leader snapshot).
+- Dedup: shared `patrol_bounds()` (walk + respawn clamp) and `send_to_map()` (wander/chase + respawn fan-out) in `npc_world.rs` / `service.rs`.
+- Documented the G4 member-gate fidelity note: members aren't grid cells in this port, so the C# `_My_IdMem1..4` gate is vacuous until members are grid cells; the QS Int snapshot at spawn is the race-free async-task contract.
