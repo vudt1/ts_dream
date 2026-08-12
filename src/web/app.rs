@@ -98,6 +98,8 @@ pub struct DashboardTemplate {
     pub accounts: Vec<AccountRow>,
     pub npcs: Vec<NpcRow>,
     pub initial_logs: Vec<LogEvent>,
+    /// Live MySQL connectivity color token: `green` / `light` / `dark` (Ch7 #22).
+    pub db_state: String,
 }
 
 impl IntoResponse for DashboardTemplate {
@@ -165,6 +167,8 @@ pub fn router(state: WebState) -> axum::Router {
         .route("/api/online", get(list_online))
         .route("/api/log/stream", get(log_stream))
         .route("/api/config/perexp", get(get_perexp).post(set_perexp))
+        .route("/api/db/status", get(db_status))
+        .route("/api/db/status/stream", get(db_status_stream))
         .with_state(s)
 }
 
@@ -190,6 +194,8 @@ async fn index(State(s): State<WebState>) -> Response {
         npcs = NpcRow::from_data(data);
     }
 
+    let db_state = s.app.read().await.db_status.as_str().to_string();
+
     let template = DashboardTemplate {
         running,
         perexp,
@@ -199,6 +205,7 @@ async fn index(State(s): State<WebState>) -> Response {
         accounts,
         npcs,
         initial_logs,
+        db_state,
     };
 
     template.into_response()
@@ -419,4 +426,32 @@ async fn set_perexp(
     app.perexp = v;
 
     htmx_or_json(&headers, || format!("{v}"), json!({ "perexp": v }))
+}
+
+/// Current MySQL connectivity state (Ch7 ticket #22).
+async fn db_status(State(s): State<WebState>) -> Json<serde_json::Value> {
+    let st = s.app.read().await.db_status.as_str().to_string();
+    Json(json!({ "state": st }))
+}
+
+/// SSE stream of `dbstatus` events; fires whenever the liveness probe flips
+/// the MySQL connection state (Ch7 ticket #22).
+async fn db_status_stream(State(s): State<WebState>) -> Response {
+    let rx = s.app.read().await.db_status_tx.subscribe();
+    let stream = futures::stream::unfold(rx, |mut rx| async move {
+        loop {
+            match rx.recv().await {
+                Ok(status) => {
+                    let payload = json!({ "state": status.as_str() }).to_string();
+                    let chunk = axum::response::sse::Event::default()
+                        .event("dbstatus")
+                        .data(payload);
+                    return Some((Ok::<_, std::convert::Infallible>(chunk), rx));
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => return None,
+            }
+        }
+    });
+    axum::response::sse::Sse::new(stream).into_response()
 }

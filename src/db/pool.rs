@@ -4,9 +4,13 @@
 //! VISCII byte names are never transcoded. Fail-fast on boot.
 
 use crate::error::{Result, TsError};
+use crate::state::{AppState, DbStatus};
 use sqlx::mysql::{MySqlConnectOptions, MySqlPoolOptions};
 use sqlx::MySqlPool;
 use std::str::FromStr;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use tokio::time::{sleep, Duration};
 
 const MAX_CONNECTIONS: u32 = 10;
 
@@ -95,6 +99,40 @@ pub async fn migrate(pool: &MySqlPool) -> Result<()> {
         .map_err(|e| TsError::Migrate(e.to_string()))
 }
 
+/// Spawn the background MySQL liveness probe (Ch7 ticket #22).
+///
+/// Every `interval` the task runs `SELECT 1`; on success it sets
+/// `DbStatus::Connected`, on failure `DbStatus::Disconnected`, broadcasting
+/// each change over `AppState.db_status_tx`. Boot stays fail-fast (spec
+/// §1.1): this only detects *runtime* DB loss, so `Disconnected` is reachable
+/// only after the dashboard is already up (DB died post-boot). `Connecting`
+/// shows at startup until the first probe resolves.
+/// Pure decision for the liveness probe: a successful ping yields
+/// `Connected`, a failed ping yields `Disconnected`.
+pub fn probe_next_state(_prev: DbStatus, ping_ok: bool) -> DbStatus {
+    if ping_ok {
+        DbStatus::Connected
+    } else {
+        DbStatus::Disconnected
+    }
+}
+
+pub fn spawn_liveness_probe(pool: MySqlPool, app: Arc<RwLock<AppState>>, interval: Duration) {
+    tokio::spawn(async move {
+        loop {
+            let ok = sqlx::query("SELECT 1").execute(&pool).await.is_ok();
+            let next = probe_next_state(app.read().await.db_status, ok);
+            let mut app = app.write().await;
+            if app.db_status != next {
+                app.db_status = next;
+                let _ = app.db_status_tx.send(next);
+            }
+            drop(app);
+            sleep(interval).await;
+        }
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -120,6 +158,15 @@ mod tests {
         assert_eq!(
             strip_database_path("mysql://user:pass@localhost:3306"),
             "mysql://user:pass@localhost:3306"
+        );
+    }
+
+    #[test]
+    fn probe_next_state_maps_ping_result() {
+        assert_eq!(probe_next_state(DbStatus::Connecting, true), DbStatus::Connected);
+        assert_eq!(
+            probe_next_state(DbStatus::Connected, false),
+            DbStatus::Disconnected
         );
     }
 }

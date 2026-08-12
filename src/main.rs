@@ -85,6 +85,15 @@ async fn main() -> anyhow::Result<()> {
     // 3. Shared AppState
     let app_state = Arc::new(RwLock::new(AppState::new(cfg.perexp_default)));
 
+    // 3b. Background MySQL liveness probe (Ch7 ticket #22): detect *runtime*
+    //     DB loss. Boot stays fail-fast (spec §1.1); the probe only flips the
+    //     dashboard's DB badge to dark if the connection drops after boot.
+    ts_dream::db::pool::spawn_liveness_probe(
+        pool.clone(),
+        app_state.clone(),
+        tokio::time::Duration::from_secs(5),
+    );
+
     // 4. Load static data (DataLoaded gate). `resolve_data_dir` prefers the
     //    configured path (repo `./Data/`), then the exe-adjacent build.rs copy.
     let data_dir = cfg.resolve_data_dir();
