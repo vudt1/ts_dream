@@ -2462,6 +2462,12 @@ impl Battle {
     /// (`leader_id_qs > 0`), the leader cell, the leader's pet cell
     /// (`row ^ 1`, `col`), and every party-member cell + pet cell regen Sp by
     /// `Round((qs.Int + qs.Int2) / 15.0)` capped at SpMax, with DB writes.
+    ///
+    /// Fidelity notes: C# gates the member cells by `_My_IdMem1..4` + online
+    /// (TheBattle.cs:4208); this port snapshots the leader's QS at spawn and
+    /// does not add party members to the grid (`npc_battle`/`teamdef_battle`
+    /// load the leader only), so the row scan below effectively hits the leader
+    /// cell (+ pet) alone — the gate is vacuous until members are grid cells.
     fn leader_sp_regen(&mut self, out: &mut Vec<Out>) {
         let qs = self.leader_id_qs;
         if qs <= 0 {
@@ -2680,24 +2686,14 @@ impl Battle {
         if entry.delay != 0 {
             return;
         }
-        let mut lo_x = entry.x_first - entry.coord;
-        if lo_x < 0 {
-            lo_x = entry.x_first;
-        }
-        let hi_x = entry.x_first + entry.coord;
-        let mut lo_y = entry.y_first - entry.coord;
-        if lo_y < 0 {
-            lo_y = entry.y_first;
-        }
-        let hi_y = entry.y_first + entry.coord;
+        let (lo_x, hi_x, lo_y, hi_y) = crate::battle::npc_world::patrol_bounds(&entry);
         let x = i64::from(self.rng.random_2.next_range(lo_x as i32, hi_x as i32));
         let y = i64::from(self.rng.random_2.next_range(lo_y as i32, hi_y as i32));
         // Write the respawn-cooldown marker back (`_Delay = 10`, next walk will
-        // decrement it each 900 ms tick).
+        // decrement it each 900 ms tick). C# does NOT store the drawn coords
+        // (TheBattle.cs:4723) — they are broadcast to the map only.
         if let Ok(mut g) = world.write() {
             if let Some(e) = g.get_mut(data.map_id, talking) {
-                e.x = x;
-                e.y = y;
                 e.delay = 10;
             }
         }

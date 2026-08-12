@@ -114,7 +114,6 @@ impl Battle {
             cell.reborn = session.reborn as i64;
             cell.row = row;
             cell.col = col;
-            cell.id_qs = session.id_qs as i64;
         }
     }
 

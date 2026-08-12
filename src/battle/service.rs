@@ -143,16 +143,7 @@ impl BattleSink for BattleSinkImpl {
             encoder::le16(x as u16),
             encoder::le16(y as u16)
         );
-        if let Ok(online) = self.online.try_read() {
-            for (id, p) in online.iter() {
-                if let Ok(s) = p.session.try_read() {
-                    if i64::from(s.map_id) == map_id {
-                        let _ = p.frames.send(frame.clone());
-                    }
-                }
-                let _ = id;
-            }
-        }
+        send_to_map(&self.online, map_id, frame);
     }
 
     fn apply_pet_exp(&self, owner: i64, stt: i64, exp: i64) {
@@ -275,6 +266,22 @@ fn push(online: &tokio::sync::RwLock<OnlineMap>, player: i64, frame: String) {
     if let Ok(online) = online.try_read() {
         if let Some(p) = online.get(&player) {
             let _ = p.frames.send(frame);
+        }
+    }
+}
+
+/// Send `frame` to every online player whose session sits on `map_id`
+/// (C# `Server.SendToAllMapid` — includes the sender's own map). Shared by the
+/// walk loop's wander/chase fan-out and the battle respawn broadcast.
+fn send_to_map(online: &tokio::sync::RwLock<OnlineMap>, map_id: i64, frame: String) {
+    if let Ok(online) = online.try_read() {
+        for (id, p) in online.iter() {
+            if let Ok(s) = p.session.try_read() {
+                if i64::from(s.map_id) == map_id {
+                    let _ = p.frames.send(frame.clone());
+                }
+            }
+            let _ = id;
         }
     }
 }
@@ -975,16 +982,7 @@ impl WorldSink for BattleService {
     }
 
     fn send_map(&self, map_id: i64, frame: String) {
-        if let Ok(online) = self.online.try_read() {
-            for (id, p) in online.iter() {
-                if let Ok(s) = p.session.try_read() {
-                    if i64::from(s.map_id) == map_id {
-                        let _ = p.frames.send(frame.clone());
-                    }
-                }
-                let _ = id;
-            }
-        }
+        send_to_map(&self.online, map_id, frame);
     }
 
     /// Engage `player` in the SoLuong TeamDef battle (DiaHinh 4712): set their

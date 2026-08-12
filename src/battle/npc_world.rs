@@ -132,23 +132,14 @@ impl NpcWorld {
     pub fn walk_tick(&mut self, chase: bool, sink: &dyn WorldSink) {
         let players = sink.players();
         for key in std::mem::take(&mut self.keys) {
-            let mut value = match self.entries.get(&key) {
+            let mut entry = match self.entries.get(&key) {
                 Some(v) => v.clone(),
                 None => continue,
             };
             let (map_id, id) = key;
-            if value.delay == 0 && value.id_battle == 0 {
+            if entry.delay == 0 && entry.id_battle == 0 {
                 if chase {
-                    let mut lo_x = value.x_first - value.coord;
-                    if lo_x < 0 {
-                        lo_x = value.x_first;
-                    }
-                    let hi_x = value.x_first + value.coord;
-                    let mut lo_y = value.y_first - value.coord;
-                    if lo_y < 0 {
-                        lo_y = value.y_first;
-                    }
-                    let hi_y = value.y_first + value.coord;
+                    let (lo_x, hi_x, lo_y, hi_y) = patrol_bounds(&entry);
                     let mut text = String::new();
                     for p in &players {
                         if p.map_id == map_id
@@ -156,44 +147,65 @@ impl NpcWorld {
                             && (p.leader_id == 0 || p.leader_id == p.id)
                             && p.logined
                         {
-                            let dx = p.x - value.x_first;
-                            let dy = p.y - value.y_first;
+                            let dx = p.x - entry.x_first;
+                            let dy = p.y - entry.y_first;
                             let dist = ((dx * dx + dy * dy) as f64).sqrt().round() as i64;
-                            if dist <= value.coord {
-                                // Chase: snap the npc onto the player and
-                                // trigger the SoLuong battle.
-                                value.x = p.x;
-                                value.y = p.y;
+                            if dist <= entry.coord {
+                                // Chase: snap the npc onto the player.
+                                entry.x = p.x;
+                                entry.y = p.y;
                                 text = npc_walk_frame(id, p.x, p.y);
                                 sink.send_map(map_id, text.clone());
-                                let teamdef = teamdef_for_so_luong(value.so_luong, value.npc_id);
-                                value.id_battle = 1;
-                                self.entries.insert(key, value.clone());
-                                sink.start_teamdef(p.id, id, teamdef);
+                                // Engage only when SoLuong is a valid 1..5 slot
+                                // mapping (C# switch has no default case); the
+                                // chase frame still fires otherwise.
+                                if let Some(teamdef) =
+                                    teamdef_for_so_luong(entry.so_luong, entry.npc_id)
+                                {
+                                    entry.id_battle = 1;
+                                    self.entries.insert(key, entry.clone());
+                                    sink.start_teamdef(p.id, id, teamdef);
+                                }
                             }
                         }
                         if p.map_id == map_id {
                             // Wander: re-roll the patrol position for this npc.
                             let nx = i64::from(self.random_3.next_range(lo_x as i32, hi_x as i32));
                             let ny = i64::from(self.random_3.next_range(lo_y as i32, hi_y as i32));
-                            value.x = nx;
-                            value.y = ny;
+                            entry.x = nx;
+                            entry.y = ny;
                             if text.is_empty() {
                                 text = npc_walk_frame(id, nx, ny);
                             }
                             sink.send_player(p.id, text.clone());
                         }
                     }
-                    self.entries.insert(key, value);
+                    self.entries.insert(key, entry);
                 }
-            } else if value.delay >= 1 {
-                value.id_battle = 0;
-                value.delay -= 1;
-                self.entries.insert(key, value);
+            } else if entry.delay >= 1 {
+                entry.id_battle = 0;
+                entry.delay -= 1;
+                self.entries.insert(key, entry);
             }
             self.keys.push(key);
         }
     }
+}
+
+/// The patrol-box clamp (`num2 = x_first - coord; if < 0 → x_first`, plus the
+/// y mirror) shared by the walk loop and the battle respawn (G1/G2).
+pub fn patrol_bounds(entry: &NpcEntry) -> (i64, i64, i64, i64) {
+    let mut lo_x = entry.x_first - entry.coord;
+    if lo_x < 0 {
+        lo_x = entry.x_first;
+    }
+    let hi_x = entry.x_first + entry.coord;
+    let mut lo_y = entry.y_first - entry.coord;
+    if lo_y < 0 {
+        lo_y = entry.y_first;
+    }
+    let hi_y = entry.y_first + entry.coord;
+    (lo_x, hi_x, lo_y, hi_y)
 }
 
 /// `F44408001602` + le16(id) + le16(x) + le16(y) — the npc walk/chase frame.
@@ -210,7 +222,10 @@ fn npc_walk_frame(id: i64, x: i64, y: i64) -> String {
 /// attack (C# `NpcOnMapWalk`, Data.cs:5016-5083): SoLuong 1 → `_id3`,
 /// 2 → `_id3,_id4`, 3 → `_id2.._id4`, 4 → `_id2,_id3,_id4,_id8`,
 /// 5 → `_id1.._id5`. DiaHinh is always 4712 (the ticket contract).
-pub fn teamdef_for_so_luong(so_luong: i64, npc_id: i64) -> Vec<i64> {
+///
+/// Returns `None` for `so_luong` outside 1..=5 — the C# switch has no default
+/// case, so such NPCs chase (frame + `_IdBattle=1`) but never enter battle.
+pub fn teamdef_for_so_luong(so_luong: i64, npc_id: i64) -> Option<Vec<i64>> {
     let diahinh = 4712;
     // teamdef[0] = diahinh, teamdef[i] = `_id{i}` for i in 1..=10.
     let mut teamdef = vec![diahinh, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -231,13 +246,14 @@ pub fn teamdef_for_so_luong(so_luong: i64, npc_id: i64) -> Vec<i64> {
             teamdef[4] = npc_id;
             teamdef[8] = npc_id;
         }
-        _ => {
+        5 => {
             for slot in teamdef.iter_mut().take(6).skip(1) {
                 *slot = npc_id;
             }
         }
+        _ => return None,
     }
-    teamdef
+    Some(teamdef)
 }
 
 #[cfg(test)]
@@ -388,5 +404,62 @@ mod tests {
         }
         // No battle triggered.
         assert!(sink.teamdefs.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn teamdef_slots_follow_so_luong() {
+        assert_eq!(
+            teamdef_for_so_luong(1, 9001).unwrap(),
+            [4712, 0, 0, 9001, 0, 0, 0, 0, 0, 0, 0]
+        );
+        assert_eq!(
+            teamdef_for_so_luong(2, 9001).unwrap(),
+            [4712, 0, 0, 9001, 9001, 0, 0, 0, 0, 0, 0]
+        );
+        assert_eq!(
+            teamdef_for_so_luong(3, 9001).unwrap(),
+            [4712, 0, 9001, 9001, 9001, 0, 0, 0, 0, 0, 0]
+        );
+        assert_eq!(
+            teamdef_for_so_luong(4, 9001).unwrap(),
+            [4712, 0, 9001, 9001, 9001, 0, 0, 0, 9001, 0, 0]
+        );
+        assert_eq!(
+            teamdef_for_so_luong(5, 9001).unwrap(),
+            [4712, 9001, 9001, 9001, 9001, 9001, 0, 0, 0, 0, 0]
+        );
+        // Outside 1..=5: C# switch has no default case → no battle.
+        assert!(teamdef_for_so_luong(0, 9001).is_none());
+        assert!(teamdef_for_so_luong(6, 9001).is_none());
+    }
+
+    #[test]
+    fn chase_with_so_luong_over_five_sends_frame_but_no_battle() {
+        let rows = vec![NpcOnMap {
+            map_id: 12001,
+            id: 8,
+            npc_id: 9001,
+            x: 400,
+            y: 500,
+            coord: 10,
+            so_luong: 6,
+        }];
+        let mut w = NpcWorld::new(&rows);
+        w.random_3 = DotNetRandom::new(42);
+        let sink = RecordingSink {
+            players: vec![WorldPlayer {
+                id: 300001,
+                map_id: 12001,
+                x: 405,
+                y: 502,
+                battle_id: 0,
+                leader_id: 0,
+                logined: true,
+            }],
+            ..Default::default()
+        };
+        w.walk_tick(true, &sink);
+        assert!(sink.teamdefs.lock().unwrap().is_empty());
+        assert_eq!(w.get(12001, 8).unwrap().id_battle, 0);
     }
 }
