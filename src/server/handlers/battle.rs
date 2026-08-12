@@ -233,8 +233,9 @@ fn skill_level_for(session: &Session, skill_id: i64, row: u8) -> i64 {
 mod tests {
     use super::*;
     use crate::battle::service::BattleService;
+    use crate::data::tables::Npc;
     use crate::server::handler::test_ctx;
-    use crate::server::session::Conn;
+    use crate::server::session::{Conn, InventoryItem, Session};
 
     fn service() -> BattleService {
         BattleService::new(std::sync::Arc::new(GameData::default()))
@@ -352,6 +353,101 @@ mod tests {
         payload[4..6].copy_from_slice(&10000u16.to_le_bytes());
         let mut ctx = test_ctx(&mut conn, &data, &svc, &mut out, 1, &payload);
         handle_battle_command(&mut ctx);
+        assert!(out.outgoing.is_empty());
+    }
+
+    /// G1: op 0x0B sub4 (join battle) against a live seeded battle. Drives the
+    /// dispatcher `handle_battle` and asserts the session joins (battle id
+    /// assigned) and the battle trailer `F44403000B0A01` is delivered to the
+    /// joiner's frame channel (C# `UpdateStatusWhenUseItem`/join burst).
+    #[tokio::test]
+    async fn join_battle_sub4_joins_and_sends_trailer() {
+        // Service with an NPC so a real battle can be seeded.
+        let mut data = GameData::default();
+        data.npcs.insert(
+            9001,
+            Npc {
+                id: 9001,
+                lv: 1,
+                hp: 30,
+                sp: 30,
+                thuoctinh: 1,
+                atk: 1,
+                def: 1,
+                agi: 1,
+                int1: 1,
+                skill: [10000, 0, 0, 0],
+                ..Default::default()
+            },
+        );
+        let svc = std::sync::Arc::new(BattleService::new(std::sync::Arc::new(data)));
+
+        // Leader seeds the battle; the returned id is what sub4 expects.
+        let mut leader = Session::new();
+        leader.id = 300001;
+        let battle_id = svc.start_npc_battle_seeded(&mut leader, 9001, 11, 1, 2, 3);
+        assert!(battle_id > 0, "seeded battle must start");
+
+        // Joiner: register so join frames are captured on a channel, then drive
+        // op 0x0B sub4 with the battle id LE32.
+        let mut conn = Conn::new();
+        conn.session.id = 300002;
+        let joiner = std::sync::Arc::new(tokio::sync::RwLock::new(conn.session.clone()));
+        let mut rx = svc.register(300002, joiner);
+
+        let mut payload = vec![0u8; 4];
+        payload[0..4].copy_from_slice(&(battle_id as u32).to_le_bytes());
+        let data = GameData::default();
+        let mut out = HandleOutcome::default();
+        let mut ctx = test_ctx(&mut conn, &data, &svc, &mut out, 4, &payload);
+        handle_battle(&mut ctx);
+
+        // Join succeeded: battle id assigned and no error frame.
+        assert_eq!(conn.session.battle_id, battle_id);
+        assert!(out.outgoing.is_empty());
+
+        // Battle trailer `F44403000B0A01` delivered to the joiner's channel.
+        let mut got_trailer = false;
+        while let Ok(f) = rx.try_recv() {
+            if f.contains("F44403000B0A01") {
+                got_trailer = true;
+            }
+        }
+        assert!(got_trailer, "expected battle trailer F44403000B0A01 on join");
+    }
+
+    /// G1: op 0x32 sub2 (use-item heal) within a battle. The handler must
+    /// consume the item from homdo and submit the command with no error frame;
+    /// the actual heal runs in the battle task.
+    #[test]
+    fn use_item_in_battle_removes_item() {
+        let mut conn = Conn::new();
+        conn.session.id = 300001;
+        conn.session.battle_id = 7; // participating in a battle
+        conn.session.add_homdo_item(InventoryItem {
+            id: 26001,
+            count: 1,
+            ..Default::default()
+        });
+        let svc = service();
+        let data = GameData::default();
+        let mut out = HandleOutcome::default();
+        // op 0x32 sub2: row, col, row_attack, col_attack, item id LE16.
+        let mut payload = vec![0u8; 6];
+        payload[0] = 0;
+        payload[1] = 1;
+        payload[2] = 0;
+        payload[3] = 2;
+        payload[4..6].copy_from_slice(&26001u16.to_le_bytes());
+        let mut ctx = test_ctx(&mut conn, &data, &svc, &mut out, 2, &payload);
+        handle_battle_command(&mut ctx);
+
+        // Item consumed from inventory.
+        assert!(
+            conn.session.homdo.iter().find(|i| i.id == 26001).is_none(),
+            "use-item must remove the consumed item"
+        );
+        // Handler submits the command and emits no error frame.
         assert!(out.outgoing.is_empty());
     }
 }

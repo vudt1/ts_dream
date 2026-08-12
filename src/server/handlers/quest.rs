@@ -417,7 +417,28 @@ fn battle_quest_win_impl(
                 encoder::le16(item_id as u16)
             ));
             session.remove_homdo_item(item_id as u16, 1);
+            // Capture pre-recompute HP/SP so the status burst can mirror C#'s
+            // `UpdateStatusWhenUseItem` clamp (if old > new max, resync client).
+            let old_hp = session.hp;
+            let old_sp = session.sp;
             session.recompute_stats();
+            // Wire-fidelity burst mirroring C# `UpdateStatusWhenUseItem`:
+            // `PlayerUpdateDataId(_Int2)`, `_Atk2`, `_Def2`, `_Hpx2`, `_Spx2`,
+            // `_Agi2` (always) then `_Hp`/`_Sp` only when the old value
+            // exceeded the freshly recomputed max. `_Hpmax`/`_Spmax` are
+            // client-only stores in C# and emit no packet.
+            frames.push(build_stat_update(0xD4, session.int2 as i32));
+            frames.push(build_stat_update(0xD2, session.atk2 as i32));
+            frames.push(build_stat_update(0xD3, session.def2 as i32));
+            frames.push(build_stat_update(0xCF, session.hpx2 as i32));
+            frames.push(build_stat_update(0xD0, session.spx2 as i32));
+            frames.push(build_stat_update(0xD6, session.agi2 as i32));
+            if old_hp > session.hp_max {
+                frames.push(build_stat_update(0x19, session.hp_max as i32));
+            }
+            if old_sp > session.sp_max {
+                frames.push(build_stat_update(0x1A, session.sp_max as i32));
+            }
         } else {
             // Pet path: `F44404001717`+stt+slot, consume, apply item to pet.
             let stt = session.active_pet_stt;
@@ -1059,6 +1080,63 @@ mod tests {
         };
         let (session, _) = run_quest_win(result, GameData::default());
         assert_eq!(session.quest_steps, vec![(100, 1)]);
+    }
+
+    #[test]
+    fn quest_win_use_items_status_burst() {
+        // G4: the self use-item branch must emit the wire-fidelity status
+        // burst mirroring C# `UpdateStatusWhenUseItem` (gear stats always,
+        // Hp/Spmax are client-only, Hp/Sp only when old exceeds new max).
+        let mut session = Session::new();
+        session.id = 300001;
+        session.map_id = 10916;
+        session.talking_battle = 1;
+        session.add_homdo_item(crate::server::session::InventoryItem {
+            id: 19001,
+            count: 3,
+            loai: 1,
+            doben: 100,
+            ..Default::default()
+        });
+        let mut data = GameData::default();
+        data.talks.insert(
+            "10916:NPC:1:0".to_string(),
+            QuestDef {
+                map_id: 10916,
+                id: 1,
+                on_win: QuestResult {
+                    use_items: vec![(19001, 0)],
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        );
+        let mut frames = Vec::new();
+        battle_quest_win(&mut session, &data, &mut frames, &mut |_| None);
+
+        // Six gear status bursts (Int2, Atk2, Def2, Hpx2, Spx2, Agi2).
+        assert!(frames
+            .iter()
+            .any(|f| f == &build_stat_update(0xD4, session.int2 as i32)));
+        assert!(frames
+            .iter()
+            .any(|f| f == &build_stat_update(0xD2, session.atk2 as i32)));
+        assert!(frames
+            .iter()
+            .any(|f| f == &build_stat_update(0xD3, session.def2 as i32)));
+        assert!(frames
+            .iter()
+            .any(|f| f == &build_stat_update(0xCF, session.hpx2 as i32)));
+        assert!(frames
+            .iter()
+            .any(|f| f == &build_stat_update(0xD0, session.spx2 as i32)));
+        assert!(frames
+            .iter()
+            .any(|f| f == &build_stat_update(0xD6, session.agi2 as i32)));
+        // Hpmax/Spmax are client-only in C# and emit no packet; Hp/Sp only when
+        // the old value exceeded the freshly recomputed max (not the case here).
+        assert!(!frames.iter().any(|f| f.starts_with("F4440C00080119")));
+        assert!(!frames.iter().any(|f| f.starts_with("F4440C0008011A")));
     }
 
     #[test]
