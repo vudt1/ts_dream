@@ -31,6 +31,11 @@ pub const MAX_LEVEL: i64 = 200;
 pub mod codec;
 pub mod encoder;
 pub mod frame;
+pub mod reader;
+pub mod writer;
+
+pub use reader::PacketReader;
+pub use writer::PacketWriter;
 
 /// Build an outgoing frame: `F444` + LE16(len) + `code` + `body`, where `len`
 /// counts every byte after the 4-byte header (i.e. `code` + `body`).

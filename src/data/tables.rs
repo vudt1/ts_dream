@@ -1,6 +1,7 @@
 //! In-memory static data tables (Chapter 3 §3.2/§3.3).
 
 use crate::encoding;
+pub use crate::data::loaders::*;
 
 /// An NPC record (`Data_Npcs`), from Npcs.txt.
 #[derive(Debug, Clone, Default)]

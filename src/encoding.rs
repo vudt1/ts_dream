@@ -60,6 +60,45 @@ pub fn reverse_mojibake_map() -> HashMap<u32, u8> {
     m
 }
 
+/// Convert a single CP1252 byte to its corresponding Unicode character.
+pub fn cp1252_byte_to_char(b: u8) -> char {
+    match b {
+        0x80 => '\u{20AC}', // €
+        0x82 => '\u{201A}', // ‚
+        0x83 => '\u{0192}', // ƒ
+        0x84 => '\u{201E}', // „
+        0x85 => '\u{2026}', // …
+        0x86 => '\u{2020}', // †
+        0x87 => '\u{2021}', // ‡
+        0x88 => '\u{02C6}', // ˆ
+        0x89 => '\u{2030}', // ‰
+        0x8A => '\u{0160}', // Š
+        0x8B => '\u{2039}', // ‹
+        0x8C => '\u{0152}', // Œ
+        0x8E => '\u{017D}', // Ž
+        0x91 => '\u{2018}', // ‘
+        0x92 => '\u{2019}', // ’
+        0x93 => '\u{201C}', // “
+        0x94 => '\u{201D}', // ”
+        0x95 => '\u{2022}', // •
+        0x96 => '\u{2013}', // –
+        0x97 => '\u{2014}', // —
+        0x98 => '\u{02DC}', // ˜
+        0x99 => '\u{2122}', // ™
+        0x9A => '\u{0161}', // š
+        0x9B => '\u{203A}', // ›
+        0x9C => '\u{0153}', // œ
+        0x9E => '\u{017E}', // ž
+        0x9F => '\u{0178}', // Ÿ
+        _ => b as char,
+    }
+}
+
+/// Decode raw CP1252 bytes to a Unicode string.
+pub fn cp1252_to_string(bytes: &[u8]) -> String {
+    bytes.iter().map(|&b| cp1252_byte_to_char(b)).collect()
+}
+
 /// True if a 32-bit char is the single unmappable mojibake char (U+0103 `ă`).
 pub fn is_unmappable(cp: u32) -> bool {
     cp == 0x0103

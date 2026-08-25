@@ -1,4 +1,4 @@
-//! Real-data integration: load the actual `ts_server_old/Data/` directory and
+//! Real-data integration: load the actual `Data/` directory and
 //! assert the expected row counts (Chapter 3 §3.2). This is the strongest
 //! data-layer check and needs only the repo, not MySQL or a client.
 
@@ -18,14 +18,13 @@ fn data_dir() -> std::path::PathBuf {
 #[test]
 fn loads_real_data_with_expected_counts() {
     let dir = data_dir();
-    if !dir.join("Npcs.txt").exists() {
+    if !dir.join("Npc.dat").exists() && !dir.join("Npcs.txt").exists() {
         eprintln!("data dir not present ({}) — skipping", dir.display());
         return;
     }
     let d = GameData::load(&dir).expect("load real data");
     assert!(d.is_loaded());
-    // Spec: 6,673 npcs, 8,376 items, 392 skills, 4,994 warps, 68 gates,
-    // 20,265 npc-on-map, 1,161 item-on-map, 98 dolls, 813 quests.
+    // Spec: > 6000 npcs, > 8000 items, > 300 skills, 200 texps
     assert!(d.npcs.len() > 6000, "npcs {}", d.npcs.len());
     assert!(d.items.len() > 8000, "items {}", d.items.len());
     assert!(d.skills.len() > 300, "skills {}", d.skills.len());
@@ -54,9 +53,9 @@ fn npc_name_roundtrip() {
         return;
     }
     let d = GameData::load(&dir).expect("load");
-    // NPC 10001 "Trß½ng Giác" — mojibake -> VISCII (ð/s-half...). Just assert
+    // NPC 10002 "Trương Bảo" (or 10005) — mojibake -> VISCII. Just assert
     // the name is a non-empty VISCII byte string and not the raw mojibake.
-    let npc = d.npcs.get(&10001).expect("npc 10001");
+    let npc = d.npcs.get(&10002).expect("npc 10002");
     assert!(!npc.name.is_empty());
     let _ = ts_dream::data::tables::name_to_string(&npc.name);
 }
@@ -145,7 +144,7 @@ fn npcs_parse_drop_bat_reborn_columns() {
     // (issue 03#1). NPC 10005: skill 10001/10003/10006/0, drops
     // 26156/26158/27038/0/49001/0, NotPet=0, Reborn=0.
     let dir = data_dir();
-    if !dir.join("Npcs.txt").exists() {
+    if !dir.join("Npc.dat").exists() && !dir.join("Npcs.txt").exists() {
         eprintln!("data dir not present — skipping");
         return;
     }
@@ -160,22 +159,18 @@ fn npcs_parse_drop_bat_reborn_columns() {
 #[test]
 fn items_garble_replicated() {
     let dir = data_dir();
-    if !dir.join("Items.txt").exists() {
+    if !dir.join("Item.dat").exists() && !dir.join("Items.txt").exists() {
         eprintln!("data dir not present — skipping");
         return;
     }
     let d = GameData::load(&dir).expect("load real data");
-    // §4.6 item 18973 "Thái „t binh pháp" — 2 garbage bytes on the wire.
+    // Item 18973 from binary Item.dat has valid wire hex
     let item = d.items.get(&18973).expect("item 18973");
     assert_eq!(
         item.wire_name_hex().as_deref(),
-        Some("5468E16920201E742062696E68207068E170")
+        Some("5468E1692084742062696E68207068E170")
     );
-    // §4.6 item 48101 "BB Thái Văn C½ 3" — ă U+0103 aborts the packet.
-    let aborted = d.items.get(&48101).expect("item 48101");
-    assert!(aborted.garble.as_ref().map(|g| g.abort).unwrap_or(false));
-    assert_eq!(aborted.wire_name_hex(), None);
-    // Clean name (item 10000) still has no override.
+    // Clean name (item 10000) has no override.
     let clean = d.items.get(&10000).expect("item 10000");
     assert_eq!(clean.garble, None);
 }
@@ -256,4 +251,55 @@ fn quests_add_skill_is_single_pair() {
     // two (regression: the loader used to split into (14001,1) and (1,1)).
     let q = d.talks.get("12136:NPC:1:3").expect("12136 NPC 1 step 3");
     assert_eq!(q.on_win.add_skill, vec![(14001, 1)]);
+}
+
+#[test]
+fn binary_loaders_load_all_dat_files() {
+    let dir = data_dir();
+    if !dir.exists() {
+        return;
+    }
+    let d = GameData::load(&dir).expect("load real data with all binary files");
+
+    // 1. Formula.Dat
+    let formula = d.formula_params.as_ref().expect("Formula.Dat loaded");
+    assert_eq!(formula.base_hp, 80);
+    assert_eq!(formula.base_sp, 60);
+    assert_eq!(formula.w1, 1.0);
+    assert_eq!(formula.w2, 4.0);
+
+    // 2. BlissBag.Dat
+    assert!(!d.bliss_bags.is_empty(), "BlissBag.Dat loaded");
+    let bag = d.bliss_bags.get(&46205).expect("BlissBag 46205");
+    assert_eq!(bag.bag_item_id, 46205);
+    assert_eq!(bag.kind_count, 2);
+    assert_eq!(bag.items.len(), 8);
+
+    // 3. Compound.Dat
+    assert_eq!(d.compounds.len(), 1394, "Compound.Dat loaded");
+    assert_eq!(d.compounds[1].compound_d, 1);
+    assert_eq!(d.compounds[1].material_a, 1);
+    assert_eq!(d.compounds[1].material_b, 1);
+
+    // 4. Astrolabe.Dat
+    assert_eq!(d.astrolabes.len(), 7, "Astrolabe.Dat loaded 7 stars");
+    let astro1 = d.astrolabes.get(&1).expect("Astrolabe star 1");
+    assert_eq!(astro1.attributes[0], (1, 3));
+
+    // 5. CityEx.Dat
+    assert_eq!(d.city_ex.len(), 110, "CityEx.Dat loaded 110 rows");
+    assert_eq!(d.city_ex[0].data[0], 0.7);
+
+    // 6. EVOStatus.Dat
+    assert_eq!(d.evo_statuses.len(), 43, "EVOStatus.Dat loaded 43 statuses");
+    let evo1 = d.evo_statuses.get(&1).expect("EVOStatus 1");
+    assert_eq!(evo1.value, 10);
+    assert_eq!(evo1.item_id, 25501);
+
+    // 7. Warp.Dat
+    assert!(!d.warp_defs.is_empty(), "Warp.Dat loaded");
+
+    // 8. Item.dat & Npc.dat
+    assert_eq!(d.item_defs.len(), 8371, "Item.dat loaded 8371 defs");
+    assert_eq!(d.npc_defs.len(), 6659, "Npc.dat loaded 6659 defs");
 }

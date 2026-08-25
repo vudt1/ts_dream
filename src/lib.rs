@@ -13,6 +13,8 @@ pub mod state;
 pub mod data {
     pub mod ini;
     pub mod loader;
+    pub mod loaders;
+    pub mod reader;
     pub mod tables;
     pub mod texps;
 }

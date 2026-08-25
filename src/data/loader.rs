@@ -27,7 +27,48 @@ pub struct GameData {
     /// `(map_id, slot)`. Pre-filled empty slots 1..255 per map, then each
     /// ItemOnMap.txt row spawns a `_Delay=999999` static drop.
     pub item_drop_on_map: HashMap<(i64, i64), ItemDropOnMap>,
+    // Binary .Dat tables
+    pub formula_params: Option<FormulaParams>,
+    pub bliss_bags: HashMap<u16, BlissBagDef>,
+    pub compounds: Vec<CompoundDef>,
+    pub astrolabes: HashMap<u8, AstrolabeDef>,
+    pub evo_statuses: HashMap<u8, EVOStatusDef>,
+    pub city_ex: Vec<CityExDef>,
+    pub item_defs: HashMap<u16, ItemDef>,
+    pub npc_defs: HashMap<u16, NpcDef>,
+    pub warp_defs: HashMap<usize, WarpDef>,
     pub loaded: bool,
+}
+
+/// Helper to locate a file in `data_dir`, checking exact name, lowercase/uppercase extension, and `_C.dat` variants.
+pub fn resolve_data_file(data_dir: &Path, file_name: &str) -> Option<PathBuf> {
+    let p = data_dir.join(file_name);
+    if p.exists() {
+        return Some(p);
+    }
+    if let Some((stem, ext)) = file_name.rsplit_once('.') {
+        let p_lower = data_dir.join(format!("{}.{}", stem, ext.to_lowercase()));
+        if p_lower.exists() {
+            return Some(p_lower);
+        }
+        let p_upper = data_dir.join(format!("{}.{}", stem, ext.to_uppercase()));
+        if p_upper.exists() {
+            return Some(p_upper);
+        }
+        let p_dat = data_dir.join(format!("{}.Dat", stem));
+        if p_dat.exists() {
+            return Some(p_dat);
+        }
+        let p_dat_lower = data_dir.join(format!("{}.dat", stem));
+        if p_dat_lower.exists() {
+            return Some(p_dat_lower);
+        }
+        let p_c_dat = data_dir.join(format!("{}_C.dat", stem));
+        if p_c_dat.exists() {
+            return Some(p_c_dat);
+        }
+    }
+    None
 }
 
 /// Render a data table into a temp dir for tests. Not part of the runtime.
@@ -60,21 +101,116 @@ impl GameData {
     /// Load the entire dataset under `data_dir`.
     pub fn load(data_dir: &Path) -> Result<Self> {
         let mut d = Self::default();
-        for name in ["Npcs.txt", "Items.txt", "Skills.txt"] {
-            let p = data_dir.join(name);
-            if !p.exists() {
-                return Err(TsError::Data(format!("missing data file: {}", p.display())));
+
+        // 1. Items: Item.dat (binary) preferred, fallback to Items.txt
+        if let Some(p) = resolve_data_file(data_dir, "Item.dat") {
+            let bytes = std::fs::read(&p)
+                .map_err(|e| TsError::Data(format!("read {}: {}", p.display(), e)))?;
+            d.item_defs = ItemDatLoader::load(&bytes)?;
+            for def in d.item_defs.values() {
+                d.items.insert(def.id as i64, def.to_item());
             }
+        } else if let Some(p) = resolve_data_file(data_dir, "Items.txt") {
+            d.load_items(&p)?;
+        } else {
+            return Err(TsError::Data(format!(
+                "missing item data file (Item.dat / Items.txt) in {}",
+                data_dir.display()
+            )));
         }
-        d.load_npcs(&data_dir.join("Npcs.txt"))?;
-        d.load_items(&data_dir.join("Items.txt"))?;
-        d.load_skills(&data_dir.join("Skills.txt"))?;
-        d.load_warps(&data_dir.join("Warps.txt"))?;
-        d.load_battle_gates(&data_dir.join("BattleGate.txt"))?;
-        d.load_dolls(&data_dir.join("Dolls.txt"))?;
-        d.load_npc_on_map(&data_dir.join("NpcOnMap.txt"))?;
-        d.load_item_on_map(&data_dir.join("ItemOnMap.txt"))?;
-        d.load_talks(&data_dir.join("Quests"))?;
+
+        // 2. NPCs: Npc.dat (binary) preferred, fallback to Npcs.txt
+        if let Some(p) = resolve_data_file(data_dir, "Npc.dat") {
+            let bytes = std::fs::read(&p)
+                .map_err(|e| TsError::Data(format!("read {}: {}", p.display(), e)))?;
+            d.npc_defs = NpcDatLoader::load(&bytes)?;
+            for def in d.npc_defs.values() {
+                d.npcs.insert(def.id as i64, def.to_npc());
+            }
+        } else if let Some(p) = resolve_data_file(data_dir, "Npcs.txt") {
+            d.load_npcs(&p)?;
+        } else {
+            return Err(TsError::Data(format!(
+                "missing NPC data file (Npc.dat / Npcs.txt) in {}",
+                data_dir.display()
+            )));
+        }
+
+        // 3. Formula.Dat
+        if let Some(p) = resolve_data_file(data_dir, "Formula.Dat") {
+            let bytes = std::fs::read(&p)
+                .map_err(|e| TsError::Data(format!("read {}: {}", p.display(), e)))?;
+            d.formula_params = Some(FormulaDatLoader::load(&bytes)?);
+        }
+
+        // 4. BlissBag.Dat
+        if let Some(p) = resolve_data_file(data_dir, "BlissBag.Dat") {
+            let bytes = std::fs::read(&p)
+                .map_err(|e| TsError::Data(format!("read {}: {}", p.display(), e)))?;
+            d.bliss_bags = BlissBagDatLoader::load(&bytes)?;
+        }
+
+        // 5. Compound.Dat
+        if let Some(p) = resolve_data_file(data_dir, "Compound.Dat") {
+            let bytes = std::fs::read(&p)
+                .map_err(|e| TsError::Data(format!("read {}: {}", p.display(), e)))?;
+            d.compounds = CompoundDatLoader::load(&bytes)?;
+        }
+
+        // 6. Astrolabe.Dat
+        if let Some(p) = resolve_data_file(data_dir, "Astrolabe.Dat") {
+            let bytes = std::fs::read(&p)
+                .map_err(|e| TsError::Data(format!("read {}: {}", p.display(), e)))?;
+            d.astrolabes = AstrolabeDatLoader::load(&bytes)?;
+        }
+
+        // 7. CityEx.Dat
+        if let Some(p) = resolve_data_file(data_dir, "CityEx.Dat") {
+            let bytes = std::fs::read(&p)
+                .map_err(|e| TsError::Data(format!("read {}: {}", p.display(), e)))?;
+            d.city_ex = CityExDatLoader::load(&bytes)?;
+        }
+
+        // 8. EVOStatus.Dat
+        if let Some(p) = resolve_data_file(data_dir, "EVOStatus.Dat") {
+            let bytes = std::fs::read(&p)
+                .map_err(|e| TsError::Data(format!("read {}: {}", p.display(), e)))?;
+            d.evo_statuses = EVOStatusDatLoader::load(&bytes)?;
+        }
+
+        // 9. Warp.Dat / Warps.txt
+        if let Some(p) = resolve_data_file(data_dir, "Warp.Dat") {
+            let bytes = std::fs::read(&p)
+                .map_err(|e| TsError::Data(format!("read {}: {}", p.display(), e)))?;
+            d.warp_defs = WarpDatLoader::load(&bytes)?;
+        }
+        if let Some(p) = resolve_data_file(data_dir, "Warps.txt") {
+            d.load_warps(&p)?;
+        }
+
+        // 10. Skills.txt
+        if let Some(p) = resolve_data_file(data_dir, "Skills.txt") {
+            d.load_skills(&p)?;
+        }
+
+        // 11. Optional game text files
+        if let Some(p) = resolve_data_file(data_dir, "BattleGate.txt") {
+            d.load_battle_gates(&p)?;
+        }
+        if let Some(p) = resolve_data_file(data_dir, "Dolls.txt") {
+            d.load_dolls(&p)?;
+        }
+        if let Some(p) = resolve_data_file(data_dir, "NpcOnMap.txt") {
+            d.load_npc_on_map(&p)?;
+        }
+        if let Some(p) = resolve_data_file(data_dir, "ItemOnMap.txt") {
+            d.load_item_on_map(&p)?;
+        }
+        let quests_dir = data_dir.join("Quests");
+        if quests_dir.is_dir() {
+            d.load_talks(&quests_dir)?;
+        }
+
         d.texps = compute_texps();
         d.loaded = true;
         Ok(d)
