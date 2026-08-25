@@ -144,6 +144,26 @@ impl<'a> PacketReader<'a> {
         };
         Ok(content.iter().map(|&b| viscii_to_unicode(b)).collect())
     }
+
+    /// Read a 35-byte `ThingData` struct from the stream.
+    pub fn read_thing_data(&mut self) -> Result<crate::protocol::codecs::ThingData> {
+        crate::protocol::codecs::ThingData::decode(self)
+    }
+
+    /// Read a `PlayerCard` struct from the stream.
+    pub fn read_player_card(&mut self) -> Result<crate::protocol::codecs::PlayerCard> {
+        crate::protocol::codecs::PlayerCard::decode(self)
+    }
+
+    /// Read a 20-byte `FriendExtra` struct from the stream.
+    pub fn read_friend_extra(&mut self) -> Result<crate::protocol::codecs::FriendExtra> {
+        crate::protocol::codecs::FriendExtra::decode(self)
+    }
+
+    /// Read a `BattleRoleData` struct from the stream.
+    pub fn read_battle_role(&mut self) -> Result<crate::protocol::codecs::BattleRoleData> {
+        crate::protocol::codecs::BattleRoleData::decode(self)
+    }
 }
 
 #[cfg(test)]

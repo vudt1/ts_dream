@@ -124,6 +124,30 @@ impl PacketWriter {
         self
     }
 
+    /// Write a 35-byte `ThingData` struct.
+    pub fn write_thing_data(&mut self, thing: &crate::protocol::codecs::ThingData) -> &mut Self {
+        thing.encode(self);
+        self
+    }
+
+    /// Write a `PlayerCard` struct.
+    pub fn write_player_card(&mut self, card: &crate::protocol::codecs::PlayerCard) -> &mut Self {
+        card.encode(self);
+        self
+    }
+
+    /// Write a 20-byte `FriendExtra` struct.
+    pub fn write_friend_extra(&mut self, extra: &crate::protocol::codecs::FriendExtra) -> &mut Self {
+        extra.encode(self);
+        self
+    }
+
+    /// Write a `BattleRoleData` struct.
+    pub fn write_battle_role(&mut self, role: &crate::protocol::codecs::BattleRoleData) -> &mut Self {
+        role.encode(self);
+        self
+    }
+
     /// Returns a slice of the internal body buffer.
     pub fn as_slice(&self) -> &[u8] {
         &self.buf

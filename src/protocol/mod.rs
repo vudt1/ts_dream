@@ -29,11 +29,16 @@ pub const MAX_LEVEL: i64 = 200;
 // pub const ADMIN_ID_THRESHOLD: u32 = 300012;
 
 pub mod codec;
+pub mod codecs;
 pub mod encoder;
 pub mod frame;
 pub mod reader;
 pub mod writer;
 
+pub use codecs::{
+    ehuman, BattleRoleData, BattleRoleSerializer, FriendExtra, PlayerCard, PlayerInfoCodec,
+    ThingData, ThingDataCodec, FRIEND_EXTRA_SIZE, THING_DATA_SIZE,
+};
 pub use reader::PacketReader;
 pub use writer::PacketWriter;
 

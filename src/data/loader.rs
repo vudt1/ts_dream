@@ -37,6 +37,7 @@ pub struct GameData {
     pub item_defs: HashMap<u16, ItemDef>,
     pub npc_defs: HashMap<u16, NpcDef>,
     pub warp_defs: HashMap<usize, WarpDef>,
+    pub scene_eve_data: HashMap<u32, SceneEveData>,
     pub loaded: bool,
 }
 
@@ -55,6 +56,19 @@ pub fn resolve_data_file(data_dir: &Path, file_name: &str) -> Option<PathBuf> {
         if p_upper.exists() {
             return Some(p_upper);
         }
+        let p_stem_lower = data_dir.join(format!("{}.{}", stem.to_lowercase(), ext.to_lowercase()));
+        if p_stem_lower.exists() {
+            return Some(p_stem_lower);
+        }
+        let p_stem_capital = data_dir.join(format!(
+            "{}{}.{}",
+            &stem[..1].to_uppercase(),
+            &stem[1..].to_lowercase(),
+            ext.to_lowercase()
+        ));
+        if p_stem_capital.exists() {
+            return Some(p_stem_capital);
+        }
         let p_dat = data_dir.join(format!("{}.Dat", stem));
         if p_dat.exists() {
             return Some(p_dat);
@@ -67,6 +81,11 @@ pub fn resolve_data_file(data_dir: &Path, file_name: &str) -> Option<PathBuf> {
         if p_c_dat.exists() {
             return Some(p_c_dat);
         }
+    }
+    // Also check CompreseData/ subfolder (Mobile convention)
+    let comp_p = data_dir.join("CompreseData").join(file_name);
+    if comp_p.exists() {
+        return Some(comp_p);
     }
     None
 }
@@ -209,6 +228,13 @@ impl GameData {
         let quests_dir = data_dir.join("Quests");
         if quests_dir.is_dir() {
             d.load_talks(&quests_dir)?;
+        }
+
+        // 12. eve.emg (binary quest and scene events container)
+        if let Some(p) = resolve_data_file(data_dir, "eve.emg") {
+            let bytes = std::fs::read(&p)
+                .map_err(|e| TsError::Data(format!("read {}: {}", p.display(), e)))?;
+            d.scene_eve_data = EveDataLoader::load(&bytes)?;
         }
 
         d.texps = compute_texps();

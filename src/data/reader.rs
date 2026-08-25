@@ -78,6 +78,11 @@ impl DatReader {
         self.position = pos.min(self.data.len());
     }
 
+    /// Advance the read pointer by `size` bytes without allocating.
+    pub fn skip(&mut self, size: usize) {
+        self.position = (self.position + size).min(self.data.len());
+    }
+
     /// Read raw slice of `size` bytes.
     pub fn read_bytes(&mut self, size: usize) -> Vec<u8> {
         if self.position + size > self.data.len() {
@@ -92,16 +97,49 @@ impl DatReader {
     }
 
     /// Helper to read numbers with optional XOR, offset, and sign conversion.
+    #[inline(always)]
     fn read_number(&mut self, size: usize, compute_xor: bool, compute_offset: bool) -> i64 {
         if self.position + size > self.data.len() {
+            self.position = self.data.len();
             return 0;
         }
 
-        let mut result: u64 = 0;
-        for i in 0..size {
-            result |= (self.data[self.position + i] as u64) << (i * 8);
-        }
-        self.position += size;
+        let mut result: u64 = match size {
+            1 => {
+                let b = self.data[self.position] as u64;
+                self.position += 1;
+                b
+            }
+            2 => {
+                let bytes = [self.data[self.position], self.data[self.position + 1]];
+                self.position += 2;
+                u16::from_le_bytes(bytes) as u64
+            }
+            4 => {
+                let bytes = [
+                    self.data[self.position],
+                    self.data[self.position + 1],
+                    self.data[self.position + 2],
+                    self.data[self.position + 3],
+                ];
+                self.position += 4;
+                u32::from_le_bytes(bytes) as u64
+            }
+            8 => {
+                let mut arr = [0u8; 8];
+                arr.copy_from_slice(&self.data[self.position..self.position + 8]);
+                self.position += 8;
+                u64::from_le_bytes(arr)
+            }
+            _ => {
+                let mut res: u64 = 0;
+                for i in 0..size {
+                    res |= (self.data[self.position + i] as u64) << (i * 8);
+                }
+                self.position += size;
+                res
+            }
+        };
 
         if compute_xor {
             match size {

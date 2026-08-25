@@ -302,4 +302,60 @@ fn binary_loaders_load_all_dat_files() {
     // 8. Item.dat & Npc.dat
     assert_eq!(d.item_defs.len(), 8371, "Item.dat loaded 8371 defs");
     assert_eq!(d.npc_defs.len(), 6659, "Npc.dat loaded 6659 defs");
+
+    // 9. eve.emg
+    assert!(!d.scene_eve_data.is_empty(), "eve.emg loaded");
+    assert!(d.scene_eve_data.len() > 1000, "eve.emg non-empty scenes count > 1000 (actual: {})", d.scene_eve_data.len());
 }
+
+#[test]
+fn eve_loader_loads_major_scenes() {
+    let dir = data_dir();
+    if !dir.exists() {
+        return;
+    }
+    let d = GameData::load(&dir).expect("load real data");
+
+    // Total loaded scene count
+    println!("Total scenes loaded: {}", d.scene_eve_data.len());
+    assert!(!d.scene_eve_data.is_empty(), "eve.emg must contain scenes");
+
+    // 1. Tân thủ thôn (Scene 10801)
+    let scene_10801 = d.scene_eve_data.get(&10801).expect("Scene 10801 present");
+    println!(
+        "10801: npcs={}, doors={}, events={}, scene_infos={}, fight_datas={}",
+        scene_10801.npcs.len(),
+        scene_10801.doors.len(),
+        scene_10801.npc_events.len(),
+        scene_10801.scene_infos.len(),
+        scene_10801.fight_datas.len()
+    );
+    assert!(!scene_10801.npcs.is_empty(), "Scene 10801 has NPCs");
+    assert!(!scene_10801.scene_infos.is_empty(), "Scene 10801 has Scene Infos");
+    assert!(!scene_10801.fight_datas.is_empty(), "Scene 10801 has FightDatas");
+
+    // 2. Trác Quận (Scene 12001)
+    let scene_12001 = d.scene_eve_data.get(&12001).expect("Scene 12001 present");
+    println!(
+        "12001: npcs={}, doors={}, events={}, scene_infos={}, fight_datas={}",
+        scene_12001.npcs.len(),
+        scene_12001.doors.len(),
+        scene_12001.npc_events.len(),
+        scene_12001.scene_infos.len(),
+        scene_12001.fight_datas.len()
+    );
+    assert!(!scene_12001.npcs.is_empty(), "Scene 12001 has NPCs");
+
+    // Validate NpcPlacement properties
+    for npc in scene_10801.npcs.values() {
+        assert!(npc.id > 0);
+    }
+
+    // Validate SceneInfo destinations
+    for scene_info in scene_10801.scene_infos.values() {
+        assert!(scene_info.eve_no > 0);
+    }
+}
+
+
+
