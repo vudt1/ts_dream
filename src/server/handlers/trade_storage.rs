@@ -1,4 +1,7 @@
 //! Cross-player trade, storage transfer, and bank operations.
+//!
+//! The settlement engine lives in [`crate::server::trade_system`]; this module
+//! keeps only wire formatting, registry plumbing, and DB persistence.
 
 use crate::db::persist;
 use crate::protocol::{encoder, frame};
@@ -6,7 +9,7 @@ use crate::server::dispatcher::OpcodeCtx;
 use crate::server::inventory;
 use crate::server::session::{online_sessions, InventoryItem, PetState, Session, TradeState};
 
-const GOLD_CAP: u32 = 9_999_999;
+pub(crate) const GOLD_CAP: u32 = 9_999_999;
 
 fn item_wire(item: &InventoryItem) -> String {
     format!(
@@ -150,40 +153,20 @@ fn pet_presence_frame(owner_id: u32, pet: &PetState) -> String {
     )
 }
 
-fn remove_offers(s: &mut Session) -> bool {
-    for offered in &s.trade.items {
-        if !s
-            .homdo
-            .iter()
-            .any(|i| i.slot == offered.slot && i.id == offered.id && i.count >= offered.count)
-        {
-            return false;
-        }
-    }
-    for offered in s.trade.items.clone() {
-        if let Some(pos) = s.homdo.iter().position(|i| i.slot == offered.slot) {
-            if s.homdo[pos].count == offered.count {
-                s.homdo.remove(pos);
-            } else {
-                s.homdo[pos].count -= offered.count;
-            }
-        }
-    }
-    true
+fn add_trade_item(s: &mut Session, item: InventoryItem) -> bool {
+    crate::server::trade_system::add_trade_item(s, item)
 }
 
-fn add_trade_item(s: &mut Session, mut item: InventoryItem) -> bool {
-    if (1..=6).contains(&item.loai) {
-        let Some(slot) = inventory::free_slot(&s.homdo) else {
-            return false;
-        };
-        item.slot = slot;
-        s.homdo.push(item);
-        true
-    } else {
-        inventory::can_add_item(&s.homdo, &item)
-            && !inventory::add_item(&mut s.homdo, item).is_empty()
-    }
+fn settle_trade(a: &mut Session, b: &mut Session) -> bool {
+    crate::server::trade_system::settle_trade(a, b)
+}
+
+fn pet_at(s: &Session, stt: u8) -> Option<PetState> {
+    crate::server::trade_system::pet_at(s, stt)
+}
+
+fn pet_trade_settle(a: &mut Session, b: &mut Session) -> Result<(), &'static str> {
+    crate::server::trade_system::pet_trade_settle(a, b)
 }
 
 fn add_storage_item(storage: &mut Vec<InventoryItem>, mut item: InventoryItem) -> bool {
@@ -204,87 +187,6 @@ fn add_storage_to_homdo(
     item.slot = slot;
     homdo.push(item.clone());
     Some(item)
-}
-
-fn settle_trade(a: &mut Session, b: &mut Session) -> bool {
-    if a.trade.gold > a.gold || b.trade.gold > b.gold {
-        return false;
-    }
-    let mut a_probe = a.clone();
-    let mut b_probe = b.clone();
-    if !remove_offers(&mut a_probe) || !remove_offers(&mut b_probe) {
-        return false;
-    }
-    for item in a.trade.items.clone() {
-        if !add_trade_item(&mut b_probe, item) {
-            return false;
-        }
-    }
-    for item in b.trade.items.clone() {
-        if !add_trade_item(&mut a_probe, item) {
-            return false;
-        }
-    }
-    a_probe.gold = a_probe.gold - a.trade.gold + b.trade.gold;
-    b_probe.gold = b_probe.gold - b.trade.gold + a.trade.gold;
-    if a_probe.gold > GOLD_CAP || b_probe.gold > GOLD_CAP {
-        return false;
-    }
-    a_probe.trade = TradeState::default();
-    b_probe.trade = TradeState::default();
-    *a = a_probe;
-    *b = b_probe;
-    true
-}
-
-fn pet_at(s: &Session, stt: u8) -> Option<PetState> {
-    s.pets.iter().find(|p| p.stt == stt && p.id > 0).cloned()
-}
-
-fn pet_trade_settle(a: &mut Session, b: &mut Session) -> Result<(), &'static str> {
-    if a.trade.gold > a.gold || b.trade.gold > b.gold {
-        return Err("gold");
-    }
-    let a_stt = a.trade.pets.first().copied().unwrap_or(0);
-    let b_stt = b.trade.pets.first().copied().unwrap_or(0);
-    let ap = if a_stt > 0 { pet_at(a, a_stt) } else { None };
-    let bp = if b_stt > 0 { pet_at(b, b_stt) } else { None };
-    if ap
-        .as_ref()
-        .is_some_and(|p| b.pets.iter().any(|x| x.id == p.id))
-        || bp
-            .as_ref()
-            .is_some_and(|p| a.pets.iter().any(|x| x.id == p.id))
-    {
-        return Err("duplicate");
-    }
-    if ap.is_some() && b.pets.len() >= 8 || bp.is_some() && a.pets.len() >= 8 {
-        return Err("full");
-    }
-    if let Some(p) = ap {
-        a.pets.retain(|x| x.stt != a_stt);
-        let mut p = p;
-        p.stt = crate::server::pet_box::next_active_slot(&b.pets)
-            .or_else(|| crate::server::pet_box::next_stable_slot(&b.pets))
-            .ok_or("full")?;
-        b.pets.push(p);
-    }
-    if let Some(p) = bp {
-        b.pets.retain(|x| x.stt != b_stt);
-        let mut p = p;
-        p.stt = crate::server::pet_box::next_active_slot(&a.pets)
-            .or_else(|| crate::server::pet_box::next_stable_slot(&a.pets))
-            .ok_or("full")?;
-        a.pets.push(p);
-    }
-    a.gold = a.gold - a.trade.gold + b.trade.gold;
-    b.gold = b.gold - b.trade.gold + a.trade.gold;
-    if a.gold > GOLD_CAP || b.gold > GOLD_CAP {
-        return Err("gold");
-    }
-    a.trade = TradeState::default();
-    b.trade = TradeState::default();
-    Ok(())
 }
 
 fn registry_get(id: u32) -> Option<Session> {

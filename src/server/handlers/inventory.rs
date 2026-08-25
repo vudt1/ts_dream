@@ -13,8 +13,20 @@ use std::sync::Arc;
 /// Pickup range (C# `Update_H17` case 2: `-150 <= dx <= 150`, same for dy).
 const PICKUP_RANGE: i32 = 150;
 
-/// Dispatch Opcode 0x17 — Inventory operations.
+/// Dispatch Opcode 0x17 — Inventory operations (Level-2 subcode routing).
+///
+/// The whole 0x17 family funnels here from the Level-1 dispatcher: base bag
+/// ops below, plus the player-shop (30..=33), storage-transfer (51|52), and
+/// reborn branches that used to sit inline in the dispatcher.
 pub async fn handle_inventory(ctx: &mut OpcodeCtx<'_>) {
+    if (30..=33).contains(&ctx.sub) {
+        crate::server::handlers::shops::handle_player_shop(ctx).await;
+        return;
+    }
+    if matches!(ctx.sub, 51 | 52) {
+        crate::server::handlers::trade_storage::handle_storage_transfer(ctx).await;
+        return;
+    }
     let conn = &mut ctx.conn;
     let out = &mut ctx.out;
     let pool = ctx.env.pool;

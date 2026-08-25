@@ -94,6 +94,17 @@ async fn main() -> anyhow::Result<()> {
         tokio::time::Duration::from_secs(5),
     );
 
+    // 3c. AutoSaveService (ticket 07): every 3 minutes, fingerprint the online
+    //     sessions and batch-write dirty ones in one InnoDB transaction each.
+    ts_dream::server::auto_save::spawn(pool.clone());
+
+    // 3d. Eve-event activation gate (ticket 07): off by default so wire parity
+    //     with the golden captures holds; operators opt in via `TS_EVE_EVENTS=1`.
+    if std::env::var("TS_EVE_EVENTS").is_ok_and(|v| v == "1" || v.eq_ignore_ascii_case("true")) {
+        ts_dream::server::handlers::npc_event::set_eve_events_enabled(true);
+        tracing::info!("Eve event engine enabled (TS_EVE_EVENTS)");
+    }
+
     // 4. Load static data (DataLoaded gate). `resolve_data_dir` prefers the
     //    configured path (repo `./Data/`), then the exe-adjacent build.rs copy.
     let data_dir = cfg.resolve_data_dir();

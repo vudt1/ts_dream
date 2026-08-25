@@ -31,14 +31,18 @@ pub mod db {
 }
 
 pub mod server {
+    pub mod auto_save;
     pub mod character_sheet;
     pub mod dispatcher;
     pub mod handlers;
     pub mod inventory;
     pub mod map_drops;
     pub mod pet_box;
+    pub mod player_state;
+    pub mod response;
     pub mod session;
     pub mod spawn;
+    pub mod trade_system;
 }
 
 pub mod web {

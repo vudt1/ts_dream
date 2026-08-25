@@ -23,7 +23,7 @@ Toàn bộ ràng buộc cốt lõi của TS PC được bảo toàn 100%:
 | [`04`](.scratch/refactor-ts-server/issues/04-eve-emg-container-loader.md) | **Eve.emg Container Parser & Models** | **COMPLETED ✅** | 15 integration tests (`tests/data.rs`) + unit tests (`src/data/loaders/eve.rs`), đọc container 9.8 MB `Data/eve.emg` (3,823 scene entries) |
 | [`05`](.scratch/refactor-ts-server/issues/05-eve-script-engine-and-auto-chain.md) | **4-Tier Eve Script Engine** | **COMPLETED ✅** | 47 tests pass 100% (`tests/eve_engine.rs`), `src/eve/` (state/evaluator/resolver/group/auto_chain) |
 | [`06`](.scratch/refactor-ts-server/issues/06-mysql-schema-migration-and-repositories.md) | **MySQL Schema 3NF & Repositories** | **COMPLETED ✅** | 12 tests (`tests/db_repositories.rs`, unit luôn chạy; integration DB gate qua `TS_TEST_DB_URL`), `migrations/0002_modern_schema.sql` + `src/db/modern/` |
-| [`07`](.scratch/refactor-ts-server/issues/07-two-tier-dispatcher-and-modular-handlers.md) | **Two-Tier Dispatcher & Handlers** | **QUEUED** | Blocked by 01, 02, 05, 06 |
+| [`07`](.scratch/refactor-ts-server/issues/07-two-tier-dispatcher-and-modular-handlers.md) | **Two-Tier Dispatcher & Handlers** | **COMPLETED ✅** | 18 tests (`tests/handlers_test.rs`), `response.rs` / `player_state.rs` / `trade_system.rs` / `auto_save.rs` / `handlers/npc_event.rs`; golden suite vẫn pass 100% |
 | [`08`](.scratch/refactor-ts-server/issues/08-test-migration-and-csharp-comment-cleanup.md) | **Test Migration & C# Cleanup** | **QUEUED** | Blocked by 07 |
 | [`09`](.scratch/refactor-ts-server/issues/09-documentation-and-domain-updates.md) | **Documentation & Domain Updates** | **QUEUED** | Blocked by 08 |
 
@@ -85,8 +85,17 @@ Toàn bộ ràng buộc cốt lõi của TS PC được bảo toàn 100%:
 
 Ticket đang ở trạng thái **UNBLOCKED / READY TO IMPLEMENT**:
 
-### Triển khai Ticket 07 — `07-two-tier-dispatcher-and-modular-handlers.md`
-- **Mục tiêu**: Level-1 dispatcher theo Opcode chính + 36 handler module chuyên trách (Level-2 phân nhánh Subcode), `ResponseSender` abstraction, wire vào `EveAutoChainEngine` (ticket 05) và repository layer (ticket 06).
+### Triển khai Ticket 08 — `08-test-migration-and-csharp-comment-cleanup.md`
+- **Mục tiêu**: Chuyển toàn bộ khối `#[cfg(test)]` inline trong `src/` sang các tệp chuyên trách trong `tests/`, xóa sạch chú thích tham chiếu C# legacy, bảo đảm toàn bộ test suite + golden diffing pass 100%.
+
+### Thành phẩm mới sau Ticket 07 (Two-Tier Dispatcher & Domain Systems)
+- **Level-1 dispatcher thuần opcode**: nhánh sub inline của op `0x17` đã dồn xuống `handlers/inventory.rs` (player-shop 30..=33, storage 51|52, base ops) — dispatcher chỉ match Main Opcode.
+- **`ResponseSender`** (`src/server/response.rs`): bọc `Conn + HandleOutcome`; phương thức chuẩn hóa `send_bag_items`, `send_equipment_items`, `send_storage_items`, `send_dialog_talk`, `end_talk`, `send_stat_update`, `send_hp_sp_updates`, `broadcast`. Handler mới nên dùng lớp này thay vì tự ghép hex.
+- **`PlayerStateManager`** (`src/server/player_state.rs`): facade thread-safe trên registry `online_sessions()` — `update/snapshot/recompute_stats/adjust_hp/adjust_sp`, trả `None` khi player offline.
+- **`TradeSystem`** (`src/server/trade_system.rs`): engine settle thuần (item + pet, chống duplicate qua probe-first) tách khỏi wire handler; coordinator `begin/cancel/accept` khóa 2 người theo id ổn định qua `lock_player_operations`. `handlers/trade_storage.rs` giờ chỉ còn wire-format + persist.
+- **`AutoSaveService`** (`src/server/auto_save.rs`): background Tokio task mỗi 3 phút (đã wire vào `main.rs`); dirty detection bằng fingerprint FNV-1a toàn bộ trạng thái volatile (gold/hp/stats/items/pets/quest steps), mỗi cycle 1 transaction InnoDB cho mỗi session dirty; `forget(player_id)` cho disconnect path.
+- **`handlers/npc_event.rs`**: bridge Eve Engine (ticket 05) — snapshot `Session` → `PlayerEventState`, resolve NPC/door event, auto-chain continuation với guard depth + map-consistency. Mặc định TẮT (`TS_EVE_EVENTS=1` để bật) nhằm giữ golden parity; mission flags/mark_defs chưa nạp (ticket 08).
+- Lưu ý: 42 clippy warnings còn lại là mã cũ (is_multiple_of, redundant pattern...) — thuộc phạm vi ticket 08.
 
 ### Thành phẩm mới sau Ticket 06 (`migrations/0002_modern_schema.sql`, `src/db/modern/`)
 - **Migration 3NF**: `characters` (accounts 1:1 — PC chỉ hỗ trợ 1 nhân vật/tài khoản, UNIQUE key trên `account_id`), `character_money`, `inventories` (hợp nhất các bảng túi đồ còn dùng: homdo/trangbi; composite PK `(character_id, storage_type, slot)`; storage_type 1=Bag, 2=Secondary, 4=Bank, 8=Equip, 16=Warehouse; đủ 20 cột ThingData), `character_pets` (4 kho: 1=Tùy thân, 2=Mã xa, 3=Khách sạn, 4=Kho), `character_skills`, `character_hotkeys`, `character_missions`, `character_mission_flags`, `character_bit_flags`, `character_completed_events`, `friends`, `mails`. Toàn bộ text giữ `latin1_bin`; không FK (parity legacy).

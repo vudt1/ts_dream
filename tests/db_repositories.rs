@@ -10,7 +10,7 @@
 //! The target database must already exist; migrations from `migrations/`
 //! are applied to it on first connect. Every test cleans up after itself.
 
-use sqlx::{MySql, MySqlPool, Row};
+use sqlx::{MySqlPool, Row};
 use ts_dream::db::modern::model::{
     InventorySlot, MissionRow, Money, PetRecord, PetSkill, PetStorageType, SkillRow,
     StorageType,

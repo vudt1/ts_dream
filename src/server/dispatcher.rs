@@ -242,16 +242,9 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         // Op 0x14 — Action / Talk
         0x14 => talk::handle_talk(ctx).await,
 
-        // Op 0x17 — Inventory base, use item, player shop, reborn
-        0x17 => {
-            if (30..=33).contains(&ctx.sub) {
-                shops::handle_player_shop(ctx).await;
-            } else if matches!(ctx.sub, 51 | 52) {
-                trade_storage::handle_storage_transfer(ctx).await;
-            } else {
-                inventory::handle_inventory(ctx).await;
-            }
-        }
+        // Op 0x17 — Inventory family; Level-2 subcode routing lives in the
+        // handler module (base ops, use item, player shop, storage, reborn).
+        0x17 => inventory::handle_inventory(ctx).await,
 
         // Op 0x19 — Trade
         0x19 => trade_storage::handle_trade(ctx).await,
