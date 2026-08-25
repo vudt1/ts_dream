@@ -7,6 +7,7 @@
 pub mod config;
 pub mod encoding;
 pub mod error;
+pub mod eve;
 pub mod protocol;
 pub mod state;
 
