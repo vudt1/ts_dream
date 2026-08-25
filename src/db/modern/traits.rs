@@ -25,12 +25,20 @@ pub trait AccountRepository {
 }
 
 /// Character lifecycle against `characters` + `character_money`.
+///
+/// The PC server is strictly 1 account : 1 character (enforced by the UNIQUE
+/// key on `characters.account_id`); the plural-looking methods below still
+/// return collections so the API survives a future multi-character build
+/// without breaking callers.
 pub trait CharacterRepository {
     /// Creates the character row plus its empty money ledger; returns the new
     /// character id. Atomic: both inserts commit or roll back together.
+    /// Fails with a duplicate-key error when the account already owns its one
+    /// allowed character.
     async fn create(&self, account_id: i64, name: &[u8], seed: &CharacterSeed) -> RepoResult<i64>;
 
     /// Lists the characters under one account (login character-select data).
+    /// On the PC server this yields at most one row (1:1 accounts/characters).
     async fn list_by_account(&self, account_id: i64) -> RepoResult<Vec<CharacterSummary>>;
 
     /// Resolves a character id by exact VISCII name bytes.

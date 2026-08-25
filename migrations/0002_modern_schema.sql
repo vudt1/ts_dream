@@ -1,9 +1,11 @@
 -- TS Dream — modern 3NF schema (ticket 06).
 --
 -- Normalized relations on top of the legacy tables from 0001:
---   accounts (0001) 1:N characters 1:1 character_money
---   characters 1:N inventories (unifies the five legacy pouches homdo /
---     trangbi / tientrang / tuideo / luulang into one table keyed by
+--   accounts (0001) 1:1 characters 1:1 character_money
+--     (the PC server supports exactly ONE character per account; the UNIQUE
+--      key on characters.account_id enforces it at the schema level)
+--   characters 1:N inventories (unifies the legacy pouches homdo / trangbi
+--     into one table keyed by
 --     (character_id, storage_type, slot) with the full 35-byte ThingData
 --     attribute set)
 --   characters 1:N character_pets across four pet storages
@@ -26,7 +28,8 @@
 -- ============================================================================
 
 -- ============================================================================
--- characters — one row per playable character under one account (1:N).
+-- characters — the single playable character of one account (1:1; the PC
+-- server never supports multiple avatars per account).
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS characters (
     id          BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -54,7 +57,7 @@ CREATE TABLE IF NOT EXISTS characters (
     map_x       BIGINT DEFAULT 0,
     map_y       BIGINT DEFAULT 0,
     created_at  BIGINT DEFAULT 0,
-    KEY characters_account (account_id),
+    UNIQUE KEY characters_account (account_id),
     KEY characters_name (name)
 ) ENGINE=InnoDB AUTO_INCREMENT = 300000
   DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;

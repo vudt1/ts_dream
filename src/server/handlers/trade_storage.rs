@@ -755,7 +755,9 @@ pub async fn handle_storage_transfer(ctx: &mut OpcodeCtx<'_>) {
     if !persist::persist_sessions_transaction(
         ctx.env.pool,
         &[&ctx.conn.session],
-        &["homdo", "tientrang", "luulang"],
+        // TienTrang / LuuLang have no backing tables (0001 usage audit) —
+        // their pouches persist in Session memory only, so just homdo here.
+        &["homdo"],
     )
     .await
     {

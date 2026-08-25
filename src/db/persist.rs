@@ -83,15 +83,14 @@ pub async fn update_skillsave(pool: Option<&MySqlPool>, player_id: u32, slot: u8
     }
 }
 
-/// Backtick-quoted table name suffixes: homdo / trangbi / tientrang / tuideo /
-/// luulang share the same item columns (verified against 0001_init.sql).
+/// Backtick-quoted table name suffixes: homdo / trangbi share the same item
+/// columns (verified against 0001_init.sql). The tientrang / tuideo / luulang
+/// tables were removed from the schema (usage audit: never wired); their
+/// Session pouches stay in-memory only.
 fn item_table(table: &str) -> Option<&'static str> {
     Some(match table {
         "homdo" => "homdo",
         "trangbi" => "trangbi",
-        "tientrang" => "tientrang",
-        "tuideo" => "tuideo",
-        "luulang" => "luulang",
         _ => return None,
     })
 }
@@ -235,7 +234,7 @@ pub async fn persist_shop_transaction(
 ///
 /// `tables` selects the tables rewritten per session:
 /// - `stats`: `players.Hp/Sp/Texp/Lv/HpMax/SpMax/Point/SkillPoint` (battle end)
-/// - `homdo` / `tientrang` / `luulang`: item tables
+/// - `homdo` / `trangbi`: item tables
 /// - `quest`: scoped quest-step rows
 /// - `pet`: full pet rows (delete + reinsert, incl. texp)
 pub async fn persist_sessions_transaction(
@@ -281,8 +280,7 @@ pub async fn persist_sessions_transaction(
             for table in tables {
                 let items = match *table {
                     "homdo" => &session.homdo,
-                    "tientrang" => &session.tientrang,
-                    "luulang" => &session.luulang,
+                    "trangbi" => &session.trangbi,
                     "quest" => {
                         let rows: Vec<(i64, i64)> = session
                             .quest_steps

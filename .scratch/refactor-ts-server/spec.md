@@ -16,7 +16,7 @@ Mã nguồn TCP Game Server TS Online (`ts_dream`) hiện tại được chuyể
 Tái cấu trúc toàn diện Game Server TS Dream trên nền tảng Rust (Tokio async runtime) dựa trên kiến trúc module hóa và thiết kế sạch (Clean Architecture) của Kotlin TS Mobile Server (`ts_mobile_server`), đồng thời bảo toàn 100% các ràng buộc giao thức và nghiệp vụ của TS Online PC:
 1. **Tầng Giao thức Nhị phân Tối ưu (Binary Protocol & Codecs)**: Xây dựng bộ công cụ đọc/ghi nhị phân Zero-Copy (`PacketReader`, `PacketWriter`) hỗ trợ Little-Endian và bảng mã VISCII 1.1; phân tách rành mạch tầng Frame Codec (Header `F4 44`, XOR `0xAD`) khỏi các Serializer miền (`ThingDataCodec` 35-byte, `PlayerInfoCodec`, `BattleRoleSerializer`).
 2. **Tầng Nạp Dữ liệu Nhị phân (.Dat & Eve.emg Engine)**: Hiện thực `DatReader` giải mã bảng khóa XOR/offset và bộ parser nhị phân cho toàn bộ 9 tệp `.Dat`; chuyển đổi toàn diện sang bộ đọc `EveDataLoader` và động cơ kịch bản sự kiện 4 tầng (`Eve Engine`) có cơ chế chống lặp vô hạn 4 lớp.
-3. **Chuẩn hóa Cơ sở Dữ liệu MySQL 8 (3NF Schema & Repository Layer)**: Redesign quan hệ Account 1:N Characters, hợp nhất 5 bảng túi đồ thành 1 bảng `inventories` chuẩn `ThingData` 20 cột, quản lý 4 kho võ tướng `character_pets` (Tùy thân, Mã xa, Khách sạn, Kho), mở rộng hệ thống Nhiệm vụ, Cờ vĩnh viễn (BitFlags), Điểm bay, Thư từ, Bạn bè; duy trì bảng mã `latin1_bin` cho chuỗi ký tự thô.
+3. **Chuẩn hóa Cơ sở Dữ liệu MySQL 8 (3NF Schema & Repository Layer)**: Redesign quan hệ Account 1:1 Characters (phiên bản PC chỉ hỗ trợ duy nhất 1 nhân vật cho mỗi tài khoản), hợp nhất 5 bảng túi đồ thành 1 bảng `inventories` chuẩn `ThingData` 20 cột, quản lý 4 kho võ tướng `character_pets` (Tùy thân, Mã xa, Khách sạn, Kho), mở rộng hệ thống Nhiệm vụ, Cờ vĩnh viễn (BitFlags), Điểm bay, Thư từ, Bạn bè; duy trì bảng mã `latin1_bin` cho chuỗi ký tự thô.
 4. **Phân rã Hệ thống Điều phối & Domain Systems**: Thiết lập mô hình điều phối 2 cấp (Two-tier Dispatcher), bóc tách tầng `ResponseSender`, xây dựng các Domain Systems chuyên trách (`PlayerStateManager`, `QuestSystem`, `PetSystem`, `TradeSystem`, `AutoSaveService`).
 5. **Di chuyển Test & Làm Sạch Mã Nguồn**: Chuyển toàn bộ kiểm thử inline từ `src/` sang các tệp test chuyên trách trong `tests/`, xóa sạch toàn bộ chú thích C# cũ, bảo đảm toàn bộ test suite và 18 golden test capture diffing vượt qua 100%.
 
@@ -42,7 +42,7 @@ Tái cấu trúc toàn diện Game Server TS Dream trên nền tảng Rust (Toki
 13. As a Player progressing through a multi-step quest, I want the `EveAutoChainEngine` with 4-layer loop protection (same condition, re-question, re-battle, duplicate item) to advance quest chains automatically, so that multi-stage dialogue flows smoothly without freezing or infinite looping.
 
 ### Nhóm 3: Cơ Sở Dữ Liệu & Hệ Thống Lưu Trữ (Persistence)
-14. As an Account Administrator, I want a 1:N relationship between `accounts` and `characters`, so that a single user account can own multiple game avatars.
+14. As an Account Administrator, I want a strict 1:1 relationship between `accounts` and `characters` (the PC server supports exactly one game avatar per user account), so that account identity and character identity stay aligned and a duplicate-character insert is rejected at the schema level.
 15. As a Player, I want my character name and raw strings to be preserved in `latin1_bin` collation, so that Vietnamese VISCII characters never suffer from encoding corruption or byte distortion.
 16. As a Player, I want my items in bag, equipment, secondary bag, bank, and temporary warehouse to be stored in a unified `inventories` table with composite key `(character_id, storage_type, slot)`, so that inventory operations are ACID-compliant.
 17. As a Pet Owner, I want my companions to be organized across 4 storage tiers (`character_pets`: Follow 1..4, Cart 1..4, Inn 1..30, Warehouse 1..150) with complete stats, skills, pills, and rebirth counts, so that no pet data is lost when transferring between storage.
@@ -91,7 +91,7 @@ Tái cấu trúc toàn diện Game Server TS Dream trên nền tảng Rust (Toki
 
 ### 3. Database Schema & Persistence Layer
 - **Chuẩn Hóa Quan Hệ (3NF)**:
-  - `accounts` (1) $\to$ (N) `characters`.
+  - `accounts` (1) $\to$ (1) `characters` (UNIQUE key trên `account_id`; PC chỉ hỗ trợ 1 nhân vật/tài khoản).
   - Hợp nhất 5 bảng túi đồ cũ thành 1 bảng duy nhất `inventories (character_id, storage_type, slot)` với `storage_type` (1=Bag, 2=Secondary, 4=Bank, 8=Equip, 16=Warehouse) lưu trữ đầy đủ 20 trường thuộc tính `ThingData`.
   - `character_pets`: Quản lý 4 kho võ tướng theo `storage_type` (1=Tùy thân, 2=Mã xa, 3=Khách sạn, 4=Kho).
   - Bảng nhiệm vụ và cờ: `character_missions`, `character_mission_flags`, `character_bit_flags` (Forever Flags), `character_completed_events`.

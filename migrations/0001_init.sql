@@ -74,7 +74,10 @@ CREATE TABLE IF NOT EXISTS players (
 ) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
 
 -- ============================================================================
--- 9 gameplay tables (shared schema, per-player composite PK incl. player_id).
+-- 6 gameplay tables (shared schema, per-player composite PK incl. player_id).
+-- The three never-wired legacy pouches (`tientrang` / `tuideo` / `luulang`)
+-- were removed after a usage audit: no handler or persist path ever targets
+-- them; their runtime state stays in-memory only.
 -- ============================================================================
 
 -- Homdo — inventory slots.
@@ -111,39 +114,8 @@ CREATE TABLE IF NOT EXISTS homdo (
     PRIMARY KEY (player_id, Slot)
 ) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
 
--- LuuLang (storage).
-CREATE TABLE IF NOT EXISTS luulang (
-    player_id BIGINT NOT NULL,
-    Slot      BIGINT NOT NULL,
-    Id         BIGINT DEFAULT 0, 
-	`Count` BIGINT DEFAULT 0,
-	Lv BIGINT DEFAULT 0, 
-	DoBen BIGINT DEFAULT 0,
-    Int1 BIGINT DEFAULT 0,
-	Atk1 BIGINT DEFAULT 0,
-	Def1 BIGINT DEFAULT 0,
-	Hpx1 BIGINT DEFAULT 0,
-	Spx1 BIGINT DEFAULT 0,
-	Agi1 BIGINT DEFAULT 0,
-	Fai1 BIGINT DEFAULT 0,
-    Int2 BIGINT DEFAULT 0,
-	Atk2 BIGINT DEFAULT 0,
-	Def2 BIGINT DEFAULT 0,
-	Hpx2 BIGINT DEFAULT 0,
-	Spx2 BIGINT DEFAULT 0,
-	Agi2 BIGINT DEFAULT 0,
-	Fai2 BIGINT DEFAULT 0,
-    Hp BIGINT DEFAULT 0,
-	Sp BIGINT DEFAULT 0,
-	`Long` BIGINT DEFAULT 0,
-	GiatriLong BIGINT DEFAULT 0,
-	Khang BIGINT DEFAULT 0,
-    Thuoctinh BIGINT DEFAULT 0,
-	GiatriThuoctinh BIGINT DEFAULT 0,
-	Loai BIGINT DEFAULT 0,
-	Texp BIGINT DEFAULT 0,
-    PRIMARY KEY (player_id, Slot)
-) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
+-- LuuLang (storage) — REMOVED: no runtime caller ever read or wrote it;
+-- the storage pouch lives in Session memory only (wire op 0x1766).
 
 -- Pet.
 CREATE TABLE IF NOT EXISTS pet (
@@ -222,40 +194,9 @@ CREATE TABLE IF NOT EXISTS skillsave (
     PRIMARY KEY (player_id, ID)
 ) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
 
--- TienTrang (storage), Trangbi (equip), Tuideo (other pouch).
-CREATE TABLE IF NOT EXISTS tientrang (
-    player_id BIGINT NOT NULL,
-    Slot BIGINT NOT NULL,
-    Id BIGINT DEFAULT 0,
-	`Count` BIGINT DEFAULT 0,
-	Lv BIGINT DEFAULT 0,
-	DoBen BIGINT DEFAULT 0,
-    Int1 BIGINT DEFAULT 0,
-	Atk1 BIGINT DEFAULT 0,
-	Def1 BIGINT DEFAULT 0,
-	Hpx1 BIGINT DEFAULT 0,
-	Spx1 BIGINT DEFAULT 0,
-	Agi1 BIGINT DEFAULT 0,
-	Fai1 BIGINT DEFAULT 0,
-    Int2 BIGINT DEFAULT 0,
-	Atk2 BIGINT DEFAULT 0,
-	Def2 BIGINT DEFAULT 0,
-	Hpx2 BIGINT DEFAULT 0,
-	Spx2 BIGINT DEFAULT 0,
-	Agi2 BIGINT DEFAULT 0,
-	Fai2 BIGINT DEFAULT 0,
-    Hp BIGINT DEFAULT 0,
-	Sp BIGINT DEFAULT 0,
-	`Long` BIGINT DEFAULT 0,
-	GiatriLong BIGINT DEFAULT 0,
-	Khang BIGINT DEFAULT 0,
-    Thuoctinh BIGINT DEFAULT 0,
-	GiatriThuoctinh BIGINT DEFAULT 0,
-	Loai BIGINT DEFAULT 0,
-	Texp BIGINT DEFAULT 0,
-    PRIMARY KEY (player_id, Slot)
-) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
-
+-- Trangbi (equip). TienTrang / Tuideo — REMOVED: no runtime caller ever
+-- read or wrote them; the pouches live in Session memory only
+-- (wire ops 0x1E01 / 0x172F).
 CREATE TABLE IF NOT EXISTS trangbi (
     player_id BIGINT NOT NULL,
     Slot      BIGINT NOT NULL,
@@ -265,39 +206,6 @@ CREATE TABLE IF NOT EXISTS trangbi (
 	DoBen BIGINT DEFAULT 0,
     Int1 BIGINT DEFAULT 0,
 	Atk1 BIGINT DEFAULT 0, 
-	Def1 BIGINT DEFAULT 0,
-	Hpx1 BIGINT DEFAULT 0,
-	Spx1 BIGINT DEFAULT 0,
-	Agi1 BIGINT DEFAULT 0,
-	Fai1 BIGINT DEFAULT 0,
-    Int2 BIGINT DEFAULT 0,
-	Atk2 BIGINT DEFAULT 0,
-	Def2 BIGINT DEFAULT 0,
-	Hpx2 BIGINT DEFAULT 0,
-	Spx2 BIGINT DEFAULT 0,
-	Agi2 BIGINT DEFAULT 0,
-	Fai2 BIGINT DEFAULT 0,
-    Hp BIGINT DEFAULT 0,
-	Sp BIGINT DEFAULT 0,
-	`Long` BIGINT DEFAULT 0,
-	GiatriLong BIGINT DEFAULT 0,
-	Khang BIGINT DEFAULT 0,
-    Thuoctinh BIGINT DEFAULT 0,
-	GiatriThuoctinh BIGINT DEFAULT 0,
-	Loai BIGINT DEFAULT 0,
-	Texp BIGINT DEFAULT 0,
-    PRIMARY KEY (player_id, Slot)
-) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
-
-CREATE TABLE IF NOT EXISTS tuideo (
-    player_id BIGINT NOT NULL,
-    Slot      BIGINT NOT NULL,
-    Id BIGINT DEFAULT 0,
-	`Count` BIGINT DEFAULT 0,
-	Lv BIGINT DEFAULT 0,
-	DoBen BIGINT DEFAULT 0,
-    Int1 BIGINT DEFAULT 0,
-	Atk1 BIGINT DEFAULT 0,
 	Def1 BIGINT DEFAULT 0,
 	Hpx1 BIGINT DEFAULT 0,
 	Spx1 BIGINT DEFAULT 0,

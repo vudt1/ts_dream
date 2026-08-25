@@ -22,7 +22,7 @@ pub async fn load(pool: &MySqlPool, s: &mut Session) -> Result<bool, sqlx::Error
     row.into_session(s);
     load_skills(pool, s).await?;
     load_hotkeys(pool, s).await?;
-    for table in ["homdo", "trangbi", "tientrang", "tuideo", "luulang"] {
+    for table in ["homdo", "trangbi"] {
         assign_items(s, table, load_items(pool, id, table).await?);
     }
     load_pets(pool, s).await?;
@@ -31,13 +31,12 @@ pub async fn load(pool: &MySqlPool, s: &mut Session) -> Result<bool, sqlx::Error
 }
 
 /// Route a loaded item table into the matching `Session` slot field.
+/// TienTrang / Tuideo / LuuLang have no backing table anymore (usage audit,
+/// 0001_init.sql) — their Session pouches stay in-memory only.
 fn assign_items(s: &mut Session, table: &str, items: Vec<InventoryItem>) {
     match table {
         "homdo" => s.homdo = items,
         "trangbi" => s.trangbi = items,
-        "tientrang" => s.tientrang = items,
-        "tuideo" => s.tuideo = items,
-        "luulang" => s.luulang = items,
         _ => {}
     }
 }
@@ -45,18 +44,15 @@ fn assign_items(s: &mut Session, table: &str, items: Vec<InventoryItem>) {
 /// Delete a character and all of its per-player gameplay rows in one
 /// transaction (C# `PlayerDeleteDataId` + the per-table deletes, op 0x23 sub 2).
 ///
-/// Every statement is scoped by `player_id`. The `players` row and the nine
-/// gameplay tables (`homdo`, `trangbi`, `tientrang`, `tuideo`, `luulang`,
-/// `pet`, `quest`, `skill`, `skillsave`) are removed; the `accounts` row is
+/// Every statement is scoped by `player_id`. The `players` row and the six
+/// gameplay tables (`homdo`, `trangbi`, `pet`, `quest`, `skill`, `skillsave`)
+/// are removed; the `accounts` row is
 /// **not** touched (account identity outlives the character). Returns `false`
 /// when the character row did not exist.
 pub async fn delete_character(pool: &MySqlPool, player_id: i64) -> Result<bool, sqlx::Error> {
-    const TABLES: [&str; 9] = [
+    const TABLES: [&str; 6] = [
         "homdo",
         "trangbi",
-        "tientrang",
-        "tuideo",
-        "luulang",
         "pet",
         "quest",
         "skill",
