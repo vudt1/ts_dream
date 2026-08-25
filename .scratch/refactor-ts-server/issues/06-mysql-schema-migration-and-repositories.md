@@ -4,10 +4,10 @@
 
 **Blocked by:** 02 — Standardized Domain Codecs (ThingData, Player, Battle)
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] Tạo file migration `migrations/0002_modern_schema.sql` định nghĩa đầy đủ các bảng: `accounts`, `characters`, `character_money`, `inventories` (composite PK: `char_id, storage_type, slot`), `character_pets` (storage_type 1..4), `character_skills`, `character_hotkeys`, `character_missions`, `character_mission_flags`, `character_bit_flags`, `character_completed_events`, `friends`, `mails`.
-- [ ] Bảo toàn cấu trúc tên nhân vật và text dưới dạng `VARCHAR(...) CHARACTER SET latin1 COLLATE latin1_bin`.
-- [ ] Xây dựng các Rust Repository Traits: `AccountRepository`, `CharacterRepository`, `InventoryRepository`, `PetRepository`, `QuestRepository`.
-- [ ] Cung cấp các thao tác transaction nguyên tử cho P2P Trade, Shop Buy, Bank Transfer.
-- [ ] Unit/Integration tests kiểm tra CRUD và transaction trên môi trường test database.
+- [x] Tạo file migration `migrations/0002_modern_schema.sql` định nghĩa đầy đủ các bảng: `accounts`, `characters`, `character_money`, `inventories` (composite PK: `char_id, storage_type, slot`), `character_pets` (storage_type 1..4), `character_skills`, `character_hotkeys`, `character_missions`, `character_mission_flags`, `character_bit_flags`, `character_completed_events`, `friends`, `mails`.
+- [x] Bảo toàn cấu trúc tên nhân vật và text dưới dạng `VARCHAR(...) CHARACTER SET latin1 COLLATE latin1_bin`.
+- [x] Xây dựng các Rust Repository Traits: `AccountRepository`, `CharacterRepository`, `InventoryRepository`, `PetRepository`, `QuestRepository`.
+- [x] Cung cấp các thao tác transaction nguyên tử cho P2P Trade, Shop Buy, Bank Transfer.
+- [x] Unit/Integration tests kiểm tra CRUD và transaction trên môi trường test database.

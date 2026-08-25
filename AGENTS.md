@@ -67,6 +67,7 @@ ts_dream/
     │   ├── players.rs          # Truy vấn/transaction players + bảng gameplay + item_code
     │   ├── persist.rs          # Ghi-through players/skills/items/pets (no-op khi Option<&Pool> là None)
     │   └── item_code.rs        # Nhận mã quà (item_code), degrade khi không có DB
+    │   └── modern/             # Schema 3NF (ticket 06): models + repository traits + MySQL impls + transactions nguyên tử (trade/shop/bank)
     ├── protocol/               # Bộ mã hóa/giải mã XOR 0xAD, phân tách khung tin
     │   ├── mod.rs              # Tổ chức module protocol
     │   ├── frame.rs            # Phân tách khung tin (Frame F4 44)

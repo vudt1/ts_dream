@@ -23,6 +23,7 @@ pub mod data {
 pub mod db {
     pub mod accounts;
     pub mod item_code;
+    pub mod modern;
     pub mod persist;
     pub mod players;
     pub mod pool;

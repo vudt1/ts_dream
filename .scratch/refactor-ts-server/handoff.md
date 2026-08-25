@@ -22,7 +22,7 @@ Toàn bộ ràng buộc cốt lõi của TS PC được bảo toàn 100%:
 | [`03`](.scratch/refactor-ts-server/issues/03-binary-dat-reader-and-loaders.md) | **Binary Dat Reader and Data Loaders** | **COMPLETED ✅** | 14 tests pass 100% (`tests/data.rs`), 9 .Dat loaders |
 | [`04`](.scratch/refactor-ts-server/issues/04-eve-emg-container-loader.md) | **Eve.emg Container Parser & Models** | **COMPLETED ✅** | 15 integration tests (`tests/data.rs`) + unit tests (`src/data/loaders/eve.rs`), đọc container 9.8 MB `Data/eve.emg` (3,823 scene entries) |
 | [`05`](.scratch/refactor-ts-server/issues/05-eve-script-engine-and-auto-chain.md) | **4-Tier Eve Script Engine** | **COMPLETED ✅** | 47 tests pass 100% (`tests/eve_engine.rs`), `src/eve/` (state/evaluator/resolver/group/auto_chain) |
-| [`06`](.scratch/refactor-ts-server/issues/06-mysql-schema-migration-and-repositories.md) | **MySQL Schema 3NF & Repositories** | **READY (Unblocked)** | Unblocked by 02 completion |
+| [`06`](.scratch/refactor-ts-server/issues/06-mysql-schema-migration-and-repositories.md) | **MySQL Schema 3NF & Repositories** | **COMPLETED ✅** | 12 tests (`tests/db_repositories.rs`, unit luôn chạy; integration DB gate qua `TS_TEST_DB_URL`), `migrations/0002_modern_schema.sql` + `src/db/modern/` |
 | [`07`](.scratch/refactor-ts-server/issues/07-two-tier-dispatcher-and-modular-handlers.md) | **Two-Tier Dispatcher & Handlers** | **QUEUED** | Blocked by 01, 02, 05, 06 |
 | [`08`](.scratch/refactor-ts-server/issues/08-test-migration-and-csharp-comment-cleanup.md) | **Test Migration & C# Cleanup** | **QUEUED** | Blocked by 07 |
 | [`09`](.scratch/refactor-ts-server/issues/09-documentation-and-domain-updates.md) | **Documentation & Domain Updates** | **QUEUED** | Blocked by 08 |
@@ -85,10 +85,16 @@ Toàn bộ ràng buộc cốt lõi của TS PC được bảo toàn 100%:
 
 Ticket đang ở trạng thái **UNBLOCKED / READY TO IMPLEMENT**:
 
-### Triển khai Ticket 06 — `06-mysql-schema-migration-and-repositories.md`
-- **Mục tiêu**: Thiết kế schema MySQL 3NF và repository layer tích hợp cấu trúc 35-byte `ThingData`:
-  - Migration SQL: bảng `inventories` (character_id, storage_type, slot, item_id, ... 20 cột ThingData), `characters`, `character_pets` (4 kho tướng).
-  - Repositories: `CharacterRepository`, `InventoryRepository`, `PetRepository`.
+### Triển khai Ticket 07 — `07-two-tier-dispatcher-and-modular-handlers.md`
+- **Mục tiêu**: Level-1 dispatcher theo Opcode chính + 36 handler module chuyên trách (Level-2 phân nhánh Subcode), `ResponseSender` abstraction, wire vào `EveAutoChainEngine` (ticket 05) và repository layer (ticket 06).
+
+### Thành phẩm mới sau Ticket 06 (`migrations/0002_modern_schema.sql`, `src/db/modern/`)
+- **Migration 3NF**: `characters` (accounts 1:N), `character_money`, `inventories` (hợp nhất 5 bảng túi đồ; composite PK `(character_id, storage_type, slot)`; storage_type 1=Bag, 2=Secondary, 4=Bank, 8=Equip, 16=Warehouse; đủ 20 cột ThingData), `character_pets` (4 kho: 1=Tùy thân, 2=Mã xa, 3=Khách sạn, 4=Kho), `character_skills`, `character_hotkeys`, `character_missions`, `character_mission_flags`, `character_bit_flags`, `character_completed_events`, `friends`, `mails`. Toàn bộ text giữ `latin1_bin`; không FK (parity legacy).
+- **Models** (`model.rs`): `StorageType`, `PetStorageType`, `InventorySlot` (ThingData-backed), `Money`, `SkillRow`, `MissionRow`, `PetRecord`.
+- **Traits** (`traits.rs`): `AccountRepository`, `CharacterRepository`, `InventoryRepository`, `PetRepository`, `QuestRepository` — async fn native, static dispatch.
+- **MySQL impls** (`mysql/`): `MySqlRepositories` bundle; HEX-compare cho password/name VISCII byte-exact; upsert/clear slot zero toàn bộ cột.
+- **Transactions** (`transactions.rs`): `bank_transfer` (guard `gold/bank_gold >= cost` ngay trong UPDATE), `shop_buy`, `p2p_trade` — mỗi op 1 transaction nguyên tử, trả `TxError::{InsufficientFunds, SourceSlotEmpty, DestinationSlotOccupied}`.
+- **Tests** (`tests/db_repositories.rs`): 4 unit tests chạy mọi nơi + 8 integration tests tự skip khi thiếu MySQL; bật bằng `TS_TEST_DB_URL=mysql://root:...@localhost:3306/ts_dream_test cargo test --test db_repositories`. Lưu ý: migration SQL chưa từng chạy trên MySQL thật trong môi trường dev (không có server); lần boot đầu với DB live sẽ xác nhận.
 
 ### Thành phẩm mới sau Ticket 05 (`src/eve/`)
 - `state.rs`: `PlayerEventState` snapshot + `EveStateBuilder` (build_player_state / find_fallback_talk / is_within_range).
