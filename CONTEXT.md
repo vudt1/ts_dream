@@ -103,16 +103,65 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
   - `HpMax/Spmax` tính từ stat **gốc** (trước bonus) với mapping `getPetHpMax` (rb 0/1→`getHpMax(0)`, rb 2→`getHpMax(1)`).
   - Phát broadcast map `0F02`/`0F01` + `SendStatusPet` + `06001301` + `2C01`; guards fail → silent.
 
-### Max HP (HpMax)
-- **Định nghĩa**: Thuật ngữ chuẩn chỉ HP tối đa. Lưu ý: codebase dùng nhiều cách viết — C# in-memory `_My_HpMax`, hằng DB `_Hpmax`, Rust `hp_max` — tất cả đều là **Max HP (HpMax)**.
+### ThingData (Dữ liệu Vật phẩm Chuẩn hóa 35 Bytes)
+- **Định nghĩa**: Cấu trúc nhị phân 35-byte đại diện toàn diện cho một vật phẩm (Item) trong game TS Online theo chuẩn Mobile & PC. Bao gồm 20 trường thuộc tính: mã vật phẩm (`id`), số lượng (`count`), chỉ số sát thương (`damage`), kháng cự (`defend`), hệ thuộc tính (`element`), ngọc khảm (`gem`), cấp cường hóa (`enhance`), cấp linh vũ khí (`grow`), thời gian hết hạn (`delete_time` theo chuẩn OADate), trạng thái khóa (`is_lock`), thuộc tính phụ (`attribute`), cấp tinh luyện (`refine`), độ bền (`durability`), cùng các đặc tính dòng ngọc và tẩy luyện.
+- **Ràng buộc (Invariants)**: Kích thước mã hóa nhị phân luôn cố định đúng 35 bytes (`THING_DATA_SIZE = 35`).
 
-### Item / Inventory (Vật phẩm & Túi đồ)
-- **Định nghĩa**: Trang bị, vật phẩm tiêu hao hoặc nguyên liệu do Nhân vật sở hữu trong túi đồ (Inventory) hoặc rương lưu trữ (Storage).
+### 4 Kho Võ Tướng (Four Pet Storage Tiers)
+- **Định nghĩa**: 4 phân vùng lưu trữ Sủng vật / Võ tướng của một Nhân vật trong hệ thống `character_pets` với `storage_type`:
+  1. `Follow` (Tùy thân): Tối đa 4 võ tướng mang theo bên mình có thể xuất chiến (slot 1..4).
+  2. `Cart` (Mã xa / Xe kéo): Tối đa 4 võ tướng đi kèm xe (slot 1..4).
+  3. `Inn` (Khách sạn): Tối đa 30 võ tướng lưu giữ tại quán trọ (slot 1..30).
+  4. `Warehouse` (Kho võ tướng): Tối đa 150 võ tướng lưu trữ trong kho mở rộng (slot 1..150).
+- **Ràng buộc (Invariants)**: Khi chuyển đổi giữa các kho lưu trữ, toàn bộ chỉ số, kỹ năng, cấp độ, số lần ăn linh đơn và reborn của võ tướng được bảo toàn nguyên vẹn.
+
+### Eve Script Engine & State Machine (Động cơ Kịch bản & Máy trạng thái Sự kiện)
+- **Định nghĩa**: Bounded Context thực thi toàn bộ kịch bản tương tác thế giới (hội thoại NPC, câu hỏi trắc nghiệm, cổng dịch chuyển Door, trận đấu nhiệm vụ Fight, trao thưởng) dựa trên dữ liệu container nhị phân `eve.emg` (3,800+ scenes).
+- **4 Tầng Ưu tiên (4-Tier Chain Resolution)**: Khi một NPC hoặc vị trí có nhiều nhánh kịch bản thỏa mãn điều kiện:
+  1. `Highest Quest Step`: Nhánh có bước nhiệm vụ cao nhất được ưu tiên hàng đầu.
+  2. `Longest Condition Chain`: Nhánh có nhiều điều kiện ràng buộc nhất (độ đặc thù cao hơn).
+  3. `Result Count`: Nhánh có nhiều hành động kết quả hơn.
+  4. `Declaration Order`: Thứ tự khai báo trong scene.
+- **Eve Auto-Chain & Loop Protection**: Động cơ tự động nối tiếp chuỗi sự kiện với 4 lớp bảo vệ chống treo/lặp vô hạn:
+  1. `Same Condition Guard`: Ngắt nếu vòng lặp lặp lại cùng một điều kiện kiểm tra.
+  2. `Re-Question Guard`: Ngắt nếu câu hỏi trắc nghiệm hiển thị lặp lại mà không có tương tác mới.
+  3. `Re-Battle Guard`: Ngắt nếu cùng một trận đấu bị kích hoạt lặp liên tục.
+  4. `Duplicate Item Guard`: Ngắt nếu trao trùng vật phẩm đặc biệt trong cùng một phiên chuỗi.
+- **Event Phase (Các giai đoạn của Máy trạng thái Sự kiện)**:
+  - `Idle`: Không có kịch bản nào đang diễn ra.
+  - `Dialogue`: Đang hiển thị thoại NPC hoặc chuỗi câu thoại.
+  - `Question`: Đang chờ người chơi lựa chọn đáp án câu hỏi / menu.
+  - `Battle`: Đang diễn ra trận đấu nhiệm vụ do Eve Script kích hoạt.
+  - `Completed`: Hoàn thành kịch bản, trao phần thưởng và cập nhật trạng thái cờ.
+
+### Mission & MissionFlags / BitFlags (Hệ thống Nhiệm vụ & Cờ Trạng thái)
+- **Định nghĩa**: Mô hình dữ liệu quản lý tiến trình nhiệm vụ và thế giới của người chơi:
+  - `Mission`: Cặp `(mission_id, step)` lưu bước tiến độ hiện tại của từng tuyến nhiệm vụ.
+  - `MissionFlags`: Các cờ đánh dấu tạm thời phục vụ rẽ nhánh trong nhiệm vụ.
+  - `BitFlags (Forever Flags)`: Mảng bit đánh dấu vĩnh viễn các sự kiện lịch sử thế giới mà người chơi đã từng hoàn thành một lần trong đời (chống nhận lại phần thưởng hoặc lặp lại cốt truyện một lần).
+  - `RoleCounts`: Bộ đếm số lần tương tác / đánh bại các vai trò hoặc NPC cụ thể.
+  - `CompletedEvents`: Danh sách mã sự kiện đã hoàn tất.
+
+### ResponseSender (Bộ Đóng Gói Phản Hồi Nghiệp Vụ)
+- **Định nghĩa**: Lớp bao bọc abstraction ở tầng Server Handlers đóng gói các thông điệp phản hồi gửi về Client (`send_bag_items`, `send_equipment_items`, `send_storage_items`, `send_dialog_talk`, `end_talk`, `send_stat_update`, `send_hp_sp_updates`, `broadcast`). Tách biệt hoàn toàn tầng nghiệp vụ khỏi việc định dạng và nối chuỗi byte thô.
+
+### PlayerStateManager (Bộ Quản Lý Trạng Thái Người Chơi)
+- **Định nghĩa**: Dịch vụ miền (Domain Service) thread-safe quản lý toàn bộ trạng thái sống in-memory của người chơi đang online: HP, SP, chỉ số cơ bản, chỉ số trang bị cộng thêm, trạng thái biến thân và định vị. Đảm bảo tính toán chỉ số chiến đấu và biến động máu/mana diễn ra tức thì không bị nghẽn I/O.
+
+### TradeSystem (Hệ thống Giao Dịch Hai Pha)
+- **Định nghĩa**: Domain Engine thực thi giao dịch an toàn 2-phase atomic giữa hai người chơi:
+  - Khóa đồng thời phiên giao dịch của 2 người chơi theo thứ tự ID ổn định (chống deadlock).
+  - Kiểm tra trước chỗ trống (probe-first) đối với túi đồ và võ tướng của cả hai bên.
+  - Hoán đổi tài sản (vật phẩm, võ tướng, tiền vàng) nguyên tử; tự động hoàn trả (rollback) trọn vẹn nếu có sự cố ngắt kết nối hoặc hủy giao dịch.
+
+### AutoSave (Dịch vụ Tự Động Lưu Trữ Nền)
+- **Định nghĩa**: Tiến trình nền (Background Task) chạy định kỳ mỗi 3 phút trong Tokio runtime, sử dụng thuật toán băm FNV-1a để phát hiện những phiên người chơi có trạng thái biến động (dirty state: vàng, HP/SP, chỉ số, túi đồ, võ tướng, nhiệm vụ) và thực hiện ghi vào MySQL theo từng Transaction nguyên tử.
 
 ### Map & Spatial Position (Bản đồ & Tọa độ)
 - **Định nghĩa**: Không gian tọa độ thế giới game nơi các Nhân vật di chuyển, tương tác với NPC và kích hoạt các sự kiện/trận đấu.
 
 ### Web Admin Dashboard (Hệ thống Quản trị Web)
 - **Định nghĩa**: Bounded Context vận hành & giám sát (Operations) cho phép Quản trị viên theo dõi số lượng người chơi online, xem log gói tin realtime (SSE) và điều khiển trạng thái server (Start/Stop).
+
 
 
