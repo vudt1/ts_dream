@@ -29,14 +29,14 @@ Tái cấu trúc toàn diện Game Server TS Dream (Rust) dựa trên mô hình 
 ## Implementation Tickets (Tracked in issues/)
 
 - [01 — Binary Packet Reader and Writer](issues/01-binary-packet-reader-writer.md) (Completed ✅)
-- [02 — Standardized Domain Codecs](issues/02-domain-codecs-thingdata-player-battle.md) (Unblocked - Frontier)
+- [02 — Standardized Domain Codecs](issues/02-domain-codecs-thingdata-player-battle.md) (Completed ✅)
 - [03 — Binary Dat Reader and Data Loaders](issues/03-binary-dat-reader-and-loaders.md) (Completed ✅)
 - [04 — Eve.emg Container Parser and Script Models](issues/04-eve-emg-container-loader.md) (Completed ✅)
 - [05 — 4-Tier Eve Script Engine and Auto-Chain Resolver](issues/05-eve-script-engine-and-auto-chain.md) (Completed ✅)
 - [06 — MySQL Schema Migration 3NF and Repository Layer](issues/06-mysql-schema-migration-and-repositories.md) (Completed ✅)
 - [07 — Two-Tier Dispatcher and Modular Handlers](issues/07-two-tier-dispatcher-and-modular-handlers.md) (Completed ✅)
 - [08 — Test Suite Migration and Legacy C# Comment Cleanup](issues/08-test-migration-and-csharp-comment-cleanup.md) (Completed ✅)
-- [09 — Documentation and Domain Updates](issues/09-documentation-and-domain-updates.md) (Blocked by 08)
+- [09 — Documentation and Domain Updates](issues/09-documentation-and-domain-updates.md) (Completed ✅)
 
 ## Out of scope
 

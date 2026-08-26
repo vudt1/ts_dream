@@ -25,7 +25,7 @@ Toàn bộ ràng buộc cốt lõi của TS PC được bảo toàn 100%:
 | [`06`](.scratch/refactor-ts-server/issues/06-mysql-schema-migration-and-repositories.md) | **MySQL Schema 3NF & Repositories** | **COMPLETED ✅** | 12 tests (`tests/db_repositories.rs`, unit luôn chạy; integration DB gate qua `TS_TEST_DB_URL`), `migrations/0002_modern_schema.sql` + `src/db/modern/` |
 | [`07`](.scratch/refactor-ts-server/issues/07-two-tier-dispatcher-and-modular-handlers.md) | **Two-Tier Dispatcher & Handlers** | **COMPLETED ✅** | 18 tests (`tests/handlers_test.rs`), `response.rs` / `player_state.rs` / `trade_system.rs` / `auto_save.rs` / `handlers/npc_event.rs`; golden suite vẫn pass 100% |
 | [`08`](.scratch/refactor-ts-server/issues/08-test-migration-and-csharp-comment-cleanup.md) | **Test Migration & C# Cleanup** | **COMPLETED ✅** | 331 unit tests chuyển khỏi `src/` vào 6 tệp `tests/` chuyên trách; 431 tests pass 100%, clippy 0 warning, golden pass |
-| [`09`](.scratch/refactor-ts-server/issues/09-documentation-and-domain-updates.md) | **Documentation & Domain Updates** | **UNBLOCKED / READY** | Unblocked — 08 completed |
+| [`09`](.scratch/refactor-ts-server/issues/09-documentation-and-domain-updates.md) | **Documentation & Domain Updates** | **COMPLETED ✅** | Cập nhật cấu trúc thư mục & testing guide trong `AGENTS.md`, mở rộng từ điển DDD trong `CONTEXT.md`, map.md hoàn tất 9/9 tickets |
 
 ---
 
