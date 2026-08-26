@@ -1,12 +1,12 @@
-//! Doll summon, dice items, special frames, sleep, full-heal and no-op ids —
-//! C# case 15 (`Client.cs:4718-4889`). Runs after `rewards`, before the
-//! point-books / party-buff / potion tail in `mod.rs`.
+//! Doll summon, dice items, special frames, sleep, full-heal and no-op ids.
+//! Runs after `rewards`, before the point-books / party-buff / potion tail in
+//! `mod.rs`.
 
 use super::UseCtx;
 use crate::db::persist;
 use crate::protocol::encoder;
 
-/// Dice items (C# 46048/46049/46173/46174): `Random.Next(1,6)` then broadcast
+/// Dice items (46048/46049/46173/46174): roll 1..=6 then broadcast
 /// `F44407001737` + id + num.
 async fn dice(ctx: &mut UseCtx<'_>) {
     let n = ctx.rng.next_range(1, 6);
@@ -19,7 +19,7 @@ async fn dice(ctx: &mut UseCtx<'_>) {
 }
 
 /// Doll summon frame `F44408000505` + id + le16(npcid) + `F444040017091301F4440200170F`
-/// (C# 48001-48097; the trailing `1301` is a fixed slot/count the client reads).
+/// (doll family 48001-48097; the trailing `1301` is a fixed slot/count the client reads).
 fn doll_frame(ctx: &UseCtx<'_>, npc_id: u16) -> String {
     format!(
         "F44408000505{}{}F444040017091301F4440200170F",
@@ -33,13 +33,13 @@ pub async fn handle(ctx: &mut UseCtx<'_>) -> bool {
     let id = ctx.id;
     let pid = ctx.conn.session.id;
 
-    // --- No-op ids (C# breaks to the shared `text17` tail, no consume). ---
+    // --- No-op ids (fall through to the shared end-feedback tail, no consume). ---
     if matches!(id, 46013 | 46014 | 46015 | 46042 | 46091) {
         ctx.end_feedback();
         return true;
     }
 
-    // --- Sleep item 46036 (C# `Sleep()` + consume). ---
+    // --- Sleep item 46036 (+ consume). ---
     if id == 46036 {
         ctx.sleep().await;
         ctx.consume().await;
@@ -73,7 +73,7 @@ pub async fn handle(ctx: &mut UseCtx<'_>) -> bool {
         return true;
     }
 
-    // --- Full-heal 46068 (C#: pet Hp/Sp to max + player Hp/Sp to max). ---
+    // --- Full-heal 46068 (pet + player Hp/Sp to max). ---
     if id == 46068 {
         let stt = ctx.use_type;
         let snap = ctx
@@ -123,7 +123,7 @@ pub async fn handle(ctx: &mut UseCtx<'_>) -> bool {
             .unwrap_or(0);
         ctx.out.send(doll_frame(ctx, npc));
         ctx.consume().await;
-        // C# stat boost: Int2+20, Hpx2+200, Spx2+200, Hpmax+200, Spmax+200
+        // Stat boost: Int2+20, Hpx2+200, Spx2+200, Hpmax+200, Spmax+200
         // (Hpmax/Spmax writes are silent — no stat packet).
         ctx.conn.session.int2 = ctx.conn.session.int2.saturating_add(20);
         ctx.conn.session.hpx2 = ctx.conn.session.hpx2.saturating_add(200);

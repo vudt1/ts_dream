@@ -3,7 +3,7 @@
 //!
 //! The .NET `Random` PRNG uses a 56-element int array with a specific
 //! seeding and generation algorithm. We replicate its exact output sequence
-//! so that the Rust port is RNG-parity with the C# server.
+//! so that the server stays RNG-parity with the reference implementation.
 
 /// A .NET-compatible `System.Random` implementation.
 ///
@@ -90,7 +90,8 @@ impl DotNetRandom {
         ret
     }
 
-    /// `Random.Next()` — returns a non-negative random integer.
+    /// Returns a non-negative random integer.
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> i32 {
         self.internal_sample()
     }
@@ -127,6 +128,7 @@ pub struct BattleRng {
 
 impl BattleRng {
     /// Create three independent time-seeded streams.
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
             random_0: DotNetRandom::time_seeded(),
@@ -142,52 +144,5 @@ impl BattleRng {
             random_1: DotNetRandom::new(s1),
             random_2: DotNetRandom::new(s2),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn deterministic_seed() {
-        let mut r1 = DotNetRandom::new(42);
-        let mut r2 = DotNetRandom::new(42);
-        for _ in 0..100 {
-            assert_eq!(r1.next(), r2.next());
-        }
-    }
-
-    #[test]
-    fn next_range_bounds() {
-        let mut r = DotNetRandom::new(123);
-        for _ in 0..1000 {
-            let v = r.next_range(5, 10);
-            assert!(v >= 5 && v < 10, "value {} out of [5,10)", v);
-        }
-    }
-
-    #[test]
-    fn next_max_bounds() {
-        let mut r = DotNetRandom::new(456);
-        for _ in 0..1000 {
-            let v = r.next_max(7);
-            assert!(v >= 0 && v < 7, "value {} out of [0,7)", v);
-        }
-    }
-
-    #[test]
-    fn three_streams_independent() {
-        let rng = BattleRng::with_seeds(1, 2, 3);
-        // Each stream should produce different sequences
-        let mut r0 = rng.random_0.clone();
-        let mut r1 = rng.random_1.clone();
-        let mut r2 = rng.random_2.clone();
-        let v0 = r0.next();
-        let v1 = r1.next();
-        let v2 = r2.next();
-        // Different seeds should give different first values
-        assert_ne!(v0, v1);
-        assert_ne!(v1, v2);
     }
 }

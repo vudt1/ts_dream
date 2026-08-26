@@ -12,7 +12,7 @@
 //!   grid, `manager.spawn` it, register the participants, and push the
 //!   `0BFA` start frames.
 //! - op 0x32 handlers call `submit_command`.
-//! - when the task ends, `battle_ended` runs `BattleQuestWin` for the leader if
+//! - when the task ends, `battle_ended` runs the quest-win progression for the leader if
 //!   a quest talk is pending and the players won, then cleans up.
 
 use crate::battle::construction::{Battle, StartPacket};
@@ -132,8 +132,8 @@ impl BattleSink for BattleSinkImpl {
     }
 
     fn apply_respawn(&self, npc_id: i64, map_id: i64, x: i64, y: i64) {
-        // Map-wide respawn broadcast (C# `Server.SendToAllMapid`,
-        // TheBattle.cs:3209/4722): `F44406001603` + le16(id) + `0A00` +
+        // Map-wide respawn broadcast to every online client on the npc's
+        // map: `F44406001603` + le16(id) + `0A00` +
         // `F44408001605` + le16(id) + le16(x) + le16(y), to every online
         // client on the npc's map.
         let frame = format!(
@@ -271,7 +271,7 @@ fn push(online: &tokio::sync::RwLock<OnlineMap>, player: i64, frame: String) {
 }
 
 /// Send `frame` to every online player whose session sits on `map_id`
-/// (C# `Server.SendToAllMapid` — includes the sender's own map). Shared by the
+/// (includes the sender's own map). Shared by the
 /// walk loop's wander/chase fan-out and the battle respawn broadcast.
 fn send_to_map(online: &tokio::sync::RwLock<OnlineMap>, map_id: i64, frame: String) {
     if let Ok(online) = online.try_read() {
@@ -356,12 +356,12 @@ pub struct BattleService {
     world: Option<Arc<std::sync::RwLock<NpcWorld>>>,
     /// Synchronous handle registry for sync handler access (op 0x32, join).
     handles: Mutex<HashMap<i32, BattleHandle>>,
-    /// Pre-rendered join cell records per battle id (the C# join loop renders
-    /// the grid; the grid lives in the async task, so we capture it at spawn).
+    /// Pre-rendered join cell records per battle id (the grid lives in the
+    /// async task, so we capture it at spawn).
     join_cells: Mutex<HashMap<i32, (i32, String)>>,
     per_exp: i64,
     next_battle: AtomicI32,
-    /// Per-turn input wait (default 21 s, mirrors the C# ≤21s poll).
+    /// Per-turn input wait (default 21 s).
     input_timeout: std::time::Duration,
 }
 
@@ -456,12 +456,21 @@ impl BattleService {
         }
     }
 
+    /// Whether any players are still registered as battle participants.
+    pub fn has_members(&self) -> bool {
+        self.sink
+            .members
+            .lock()
+            .map(|m| !m.is_empty())
+            .unwrap_or(false)
+    }
+
     /// The next battle id (dedicated counter; `BattleManager` is shared).
     pub fn next_battle_id(&self) -> i32 {
         self.next_battle.fetch_add(1, Ordering::SeqCst)
     }
 
-    /// Start an NPC battle (`TheBattle(leader, npcId, onMap, 112)`).
+    /// Start an NPC battle.
     ///
     /// Returns the new battle id, or 0 if the NPC template is missing.
     pub fn start_npc_battle(&self, session: &mut Session, npc_id: i64, npc_on_map_id: i64) -> i32 {
@@ -511,7 +520,7 @@ impl BattleService {
         )
     }
 
-    /// Start a PK battle (`TheBattle(leader, opponent, 112)`).
+    /// Start a PK battle.
     pub fn start_pk_battle(&self, session: &mut Session, opponent: i64) -> i32 {
         let opp = {
             let online = match self.online.try_read() {
@@ -656,7 +665,7 @@ impl BattleService {
 
     /// Build the op 0x0B sub-4 join frame: `0BFA` + LE16(diahinh) + `0402` +
     /// self record + the 20 grid cell records (captured at spawn).
-    fn build_join_frame(&self, session: &Session, battle_id: i32) -> String {
+    pub fn build_join_frame(&self, session: &Session, battle_id: i32) -> String {
         let cells = self
             .join_cells
             .lock()
@@ -749,7 +758,7 @@ impl BattleService {
         Some(s.battle_id)
     }
 
-    /// The designated quan-su member's `Int + Int2` sum (C# `IL_caac` `num108`),
+    /// The designated quan-su member's `Int + Int2` sum,
     /// resolved from the online registry at battle spawn. `0` when no QS is
     /// designated or the member is offline.
     fn leader_qs_int(&self, session: &Session) -> i64 {
@@ -787,7 +796,7 @@ impl BattleService {
     }
 
     /// Capture the grid cell records for join (op 0x0B sub 4) and add a battle
-    /// participant. Renders one per-cell record per the C# join loop.
+    /// participant. Renders one per-cell record per grid cell.
     fn record_join_cells(&self, id: i32, battle: &Battle) {
         let mut records = String::new();
         for key in &battle.keys {
@@ -870,7 +879,7 @@ impl BattleService {
         let lid = i64::from(session.id);
 
         // Snapshot the leader's quan-su designation for the per-turn SP regen
-        // block (C# reads it live from `Server.Clients`; this port snapshots).
+        // block (snapshotted rather than read live).
         battle.leader_id_qs = i64::from(session.id_qs);
         battle.leader_qs_int = self.leader_qs_int(session);
 
@@ -1008,246 +1017,5 @@ impl WorldSink for BattleService {
             diahinh: 4712,
         };
         self.start_teamdef_battle(&mut s, &trigger);
-    }
-}
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::data::tables::{Npc, Skill};
-    use crate::server::session::Session;
-
-    fn game_data() -> GameData {
-        let mut data = GameData::default();
-        data.npcs.insert(
-            9001,
-            Npc {
-                id: 9001,
-                lv: 1,
-                hp: 30,
-                sp: 30,
-                thuoctinh: 1,
-                atk: 1,
-                def: 1,
-                agi: 1,
-                int1: 1,
-                skill: [10000, 0, 0, 0],
-                ..Default::default()
-            },
-        );
-        data.skills.insert(
-            10000,
-            Skill {
-                id: 10000,
-                sp: 5,
-                lv_max: 10,
-                skill_type: 1,
-                do_manh: 10,
-                sl_danh: 1,
-                delay: 1000,
-                ..Default::default()
-            },
-        );
-        data
-    }
-
-    fn strong_session(id: u32) -> Arc<tokio::sync::RwLock<Session>> {
-        let s = Arc::new(tokio::sync::RwLock::new(Session::new()));
-        {
-            let mut s = s.try_write().expect("lock");
-            s.id = id;
-            s.level = 50;
-            s.hp = 5000;
-            s.hp_max = 5000;
-            s.sp = 500;
-            s.sp_max = 500;
-            s.atk = 300;
-            s.def = 50;
-            s.agi = 100;
-            s.int1 = 100;
-            s.hp_max = crate::battle::engine::get_hp_max(0, 0, 50, 6) as u16;
-            s.hp = s.hp_max;
-            s.skills.push((10000, 10));
-        }
-        s
-    }
-
-    /// Drain the receiver (up to 200 frames, up to 300 ms) and return them.
-    async fn drain(rx: &mut mpsc::UnboundedReceiver<String>) -> Vec<String> {
-        let mut out = Vec::new();
-        let mut collected = 0usize;
-        while collected < 200 {
-            match tokio::time::timeout(std::time::Duration::from_millis(1), rx.recv()).await {
-                Ok(Some(f)) => {
-                    out.push(f);
-                    collected += 1;
-                }
-                _ => break,
-            }
-        }
-        out
-    }
-
-    async fn wait_no_members(service: &Arc<BattleService>) {
-        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
-        while tokio::time::Instant::now() < deadline {
-            let empty = service
-                .sink
-                .members
-                .lock()
-                .map(|m| m.is_empty())
-                .unwrap_or(false);
-            if empty {
-                return;
-            }
-            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-        }
-        panic!("battle did not end in time");
-    }
-
-    #[tokio::test]
-    async fn npc_battle_runs_to_win_and_clears_members() {
-        let mut service = BattleService::new(Arc::new(game_data()));
-        service.set_input_timeout(std::time::Duration::from_millis(50));
-        let service = Arc::new(service);
-
-        let session = strong_session(300001);
-        let mut rx = service.register(300001, Arc::clone(&session));
-
-        let start_frames = {
-            let mut s = session.write().await;
-            service.start_npc_battle(&mut s, 9001, 11)
-        };
-        assert!(start_frames > 0);
-
-        // Actor command: leader at (3,2) basic-attacks the NPC at (0,2).
-        {
-            let cmd = BattleCommand {
-                row: 3,
-                col: 2,
-                skill_id: 10000,
-                skill_lv: 10,
-                row_attack: 0,
-                col_attack: 2,
-                use_item: 0,
-            };
-            let s = session.read().await;
-            assert!(service.submit_command(&s, cmd), "command accepted");
-        }
-
-        // The battle task ends; collect its frames.
-        wait_no_members(&service).await;
-        let frames = drain(&mut rx).await;
-
-        // Open board + turn-action frames are emitted (acting `F44404003505`
-        // is sent by the op 0x32 *handler*, not the battle task).
-        assert!(
-            frames.iter().any(|f| f.starts_with("F4441C000BFA")),
-            "open board frame expected: {frames:?}"
-        );
-        assert!(
-            frames.iter().any(|f| f.contains("3201")),
-            "turn-action frame expected"
-        );
-
-        // The participant's battle id was cleared and exit frames sent.
-        let s = session.read().await;
-        assert_eq!(s.battle_id, 0, "battle id cleared after end");
-        drop(s);
-    }
-
-    #[tokio::test]
-    async fn join_frame_has_24byte_cell_records() {
-        let mut service = BattleService::new(Arc::new(game_data()));
-        service.set_input_timeout(std::time::Duration::from_millis(50));
-        let service = Arc::new(service);
-
-        let session = strong_session(300001);
-        let mut rx = service.register(300001, Arc::clone(&session));
-        let battle_id = {
-            let mut s = session.write().await;
-            service.start_npc_battle_seeded(&mut s, 9001, 11, 1, 2, 3)
-        };
-        assert!(battle_id > 0);
-        // Build the join frame and verify the length header matches the payload.
-        let join = {
-            let s = session.read().await;
-            service.build_join_frame(&s, battle_id)
-        };
-        assert!(join.starts_with("F444"));
-        let len_bytes = encoder::u16_le(hex_u8(&join[4..6]), hex_u8(&join[6..8])) as usize;
-        let payload = &join[8..];
-        assert_eq!(
-            len_bytes,
-            payload.len() / 2,
-            "join frame length header must match payload (frame={join})"
-        );
-        // Payload = 0BFA + diahinh + 0402 + self(22B) + 20 × 24-byte cells.
-        assert_eq!(payload.len() / 2, 2 + 2 + 2 + 22 + 20 * 24);
-        let _ = rx.try_recv();
-        let _ = battle_id;
-    }
-
-    fn hex_u8(hex: &str) -> u8 {
-        u8::from_str_radix(hex, 16).unwrap()
-    }
-
-    #[tokio::test]
-    async fn battle_end_triggers_quest_win() {
-        let mut data = game_data();
-        data.talks.insert(
-            "12001:NPC:7:0".to_string(),
-            crate::data::tables::QuestDef {
-                map_id: 12001,
-                id: 7,
-                on_win: crate::data::tables::QuestResult {
-                    rewards: vec![(46001, 5, 0)],
-                    message: "Win".to_string(),
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
-        );
-        let mut service = BattleService::new(Arc::new(data));
-        service.set_input_timeout(std::time::Duration::from_millis(50));
-        let service = Arc::new(service);
-
-        let session = strong_session(300001);
-        {
-            let mut s = session.write().await;
-            s.map_id = 12001;
-            s.talking_battle = 7;
-        }
-        let mut rx = service.register(300001, Arc::clone(&session));
-
-        {
-            let mut s = session.write().await;
-            service.start_npc_battle(&mut s, 9001, 11);
-        }
-        {
-            let cmd = BattleCommand {
-                row: 3,
-                col: 2,
-                skill_id: 10000,
-                skill_lv: 10,
-                row_attack: 0,
-                col_attack: 2,
-                use_item: 0,
-            };
-            let s = session.read().await;
-            service.submit_command(&s, cmd);
-        }
-        wait_no_members(&service).await;
-        let frames = drain(&mut rx).await;
-
-        // Reward granted to the leader.
-        let s = session.read().await;
-        assert!(
-            s.homdo.iter().any(|i| i.id == 46001 && i.count == 5),
-            "quest reward item granted: {:?}",
-            s.homdo
-        );
-        // Red message frame emitted.
-        assert!(frames.iter().any(|f| f.contains("020B")));
-        assert_eq!(s.talking_battle, 0, "quest talk cleared");
     }
 }

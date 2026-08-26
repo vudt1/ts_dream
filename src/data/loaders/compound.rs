@@ -20,7 +20,7 @@ pub struct CompoundDatLoader;
 impl CompoundDatLoader {
     /// Load all compounding recipes from binary slice of `Compound.Dat`.
     pub fn load(bytes: &[u8]) -> Result<Vec<CompoundDef>> {
-        if bytes.len() % 8 != 0 {
+        if !bytes.len().is_multiple_of(8) {
             return Err(TsError::Data(format!(
                 "Invalid Compound.Dat length {} (not a multiple of 8)",
                 bytes.len()

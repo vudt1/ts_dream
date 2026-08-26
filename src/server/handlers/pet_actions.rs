@@ -1,18 +1,14 @@
 //! Pet actions (Opcode 0x0F), Pet stable (Opcode 0x1F), & Pet summon/recall (Opcode 0x13) handlers.
 //!
-//! Wire semantics follow the C# authority (`Client.cs:1776-2074`) — the ticket
-//! checklist names are NOT authoritative: the review corrected the subcode
-//! mapping:
+//! Subcode mapping (corrected during review — earlier checklist names were
+//! wrong):
 //!
-//! - `0x0F sub 3` / `0x1F sub 2`: **Stable → Roster** (take out of the stable;
-//!   `Client.cs:1790-1812, 6006-6028`). Request `packet[6]` names a stable
-//!   slot; the source row is `packet[6] + 4`.
+//! - `0x0F sub 3` / `0x1F sub 2`: **Stable → Roster** (take out of the stable).
+//!   Request `packet[6]` names a stable slot; the source row is `packet[6] + 4`.
 //! - `0x0F sub 7` / `0x1F sub 3`: **Roster → Stable** (store; has the
-//!   active-pet guard; `Client.cs:1814-1850, 6030-6064`). `packet[6]` is the
-//!   roster slot.
+//!   active-pet guard). `packet[6]` is the roster slot.
 //! - `0x0F sub 8` / `0x1F sub 4`: **swap** a stable slot (`packet[6]+4`) with a
-//!   roster slot (`packet[7]`); active-pet guard on the roster slot
-//!   (`Client.cs:1852-1878, 6068-6094`).
+//!   roster slot (`packet[7]`); active-pet guard on the roster slot.
 //!
 //! Every roster/stable mutation is a slot operation on the composite
 //! `(player_id, stt)` and also relocates the pet equipment (`trangbi`
@@ -27,19 +23,18 @@ use crate::server::session::{Conn, PetState};
 use sqlx::MySqlPool;
 
 /// True when `stt` lies in the player's fight roster (`1..=4`).
-fn is_roster(stt: u8) -> bool {
+pub fn is_roster(stt: u8) -> bool {
     ACTIVE_SLOTS.contains(&stt)
 }
 
-/// The next free slot in `[lo..=hi]`, mirroring the C# first-fit scans.
-fn find_free(pets: &[PetState], lo: u8, hi: u8) -> Option<u8> {
+/// The next free slot in `[lo..=hi]` (first-fit scan).
+pub fn find_free(pets: &[PetState], lo: u8, hi: u8) -> Option<u8> {
     let used: Vec<u8> = pets.iter().map(|p| p.stt).collect();
     (lo..=hi).find(|s| !used.contains(s))
 }
 
 /// Move one pet row + its six equipment slots to another slot (a pet only on
-/// the source side moves; two present rows keep the swap semantics of C#
-/// `Data.SwitchPet`).
+/// the source side moves; two present rows swap instead).
 fn move_pet_slot(conn: &mut Conn, from: u8, to: u8) {
     if let Some(pos) = conn.session.pets.iter().position(|p| p.stt == from) {
         conn.session.pets[pos].stt = to;
@@ -57,7 +52,7 @@ fn move_pet_slot(conn: &mut Conn, from: u8, to: u8) {
     }
 }
 
-/// Swap two pet slots + their pet equipment atomically (C# `Data.SwitchPet`).
+/// Swap two pet slots + their pet equipment atomically.
 ///
 /// When both slots hold a pet the two composite `(player_id, stt)` identities
 /// exchange (a one-way move would leave two pets sharing one `stt`); when only
@@ -141,7 +136,7 @@ pub async fn handle_pet_actions(ctx: &mut OpcodeCtx<'_>) {
             ctx.out.send(frame.clone());
             ctx.out.broadcast(ctx.conn.session.id, frame);
         }
-        // Sub 3: Stable → Roster (C# Client.cs:1790-1812).
+        // Sub 3: Stable → Roster.
         3 => {
             let src_stable = payload[0];
             let source_stt = src_stable + 4; // stable slot (client index + 4)
@@ -178,7 +173,7 @@ pub async fn handle_pet_actions(ctx: &mut OpcodeCtx<'_>) {
             ctx.out.send("F44402001F0C");
             persist_pet_state(ctx.env.pool, ctx.conn).await;
         }
-        // Sub 7: Roster → Stable (C# Client.cs:1814-1850).
+        // Sub 7: Roster → Stable.
         7 => {
             let stt = payload[0];
             if ctx.conn.session.active_pet_stt == stt {
@@ -204,7 +199,7 @@ pub async fn handle_pet_actions(ctx: &mut OpcodeCtx<'_>) {
             ctx.out.send("F44402001F09");
             persist_pet_state(ctx.env.pool, ctx.conn).await;
         }
-        // Sub 8: Swap stable ↔ roster (C# Client.cs:1852-1878).
+        // Sub 8: Swap stable ↔ roster.
         8 => {
             if payload.len() < 2 {
                 return;
@@ -270,7 +265,7 @@ pub async fn handle_pet_actions(ctx: &mut OpcodeCtx<'_>) {
             ctx.out.send(frame.clone());
             ctx.out.broadcast(ctx.conn.session.id, frame);
         }
-        // Sub 5: Unmount horse (only ack when mounted, Client.cs:1899-1905).
+        // Sub 5: Unmount horse (only ack when mounted).
         5 => {
             if ctx.conn.session.horse_pet_id == 0 {
                 return;
@@ -309,7 +304,7 @@ pub async fn handle_pet_actions(ctx: &mut OpcodeCtx<'_>) {
     }
 }
 
-/// Handle Opcode 0x1F — Pet stable menu (C# `Update_H1F`, Client.cs:6002-6097).
+/// Handle Opcode 0x1F — Pet stable menu.
 ///
 /// 0x1F sub 2/3/4 are the stable-menu equivalents of the 0x0F sub 3/7/8 flows;
 /// they must NOT be forwarded by numeric coincidence to the 0x0F handler.
@@ -327,7 +322,7 @@ pub async fn handle_pet_stable(ctx: &mut OpcodeCtx<'_>) {
 
 /// Handle Opcode 0x13 — Pet summon / recall.
 ///
-/// Out of battle (C# `Update_H13`, Client.cs:1926-1964): sub 1 requires the
+/// Out of battle: sub 1 requires the
 /// LE32 pet id, a roster slot (`stt <= 4`) and not being mounted; sub 2 only
 /// acknowledges when an active pet exists. In battle the owner battle task is
 /// the only authority for grid mutation (Ch2 §2.3.12); the handler stays quiet
@@ -374,167 +369,5 @@ pub async fn handle_pet_summon(ctx: &mut OpcodeCtx<'_>) {
                 .await;
         }
         _ => {}
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::battle::service::BattleService;
-    use crate::data::loader::GameData;
-    use crate::server::dispatcher::{test_ctx, HandleOutcome};
-    use crate::server::session::{Conn, InventoryItem, PetState};
-    use std::sync::Arc;
-
-    fn fixture() -> (Conn, GameData, BattleService) {
-        let mut conn = Conn::new();
-        conn.session.id = 300001;
-        conn.session.pets = vec![
-            PetState {
-                stt: 1,
-                id: 18001,
-                ..Default::default()
-            },
-            PetState {
-                stt: 5,
-                id: 18002,
-                ..Default::default()
-            },
-        ];
-        (
-            conn,
-            GameData::default(),
-            BattleService::new(Arc::new(GameData::default())),
-        )
-    }
-
-    #[test]
-    fn find_free_honors_range() {
-        let pets: Vec<PetState> = vec![PetState {
-            stt: 2,
-            ..Default::default()
-        }];
-        assert_eq!(find_free(&pets, 1, 4), Some(1));
-        let full: Vec<PetState> = (1..=4)
-            .map(|stt| PetState {
-                stt,
-                ..Default::default()
-            })
-            .collect();
-        assert_eq!(find_free(&full, 1, 4), None);
-    }
-
-    #[tokio::test]
-    async fn sub3_stable_to_roster_moves_pet() {
-        let (mut conn, data, service) = fixture();
-        let mut out = HandleOutcome::default();
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 3, &[1]);
-        handle_pet_actions(&mut ctx).await;
-
-        assert!(
-            conn.session
-                .pets
-                .iter()
-                .any(|p| p.id == 18002 && is_roster(p.stt)),
-            "pet moved into a free roster slot"
-        );
-        assert!(out.outgoing.iter().any(|f| f.contains("1F06")));
-    }
-
-    #[tokio::test]
-    async fn sub7_roster_to_stable_guards_active() {
-        let (mut conn, data, service) = fixture();
-        conn.session.active_pet_stt = 1;
-        let mut out = HandleOutcome::default();
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 7, &[1]);
-        handle_pet_actions(&mut ctx).await;
-        // Active pet cannot be stored: red message + `F44402001F09`, no move.
-        assert!(out.outgoing.iter().any(|f| f.ends_with("1F09")));
-        assert!(
-            conn.session.pets.iter().any(|p| p.id == 18001 && p.stt == 1),
-            "active pet must not move to the stable"
-        );
-    }
-
-    #[tokio::test]
-    async fn sub7_non_active_roster_to_stable_moves() {
-        let (mut conn, data, service) = fixture();
-        // Only the 18001 roster pet is active-able; store pet 18001 (stt 1).
-        let mut out = HandleOutcome::default();
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 7, &[1]);
-        handle_pet_actions(&mut ctx).await;
-        assert!(out.outgoing.iter().any(|f| f.starts_with("F44407000F02")));
-        assert!(
-            conn.session.pets.iter().any(|p| p.id == 18001 && p.stt >= 5),
-            "roster pet stored into the stable"
-        );
-    }
-
-    #[tokio::test]
-    async fn summon_requires_roster() {
-        let (mut conn, data, service) = fixture();
-        conn.session.pets.push(PetState {
-            stt: 5,
-            id: 15001,
-            ..Default::default()
-        });
-        let mut out = HandleOutcome::default();
-        // 15001 (0x3A99) is in the stable — LE32 request must be rejected.
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[0x99, 0x3A, 0, 0]);
-        handle_pet_summon(&mut ctx).await;
-        assert!(out.outgoing.is_empty());
-    }
-
-    #[tokio::test]
-    async fn summon_le32_picks_active() {
-        let (mut conn, data, service) = fixture();
-        let mut out = HandleOutcome::default();
-        // 18001 (0x4651) LE32.
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[0x51, 0x46, 0, 0]);
-        handle_pet_summon(&mut ctx).await;
-        assert_eq!(conn.session.active_pet_stt, 1);
-        assert!(out.outgoing[0].contains("1301"));
-    }
-
-    #[tokio::test]
-    async fn sub8_swap_exchanges_occupied_slots() {
-        // Both the stable slot (5) and the roster slot (1) hold a pet: the swap
-        // must exchange the composite `(player_id, stt)` identities — never
-        // leave two pets sharing one `stt` (ticket 17 review, C# SwitchPet).
-        let (mut conn, data, service) = fixture(); // stt 1 = 18001, stt 5 = 18002
-        conn.session.trangbi.push(InventoryItem {
-            slot: 11,
-            id: 9001,
-            ..Default::default()
-        });
-        conn.session.trangbi.push(InventoryItem {
-            slot: 51,
-            id: 9002,
-            ..Default::default()
-        });
-        let mut out = HandleOutcome::default();
-        // payload: stable index 1 (-> stt 5), roster slot 1.
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 8, &[1, 1]);
-        handle_pet_actions(&mut ctx).await;
-
-        let at_roster = conn.session.pets.iter().find(|p| p.stt == 1).map(|p| p.id);
-        let at_stable = conn.session.pets.iter().find(|p| p.stt == 5).map(|p| p.id);
-        assert_eq!(at_roster, Some(18002), "stable pet moved into the roster");
-        assert_eq!(at_stable, Some(18001), "roster pet moved into the stable");
-        // Equipment relocated with their owners.
-        let eq = |slot: u8| {
-            conn.session
-                .trangbi
-                .iter()
-                .find(|i| i.slot == slot)
-                .map(|i| i.id)
-        };
-        assert_eq!(eq(51), Some(9001), "roster pet's gear moved to pet stt 5");
-        assert_eq!(eq(11), Some(9002), "stable pet's gear moved to pet stt 1");
-        // No two pets share one `stt`.
-        let mut stts: Vec<u8> = conn.session.pets.iter().map(|p| p.stt).collect();
-        stts.sort_unstable();
-        stts.dedup();
-        assert_eq!(stts.len(), conn.session.pets.len());
     }
 }

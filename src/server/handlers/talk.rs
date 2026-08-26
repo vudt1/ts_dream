@@ -2,8 +2,8 @@
 //!
 //! Identity rules (ticket 18 review):
 //! - **Map Object ID** (`map_object_id` = `idtalking`): the on-map instance
-//!   from the H1 request (LE16). It keys `Data_Talks`/quests and is embedded in
-//!   the special NPC packets (C# writes `idtalking.ToString("X2")`).
+//!   from the H1 request (LE16). It keys `Data_Talks`/quests and is embedded
+//!   hex-encoded in the special NPC packets.
 //! - **NPC Template ID** (`npc_id`): resolved `(map, map_object_id) →
 //!   NpcOnMap.NpcId`. The H1/H6 **special** branches (banker/inn/`16012`) are
 //!   selected on this id, never on the object id.
@@ -16,7 +16,7 @@ use crate::server::handlers::stats::build_stat_update;
 use crate::server::session::Conn;
 use sqlx::MySqlPool;
 
-/// EndTalk packet + reset the whole talk context (C# `EndTalk`, Client.cs:7919-7925).
+/// EndTalk packet + reset the whole talk context.
 pub fn end_talk(conn: &mut Conn, out: &mut HandleOutcome) {
     out.send("F44402001408");
     conn.session.idtalking = 0;
@@ -25,8 +25,8 @@ pub fn end_talk(conn: &mut Conn, out: &mut HandleOutcome) {
     conn.session.warp_finish = false;
 }
 
-/// Split a dialog hex string on `F444` and emit each fragment 500 ms apart
-/// (C# `TalkMessages`, FTalk.cs:3439-3454). Frame order is preserved.
+/// Split a dialog hex string on `F444` and emit each fragment 500 ms apart.
+/// Frame order is preserved.
 pub fn talk_messages(conn: &mut Conn, talk_string: &str, out: &mut HandleOutcome) {
     for part in talk_string.split("F444") {
         if !part.is_empty() {
@@ -56,7 +56,7 @@ pub async fn handle_talk(ctx: &mut OpcodeCtx<'_>) {
     }
 }
 
-/// H1 identity + distance gate (FTalk.cs:69-112).
+/// H1 identity + distance gate.
 ///
 /// The `(map, object)` row MUST exist (its NPC template id drives the special
 /// branches and its position the ±150 distance test); a talk to a missing
@@ -88,8 +88,8 @@ fn handle_talk_start(conn: &mut Conn, payload: &[u8], data: &GameData, out: &mut
     };
     conn.session.idnpctalking = template_id;
 
-    // Special template ids embed the map object id (`idtalking.ToString("X2")`).
-    // Distance gate applies before the special payload (FTalk.cs:77-102).
+    // Special template ids embed the map object id (hex-encoded).
+    // Distance gate applies before the special payload.
     if matches!(template_id, 16080 | 16004 | 16011 | 16015) {
         if !in_range {
             end_talk(conn, out);
@@ -118,7 +118,7 @@ fn handle_talk_start(conn: &mut Conn, payload: &[u8], data: &GameData, out: &mut
         return;
     }
 
-    // Generic dialog: the distance gate still applies (FTalk.cs:69-112).
+    // Generic dialog: the distance gate still applies.
     if !in_range {
         end_talk(conn, out);
         return;
@@ -153,7 +153,7 @@ async fn handle_talk_continue(
     pool: Option<&MySqlPool>,
     out: &mut HandleOutcome,
 ) {
-    // H6 pre-dispatch guards (FTalk.cs:272-294).
+    // H6 pre-dispatch guards.
     if conn.session.warp_finish {
         out.send("F44402000504");
         out.send("F44402001408");
@@ -223,7 +223,7 @@ async fn handle_talk_continue(
         return;
     }
 
-    // NPC 16015 — inn + `method_2(10)` gift.
+    // NPC 16015 — inn + gift item x2.
     if template == 16015 {
         match conn.session.select_menu {
             30 => out.send("F44411001401000000010603010000000000000200"),
@@ -281,89 +281,5 @@ fn handle_talk_warp(conn: &mut Conn, payload: &[u8], data: &GameData, out: &mut 
 fn handle_talk_select_menu(conn: &mut Conn, payload: &[u8]) {
     if !payload.is_empty() {
         conn.session.select_menu = payload[0] as i32;
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::battle::service::BattleService;
-    use crate::data::tables::NpcOnMap;
-    use crate::server::dispatcher::test_ctx;
-    use std::sync::Arc;
-
-    fn talk_fixture(npc_id: i64) -> (Conn, GameData, BattleService) {
-        let mut conn = Conn::new();
-        conn.session.id = 300001;
-        conn.session.map_id = 10817;
-        conn.session.map_x = 400;
-        conn.session.map_y = 500;
-        let mut data = GameData::default();
-        data.npc_on_map.push(NpcOnMap {
-            map_id: 10817,
-            id: 6,
-            npc_id,
-            x: 401,
-            y: 501,
-            ..Default::default()
-        });
-        (
-            conn,
-            data,
-            BattleService::new(Arc::new(GameData::default())),
-        )
-    }
-
-    #[tokio::test]
-    async fn test_talk_start_banker_resolves_template() {
-        let (mut conn, data, service) = talk_fixture(16080);
-        let mut out = crate::server::dispatcher::HandleOutcome::default();
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[0x06, 0x00]);
-        handle_talk(&mut ctx).await;
-        assert_eq!(conn.session.idtalking, 6);
-        assert_eq!(conn.session.idnpctalking, 16080);
-        assert_eq!(out.outgoing[0], "F44402000602");
-        assert_eq!(
-            out.outgoing[1],
-            "F44411001401000000010603060000000000000100"
-        );
-    }
-
-    #[tokio::test]
-    async fn test_talk_out_of_range_ends() {
-        let (mut conn, data, service) = talk_fixture(16080);
-        conn.session.map_x = 999;
-        conn.session.map_y = 999;
-        let mut out = crate::server::dispatcher::HandleOutcome::default();
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[0x06, 0x00]);
-        handle_talk(&mut ctx).await;
-        assert_eq!(out.outgoing, vec!["F44402001408"]);
-        assert_eq!(conn.session.idtalking, 0);
-    }
-
-    #[tokio::test]
-    async fn test_talk_missing_instance_rejected() {
-        // A talk to an on-map id that has NO row is rejected (EndTalk), per the
-        // ticket 18 review "reject missing/out-of-range" rule.
-        let (mut conn, data, service) = talk_fixture(16080);
-        // Object id 99 is not in `npc_on_map` (only object 6 is registered).
-        let mut out = crate::server::dispatcher::HandleOutcome::default();
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[0x63, 0x00]);
-        handle_talk(&mut ctx).await;
-        assert_eq!(conn.session.idtalking, 0);
-        assert_eq!(out.outgoing, vec!["F44402001408"]);
-    }
-
-    #[tokio::test]
-    async fn test_talk_end_resets_context() {
-        let (mut conn, data, service) = talk_fixture(16080);
-        conn.session.idtalking = 6;
-        conn.session.select_menu = 30;
-        let mut out = crate::server::dispatcher::HandleOutcome::default();
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 4, &[]);
-        handle_talk(&mut ctx).await;
-        assert_eq!(conn.session.idtalking, 0);
-        assert_eq!(conn.session.select_menu, 0);
-        assert_eq!(out.outgoing, vec!["F44402001408"]);
     }
 }

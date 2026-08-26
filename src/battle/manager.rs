@@ -2,7 +2,7 @@
 //!
 //! One battle runs on its own `tokio::spawn` task. Player commands (op 0x32)
 //! arrive through a per-battle `mpsc` channel; the task collects them each turn
-//! (with a timeout, mirroring the C# ≤21 s poll), runs the deterministic
+//! (with a per-turn timeout, default ≤21 s), runs the deterministic
 //! `Battle::run_turn`, and dispatches every `runner::Out` through a `BattleSink`.
 //! The grid + RNG live only inside the task, so battle state is race-free.
 
@@ -51,7 +51,7 @@ impl BattleHandle {
     }
 }
 
-/// The registry of live battles (mirrors C# `Server.TheBattles` + `IdBattleCount`).
+/// The registry of live battles (id assignment precedes increment).
 pub struct BattleManager {
     battles: RwLock<HashMap<i32, BattleHandle>>,
     next_id: AtomicI32,
@@ -73,7 +73,7 @@ impl BattleManager {
         }
     }
 
-    /// The next battle id (`IdBattleCount++`; assigns before increment).
+    /// The next battle id (assigns before increment).
     pub fn next_id(&self) -> i32 {
         self.next_id.fetch_add(1, Ordering::SeqCst)
     }
@@ -265,133 +265,5 @@ fn dispatch(out: &[Out], sink: &dyn BattleSink) {
             } => sink.apply_respawn(*npc_id, *map_id, *x, *y),
             PetExp { owner, stt, exp } => sink.apply_pet_exp(*owner, *stt, *exp),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::battle::construction::Battle;
-    use crate::battle::runner::Out;
-
-    #[derive(Default)]
-    struct RecordingSink;
-
-    impl BattleSink for RecordingSink {
-        fn send_to(&self, _p: i64, _f: String) {}
-        fn send_map(&self, _p: i64, _f: String) {}
-        fn broadcast(&self, _f: String) {}
-        fn apply_db(&self, _u: DbUpdate) {}
-        fn apply_drop(&self, _d: Out) {}
-        fn apply_catch(&self, _o: i64, _n: i64) {}
-        fn apply_fled(&self, _p: i64) {}
-        fn apply_respawn(&self, _n: i64, _m: i64, _x: i64, _y: i64) {}
-        fn apply_pet_exp(&self, _o: i64, _s: i64, _e: i64) {}
-        fn battle_ended(&self, _id: i32, _outcome: Outcome) {}
-    }
-
-    fn skill(id: i64) -> Skill {
-        Skill {
-            id,
-            sp: 5,
-            thuoctinh: 1,
-            lv_max: 10,
-            skill_type: 1,
-            do_manh: 10,
-            sl_danh: 1,
-            combo: 0,
-            delay: 10,
-            ..Default::default()
-        }
-    }
-
-    fn npc(id: i64) -> Npc {
-        Npc {
-            id,
-            lv: 5,
-            hp: 200,
-            sp: 50,
-            thuoctinh: 1,
-            atk: 5,
-            def: 5,
-            agi: 5,
-            int1: 5,
-            skill: [10000, 0, 0, 0],
-            ..Default::default()
-        }
-    }
-
-    fn build_battle() -> Battle {
-        let mut battle = Battle::with_seeds(1, 112, 11, 22, 33);
-        let mut session = crate::server::session::Session::new();
-        session.id = 300001;
-        session.level = 10;
-        session.hp = 5_000;
-        session.hp_max = 5_000;
-        session.sp = 200;
-        session.sp_max = 200;
-        session.atk = 200;
-        session.def = 30;
-        session.agi = 60;
-        session.int1 = 40;
-        battle.add_player(&session, 300001, 3, 2);
-        battle.add_npc(&npc(9001), 1, 0, 2, 3);
-        battle
-    }
-
-    #[tokio::test]
-    async fn manager_runs_battle_to_win() {
-        let mut skills = HashMap::new();
-        skills.insert(10000, skill(10000));
-        let npcs = {
-            let mut m = HashMap::new();
-            m.insert(9001, npc(9001));
-            m
-        };
-        let items = HashMap::new();
-        let pets = HashMap::new();
-        let players = HashMap::new();
-        let texps = crate::data::texps::compute_texps();
-
-        let manager = Arc::new(BattleManager::new());
-        let sink = Arc::new(RecordingSink::default());
-        let handle = manager.spawn_timeout(
-            build_battle(),
-            Arc::new(npcs),
-            Arc::new(skills),
-            Arc::new(items),
-            Arc::new(pets),
-            Arc::new(players),
-            Arc::new(texps),
-            1,
-            None,
-            0,
-            0,
-            std::time::Duration::from_millis(50),
-            sink,
-        );
-        // Submit the basic-attack command; then the task should run to a win.
-        handle.command(PlayerInput {
-            player: 300001,
-            cmd: BattleCommand {
-                row: 3,
-                col: 2,
-                skill_id: 10000,
-                skill_lv: 1,
-                row_attack: 0,
-                col_attack: 2,
-                use_item: 0,
-            },
-        });
-
-        // Wait for the battle to be removed from the registry (task finished).
-        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
-        while tokio::time::Instant::now() < deadline {
-            if manager.len().await == 0 {
-                return;
-            }
-            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-        }
-        panic!("battle task did not finish in time");
     }
 }

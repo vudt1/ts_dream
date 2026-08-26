@@ -92,30 +92,3 @@ impl AppState {
         let _ = self.broadcast.send(event);
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn db_status_as_str_mapping() {
-        assert_eq!(DbStatus::Connecting.as_str(), "light");
-        assert_eq!(DbStatus::Connected.as_str(), "green");
-        assert_eq!(DbStatus::Disconnected.as_str(), "dark");
-    }
-
-    #[test]
-    fn app_state_new_starts_connecting() {
-        assert_eq!(AppState::new(0).db_status, DbStatus::Connecting);
-    }
-
-    #[tokio::test]
-    async fn db_status_broadcast_delivers_to_subscriber() {
-        let state = AppState::new(0);
-        let mut rx = state.db_status_tx.subscribe();
-        let tx = state.db_status_tx.clone();
-        tx.send(DbStatus::Connected).unwrap();
-        let got = rx.recv().await.expect("subscriber should receive status");
-        assert_eq!(got, DbStatus::Connected);
-    }
-}

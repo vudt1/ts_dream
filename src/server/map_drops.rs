@@ -1,10 +1,10 @@
-//! Map item drops (C# `Data.ItemDropOnMap` / `PickupItemOnMap`).
+//! Map item drops.
 //!
 //! Thrown items (`op 0x17` sub 3 → `HomdoDropItem`) land on the shared map
 //! registry and are recovered by any player within pickup range (`op 0x17`
-//! sub 2). The registry is server-global exactly like the C# static
-//! `ItemDropOnMap` dictionary (keyed by `(map_id, slot)`); golden replay and
-//! unit tests drive it through the exported helpers directly.
+//! sub 2). The registry is server-global and keyed by `(map_id, slot)`;
+//! golden replay and integration tests drive it through the exported helpers
+//! directly, each suite owning a disjoint `map_id` band.
 
 use crate::server::session::InventoryItem;
 use std::collections::HashMap;
@@ -36,10 +36,10 @@ pub fn drop(map_id: u16, slot: u8, item: InventoryItem, x: u16, y: u16) {
     );
 }
 
-/// Allocate a free drop slot (1..=255) for a map, mirroring C# `HomdoDropItem`
-/// (`Data.cs:3511-3562`) which scans ascending and takes the first empty slot.
+/// Allocate a free drop slot (1..=255) for a map, mirroring the legacy
+/// throw-item flow which scans ascending and takes the first empty slot.
 /// Returns `None` when the map has no free slot (the drop is refused and the
-/// item stays in the player's bag, matching the C# `num3 > 255` return).
+/// item stays in the player's bag).
 pub fn allocate(map_id: u16, item: InventoryItem, x: u16, y: u16) -> Option<u8> {
     let mut reg = registry().lock().unwrap();
     for slot in 1..=255u8 {
@@ -68,31 +68,20 @@ pub fn take(map_id: u16, slot: u8) -> Option<DropItem> {
     registry().lock().unwrap().remove(&(map_id, slot))
 }
 
-/// Clear every drop (test/restart aid).
-pub fn clear_all() {
-    registry().lock().unwrap().clear();
+/// Clear every drop on one map.
+///
+/// Idempotent per-map reset. Tests that seed drops must clean up with this
+/// scoped reset (or targeted [`take`] calls) instead of [`clear_all`], which
+/// wipes every map's entries and races with parallel tests that own their own
+/// map ids.
+pub fn clear_map(map_id: u16) {
+    registry()
+        .lock()
+        .unwrap()
+        .retain(|(m, _), _| *m != map_id);
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn drop_take_and_get() {
-        clear_all();
-        let item = InventoryItem {
-            id: 1001,
-            count: 2,
-            ..Default::default()
-        };
-        drop(12001, 3, item.clone(), 400, 500);
-        let got = get(12001, 3).unwrap();
-        assert_eq!(got.item.id, 1001);
-        assert_eq!(got.item.count, 2);
-        assert_eq!(got.map_x, 400);
-        let taken = take(12001, 3).unwrap();
-        assert_eq!(taken.item.id, 1001);
-        assert!(get(12001, 3).is_none());
-        clear_all();
-    }
+/// Clear every drop on every map (restart aid; wipes all maps at once).
+pub fn clear_all() {
+    registry().lock().unwrap().clear();
 }

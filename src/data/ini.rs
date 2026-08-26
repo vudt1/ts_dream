@@ -5,7 +5,7 @@
 //! 2. Section & key matching is case-insensitive (`[OnWin]` vs query "ONWIN").
 //! 3. Value buffer capped at 1024 chars.
 //! 4. `Dialogs=` hex forwarded verbatim.
-//! 5. `[OnLose]` WarpTo read from ONWIN (C# copy-paste bug).
+//! 5. `[OnLose]` WarpTo read from ONWIN (a quirk the spec keeps).
 
 /// Maximum value buffer length (GetPrivateProfileString cap).
 pub const VALUE_CAP: usize = 1024;
@@ -86,40 +86,5 @@ impl Ini {
 
     pub fn sections(&self) -> &[String] {
         &self.sections
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn absent_key_is_nothing() {
-        let ini = Ini::parse("[BASE]\nMapId=1\n");
-        assert_eq!(ini.get("BASE", "Missing"), NOTHING);
-        assert_eq!(ini.get_raw("BASE", "Missing"), None);
-    }
-
-    #[test]
-    fn case_insensitive_section_key() {
-        let ini = Ini::parse("[OnWin]\nWarpTo=5\n");
-        assert_eq!(ini.get("onwin", "warpto"), "5");
-        assert_eq!(ini.get("ONWIN", "WARPTO"), "5");
-    }
-
-    #[test]
-    fn on_lose_warpto_reads_onwin() {
-        // [OnLose] WarpTo must read from ONWIN — a C# bug the spec keeps.
-        let ini = Ini::parse("[OnWin]\nWarpTo=99");
-        assert_eq!(ini.get("ONLOSE", "WarpTo"), NOTHING); // absent -> sentinel
-                                                          // Executor must replicate the bug by reading ONWIN for OnLose.WarpTo.
-        assert_eq!(ini.get("ONWIN", "WarpTo"), "99");
-    }
-
-    #[test]
-    fn value_capped() {
-        let long = "x".repeat(5000);
-        let ini = Ini::parse(&format!("[S]\nK={}", long));
-        assert_eq!(ini.get_raw("S", "K").unwrap().len(), VALUE_CAP);
     }
 }

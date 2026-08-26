@@ -5,7 +5,7 @@
 //! bytes; UTF-8 mojibake (Npcs/Items) is reversed back to VISCII car-by-char.
 //!
 //! Garble exceptions are replicated bug-for-bug so the Rust output diffs
-//! byte-exactly against captured C# traffic (Chapter 4 §4.3/§4.6).
+//! byte-exactly against captured traffic (Chapter 4 §4.3/§4.6).
 
 use std::collections::HashMap;
 
@@ -121,10 +121,10 @@ pub fn to_viscii(s: &str) -> Vec<u8> {
     s.chars().map(|c| char_to_viscii(c as u32, &map)).collect()
 }
 
-/// The VISCII byte→Unicode table used for display (TextEncoder.cs:15-42), the
-/// 102-entry table imported character-for-character, plus the `0xD0→Đ`,
-/// `0xDD→Đ` additions from smethod_17. Bytes outside the table fall back to
-/// Latin-1 pass-through (`(char)byte`), exactly like `convertToUniCode`.
+/// The VISCII byte→Unicode table used for display: the 102-entry table
+/// imported character-for-character, plus the `0xD0→Đ`, `0xDD→Đ` additions.
+/// Bytes outside the table fall back to Latin-1 pass-through (`(char)byte`),
+/// matching the original decoder.
 pub fn viscii_to_unicode(byte: u8) -> char {
     match byte {
         0x02 => '\u{1EB2}', // Ẳ
@@ -204,7 +204,7 @@ pub fn viscii_to_unicode(byte: u8) -> char {
         0xCB => '\u{1EBA}', // Ẻ
         0xCE => '\u{0128}', // Ĩ
         0xCF => '\u{1EF3}', // ỳ
-        0xD0 => 'Đ',        // smethod_17 addition
+        0xD0 => 'Đ',        // extended-table addition
         0xD1 => '\u{1EE9}', // ứ
         0xD5 => '\u{1EA1}', // ạ
         0xD6 => '\u{1EF7}', // ỷ
@@ -212,7 +212,7 @@ pub fn viscii_to_unicode(byte: u8) -> char {
         0xD8 => '\u{1EED}', // ử
         0xDB => '\u{1EF9}', // ỹ
         0xDC => '\u{1EF5}', // ỵ
-        0xDD => 'Đ',        // smethod_17 addition
+        0xDD => 'Đ',        // extended-table addition
         0xDE => '\u{1EE1}', // ỡ
         0xDF => '\u{01B0}', // ư
         0xE4 => '\u{1EA3}', // ả
@@ -235,15 +235,15 @@ pub fn viscii_to_unicode(byte: u8) -> char {
     }
 }
 
-/// Unicode→VISCII search alphabet (`@string` in smethod_17).
+/// Unicode→VISCII search alphabet.
 const SM17_UNI: &str = "áàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖƠỚỜỞỠÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ";
 
-/// Unicode→VISCII encode alphabet (`str` in smethod_17) — the VISCII byte for
-/// each `SM17_UNI` position, as Latin-1 chars. Same length as `SM17_UNI`.
+/// Unicode→VISCII encode alphabet — the VISCII byte for each `SM17_UNI`
+/// position, as Latin-1 chars. Same length as `SM17_UNI`.
 const SM17_ENC: &str = "áàäãÕå¡¢ÆÇ£â¤¥¦ç§éèë¨©êª«¬\u{ad}®íìïî¸óòöõ÷ô¯°±²µ½¾¶·ÞþúùüûøßÑ×ØæñýÏÖÛÜðÁÀÄÃÁÅ\u{81}‚AAƒÂ„…†\u{06}‡ÉÈËˆ‰ÊŠ‹Œ\u{8d}ÊÍÌ›Î˜ÓÒ???Ô\u{8f}\u{90}‘’´•–—³ÚÙœ\u{9d}Ú¿º»¼ÿ¹ÝŸ???Ð";
 
 /// `viscii_encode(s)` — server-authored Unicode → VISCII bytes, byte-exact
-/// with the C# positional table `smethod_17` (Class5.cs:420-462). Each char's
+/// with the original positional table. Each char's
 /// position in `SM17_UNI` picks the Latin-1 / VISCII byte in `SM17_ENC`;
 /// unmapped chars pass through (their low byte), and `\r`/`\n` are preserved
 /// verbatim.
@@ -267,7 +267,7 @@ pub fn viscii_encode(s: &str) -> Vec<u8> {
 
 /// A record's wire-name garble override (Chapter 4 §4.3/§4.6).
 ///
-/// When a mojibake name contains a codepoint > 0xFF the C# `smethod_13` emits
+/// When a mojibake name contains a codepoint > 0xFF the legacy emitter wrote
 /// it as `AscW(ch).ToString("X2")` — a 4-digit group that the 2-byte-at-a-time
 /// hex parser turns into **2 garbage bytes**, or a 3-digit group (only `ă`
 /// U+0103 exists in the data) that **aborts the whole packet**. Bug-for-bug
@@ -275,14 +275,15 @@ pub fn viscii_encode(s: &str) -> Vec<u8> {
 /// carries this override verbatim.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct GarbleSpec {
-    /// Exact hex string the C# server emits for this name on the wire.
+    /// Exact hex string emitted for this name on the wire.
     pub hex: String,
-    /// True when the C# hex→bytes parser aborts (odd group) — the caller must
+    /// True when the hex→bytes parser aborts (odd group) — the caller must
     /// drop the whole packet.
     pub abort: bool,
 }
 
-/// Compute the C# `smethod_13` wire hex for a mojibake name string.
+/// Compute the wire hex for a mojibake name string (wide chars emit 4-digit
+/// groups, min 2 digits otherwise).
 ///
 /// Returns `None` for names whose codepoints are all ≤ 0xFF (the 99.9%
 /// case — their wire hex equals the clean VISCII bytes). Otherwise the exact
@@ -320,102 +321,5 @@ pub fn name_wire_hex(clean: &[u8], garble: &Option<GarbleSpec>) -> Option<String
                 .map(|b| format!("{:02X}", b))
                 .collect::<String>(),
         ),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn mojibake_roundtrip_simple() {
-        // "D¤u Ch¤m Höi" = VISCII 44 A4 75 20 43 68 A4 6D 20 48 F6 69
-        let s = "D¤u Ch¤m Höi";
-        let v = to_viscii(s);
-        assert_eq!(
-            v,
-            vec![0x44, 0xA4, 0x75, 0x20, 0x43, 0x68, 0xA4, 0x6D, 0x20, 0x48, 0xF6, 0x69]
-        );
-    }
-
-    #[test]
-    fn cp1252_punct_maps_back() {
-        // „ U+201E -> byte 0x84
-        assert_eq!(to_viscii("„"), vec![0x84]);
-        // † U+2020 -> 0x86
-        assert_eq!(to_viscii("†"), vec![0x86]);
-    }
-
-    #[test]
-    fn unmappable_anh_normalized() {
-        // single genuine ă U+0103 -> VISCII 0xE5
-        assert_eq!(to_viscii("ă"), vec![0xE5]);
-    }
-
-    #[test]
-    fn ascii_passthrough() {
-        assert_eq!(to_viscii("TSVN"), b"TSVN".to_vec());
-    }
-
-    #[test]
-    fn garble_two_garbage_bytes() {
-        // §4.6 item 18973 "Thái „t binh pháp": „ U+201E -> "201E" -> bytes 20 1E.
-        let g = compute_garble("Thái „t binh pháp").expect("garble name");
-        assert!(!g.abort);
-        assert_eq!(g.hex, "5468E16920201E742062696E68207068E170");
-        assert_eq!(
-            name_wire_hex(b"", &Some(g.clone())).as_deref(),
-            Some("5468E16920201E742062696E68207068E170")
-        );
-    }
-
-    #[test]
-    fn garble_aborts_on_three_digit_group() {
-        // §4.6 item 48101 "BB Thái Văn C½ 3": ă U+0103 -> "103" (3 digits) aborts.
-        let g = compute_garble("BB Thái Văn C½ 3").expect("garble name");
-        assert!(g.abort);
-        assert_eq!(g.hex, "4242205468E16920561036E2043BD2033");
-        assert_eq!(name_wire_hex(b"", &Some(g)), None);
-    }
-
-    #[test]
-    fn garble_none_for_clean_names() {
-        // Item 10000 "D¤u Ch¤m Höi" — all codepoints ≤ 0xFF → no override.
-        assert_eq!(compute_garble("D¤u Ch¤m Höi"), None);
-        assert_eq!(name_wire_hex(&[0x44, 0xA4], &None).as_deref(), Some("44A4"));
-    }
-
-    #[test]
-    fn viscii_display_full_table() {
-        // TextEncoder.cs: 0xA4 = ấ, 0xE5 = ă, 0xF6 = ỏ, 0xD0/0xDD = Đ (smethod_17).
-        assert_eq!(viscii_to_unicode(0xA4), 'ấ');
-        assert_eq!(viscii_to_unicode(0xE5), 'ă');
-        assert_eq!(viscii_to_unicode(0xF6), 'ỏ');
-        assert_eq!(viscii_to_unicode(0xD0), 'Đ');
-        assert_eq!(viscii_to_unicode(0xDD), 'Đ');
-        assert_eq!(viscii_to_unicode(0x84), 'Ấ'); // VISCII 0x84 = Ấ (upper)
-        assert_eq!(viscii_to_unicode(0x41), 'A');
-        // Fallback = Latin-1 pass-through for bytes outside the 102-entry table.
-        assert_eq!(viscii_to_unicode(0x20), ' ');
-        assert_eq!(viscii_to_unicode(0xFF), 'Ữ'); // VISCII 0xFF = Ữ (upper)
-        assert_eq!(viscii_to_unicode(0xE6), 'ữ'); // lower-case ữ
-    }
-
-    #[test]
-    fn viscii_encode_maps_vietnamese_unicode() {
-        // Đ -> 0xD0, ấ -> 0xA4 (research 03 §3.2 verified).
-        assert_eq!(viscii_encode("Đ"), vec![0xD0]);
-        assert_eq!(viscii_encode("ấ"), vec![0xA4]);
-        // Unmappable positions collapse to '?' (0x3F) exactly like C#.
-        assert_eq!(viscii_encode("Ỷ"), vec![0x3F]);
-        assert_eq!(viscii_encode("Ẳ"), vec![0x41]); // -> 'A'
-                                                    // ASCII passes through unchanged; CR/LF are preserved.
-        assert_eq!(viscii_encode("TSVN"), b"TSVN".to_vec());
-        assert_eq!(viscii_encode("a\r\nb"), b"a\r\nb".to_vec());
-        // "Th¶i gian:" = ờ is 0xB6 (Client.cs:8169 uses ¶ for the banner).
-        assert_eq!(
-            viscii_encode("Thời gian:"),
-            vec![0x54, 0x68, 0xB6, 0x69, 0x20, 0x67, 0x69, 0x61, 0x6E, 0x3A]
-        );
     }
 }

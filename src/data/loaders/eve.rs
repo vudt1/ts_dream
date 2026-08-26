@@ -1,8 +1,8 @@
 //! Binary loader and domain models for `eve.emg` container.
 //!
-//! Maps directly to client Lua scripts (`Eve_NpcData.lua`, `Eve_NpcEventData.lua`,
-//! `Eve_DoorData.lua`, `Eve_SceneInfoData.lua`, `Eve_FightData.lua`, `Eve_SurfaceData.lua`,
-//! `Eve_GroupData.lua`) and Kotlin TS Mobile `EveDataLoader.kt`.
+//! The container mirrors the client Eve scripts (`Eve_NpcData.lua`,
+//! `Eve_NpcEventData.lua`, `Eve_DoorData.lua`, `Eve_SceneInfoData.lua`,
+//! `Eve_FightData.lua`, `Eve_SurfaceData.lua`, `Eve_GroupData.lua`).
 
 use crate::data::reader::DatReader;
 use crate::error::{Result, TsError};
@@ -879,51 +879,9 @@ impl EveDataLoader {
                 );
             }
         }
-
         Ok(result)
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_eve_enums_and_models() {
-        assert_eq!(EveConditionClass::from(0), EveConditionClass::Unconditional);
-        assert_eq!(EveConditionClass::from(1), EveConditionClass::BagItem);
-        assert_eq!(EveConditionClass::from(2), EveConditionClass::QuestStep);
-        assert_eq!(EveConditionClass::from(7), EveConditionClass::PlayerAttribute);
-        assert_eq!(EveConditionClass::from(8), EveConditionClass::BattleResult);
-        assert_eq!(EveConditionClass::from(9), EveConditionClass::FollowPet);
-        assert_eq!(EveConditionClass::from(10), EveConditionClass::DialogChoice);
-        assert_eq!(EveConditionClass::from(12), EveConditionClass::SceneEventCount);
-        assert_eq!(EveConditionClass::from(14), EveConditionClass::RoleCount);
-
-        assert_eq!(EveResultType::from(0), EveResultType::Action);
-        assert_eq!(EveResultType::from(1), EveResultType::Talk);
-        assert_eq!(EveResultType::from(2), EveResultType::Door);
-        assert_eq!(EveResultType::from(3), EveResultType::Battle);
-        assert_eq!(EveResultType::from(5), EveResultType::Animation);
-        assert_eq!(EveResultType::from(6), EveResultType::Surface);
-        assert_eq!(EveResultType::from(9), EveResultType::NpcAction);
-
-        assert_eq!(EveResultClass::from(1), EveResultClass::Item);
-        assert_eq!(EveResultClass::from(2), EveResultClass::Quest);
-        assert_eq!(EveResultClass::from(3), EveResultClass::NpcTeam);
-        assert_eq!(EveResultClass::from(4), EveResultClass::Skill);
-        assert_eq!(EveResultClass::from(7), EveResultClass::Player);
-        assert_eq!(EveResultClass::from(8), EveResultClass::RewardPet);
-
-        let enemy = EveFightEnemy {
-            no: 1,
-            npc_id: 10001,
-            location_pos: 7, // col = 7 / 5 = 1, row = 7 % 5 = 2
-            ai: 0,
-        };
-        assert_eq!(enemy.col(), 1);
-        assert_eq!(enemy.row(), 2);
-    }
-}
 
 

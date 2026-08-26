@@ -115,7 +115,7 @@ impl NpcDatLoader {
 
     /// Load all NPC definitions from binary slice of `Npc.dat`.
     pub fn load(bytes: &[u8]) -> Result<HashMap<u16, NpcDef>> {
-        if bytes.len() % Self::FIELD_LENGTH != 0 {
+        if !bytes.len().is_multiple_of(Self::FIELD_LENGTH) {
             return Err(TsError::Data(format!(
                 "Invalid Npc.dat size {} (not multiple of {})",
                 bytes.len(),
@@ -155,9 +155,9 @@ impl NpcDatLoader {
             let mask_id = Self::dec16(u16::from_le_bytes([chunk[20], chunk[21]]));
 
             let mut color_tints = [0u32; 4];
-            for j in 0..4 {
+            for (j, tint) in color_tints.iter_mut().enumerate() {
                 let off = 22 + j * 4;
-                color_tints[j] = Self::dec32(u32::from_le_bytes([
+                *tint = Self::dec32(u32::from_le_bytes([
                     chunk[off],
                     chunk[off + 1],
                     chunk[off + 2],

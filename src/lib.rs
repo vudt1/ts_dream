@@ -1,4 +1,4 @@
-//! TS Dream — Rust server, byte-level port of the TS Online C# server.
+//! TS Dream — Rust server, byte-level port of the TS Online server.
 //!
 //! Module layout mirrors the spec chapters. Foundation layers (protocol,
 //! encoding, config, data) are testable without a live database or wire

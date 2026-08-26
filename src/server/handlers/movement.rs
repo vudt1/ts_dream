@@ -26,16 +26,15 @@ pub fn handle_move(ctx: &mut OpcodeCtx) {
     if id_leader > 0 && id_leader != id {
         return; // Member following a leader; the leader moves everyone.
     }
-    // Map-scoped broadcast (never echoed to the mover; C# `Walked` →
-    // `SendToAllClientMapid`, which skips the walk's own subject).
+    // Map-scoped broadcast (never echoed to the mover; the fan-out skips the
+    // walk's own subject).
     out.broadcast(id, spawn::move_broadcast(id, dir, x, y));
     if id_leader == id {
         for member in conn.session.id_mem {
             if member > 0 {
                 out.broadcast(member, spawn::move_broadcast(member, dir, x, y));
-                // C# `Walked(member)` also persists the member's new position
-                // (`Data.PlayerUpdateDataId`); keep the shared online registry
-                // authoritative so later reads see the follower's real coords.
+                // Persist the member's new position through the shared online
+                // registry so later reads see the follower's real coords.
                 if let Some(mem) = crate::server::session::online_sessions()
                     .lock()
                     .unwrap()

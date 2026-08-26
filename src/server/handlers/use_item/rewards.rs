@@ -1,8 +1,7 @@
-//! Lucky-box random rewards + fixed multi-item packs — C# case 15
-//! (`Client.cs:4041-4759`). Each box rolls a reward via the injected
-//! `.NET`-compatible `DotNetRandom` (C# `new Random()` per use), adds it with
-//! `HomdoAddItem` (`1706` reward frame), then consumes with `HomdoUseHPSPFAI`.
-//! The 29/28/19-entry switch tables are transcribed verbatim (bug-for-bug).
+//! Lucky-box random rewards + fixed multi-item packs (sub-15 reward tables).
+//! Each box rolls a reward via the injected `DotNetRandom`, adds it (the
+//! `1706` reward frame), then consumes with the standard end feedback.
+//! The 29/28/19-entry tables are transcribed verbatim (bug-for-bug).
 
 use super::UseCtx;
 use crate::battle::rng::DotNetRandom;
@@ -12,7 +11,7 @@ async fn roll(ctx: &mut UseCtx<'_>) {
     let id = ctx.id;
     let rng: &mut DotNetRandom = ctx.rng;
     match id {
-        // C# 99999 is unreachable here: item ids are u16 (max 65535) and 99999
+        // 99999 is unreachable here: item ids are u16 (max 65535) and 99999
         // is not present in the dataset, so no inventory slot can hold it.
         // 46129: Next(0,4); 0|4 → Next(0,7), else Next(4,7) → 57005+n*100+r.
         46129 => {
@@ -426,11 +425,11 @@ pub async fn handle(ctx: &mut UseCtx<'_>) -> bool {
     true
 }
 
-/// Fixed multi-item packs (C# 46908-46911, 46900-46907, 46905/46904/46906/46907,
+/// Fixed multi-item packs (46908-46911, 46900-46907, 46905/46904/46906/46907,
 /// 46077, 46197). Returns true when handled.
 async fn fixed_pack(ctx: &mut UseCtx<'_>) -> bool {
     let id = ctx.id;
-    // (item, count) list, transcribed from Client.cs.
+    // (item, count) list, transcribed verbatim.
     let pack: &[(u16, u8)] = match id {
         46908 => &[(15054, 1), (21628, 1), (20643, 1), (22941, 1), (19646, 1)],
         46909 => &[(15055, 1), (21629, 1), (20644, 1), (22942, 1), (19647, 1), (19647, 1)],

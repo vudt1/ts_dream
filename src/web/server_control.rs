@@ -30,7 +30,10 @@ pub struct ServerControl {
     pub data: Option<Arc<GameData>>,
     pub pool: Option<MySqlPool>,
     pub clients: Arc<Mutex<HashMap<u32, ClientSender>>>,
-    shutdown_tx: Arc<Mutex<Option<broadcast::Sender<()>>>>,
+    /// Shutdown signal for the accept loop (`Some` while listening). Exposed
+    /// so lifecycle owners (and tests) can halt the listener without the 5s
+    /// countdown performed by [`ServerControl::stop`].
+    pub shutdown_tx: Arc<Mutex<Option<broadcast::Sender<()>>>>,
 }
 
 impl ServerControl {
@@ -196,7 +199,7 @@ impl ServerControl {
     pub async fn broadcast_packet(&self, hex_frame: &str) {
         let clients = self.clients.lock().await;
         for (player_id, tx) in clients.iter() {
-            if let Err(_) = tx.send(hex_frame.to_string()) {
+            if tx.send(hex_frame.to_string()).is_err() {
                 tracing::debug!("Failed to send broadcast to player {player_id}");
             }
         }
@@ -219,15 +222,13 @@ impl ServerControl {
     pub async fn broadcast_except(&self, from_id: u32, hex_frame: &str) {
         let clients = self.clients.lock().await;
         for (player_id, tx) in clients.iter() {
-            if *player_id != from_id {
-                if let Err(_) = tx.send(hex_frame.to_string()) {
-                    tracing::debug!("Failed to send broadcast to player {player_id}");
-                }
+            if *player_id != from_id && tx.send(hex_frame.to_string()).is_err() {
+                tracing::debug!("Failed to send broadcast to player {player_id}");
             }
         }
     }
 
-    /// Map-scoped fan-out for move/expression frames (C# `SendToAllClientMapid`).
+    /// Map-scoped fan-out for move/expression frames.
     ///
     /// Every `MapBroadcast` is delivered to each registered client on the same
     /// map as `from_id` whose id differs from the broadcast's `subject`, so:
@@ -269,7 +270,7 @@ impl ServerControl {
     }
 
     /// Send `hex_frame` to one registered client. No-op when the player is
-    /// offline (whisper/party/gold-item routing; C# `Server.SendToClient`).
+    /// offline (whisper/party/gold-item routing).
     pub async fn send_to(&self, player_id: u32, hex_frame: &str) {
         let clients = self.clients.lock().await;
         if let Some(tx) = clients.get(&player_id) {
@@ -379,8 +380,8 @@ async fn handle_client_connection(
                                     .insert(logined_id, conn.session.clone());
                             }
                             for frame in &out.outgoing {
-                                // Dialog fragments are paced (C# sleeps 500 ms
-                                // between `TalkMessages` splits); honor it on the
+                                // Dialog fragments are paced (500 ms between
+                                // dialog splits); honor it on the
                                 // live connection, never blocking the runtime.
                                 if frame.delay_ms > 0 {
                                     tokio::time::sleep(Duration::from_millis(frame.delay_ms))
@@ -426,231 +427,4 @@ async fn handle_client_connection(
     app.write()
         .await
         .push_log("system", format!("Client disconnected from {peer_ip}"));
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::state::AppState;
-
-    fn control() -> ServerControl {
-        let app = Arc::new(RwLock::new(AppState::new(100)));
-        ServerControl::new(6414, app, None, None)
-    }
-
-    #[tokio::test]
-    async fn start_refuses_when_data_not_loaded() {
-        let c = control(); // AppState::new() leaves data_loaded = false
-        let r = c.start().await;
-        assert!(
-            r.is_err(),
-            "must refuse to start when static data not loaded"
-        );
-        assert!(
-            !c.app.read().await.running,
-            "must not flip running on a refused start"
-        );
-    }
-
-    #[tokio::test]
-    async fn start_accepts_when_data_loaded() {
-        let app = Arc::new(RwLock::new(AppState::new(100)));
-        app.write().await.data_loaded = true;
-        // Port 0 binds an ephemeral port, avoiding collisions with other tests.
-        let c = ServerControl::new(0, app.clone(), None, None);
-
-        let r = c.start().await;
-        assert!(r.unwrap_or(false), "must start once static data is loaded");
-        assert!(
-            c.app.read().await.running,
-            "running flag flips once started"
-        );
-
-        // Stop the accept loop cleanly (no 5s countdown in tests).
-        if let Some(tx) = c.shutdown_tx.lock().await.take() {
-            let _ = tx.send(());
-        }
-        c.app.write().await.running = false;
-    }
-
-    #[tokio::test]
-    async fn login_register_is_atomic_double_login_guard() {
-        let c = control();
-        let (tx1, _rx1) = mpsc::unbounded_channel::<String>();
-        let (tx2, _rx2) = mpsc::unbounded_channel::<String>();
-
-        assert!(
-            c.login_register(300001, &tx1).await,
-            "first login registers"
-        );
-        assert!(
-            !c.login_register(300001, &tx2).await,
-            "second concurrent login is rejected (double-login guard)"
-        );
-        // The failed registration must not clobber the original sender.
-        assert_eq!(c.clients.lock().await.len(), 1);
-    }
-
-    #[tokio::test]
-    async fn broadcast_except_skips_origin() {
-        let c = control();
-        let (tx1, mut rx1) = mpsc::unbounded_channel::<String>();
-        let (tx2, mut rx2) = mpsc::unbounded_channel::<String>();
-        c.login_register(300001, &tx1).await;
-        c.login_register(300002, &tx2).await;
-
-        c.broadcast_except(300001, "F4440B000601FFFFFFFF026400C800")
-            .await;
-
-        assert_eq!(
-            rx1.try_recv(),
-            Err(mpsc::error::TryRecvError::Empty),
-            "origin excluded"
-        );
-        assert_eq!(
-            rx2.try_recv().unwrap(),
-            "F4440B000601FFFFFFFF026400C800",
-            "peer receives the broadcast"
-        );
-    }
-
-    #[tokio::test]
-    async fn broadcast_map_scopes_to_same_map_and_skips_subjects() {
-        // P2 + P3: each `(subject, frame)` goes only to clients on the source's
-        // map whose id != subject — nobody receives their own move/expression.
-        let c = control();
-        let (tx1, mut rx1) = mpsc::unbounded_channel::<String>(); // 300001 map 12001
-        let (tx2, mut rx2) = mpsc::unbounded_channel::<String>(); // 300002 map 12001
-        let (tx3, mut rx3) = mpsc::unbounded_channel::<String>(); // 300003 map 13001
-        c.login_register(300001, &tx1).await;
-        c.login_register(300002, &tx2).await;
-        c.login_register(300003, &tx3).await;
-        {
-            let mut sessions = online_sessions().lock().unwrap();
-            sessions.insert(
-                300001,
-                crate::server::session::Session {
-                    map_id: 12001,
-                    ..Default::default()
-                },
-            );
-            sessions.insert(
-                300002,
-                crate::server::session::Session {
-                    map_id: 12001,
-                    ..Default::default()
-                },
-            );
-            sessions.insert(
-                300003,
-                crate::server::session::Session {
-                    map_id: 13001,
-                    ..Default::default()
-                },
-            );
-        }
-
-        // Leader 300001 walks self + member 300002.
-        c.broadcast_map(
-            300001,
-            &[
-                dispatcher::MapBroadcast {
-                    subject: 300001,
-                    frame: "F4440B000601E1930400026400C800".into(),
-                },
-                dispatcher::MapBroadcast {
-                    subject: 300002,
-                    frame: "F4440B000601E2930400026400C800".into(),
-                },
-            ],
-        )
-        .await;
-
-        // Same-map peer 300002: gets leader's walk, NOT its own walk.
-        assert_eq!(rx2.try_recv().unwrap(), "F4440B000601E1930400026400C800");
-        assert_eq!(
-            rx2.try_recv(),
-            Err(mpsc::error::TryRecvError::Empty),
-            "member must not receive its own walk"
-        );
-        // Different map 300003: nothing.
-        assert_eq!(
-            rx3.try_recv(),
-            Err(mpsc::error::TryRecvError::Empty),
-            "other map receives nothing"
-        );
-        // The origin 300001 receives nothing at all (no self-echo).
-        assert_eq!(
-            rx1.try_recv(),
-            Err(mpsc::error::TryRecvError::Empty),
-            "origin excluded"
-        );
-
-        let mut sessions = online_sessions().lock().unwrap();
-        sessions.remove(&300001);
-        sessions.remove(&300002);
-        sessions.remove(&300003);
-    }
-
-    #[tokio::test]
-    async fn broadcast_map_is_noop_without_online_source() {
-        // An unregistered source has no map scope → no fan-out.
-        let c = control();
-        let (tx2, mut rx2) = mpsc::unbounded_channel::<String>();
-        c.login_register(300002, &tx2).await;
-        {
-            let mut sessions = online_sessions().lock().unwrap();
-            sessions.insert(
-                300002,
-                crate::server::session::Session {
-                    map_id: 12001,
-                    ..Default::default()
-                },
-            );
-        }
-
-        c.broadcast_map(
-            300001,
-            &[dispatcher::MapBroadcast {
-                subject: 300001,
-                frame: "F4440B000601E1930400026400C800".into(),
-            }],
-        )
-        .await;
-
-        assert_eq!(
-            rx2.try_recv(),
-            Err(mpsc::error::TryRecvError::Empty),
-            "no broadcast when the source has no online session"
-        );
-
-        let mut sessions = online_sessions().lock().unwrap();
-        sessions.remove(&300002);
-    }
-
-    #[tokio::test]
-    async fn disconnect_player_broadcasts_offline_and_unregisters() {
-        let c = control();
-        let (tx1, mut rx1) = mpsc::unbounded_channel::<String>();
-        let (tx2, mut rx2) = mpsc::unbounded_channel::<String>();
-        c.login_register(300001, &tx1).await;
-        c.login_register(300002, &tx2).await;
-        online_sessions()
-            .lock()
-            .unwrap()
-            .insert(300001, Default::default());
-
-        c.disconnect_player(300001).await;
-
-        // Peers receive the leave/offline hide frame (Ch2 §2.1).
-        assert_eq!(rx2.try_recv().unwrap(), "F44408000B00E19304000000");
-        assert_eq!(
-            rx1.try_recv(),
-            Err(mpsc::error::TryRecvError::Empty),
-            "origin gets nothing"
-        );
-        // Registration and online snapshot are dropped.
-        assert_eq!(c.clients.lock().await.len(), 1);
-        assert!(!online_sessions().lock().unwrap().contains_key(&300001));
-    }
 }

@@ -13,6 +13,7 @@
 //! - hair (1B u8)
 //! - color1 (4B u32 LE)
 //! - color2 (4B u32 LE)
+//!
 //! Total fixed part = 15 bytes + (1 + name.len()).
 //!
 //! Friend extra wire format (20 bytes):
@@ -182,47 +183,5 @@ impl PlayerInfoCodec {
     /// Writes friend extra directly to writer.
     pub fn write_friend_extra(writer: &mut PacketWriter, extra: &FriendExtra) {
         extra.encode(writer);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_player_card_roundtrip() {
-        let card = PlayerCard {
-            name: "LữBố".to_string(),
-            level: 120,
-            element: 3,
-            turn3_element: 4,
-            turn: 2,
-            career: 1,
-            sex: 1,
-            hair: 5,
-            color1: 0x12345678,
-            color2: 0x9ABCDEF0,
-        };
-
-        let bytes = card.to_bytes();
-        let decoded = PlayerCard::from_bytes(&bytes).unwrap();
-        assert_eq!(card, decoded);
-    }
-
-    #[test]
-    fn test_friend_extra_roundtrip() {
-        let extra = FriendExtra {
-            online: true,
-            friendly: 500,
-            function_flag: 2,
-            add_time: 44100.25,
-            offline_time: 44101.75,
-        };
-
-        let bytes = extra.to_bytes();
-        assert_eq!(bytes.len(), FRIEND_EXTRA_SIZE);
-
-        let decoded = FriendExtra::from_bytes(&bytes).unwrap();
-        assert_eq!(extra, decoded);
     }
 }

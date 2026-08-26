@@ -11,7 +11,7 @@ pub struct InventoryItem {
     pub slot: u8,
     pub id: u16,
     pub count: u8,
-    /// Item level requirement (equip gate `player.Lv >= item.Lv`; C# `_Lv`).
+    /// Item level requirement (equip gate `player.Lv >= item.Lv`).
     pub lv: u8,
     pub doben: u8,
     pub long_val: u8,
@@ -25,7 +25,7 @@ pub struct InventoryItem {
     pub spx1: i16,
     pub agi1: i16,
     pub fai1: i16,
-    /// Elemental `_2` stat fields (C# `_Int2.._Agi2/_Fai2`, Items.txt cols 12..19).
+    /// Elemental `_2` stat fields (Items.txt cols 12..19).
     pub int2: i16,
     pub atk2: i16,
     pub def2: i16,
@@ -45,9 +45,8 @@ pub struct InventoryItem {
 impl InventoryItem {
     /// Materialise an inventory instance from the static item template
     /// (`Data.Item`, Items.txt), copying the base `_1`/`_2` stats, the element,
-    /// and the elemental bonus. Mirrors the C# `HomdoAddItem` item-constructor
-    /// (`Data.cs:3191`), which copies the full stat set from `Data_Items`. Slot
-    /// and per-instance dynamic fields (doben/long/khang/texp) are left defaulted.
+    /// and the elemental bonus from the static table. Slot and per-instance
+    /// dynamic fields (doben/long/khang/texp) are left defaulted.
     pub fn from_template(def: &crate::data::tables::Item, count: u8) -> Self {
         InventoryItem {
             id: def.id as u16,
@@ -126,7 +125,7 @@ pub struct PlayerShopState {
     pub items: Vec<ShopItem>,
 }
 
-/// Per-connection game session state (mirrors C# `Client`).
+/// Per-connection game session state.
 #[derive(Debug, Clone)]
 pub struct Session {
     pub id: u32,
@@ -188,7 +187,7 @@ pub struct Session {
     pub god: u32,
     pub hp_store: u32,
     pub sp_store: u32,
-    /// `.NET` counter field (`tanthu`), incremented by item 46238.
+    /// Counter field (`tanthu`), incremented by item 46238.
     pub tanthu: u32,
     /// Respawn-map flag (`savemap`), set by inn-keepers (H6 SM33).
     pub savemap: u16,
@@ -211,7 +210,7 @@ pub struct Session {
     pub active_pet_stt: u8,
 
     pub shop: PlayerShopState,
-    /// Player whose shop we are viewing (`_Open_Shop_Id`, C# case 32/33).
+    /// Player whose shop we are viewing (`_Open_Shop_Id`, ops 0x17 sub 32/33).
     pub open_shop_id: u32,
 
     pub bank_gold: u32,
@@ -461,9 +460,9 @@ pub struct Conn {
     pub session: Session,
 }
 
-/// Online session registry (C# `Server.Clients`): authoritative per-player
-/// session snapshots, synced by the connection loop on every frame. Cross-player
-/// flows (player shop op 0x17 sub 32/33) read and mutate it.
+/// Online session registry: authoritative per-player session snapshots, synced
+/// by the connection loop on every frame. Cross-player flows (player shop op
+/// 0x17 sub 32/33) read and mutate it.
 pub fn online_sessions() -> &'static std::sync::Mutex<std::collections::HashMap<u32, Session>> {
     static ONLINE: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<u32, Session>>> =
         std::sync::OnceLock::new();
@@ -511,29 +510,8 @@ impl Conn {
     }
 }
 
-#[cfg(test)]
-mod player_operation_lock_tests {
-    use super::*;
-    use std::time::Duration;
-
-    #[tokio::test]
-    async fn player_locks_block_same_player_but_not_unrelated_player() {
-        let held = lock_player_operations([388_881]).await;
-        assert!(
-            tokio::time::timeout(Duration::from_millis(50), lock_player_operations([388_882]))
-                .await
-                .is_ok()
-        );
-        assert!(
-            tokio::time::timeout(Duration::from_millis(20), lock_player_operations([388_881]))
-                .await
-                .is_err()
-        );
-        drop(held);
-        assert!(
-            tokio::time::timeout(Duration::from_millis(50), lock_player_operations([388_881]))
-                .await
-                .is_ok()
-        );
+impl Default for Conn {
+    fn default() -> Self {
+        Self::new()
     }
 }

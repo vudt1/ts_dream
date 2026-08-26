@@ -1,6 +1,6 @@
 //! Login & session handlers (Opcode 0x00, 0x01, 0x03).
 //!
-//! Live-server path (env.pool present) mirrors C# `Update_H1`/`Update_H3`:
+//! Live-server path (env.pool present):
 //! version gate → account exists → pass1 check → double-login guard → load the
 //! player row + skills/hotkeys/inventory/pets → `Logined1`. Without a pool
 //! (golden replay) the handlers run in-memory over the seeded session.
@@ -56,7 +56,7 @@ pub async fn handle_login(ctx: &mut OpcodeCtx<'_>) {
                 .await
                 .is_err()
             {
-                out.shutdown = true; // C# exception -> disconnect
+                out.shutdown = true; // Handler error -> disconnect
             }
         }
         None => {
@@ -119,8 +119,8 @@ pub async fn handle_enter_game(ctx: &mut OpcodeCtx<'_>) {
     }
 }
 
-/// C# `Update_H1` success path: account exists → pass1 matches → double-login
-/// guard → load the player → `Logined1` (or the create-char screen).
+/// Login success path: account exists → pass1 matches → double-login guard →
+/// load the player → `Logined1` (or the create-char screen).
 async fn login_db(
     conn: &mut Conn,
     out: &mut HandleOutcome,
@@ -142,15 +142,15 @@ async fn login_db(
     }
 
     // Player existence: an account with no character goes to the create-char
-    // screen (and is NOT registered as online — C# `Logined()` only adds the
-    // client to `Server.Clients` once a character exists).
+    // screen (and is NOT registered as online — the online registry only gains
+    // an entry once a character exists).
     if !db::players::load(pool, &mut conn.session).await? {
         out.send(spawn::LOGIN_CREATE_CHAR);
         return Ok(());
     }
 
-    // Double-login guard (C# `Server.Clients.ContainsKey` + Add): the
-    // check+register is one atomic lock so concurrent logins cannot race.
+    // Double-login guard: the check+register is one atomic lock so concurrent
+    // logins cannot race.
     if let (Some(hub), Some(sender)) = (hub, sender) {
         if !hub.login_register(conn.session.id, sender).await {
             out.shutdown = true; // Already online elsewhere -> disconnect
@@ -162,11 +162,10 @@ async fn login_db(
     conn.session.authed = true;
     let seq = spawn::build_logined_sequence_session(&conn.session);
     out.outgoing.extend(seq.into_iter().map(crate::server::dispatcher::OutFrame::new));
-    // C# Logined1 purges the basic `Skill` rows (Id 0..9) at its tail
-    // (Client.cs:8193, §5.6); the shared schema requires the `player_id`
-    // predicate (§5.4 note 2). Runs after the stats frame is built so the
-    // Logined1 skill list still matches the pre-purge C# output.
-    // Temporary disabled.
+    // The legacy login tail purged the basic `Skill` rows (Id 0..9); the
+    // shared schema requires the `player_id` predicate (§5.4 note 2). This
+    // would run after the stats frame so the skill list still matches the
+    // pre-purge output. Currently disabled.
     // db::persist::delete_system_skills(Some(pool), conn.session.id).await;
     Ok(())
 }

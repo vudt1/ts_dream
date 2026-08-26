@@ -4,7 +4,7 @@ use thiserror::Error;
 
 /// Errors surfaced across the port. Grouped by subsystem so callers can
 /// decide whether to hard-exit (DB / migration / data load) or swallow
-/// (handler exceptions, which the C# server silently ignores).
+/// (handler exceptions, which fail soft per-connection).
 #[derive(Debug, Error)]
 pub enum TsError {
     #[error("config error: {0}")]

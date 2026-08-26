@@ -9,8 +9,8 @@ use ts_dream::web::app::WebState;
 use ts_dream::web::server_control::ServerControl;
 
 /// Register every spawned static drop (ItemOnMap.txt) into the server-global
-/// `map_drops` registry (C# `SystemDropItem`, Data.cs:5278-5345). The C#
-/// broadcast fires with no clients during boot — a no-op we do not repeat.
+/// `map_drops` registry. The boot-time broadcast fires with no clients
+/// connected — a no-op we do not repeat.
 fn seed_static_drops(data: &GameData) {
     let spawned: Vec<_> = data
         .item_drop_on_map
@@ -128,7 +128,7 @@ async fn main() -> anyhow::Result<()> {
     app_state.write().await.data_loaded = data.is_loaded();
 
     // Seed the runtime drop registry from the loaded static ItemOnMap drops so
-    // they are pickable (C# `CreatMapItem` → `SystemDropItem`, Data.cs:5403).
+    // they are pickable on map load.
     seed_static_drops(&data);
 
     // 5. ServerControl handle

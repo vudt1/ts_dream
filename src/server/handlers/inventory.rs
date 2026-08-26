@@ -10,7 +10,7 @@ use crate::server::map_drops;
 use crate::server::session::{Conn, InventoryItem};
 use std::sync::Arc;
 
-/// Pickup range (C# `Update_H17` case 2: `-150 <= dx <= 150`, same for dy).
+/// Pickup range (`-150 <= dx <= 150`, same for dy).
 const PICKUP_RANGE: i32 = 150;
 
 /// Dispatch Opcode 0x17 — Inventory operations (Level-2 subcode routing).
@@ -52,7 +52,7 @@ pub async fn handle_inventory(ctx: &mut OpcodeCtx<'_>) {
     }
 }
 
-/// Build the `1706` add-item frame (C# `PickupItemOnMap`).
+/// Build the `1706` add-item frame.
 fn item_added_frame(item: &InventoryItem) -> String {
     // F4440E001706 + le16(id) + count + 00 + doben + long + (giatriLong+100) + khang + le32(texp)
     let body = format!(
@@ -85,7 +85,7 @@ async fn handle_pickup(
     let Some(drop) = map_drops::get(map_id, slot) else {
         return; // nothing on that map slot
     };
-    // Distance gate (C# case 2): within ±150 map units of the player.
+    // Distance gate: within ±150 map units of the player.
     let dx = i32::from(drop.map_x) - i32::from(conn.session.map_x);
     let dy = i32::from(drop.map_y) - i32::from(conn.session.map_y);
     if !(-PICKUP_RANGE..=PICKUP_RANGE).contains(&dx)
@@ -93,8 +93,8 @@ async fn handle_pickup(
     {
         return; // out of range: the drop stays on the map
     }
-    // A full bag must leave the drop untouched and reply with nothing (C#
-    // `PickupItemOnMap`, Data.cs:3788-3872) — probe on a copy first.
+    // A full bag must leave the drop untouched and reply with nothing —
+    // probe on a copy first.
     let mut probe = conn.session.homdo.clone();
     if crate::server::inventory::add_item(&mut probe, drop.item.clone()).is_empty() {
         return;
@@ -111,7 +111,7 @@ async fn handle_pickup(
         }
     }
     {
-        // C# `PickupItemOnMap` acks: 1702 (2-byte LE slot) + 1706 to the picker,
+        // Pickup acks: 1702 (2-byte LE slot) + 1706 to the picker,
         // and a `04001702` removal broadcast to the map. No dump is emitted.
         out.send(format!("F44405001702{}01", encoder::le16(u16::from(slot))));
         out.send(item_added_frame(&drop.item));
@@ -142,16 +142,15 @@ async fn handle_drop(
     };
     let item = conn.session.homdo[pos].clone();
     if item.id == 0 || item.count == 0 || u16::from(item.count) < count {
-        return; // C# `HomdoDropItem`: `count2 >= count && count2 > 0`
+        return; // need count2 >= requested && count2 > 0
     }
     let map_id = conn.session.map_id;
     let x = conn.session.map_x;
     let y = conn.session.map_y;
     // The drop is placed under a per-map allocated slot (1..=255), NOT the homdo
-    // slot, so two players can drop onto the same map without colliding (C#
-    // `HomdoDropItem`, Data.cs:3511-3562). The client correlates it by (x,y) and
-    // echoes that slot back on the pickup. On a full map we refuse silently: the
-    // item stays in the bag (C# `num3 > 255` return).
+    // slot, so two players can drop onto the same map without colliding. The
+    // client correlates it by (x,y) and echoes that slot back on the pickup.
+    // On a full map we refuse silently: the item stays in the bag.
     let mut dropped = item.clone();
     dropped.count = count.min(255) as u8;
     // The map slot is deliberately unused here: the client correlates the drop
@@ -166,7 +165,7 @@ async fn handle_drop(
     } else {
         conn.session.homdo.remove(pos);
     }
-    // C# `HomdoDropItem`: self 1703 (drop at x,y) + 1709 (slot, remaining);
+    // Self acks 1703 (drop at x,y) + 1709 (slot, remaining);
     // map peers see the 1703-only variant.
     out.send(format!(
         "F44409001703{}{}{}01",
@@ -198,7 +197,7 @@ async fn handle_drop(
 }
 
 fn handle_move_stack(conn: &mut Conn, payload: &[u8], decoded: &[u8], out: &mut HandleOutcome) {
-    // C# `HomdoMoveItem(oldslot, count, newslot)`: payload[0]=old, [1]=count, [2]=new.
+    // Move/stack: payload[0]=old slot, [1]=count, [2]=new slot.
     if payload.len() < 3 {
         return;
     }
@@ -270,7 +269,7 @@ async fn handle_equip(
     };
     let item = conn.session.homdo[pos].clone();
     let loai = item.loai;
-    // C# case 11 gates: id > 0, loai 1..=6, and player level >= item level.
+    // Equip gates: id > 0, loai 1..=6, and player level >= item level.
     if item.id == 0 || !(1..=6).contains(&loai) || conn.session.level < item.lv {
         return;
     }
@@ -292,7 +291,7 @@ async fn handle_equip(
     out.send(format!("F44403001711{:02X}", homdo_slot));
     conn.session.recompute_stats();
     out.send(conn.session.dump_trangbi());
-    // C# `UpdateStatusWhenUseItem` → PlayerUpdateDataId sends HP/SP max + gear 2-stats.
+    // Status burst: HP/SP max + gear 2-stats.
     out.send(build_stat_update(0x19, conn.session.hp_max as i32));
     out.send(build_stat_update(0x1A, conn.session.sp_max as i32));
     out.send(build_stat_update(0xCF, conn.session.hpx2 as i32));
@@ -302,7 +301,7 @@ async fn handle_equip(
     out.send(build_stat_update(0xD4, conn.session.int2 as i32));
     out.send(build_stat_update(0xD6, conn.session.agi2 as i32));
     if let Some(hub) = hub {
-        // C# `ServerSend_EquitItem`: `F44408000502` + id + item.
+        // Equip broadcast: `F44408000502` + id + item.
         hub.broadcast_except(
             conn.session.id,
             &format!(
@@ -328,7 +327,7 @@ async fn handle_unequip(
     }
     let trangbi_slot = payload[0];
     let homdo_slot = payload[1];
-    // C# case 12 gate: the target homdo slot must be empty.
+    // Unequip gate: the target homdo slot must be empty.
     if conn
         .session
         .homdo
@@ -372,7 +371,7 @@ async fn handle_unequip(
     out.send(build_stat_update(0xD4, conn.session.int2 as i32));
     out.send(build_stat_update(0xD6, conn.session.agi2 as i32));
     if let Some(hub) = hub {
-        // C# `ServerSend_UnEquitItem`: `F44408000501` + id + item.
+        // Unequip broadcast: `F44408000501` + id + item.
         hub.broadcast_except(
             conn.session.id,
             &format!(
@@ -492,9 +491,9 @@ async fn handle_reborn(
 
     out.send("F44402002C01");
 
-    // C# reborn tail (Client.cs:5730-5752): replay the current talk's OnWin,
+    // Reborn tail: replay the current talk's OnWin,
     // bump quest step 59411 to 2, send the reborn dialog packet, then the
-    // character "dies" (socket closed) — `BattleQuestWin` / `QuestUpdateDataNpc`.
+    // character "dies" (socket closed).
     let idtalking = conn.session.idtalking;
     if idtalking > 0 {
         let mut frames = Vec::new();
@@ -518,269 +517,4 @@ async fn handle_reborn(
     conn.session.select_menu = 40;
     out.send("F4441100140100000001010302000000000000F476");
     out.shutdown = true;
-}
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::battle::service::BattleService;
-    use crate::data::loader::GameData;
-    use crate::server::dispatcher::{test_ctx, HandleOutcome};
-    use crate::server::session::Conn;
-    use std::sync::Arc;
-
-    fn bag_item(slot: u8, id: u16, count: u8, loai: u8) -> InventoryItem {
-        InventoryItem {
-            slot,
-            id,
-            count,
-            loai,
-            ..Default::default()
-        }
-    }
-
-    async fn run(conn: &mut Conn, sub: u8, payload: &[u8]) -> HandleOutcome {
-        let data = GameData::default();
-        let service = BattleService::new(Arc::new(GameData::default()));
-        let mut out = HandleOutcome::default();
-        let mut ctx = test_ctx(conn, &data, &service, &mut out, sub, payload);
-        handle_inventory(&mut ctx).await;
-        out
-    }
-
-    #[tokio::test]
-    async fn equip_respects_level_gate() {
-        let mut conn = Conn::new();
-        conn.session.level = 5;
-        conn.session.homdo.push(InventoryItem {
-            slot: 1,
-            id: 12001,
-            count: 1,
-            lv: 10,
-            loai: 1,
-            ..Default::default()
-        });
-        let out = run(&mut conn, 11, &[1]).await;
-        assert!(conn.session.trangbi.is_empty(), "below level: no equip");
-        assert!(out.outgoing.is_empty());
-    }
-
-    #[tokio::test]
-    async fn equip_moves_to_trangbi_and_sends_stats() {
-        let mut conn = Conn::new();
-        conn.session.level = 10;
-        conn.session.homdo.push(InventoryItem {
-            slot: 1,
-            id: 12001,
-            count: 1,
-            lv: 1,
-            loai: 1,
-            atk1: 15,
-            ..Default::default()
-        });
-        let out = run(&mut conn, 11, &[1]).await;
-        assert_eq!(conn.session.trangbi.len(), 1);
-        assert_eq!(conn.session.trangbi[0].id, 12001);
-        assert!(conn.session.homdo.is_empty());
-        assert_eq!(conn.session.atk2, 15);
-        assert!(out.outgoing.iter().any(|f| f.contains("171101")));
-        // Gear stat packets include the HP/SP max recompute frames.
-        assert!(out.outgoing.iter().any(|f| f.contains("08011A")));
-        assert!(out.outgoing.iter().any(|f| f.contains("080119")));
-    }
-
-    #[tokio::test]
-    async fn unequip_requires_empty_destination_slot() {
-        let mut conn = Conn::new();
-        conn.session.homdo.push(bag_item(2, 5001, 1, 0));
-        conn.session.trangbi.push(InventoryItem {
-            slot: 1,
-            id: 12001,
-            count: 1,
-            lv: 1,
-            loai: 1,
-            ..Default::default()
-        });
-        // Destination homdo slot 2 is occupied -> rejected.
-        let out = run(&mut conn, 12, &[1, 2]).await;
-        assert_eq!(
-            conn.session.trangbi.len(),
-            1,
-            "must not unequip onto a full slot"
-        );
-        assert!(out.outgoing.is_empty());
-    }
-
-    #[tokio::test]
-    async fn unequip_moves_to_empty_homdo_slot() {
-        let mut conn = Conn::new();
-        conn.session.homdo.push(bag_item(2, 0, 0, 0));
-        conn.session.trangbi.push(InventoryItem {
-            slot: 1,
-            id: 12001,
-            count: 1,
-            lv: 1,
-            loai: 1,
-            atk1: 15,
-            ..Default::default()
-        });
-        let out = run(&mut conn, 12, &[1, 2]).await;
-        assert!(conn.session.trangbi.is_empty());
-        assert_eq!(conn.session.homdo[0].slot, 2);
-        assert_eq!(conn.session.atk2, 0);
-        assert!(out.outgoing.iter().any(|f| f.contains("17100102")));
-    }
-
-    #[tokio::test]
-    async fn move_stack_splits_counts() {
-        let mut conn = Conn::new();
-        conn.session.homdo.push(bag_item(1, 100, 20, 0));
-        conn.session.homdo.push(bag_item(2, 100, 10, 0));
-        // move 5 from slot 1 to slot 2 (loai 0 -> stackable, total 15 <= 50)
-        let decoded = encoder::bytes("F4440700170A010502").unwrap();
-        let data = GameData::default();
-        let service = BattleService::new(Arc::new(GameData::default()));
-        let mut out = HandleOutcome::default();
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 10, &decoded[6..]);
-        // decoded is only used for the echo, so feed it via a raw frame anyway.
-        ctx.decoded = &decoded;
-        handle_inventory(&mut ctx).await;
-
-        assert_eq!(
-            conn.session
-                .homdo
-                .iter()
-                .find(|i| i.slot == 1)
-                .unwrap()
-                .count,
-            15
-        );
-        assert_eq!(
-            conn.session
-                .homdo
-                .iter()
-                .find(|i| i.slot == 2)
-                .unwrap()
-                .count,
-            15
-        );
-        assert_eq!(out.outgoing, vec![encoder::hex(&decoded)]);
-    }
-
-    #[tokio::test]
-    async fn pickup_requires_distance_gate() {
-        crate::server::map_drops::clear_all();
-        let mut conn = Conn::new();
-        conn.session.map_id = 12009;
-        conn.session.map_x = 1000;
-        conn.session.map_y = 1000;
-        crate::server::map_drops::drop(12009, 1, bag_item(1, 1001, 1, 0), 400, 500);
-        let out = run(&mut conn, 2, &[1]).await;
-        assert!(conn.session.homdo.is_empty(), "out of range: no pickup");
-        assert!(out.outgoing.is_empty());
-        assert!(
-            crate::server::map_drops::get(12009, 1).is_some(),
-            "drop must stay on the map when out of range"
-        );
-        crate::server::map_drops::clear_all();
-    }
-
-    #[tokio::test]
-    async fn pickup_adds_item_to_homdo() {
-        crate::server::map_drops::clear_all();
-        let mut conn = Conn::new();
-        conn.session.map_id = 12010;
-        conn.session.map_x = 400;
-        conn.session.map_y = 500;
-        crate::server::map_drops::drop(12010, 1, bag_item(1, 1001, 2, 0), 400, 500);
-        let out = run(&mut conn, 2, &[1]).await;
-        assert_eq!(conn.session.homdo.len(), 1);
-        assert_eq!(conn.session.homdo[0].id, 1001);
-        assert_eq!(conn.session.homdo[0].count, 2);
-        assert!(
-            crate::server::map_drops::get(12010, 1).is_none(),
-            "drop consumed by pickup"
-        );
-        assert!(out.outgoing.iter().any(|f| f.contains("1702")));
-        assert!(out.outgoing.iter().any(|f| f.contains("1706")));
-        crate::server::map_drops::clear_all();
-    }
-
-    #[tokio::test]
-    async fn drop_creates_map_drop_and_reduces_count() {
-        crate::server::map_drops::clear_all();
-        let mut conn = Conn::new();
-        conn.session.map_id = 12011;
-        conn.session.map_x = 400;
-        conn.session.map_y = 500;
-        conn.session.homdo.push(bag_item(3, 1001, 5, 0));
-        let out = run(&mut conn, 3, &[3, 2]).await;
-        assert_eq!(conn.session.homdo[0].count, 3, "dropped 2 of 5");
-        // The drop lands under a freshly allocated per-map slot (first free = 1),
-        // not under the homdo slot, and carries the dropped count (2).
-        let drop = crate::server::map_drops::get(12011, 1).expect("drop on map");
-        assert_eq!(drop.item.id, 1001);
-        assert_eq!(drop.item.count, 2);
-        assert!(out.outgoing.iter().any(|f| f.contains("17090303")));
-        crate::server::map_drops::clear_all();
-    }
-
-    #[tokio::test]
-    async fn drop_refuses_when_map_full_keeps_item() {
-        crate::server::map_drops::clear_all();
-        let mut conn = Conn::new();
-        conn.session.map_id = 12012;
-        conn.session.map_x = 400;
-        conn.session.map_y = 500;
-        conn.session.homdo.push(bag_item(3, 1001, 5, 0));
-        // Fill every map slot 1..=255.
-        for slot in 1..=255u8 {
-            crate::server::map_drops::drop(12012, slot, bag_item(slot, 7000, 1, 0), 0, 0);
-        }
-        let out = run(&mut conn, 3, &[3, 2]).await;
-        assert_eq!(conn.session.homdo[0].count, 5, "full map: item kept");
-        assert!(out.outgoing.is_empty(), "full map: silent, no frames");
-        crate::server::map_drops::clear_all();
-    }
-
-    #[tokio::test]
-    async fn reborn_rejected_if_equipped() {
-        let mut conn = Conn::new();
-        conn.session.trangbi.push(InventoryItem {
-            slot: 1,
-            id: 12001,
-            count: 1,
-            lv: 1,
-            loai: 1,
-            ..Default::default()
-        });
-        let out = run(&mut conn, 46, &[]).await;
-        assert_eq!(conn.session.reborn, 0);
-        assert!(out.outgoing.iter().any(|f| f.contains("1401")));
-    }
-
-    #[tokio::test]
-    async fn reborn_resets_stats_retains_special_skills() {
-        let mut conn = Conn::new();
-        conn.session.level = 125;
-        conn.session.reborn = 0;
-        conn.session.skills = vec![(10001, 10), (10016, 10)]; // 10001 normal, 10016 special
-        let out = run(&mut conn, 46, &[10, 0, 0, 0, 0, 0, 0, 0, 0]).await;
-
-        assert_eq!(conn.session.reborn, 1);
-        assert_eq!(conn.session.level, 1);
-        assert_eq!(conn.session.point, 1); // 0 + (125-120)/5 = 1
-        assert_eq!(conn.session.skill_point, 25); // 24 + (125-120)/5 = 25
-        assert_eq!(conn.session.skills.len(), 1);
-        assert_eq!(conn.session.skills[0], (10016, 10)); // special skill retained
-        assert!(out
-            .outgoing
-            .iter()
-            .any(|f| f.frame == "F44402002C01"));
-        assert!(out
-            .outgoing
-            .iter()
-            .any(|f| f.frame == "F4441100140100000001010302000000000000F476"));
-        assert!(out.shutdown, "reborn closes the socket (death, Client.cs:5751)");
-        assert_eq!(conn.session.quest_steps, vec![(59411, 2)]);
-    }
 }

@@ -7,9 +7,8 @@ use crate::server::session::InventoryItem;
 use crate::server::spawn::{store_frame, sys_msg_frame};
 
 /// Op 0x42 point frame: `F44406004202`+le16(points)+`0100`. Width is the spec-
-/// normalized LE16; C# `Shoppoin` (`Client.cs:7914-7917`) uses `smethod_12`
-/// (LE32) with a malformed 4-byte length header — the concrete parity needs a
-/// real capture (ticket review: "C# LE32 vs spec-normalized LE16").
+/// normalized LE16 (a legacy build emitted LE32 with a malformed 4-byte length
+/// header — final parity needs a real capture).
 fn shop_points_frame(points: u32) -> String {
     let mut body = String::new();
     body.push_str(&encoder::le16(points as u16));
@@ -17,11 +16,11 @@ fn shop_points_frame(points: u32) -> String {
     crate::protocol::frame("4202", &body)
 }
 
-/// Handle Opcode 0x21 — PK / War Mode (§2.3.22, Client.cs:7349-7379).
+/// Handle Opcode 0x21 — PK / War Mode (§2.3.22).
 ///
-/// Only flags `0` and `1` are accepted (C# switches on 0/1; anything else is
-/// silently ignored). The new value is persisted to `players.Pk` /
-/// `players.ThamChien` scoped by `player_id`.
+/// Only flags `0` and `1` are accepted; anything else is silently ignored.
+/// The new value is persisted to `players.Pk` / `players.ThamChien` scoped by
+/// `player_id`.
 pub async fn handle_pk_war(ctx: &mut OpcodeCtx<'_>) {
     let conn = &mut ctx.conn;
     let out = &mut ctx.out;
@@ -31,7 +30,7 @@ pub async fn handle_pk_war(ctx: &mut OpcodeCtx<'_>) {
     }
     let flag = payload[0];
     if flag > 1 {
-        return; // C# only accepts 0/1 — reject anything else silently.
+        return; // only 0/1 accepted — reject anything else silently.
     }
 
     match sub {
@@ -61,11 +60,10 @@ pub async fn handle_pk_war(ctx: &mut OpcodeCtx<'_>) {
     }
 }
 
-/// Handle Opcode 0x22 — Game points / God panel (§2.3.23, Client.cs:7382-7389,
-/// `method_0` at :8249-8252).
+/// Handle Opcode 0x22 — Game points / God panel (§2.3.23).
 ///
-/// Only sub 1: `F44412002304`+`le32(gold)`+12 zero bytes. The ticket's earlier
-/// `le16 + 24 zero` width was a bug (C# `smethod_12` = LE32, 12 zero bytes).
+/// Only sub 1: `F44412002304`+`le32(gold)`+12 zero bytes (the earlier
+/// `le16 + 24 zero` width was wrong).
 pub fn handle_game_points(ctx: &mut OpcodeCtx) {
     if ctx.sub != 1 {
         return;
@@ -75,7 +73,7 @@ pub fn handle_game_points(ctx: &mut OpcodeCtx) {
     out.send(store_frame(conn.session.gold));
 }
 
-/// Handle Opcode 0x41 — Rank system (§2.3.28, Client.cs:7852-7863).
+/// Handle Opcode 0x41 — Rank system (§2.3.28).
 pub fn handle_rank(ctx: &mut OpcodeCtx) {
     let out = &mut ctx.out;
     let sub = ctx.sub;
@@ -86,14 +84,14 @@ pub fn handle_rank(ctx: &mut OpcodeCtx) {
     }
 }
 
-/// Handle Opcode 0x42 — GM / Mall shop (§2.3.29, Client.cs:7870-7917).
+/// Handle Opcode 0x42 — GM / Mall shop (§2.3.29).
 ///
 /// Sub 1 reads the item and price from raw packet bytes 9..10 / 11..12; since
 /// `OpcodeCtx.payload` starts at raw byte 6 that is `payload[3..5]` and
 /// `payload[5..7]` (the previous `[2..3]`/`[4..5]` decode mis-parses both
 /// fields). The item is materialised from the static template, `homdo` +
 /// `ShopPoint` are persisted in one InnoDB transaction, and the item-add frame
-/// (`1706`) is emitted before the points frame (C# `HomdoAddItem` → `Shoppoin`).
+/// (`1706`) is emitted before the points frame.
 pub async fn handle_gm_shop(ctx: &mut OpcodeCtx<'_>) {
     let conn = &mut ctx.conn;
     let out = &mut ctx.out;
@@ -108,7 +106,7 @@ pub async fn handle_gm_shop(ctx: &mut OpcodeCtx<'_>) {
             let price = u32::from(encoder::u16_le(payload[5], payload[6]));
 
             if conn.session.shop_point < price {
-                return; // C# silently ignores under-funded buys
+                return; // under-funded buys are silently ignored
             }
             let Some(template) = ctx.data.items.get(&i64::from(item_id)) else {
                 return; // Unknown item id -> no grant
@@ -120,8 +118,8 @@ pub async fn handle_gm_shop(ctx: &mut OpcodeCtx<'_>) {
                 return;
             }
 
-            // C# `HomdoAddItem` emits the item-add frame `F4440E001706`+id+count+9
-            // zero bytes *before* deducting the points (Data.cs:3191-3277).
+            // Emit the item-add frame `F4440E001706`+id+count+9 zero bytes
+            // *before* deducting the points.
             let mut add_body = String::new();
             add_body.push_str(&encoder::le16(item.id));
             add_body.push_str(&format!("{:02X}", 1));
@@ -163,7 +161,7 @@ pub async fn handle_gm_shop(ctx: &mut OpcodeCtx<'_>) {
     }
 }
 
-/// Handle Opcode 0x0C — Teleport confirm (§2.3.9, Client.cs:1439-1455).
+/// Handle Opcode 0x0C — Teleport confirm (§2.3.9).
 ///
 /// Sub 1 only. When a party leader exists and is not self, the two confirmation
 /// frames are sent and the handler returns (member branch). Otherwise
@@ -186,8 +184,8 @@ pub fn handle_teleport_confirm(ctx: &mut OpcodeCtx) {
 
 /// Handle Opcode 0x23 — Account Management (change pass, delete char, gift code).
 ///
-/// C# wire order for sub 1 is `oldPass1, newPass1, oldPass2, newPass2`
-/// (Client.cs:7398-7444). All validation runs against the MySQL `accounts` and
+/// Wire order for sub 1 is `oldPass1, newPass1, oldPass2, newPass2`.
+/// All validation runs against the MySQL `accounts` and
 /// `players` tables; `player_id` scoping is enforced in every repository call.
 pub async fn handle_account_mgmt(ctx: &mut OpcodeCtx<'_>) {
     let conn = &mut ctx.conn;
@@ -269,7 +267,7 @@ pub async fn handle_account_mgmt(ctx: &mut OpcodeCtx<'_>) {
 
             let id = i64::from(conn.session.id);
 
-            // The once-only TSVN123/TSVN456 gift (§5.5, Client.cs:7591-7617).
+            // The once-only TSVN123/TSVN456 gift (§5.5).
             if code_str == "TSVN123" && pass_str == "TSVN456" {
                 if conn.session.tanthu == 1 {
                     out.send(sys_msg_frame(
@@ -366,7 +364,7 @@ pub async fn handle_account_mgmt(ctx: &mut OpcodeCtx<'_>) {
     }
 }
 
-/// Teardown a validated character deletion (op 0x23 sub 2, Client.cs:7447-7568).
+/// Teardown a validated character deletion (op 0x23 sub 2).
 ///
 /// Leaves any battle, flags the player offline, then deletes `players` + all
 /// nine gameplay tables scoped by `player_id` in one transaction, removes the
@@ -416,9 +414,8 @@ async fn delete_character_flow(ctx: &mut OpcodeCtx<'_>) {
 /// Parse `n` length-prefixed byte strings from `payload` (`[len][bytes]*`).
 ///
 /// Returns `None` whenever a length prefix overruns the remaining buffer — the
-/// connection must then be dropped (C# `checked` arithmetic throws and the
-/// exception swallower shuts the socket down).
-fn parse_len_strings(payload: &[u8], n: usize) -> Option<Vec<&[u8]>> {
+/// connection must then be dropped (the parse failure shuts the socket down).
+pub fn parse_len_strings(payload: &[u8], n: usize) -> Option<Vec<&[u8]>> {
     let mut rest = payload;
     let mut out = Vec::with_capacity(n);
     for _ in 0..n {
@@ -441,170 +438,4 @@ fn parse_len_strings(payload: &[u8], n: usize) -> Option<Vec<&[u8]>> {
 fn parse_gift_code(payload: &[u8]) -> Option<(&[u8], &[u8])> {
     let parts = parse_len_strings(payload, 2)?;
     Some((parts[0], parts[1]))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::battle::service::BattleService;
-    use crate::data::loader::GameData;
-    use crate::server::dispatcher::{test_ctx, HandleOutcome};
-    use crate::server::session::Conn;
-    use std::sync::Arc;
-
-    #[tokio::test]
-    async fn test_pk_and_war_toggle() {
-        let mut conn = Conn::new();
-        let data = GameData::default();
-        let service = BattleService::new(Arc::new(GameData::default()));
-
-        let mut out = HandleOutcome::default();
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[1]);
-        handle_pk_war(&mut ctx).await;
-        assert_eq!(conn.session.pk, 1);
-        assert_eq!(out.outgoing[0], "F444040021020100");
-
-        let mut out2 = HandleOutcome::default();
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out2, 2, &[1]);
-        handle_pk_war(&mut ctx).await;
-        assert_eq!(conn.session.tham_chien, 1);
-        assert_eq!(out2.outgoing[0], "F444040021020101");
-    }
-
-    #[tokio::test]
-    async fn test_pk_rejects_invalid_flag() {
-        let mut conn = Conn::new();
-        let data = GameData::default();
-        let service = BattleService::new(Arc::new(GameData::default()));
-
-        let mut out = HandleOutcome::default();
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[7]);
-        handle_pk_war(&mut ctx).await;
-        assert_eq!(conn.session.pk, 0, "flag 7 must be rejected silently");
-        assert!(out.outgoing.is_empty(), "no ack for invalid flag");
-    }
-
-    #[test]
-    fn test_game_points_width_and_gate() {
-        let mut conn = Conn::new();
-        conn.session.gold = 5000;
-
-        let data = GameData::default();
-        let service = BattleService::new(Arc::new(GameData::default()));
-
-        // Sub 1: le32(gold) + 12 zero bytes (C# `method_0`).
-        let mut out = HandleOutcome::default();
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[]);
-        handle_game_points(&mut ctx);
-        assert_eq!(out.outgoing[0], "F4441200230488130000000000000000000000000000");
-
-        // Sub 2 must be silent.
-        let mut out2 = HandleOutcome::default();
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out2, 2, &[]);
-        handle_game_points(&mut ctx);
-        assert!(out2.outgoing.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_gm_shop_buy() {
-        let mut conn = Conn::new();
-        conn.session.shop_point = 500;
-        let mut data = GameData::default();
-        data.items.insert(
-            0x2711,
-            crate::data::tables::Item {
-                id: 0x2711,
-                ..Default::default()
-            },
-        );
-
-        let service = BattleService::new(Arc::new(data.clone()));
-        let mut out = HandleOutcome::default();
-        // C2S mall request: item at raw[9..10] = 0x2711, price at raw[11..12] =
-        // 0x00C8. payload = raw[6..], so payload[3..5]=item, payload[5..7]=price.
-        let payload = vec![0, 0, 0, 0x11, 0x27, 0xC8, 0x00, 0, 0];
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &payload);
-        handle_gm_shop(&mut ctx).await;
-
-        assert_eq!(conn.session.shop_point, 300);
-        assert!(conn.session.homdo.iter().any(|i| i.id == 0x2711));
-        // Order: item-add `1706` before the points frame.
-        assert!(out.outgoing[0].contains("1706"));
-        assert!(out.outgoing.iter().any(|f| f.contains("4202")));
-    }
-
-    #[test]
-    fn test_rank_frames() {
-        let mut conn = Conn::new();
-        let data = GameData::default();
-        let service = BattleService::new(Arc::new(GameData::default()));
-
-        let mut out = HandleOutcome::default();
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[]);
-        handle_rank(&mut ctx);
-        assert_eq!(out.outgoing, vec!["F44402004101"]);
-
-        let mut out2 = HandleOutcome::default();
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out2, 2, &[]);
-        handle_rank(&mut ctx);
-        assert_eq!(out2.outgoing, vec!["F44402004102"]);
-    }
-
-    #[test]
-    fn test_teleport_confirm_leader_resets_state() {
-        let mut conn = Conn::new();
-        conn.session.id = 300001;
-        conn.session.map_id = 12001;
-        conn.session.warp_finish = true;
-        conn.session.talk_count = 3;
-        conn.session.idtalking = 6;
-
-        let data = GameData::default();
-        let service = BattleService::new(Arc::new(GameData::default()));
-
-        let mut out = HandleOutcome::default();
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[]);
-        handle_teleport_confirm(&mut ctx);
-        assert_eq!(out.outgoing, vec!["F44402000504F44402001408"]);
-        // Leader/solo branch resets the warp/talk state (Client.cs:1439-1455).
-        assert!(!conn.session.warp_finish);
-        assert_eq!(conn.session.talk_count, 0);
-        assert_eq!(conn.session.idtalking, 0);
-    }
-
-    #[test]
-    fn test_teleport_confirm_member_returns_early() {
-        let mut conn = Conn::new();
-        conn.session.id = 300001;
-        conn.session.id_leader = 300002; // somebody else is the leader
-        conn.session.warp_finish = true;
-        conn.session.talk_count = 3;
-        conn.session.idtalking = 6;
-
-        let data = GameData::default();
-        let service = BattleService::new(Arc::new(GameData::default()));
-
-        let mut out = HandleOutcome::default();
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[]);
-        handle_teleport_confirm(&mut ctx);
-        assert_eq!(out.outgoing, vec!["F44402000504F44402001408"]);
-        // Member branch: the two confirmation frames only, state untouched.
-        assert!(conn.session.warp_finish);
-        assert_eq!(conn.session.talk_count, 3);
-    }
-
-    #[test]
-    fn test_len_string_parser() {
-        let mut payload = vec![3];
-        payload.extend_from_slice(b"abc");
-        payload.push(2);
-        payload.extend_from_slice(b"xy");
-        let parts = parse_len_strings(&payload, 2).unwrap();
-        assert_eq!(parts[0], b"abc");
-        assert_eq!(parts[1], b"xy");
-
-        // Truncated: 4-byte string but only 3 remain -> None.
-        let bad = vec![4, 1, 2, 3];
-        assert!(parse_len_strings(&bad, 1).is_none());
-    }
 }

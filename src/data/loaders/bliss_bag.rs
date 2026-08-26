@@ -37,7 +37,7 @@ impl BlissBagDatLoader {
 
     /// Load all bliss bags from binary slice of `BlissBag.Dat`.
     pub fn load(bytes: &[u8]) -> Result<HashMap<u16, BlissBagDef>> {
-        if bytes.len() % Self::FIELD_LENGTH != 0 {
+        if !bytes.len().is_multiple_of(Self::FIELD_LENGTH) {
             return Err(TsError::Data(format!(
                 "Invalid BlissBag.Dat length {} (not a multiple of {})",
                 bytes.len(),

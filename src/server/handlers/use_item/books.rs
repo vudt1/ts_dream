@@ -1,15 +1,15 @@
 //! Skill / Texp / god / stat / pet-stat books and HP/SP store items —
-//! C# case 15 (`Client.cs:4987-5151`, `46240`/`46238`/`26456` family, pet-stat
-//! books `46185-46190`/`46239`/`46241`). Each consumes (or keeps, per quirk)
+//! the `46240`/`46238`/`26456` family and pet-stat books
+//! `46185-46190`/`46239`/`46241`. Each consumes (or keeps, per quirk)
 //! via the shared helpers in `mod.rs`. Runs after `reborn`, before `rewards`.
 
 use super::UseCtx;
 use crate::db::persist;
 use crate::protocol::encoder;
 
-/// C# skill-book family (Client.cs:5127-5151): item id → learned skill id.
-/// Skill books learn at level 10 (`int num138 = 10`) and REMOVE ONE ITEM via
-/// `HomdoRemoveItem` (no `1709/170F` end feedback). Already-known → red msg.
+/// Skill-book family: item id → learned skill id.
+/// Skill books learn at level 10 and REMOVE ONE ITEM directly from the bag
+/// (no `1709/170F` end feedback). Already-known → red msg.
 fn skill_book_target(id: u16) -> Option<u16> {
     Some(match id {
         46230 => 10016,
@@ -21,8 +21,8 @@ fn skill_book_target(id: u16) -> Option<u16> {
     })
 }
 
-/// Multi-skill books (C# 46136/46132/46133/46134): `SkillAdd` a fixed list of 8
-/// skills at level 1, then standard `HomdoUseHPSPFAI` consume + end feedback.
+/// Multi-skill books (46136/46132/46133/46134): grant a fixed list of 8
+/// skills at level 1, then standard consume + end feedback.
 fn multi_skill_set(id: u16) -> Option<&'static [u16]> {
     Some(match id {
         46136 => &[10027, 10028, 10029, 10030, 10031, 10032, 10033, 10034],
@@ -33,7 +33,7 @@ fn multi_skill_set(id: u16) -> Option<&'static [u16]> {
     })
 }
 
-/// Texp books (C# 46214-46219): `_My_Lv <= 200` gate, add fixed exp, stat `24`,
+/// Texp books (46211-46219): player level <= 200 gate, add fixed exp, stat `24`,
 /// then consume.
 fn texp_book_value(id: u16) -> Option<u32> {
     Some(match id {
@@ -50,11 +50,11 @@ fn texp_book_value(id: u16) -> Option<u32> {
     })
 }
 
-/// Pet-stat books (C# 46185-46190/46239/46241): add +1 to a pet stat via
-/// `PetUpdateData` (Type_Status code), then consume. Item id → (Type_Status).
+/// Pet-stat books (46185-46190/46239/46241): add +1 to a pet stat via the
+/// pet stat frame (Type_Status code), then consume. Item id → (Type_Status).
 fn pet_stat_book(id: u16) -> Option<u8> {
     Some(match id {
-        46185 => 0x1B, // Int atk  1/31-199 nên dùng stat: PetUpdateData(_Int)
+        46185 => 0x1B, // Int
         46186 => 0x1C, // Atk
         46187 => 0x1D, // Def
         46188 => 0x1F, // Hpx
@@ -71,7 +71,7 @@ pub async fn handle(ctx: &mut UseCtx<'_>) -> bool {
     let id = ctx.id;
     let pid = ctx.conn.session.id;
 
-    // --- Skill books: learn at level 10, consume 1 via HomdRemoveItem. ---
+    // --- Skill books: learn at level 10, consume 1 from the bag. ---
     if let Some(skill_id) = skill_book_target(id) {
         let known = ctx.conn.session.skills.iter().any(|(s, _)| *s == skill_id);
         if !known {
@@ -84,9 +84,9 @@ pub async fn handle(ctx: &mut UseCtx<'_>) -> bool {
                 .map(|s| s.sp.min(255) as u8)
                 .unwrap_or(0);
             persist::upsert_skill(ctx.pool, pid, skill_id, lv, sp, 0).await;
-            // C# `HomdoRemoveItem(_My_Id, num63, 1)` — remove 1 of the item id.
+            // Remove 1 of the item id.
             ctx.conn.session.remove_homdo_item(id, 1);
-            // C# learn packet: F4440C0008016E01 + le32(lv) + le32(skillid).
+            // Learn packet: F4440C0008016E01 + le32(lv) + le32(skillid).
             let body = format!(
                 "6E01{}{}",
                 encoder::le32(lv as u32),
@@ -118,12 +118,12 @@ pub async fn handle(ctx: &mut UseCtx<'_>) -> bool {
         return true;
     }
 
-    // --- God book 46169 (C# `_My_God <= 240`, silent write, then consume). ---
+    // --- God book 46169 (god <= 240 gate, silent write, then consume). ---
     if id == 46169 {
         if ctx.conn.session.god <= 240 {
             ctx.conn.session.god += 10;
             persist::update_player(ctx.pool, pid, "God", i64::from(ctx.conn.session.god)).await;
-            // C# `PlayerUpdateDataId(_God)` is NOT stat-emitting (Data.cs:401).
+            // The god column update does NOT emit a stat packet.
         }
         ctx.consume().await;
         return true;
@@ -140,7 +140,7 @@ pub async fn handle(ctx: &mut UseCtx<'_>) -> bool {
         return true;
     }
 
-    // --- Hpx +1 book 46240 (C#: player Hpx+1 via PlayerUpdateDataId). ---
+    // --- Hpx +1 book 46240 (player Hpx+1). ---
     if id == 46240 {
         if ctx.conn.session.hpx < 400 {
             ctx.conn.session.hpx += 1;
@@ -151,7 +151,7 @@ pub async fn handle(ctx: &mut UseCtx<'_>) -> bool {
         return true;
     }
 
-    // --- Spx2/SpMax/tanthu book 46238 (C#: Spx2+50, SpMax+50, tanthu+1). ---
+    // --- Spx2/SpMax/tanthu book 46238 (Spx2+50, SpMax+50, tanthu+1). ---
     if id == 46238 {
         ctx.conn.session.spx2 = ctx.conn.session.spx2.saturating_add(50);
         ctx.conn.session.sp_max = ctx.conn.session.sp_max.saturating_add(50);
@@ -164,7 +164,7 @@ pub async fn handle(ctx: &mut UseCtx<'_>) -> bool {
         return true;
     }
 
-    // --- Pet-stat books (target the pet in slot `use_type`, C# `num62`). ---
+    // --- Pet-stat books (target the pet in slot `use_type`). ---
     if let Some(ty) = pet_stat_book(id) {
         let stt = ctx.use_type;
         if let Some(pet) = ctx.conn.session.pets.iter_mut().find(|p| p.stt == stt) {
@@ -180,7 +180,7 @@ pub async fn handle(ctx: &mut UseCtx<'_>) -> bool {
                 0x20 => inc(&mut pet.spx),
                 _ => inc(&mut pet.agi),
             };
-            // C# `PetUpdateData` sends le16 based frame (pet_stat_frame) + persists.
+            // Send the le16-based pet stat frame + persist.
             let pet_snap = pet.clone();
             ctx.pet_stat(stt, ty, val);
             persist::upsert_pet(ctx.pool, pid, &pet_snap).await;
@@ -189,7 +189,7 @@ pub async fn handle(ctx: &mut UseCtx<'_>) -> bool {
         return true;
     }
 
-    // --- HP/SP store items (C# 26456/26457/46145/46146): +10000 + red msg. ---
+    // --- HP/SP store items (26456/26457/46145/46146): +10000 + red msg. ---
     let store = match id {
         26456 | 46145 => Some((true, ctx.conn.session.hp_store)),
         26457 | 46146 => Some((false, ctx.conn.session.sp_store)),

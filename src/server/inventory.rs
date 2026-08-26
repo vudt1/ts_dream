@@ -8,8 +8,8 @@ use crate::server::session::InventoryItem;
 /// The number of usable bag slots (1-based indices `1..=25`).
 pub const HOMDO_SLOTS: u8 = 25;
 
-/// Per-slot stack cap for mergeable items (C# hard-coded `50` in `HomdoAddItem`
-/// and `HomdoMoveItem`, `Data.cs:3600` / `Data.cs:3291-3305`).
+/// Per-slot stack cap for mergeable items (hard-coded `50` in the bag
+/// add/move rules).
 pub const STACK_CAP: u16 = 50;
 
 /// Build an inventory item from its static template (`Data.Item`), carrying the
@@ -32,8 +32,8 @@ pub fn free_slot(bag: &[InventoryItem]) -> Option<u8> {
 }
 
 /// Add `item` to a homdo-style bag, stacking onto existing non-full slots when
-/// possible and capping any single stack at 50 (C# `HomdoAddItem` merge rule,
-/// `Data.cs:3291-3305`). Returns the slot(s) actually written — a capped merge
+/// possible and capping any single stack at 50. Returns the slot(s) actually
+/// written — a capped merge
 /// can straddle an existing stack **and** a fresh slot, so callers must persist
 /// every returned slot (a single-slot return would drop the straddle increment
 /// on reload). Returns an empty `Vec` when the bag is full (nothing added).
@@ -105,74 +105,4 @@ pub fn remove_item(bag: &mut Vec<InventoryItem>, item_id: u16, count: u32) -> u3
     }
     bag.retain(|i| i.count > 0 || i.id == 0);
     removed
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn item(id: u16, count: u8) -> InventoryItem {
-        InventoryItem {
-            id,
-            count,
-            ..Default::default()
-        }
-    }
-
-    #[test]
-    fn add_fills_free_slots_in_order() {
-        let mut bag = vec![item(1001, 1), item(1002, 1)];
-        bag[0].slot = 1;
-        bag[1].slot = 2;
-        assert_eq!(add_item(&mut bag, item(1003, 1)), vec![3]);
-        assert_eq!(bag[2].slot, 3);
-        assert_eq!(bag[2].id, 1003);
-    }
-
-    #[test]
-    fn add_stacks_onto_nonfull_existing_slot() {
-        let mut bag = vec![item(1001, 40)];
-        bag[0].slot = 1;
-        // Cap-50 merge: fills slot 1 to 50, remainder (40) goes to a new slot.
-        // Both slots are returned so the caller persists the straddle.
-        assert_eq!(add_item(&mut bag, item(1001, 50)), vec![1, 2]);
-        assert_eq!(bag[0].count, 50);
-        assert_eq!(bag.len(), 2);
-        assert_eq!(bag[1].id, 1001);
-        assert_eq!(bag[1].count, 40);
-    }
-
-    #[test]
-    fn add_rejects_when_full() {
-        let mut bag: Vec<InventoryItem> = (1..=25)
-            .map(|slot| InventoryItem {
-                slot,
-                id: 9000 + u16::from(slot),
-                count: 1,
-                ..Default::default()
-            })
-            .collect();
-        assert!(add_item(&mut bag, item(999, 1)).is_empty());
-        assert!(!can_add_item(&bag, &item(999, 1)));
-    }
-
-    #[test]
-    fn can_add_item_accepts_existing_stack() {
-        let bag = vec![InventoryItem {
-            slot: 1,
-            id: 999,
-            count: 1,
-            ..Default::default()
-        }];
-        assert!(can_add_item(&bag, &item(999, 1)));
-    }
-
-    #[test]
-    fn remove_partial_and_full() {
-        let mut bag = vec![item(1001, 3), item(1001, 2)];
-        assert_eq!(remove_item(&mut bag, 1001, 4), 4);
-        assert_eq!(bag[0].count, 1);
-        assert_eq!(remove_item(&mut bag, 1001, 1), 1);
-        assert!(bag.is_empty());
-    }
 }

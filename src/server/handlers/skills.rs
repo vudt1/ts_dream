@@ -43,10 +43,11 @@ enum PetStatKind {
     Agi,
 }
 
-/// Weighted random stat pick — C# `Data.GetRandomPointPet` (Data.cs:98-155).
+/// Weighted random stat pick.
 ///
-/// Consumes 7 `.NET` draws per call in the exact C# order: 6 tie-break
-/// `Next(1,999)` (one per stat, Int→Agi) + 1 selection `Next(1,1000)`.
+/// Consumes 7 draws per call in a fixed order: 6 tie-break
+/// `next_range(1, 999)` calls (one per stat, Int→Agi) + 1 selection
+/// `next_range(1, 1000)`.
 fn random_point_stat(rng: &mut DotNetRandom, npc: &Npc) -> PetStatKind {
     let raw = [
         (npc.int1, PetStatKind::Int),
@@ -58,7 +59,7 @@ fn random_point_stat(rng: &mut DotNetRandom, npc: &Npc) -> PetStatKind {
     ];
     let total: i64 = raw.iter().map(|(v, _)| *v).sum();
     if total <= 0 {
-        return PetStatKind::Atk; // C# default `result = "Atk"`
+        return PetStatKind::Atk; // default fallback
     }
     let mut rows: Vec<(i64, i64, PetStatKind)> = raw
         .into_iter()
@@ -68,7 +69,7 @@ fn random_point_stat(rng: &mut DotNetRandom, npc: &Npc) -> PetStatKind {
             (w, r, kind)
         })
         .collect();
-    // Sort `Point ASC, Random DESC` (Data.cs:122).
+    // Sort `Point ASC, Random DESC`.
     rows.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| b.1.cmp(&a.1)));
     let num7 = rng.next_range(1, 1000);
     let mut acc = 0i64;
@@ -344,9 +345,9 @@ pub async fn handle_pet_reborn(ctx: &mut OpcodeCtx<'_>) {
 
     let bonus_points = (u16::from(pet_lv).saturating_sub(u16::from(threshold))) / 5;
 
-    // C# `RebornPet` snapshots the NPC base stats (Client.cs:9893-9895) BEFORE
-    // the bonus distribution and derives HpMax/SpMax from them (Data.cs:9958-9959);
-    // the boosted values are stored to the stat columns after.
+    // Snapshot the NPC base stats BEFORE the bonus distribution and derive
+    // HpMax/SpMax from them; the boosted values are stored to the stat
+    // columns after.
     let base_hpx = new_npc.hpx as u16;
     let base_spx = new_npc.spx as u16;
     let mut int_val = new_npc.int1 as u16;
@@ -356,9 +357,9 @@ pub async fn handle_pet_reborn(ctx: &mut OpcodeCtx<'_>) {
     let mut spx_val = base_spx;
     let mut agi_val = new_npc.agi as u16;
 
-    // Distribute bonus points via the weighted `GetRandomPointPet` draw
-    // (Data.cs:9961-9990), NOT a fixed rotation. Fresh time-seeded RNG mirrors
-    // the C# global `Data.random_0` (non-deterministic, so not golden-covered).
+    // Distribute bonus points via the weighted random draw, NOT a fixed
+    // rotation. Fresh time-seeded RNG (non-deterministic, so not
+    // golden-covered).
     let mut rng = DotNetRandom::time_seeded();
     for _ in 0..bonus_points {
         match random_point_stat(&mut rng, new_npc) {
@@ -372,8 +373,8 @@ pub async fn handle_pet_reborn(ctx: &mut OpcodeCtx<'_>) {
     }
 
     // Pet HpMax/SpMax map the reborn level onto the player formula:
-    // `getPetHpMax/getPetSpMax` (Data.cs:5569-5603): rb 0/1 → getXmax(0), rb 2 →
-    // getXmax(1), all at level 1 and from the BASE stats.
+    // rb 0/1 → get_x_max(0), rb 2 → get_x_max(1), all at level 1 and from
+    // the BASE stats.
     let rb_map = if new_npc.reborn == 2 { 1 } else { 0 };
     let hp_max = crate::battle::engine::get_hp_max(rb_map, 0, 1, i64::from(base_hpx)) as u16;
     let sp_max = crate::battle::engine::get_sp_max(rb_map, 0, 1, i64::from(base_spx)) as u16;
@@ -411,9 +412,8 @@ pub async fn handle_pet_reborn(ctx: &mut OpcodeCtx<'_>) {
     let player_id_le = encoder::le32(conn.session.id);
     let pet_id_le = encoder::le32(pet.id as u32);
 
-    // Map broadcasts first (C# `Server.SendToAllMapid` includes the sender, so
-    // `07000F02` / `0C000F01` go to the player AND the map — the latter via
-    // `broadcast_except`). Client.cs:9993-9995.
+    // Map broadcasts first: `07000F02` / `0C000F01` go to the player AND the
+    // map — the latter via `broadcast_except`.
     let f_0f02 = format!("F44407000F02{}{:02X}", player_id_le, stt);
     let f_0f01 = format!("F4440C000F01{}{:02X}{}01", player_id_le, stt, pet_id_le);
     out.send(f_0f02.clone());
@@ -423,148 +423,11 @@ pub async fn handle_pet_reborn(ctx: &mut OpcodeCtx<'_>) {
         hub.broadcast_except(conn.session.id, &f_0f01).await;
     }
 
-    // Pet status + trailer (C# `Data.SendStatusPet`, Data.cs:2212-2278).
+    // Pet status + trailer frames.
     for f in crate::server::spawn::pet_status_single(&conn.session, stt) {
         out.send(f);
     }
 
     out.send(format!("F44406001301{}", pet_id_le));
     out.send("F44402002C01");
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::battle::service::BattleService;
-    use crate::data::loader::GameData;
-    use crate::data::tables::{Item, Npc, Skill};
-    use crate::server::dispatcher::{test_ctx, HandleOutcome};
-    use crate::server::session::{Conn, InventoryItem, PetState};
-    use std::sync::Arc;
-
-    fn test_game_data() -> GameData {
-        let mut data = GameData::default();
-        // Add skill 10001 (element 1, point 1, lv_max 10, reborn 0)
-        data.skills.insert(
-            10001,
-            Skill {
-                id: 10001,
-                name: "Earth Skill".into(),
-                point: 1,
-                thuoctinh: 1,
-                lv_max: 10,
-                reborn: 0,
-                ..Default::default()
-            },
-        );
-        data.skills.insert(
-            10002,
-            Skill {
-                id: 10002,
-                name: "Fire Skill".into(),
-                point: 1,
-                thuoctinh: 3,
-                lv_max: 10,
-                reborn: 0,
-                ..Default::default()
-            },
-        );
-        // Add reborn pet item and pet NPC templates
-        data.items.insert(
-            20001,
-            Item {
-                id: 20001,
-                rb_pet_from: 15001,
-                rb_pet_to: 15002,
-                ..Default::default()
-            },
-        );
-        data.npcs.insert(
-            15002,
-            Npc {
-                id: 15002,
-                name: b"Reborn Pet".to_vec(),
-                reborn: 1,
-                thuoctinh: 1,
-                hpx: 10,
-                spx: 10,
-                atk: 20,
-                skill: [10001, 0, 0, 0],
-                ..Default::default()
-            },
-        );
-        data
-    }
-
-    #[tokio::test]
-    async fn test_player_skill_learn_success() {
-        let mut conn = Conn::new();
-        conn.session.skill_point = 5;
-        conn.session.thuoctinh = 1; // Earth
-
-        let data = test_game_data();
-        let service = BattleService::new(Arc::new(test_game_data()));
-        let mut out = HandleOutcome::default();
-        let payload = vec![0x11, 0x27, 0x01]; // skill 10001 target lv 1
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &payload);
-        handle_skills(&mut ctx).await;
-
-        assert_eq!(conn.session.skills.len(), 1);
-        assert_eq!(conn.session.skills[0], (10001, 1));
-        assert_eq!(conn.session.skill_point, 4);
-        assert_eq!(out.outgoing.len(), 2);
-    }
-
-    #[tokio::test]
-    async fn test_player_skill_learn_opposing_element_rejected() {
-        let mut conn = Conn::new();
-        conn.session.skill_point = 5;
-        conn.session.thuoctinh = 1; // Earth player cannot learn Fire skill (10002)
-
-        let data = test_game_data();
-        let service = BattleService::new(Arc::new(test_game_data()));
-        let mut out = HandleOutcome::default();
-        let payload = vec![0x12, 0x27, 0x01]; // skill 10002 target lv 1
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &payload);
-        handle_skills(&mut ctx).await;
-
-        assert!(
-            conn.session.skills.is_empty(),
-            "Earth player cannot learn Fire skill"
-        );
-        assert_eq!(conn.session.skill_point, 5);
-    }
-
-    #[tokio::test]
-    async fn test_pet_reborn_consumes_item_and_transforms_pet() {
-        let mut conn = Conn::new();
-        conn.session.id = 300001;
-        conn.session.pets.push(PetState {
-            stt: 1,
-            id: 15001,
-            level: 50,
-            reborn: 0,
-            skills: [(10001, 1), (0, 0), (0, 0), (0, 0)],
-            ..Default::default()
-        });
-        conn.session.homdo.push(InventoryItem {
-            slot: 1,
-            id: 20001,
-            count: 1,
-            ..Default::default()
-        });
-
-        let data = test_game_data();
-        let service = BattleService::new(Arc::new(test_game_data()));
-        let mut out = HandleOutcome::default();
-        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[1]);
-        handle_pet_reborn(&mut ctx).await;
-
-        assert_eq!(conn.session.pets[0].id, 15002);
-        assert_eq!(conn.session.pets[0].reborn, 1);
-        assert_eq!(conn.session.pets[0].level, 1);
-        assert!(conn.session.homdo.is_empty(), "Reborn item consumed");
-        assert!(out.outgoing.iter().any(|f| f.contains("0F08")));
-        assert!(out.outgoing.iter().any(|f| f.contains("2C01")));
-    }
 }

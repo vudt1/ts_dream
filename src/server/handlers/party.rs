@@ -14,7 +14,7 @@ pub fn handle_party(ctx: &mut OpcodeCtx) {
     let out = &mut ctx.out;
     let (sub, payload) = (ctx.sub, ctx.payload);
     match sub {
-        // Sub 5 — designate a member as quan-su (leader only, C# `Client.cs:1590-1638`).
+        // Sub 5 — designate a member as quan-su (leader only).
         5 => {
             if payload.len() < 4 {
                 return;
@@ -37,11 +37,11 @@ pub fn handle_party(ctx: &mut OpcodeCtx) {
             out.send(format!("F44406000D08{id4}"));
             out.send(format!("F44406000D07{id4}"));
             out.send(format!("F44406000D0B{id4}"));
-            // Map-wide fan-out (C# `SendToAllClientMapid`).
+            // Map-wide fan-out.
             out.broadcast(conn.session.id, format!("F44406000D07{id4}"));
             out.broadcast(conn.session.id, format!("F44406000D0B{id4}"));
         }
-        // Sub 6 — clear the quan-su designation (C# `Client.cs:1640-1648`).
+        // Sub 6 — clear the quan-su designation.
         6 => {
             let qs = conn.session.id_qs;
             if qs == 0 {
@@ -55,78 +55,5 @@ pub fn handle_party(ctx: &mut OpcodeCtx) {
             conn.session.id_qs = 0;
         }
         _ => {}
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::battle::service::BattleService;
-    use crate::data::loader::GameData;
-    use crate::server::dispatcher::{test_ctx, HandleOutcome};
-    use crate::server::session::Conn;
-
-    #[test]
-    fn leader_designates_quan_su() {
-        let svc = BattleService::new(std::sync::Arc::new(GameData::default()));
-        let data = GameData::default();
-        let mut conn = Conn::new();
-        conn.session.id = 300001;
-        conn.session.id_leader = 300001;
-        conn.session.id_mem = [300002, 300003, 0, 0];
-        let mut out = HandleOutcome::default();
-        let payload = 300002u32.to_le_bytes().to_vec();
-        let mut c = test_ctx(&mut conn, &data, &svc, &mut out, 5, &payload);
-        handle_party(&mut c);
-        assert_eq!(conn.session.id_qs, 300002);
-        // Self frames + map fan-out = 3 + 2.
-        assert_eq!(out.outgoing.len(), 3);
-        assert!(out.outgoing.iter().all(|f| f.contains("0D0")));
-        assert_eq!(out.map_broadcast.len(), 2);
-    }
-
-    #[test]
-    fn non_member_or_non_leader_ignored() {
-        let svc = BattleService::new(std::sync::Arc::new(GameData::default()));
-        let data = GameData::default();
-        let mut conn = Conn::new();
-        conn.session.id = 300001;
-        conn.session.id_leader = 300001;
-        conn.session.id_mem = [300002, 300003, 0, 0];
-        let mut out = HandleOutcome::default();
-        // Not a member.
-        let payload = 300009u32.to_le_bytes().to_vec();
-        let mut c = test_ctx(&mut conn, &data, &svc, &mut out, 5, &payload);
-        handle_party(&mut c);
-        assert_eq!(conn.session.id_qs, 0);
-        assert!(out.outgoing.is_empty());
-        // Member but not leader.
-        let svc2 = BattleService::new(std::sync::Arc::new(GameData::default()));
-        let data2 = GameData::default();
-        let mut conn2 = Conn::new();
-        conn2.session.id = 300002;
-        conn2.session.id_leader = 300001;
-        conn2.session.id_mem = [300002, 300003, 0, 0];
-        let mut out2 = HandleOutcome::default();
-        let payload = 300003u32.to_le_bytes().to_vec();
-        let mut c2 = test_ctx(&mut conn2, &data2, &svc2, &mut out2, 5, &payload);
-        handle_party(&mut c2);
-        assert_eq!(conn2.session.id_qs, 0);
-        assert!(out2.outgoing.is_empty());
-    }
-
-    #[test]
-    fn clear_quan_su() {
-        let svc = BattleService::new(std::sync::Arc::new(GameData::default()));
-        let data = GameData::default();
-        let mut conn = Conn::new();
-        conn.session.id = 300001;
-        conn.session.id_qs = 300002;
-        let mut out = HandleOutcome::default();
-        let mut c = test_ctx(&mut conn, &data, &svc, &mut out, 6, &[]);
-        handle_party(&mut c);
-        assert_eq!(conn.session.id_qs, 0);
-        assert_eq!(out.outgoing.len(), 2);
-        assert_eq!(out.map_broadcast.len(), 2);
     }
 }

@@ -5,8 +5,7 @@
 //! runs in a transaction guarded by `rows_affected() == 1` so a concurrent
 //! double-redeem of the same code cannot grant the reward twice.
 //!
-//! Unlike the C# version (which reserves the code and grants the item in two
-//! separate statements), here the reservation **and** the `homdo` grant live in
+//! The reservation **and** the `homdo` grant live in
 //! the same InnoDB transaction: if the inventory insert fails the redeem
 //! rolls back, so a used code never "disappears" while the reward was lost.
 
@@ -96,12 +95,12 @@ pub async fn redeem_and_grant(
     })
 }
 
-/// The once-only `TSVN123/TSVN456` special gift (Chapter 5 §5.5, Client.cs:7591-7617).
+/// The once-only `TSVN123/TSVN456` special gift (Chapter 5 §5.5).
 ///
 /// Grants the five hard-coded items (46197 + 20711 + 19711 + 23549 + 11001)
 /// and sets the player's `tanthu` flag in the same transaction as the `homdo`
 /// inserts, guarded against a concurrent double-claim. The `item_code`
-/// reservation is not consulted (C# updates it unconditionally); the once-only
+/// reservation is not consulted; the once-only
 /// guard is the `tanthu` flag.
 pub async fn redeem_special_gift(
     pool: &MySqlPool,

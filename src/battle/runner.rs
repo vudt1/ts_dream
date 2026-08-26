@@ -1,10 +1,9 @@
 //! Battle turn engine (Chapter 6 §6.2/§6.3) — deterministic, race-free.
 //!
-//! Faithful port of `TheBattle.cs` `Battling()` (lines 1002-4950). The turn
-//! engine runs synchronously over a `Battle` grid; the async per-battle task
-//! (`crate::battle::manager`) drives it turn-by-turn, feeding player commands
-//! and broadcasting the produced `Out` events. All packet strings are emitted
-//! byte-for-byte as the C# concatenates them.
+//! The turn engine runs synchronously over a `Battle` grid; the async
+//! per-battle task (`crate::battle::manager`) drives it turn-by-turn, feeding
+//! player commands and broadcasting the produced `Out` events. All packet
+//! strings are emitted byte-for-byte.
 
 use crate::battle::construction::Battle;
 use crate::battle::damage;
@@ -33,7 +32,7 @@ pub struct BattleCommand {
     pub use_item: i64,
 }
 
-/// Read tables the battle engine needs (mirrors the C# `Data` statics).
+/// Read-only view over the tables the battle engine needs.
 pub struct BattleData<'a> {
     pub npcs: &'a HashMap<i64, Npc>,
     pub skills: &'a HashMap<i64, Skill>,
@@ -54,7 +53,7 @@ pub struct BattleData<'a> {
     pub texps: &'a [crate::data::tables::TexpRow],
 }
 
-/// Player stats needed to settle exp/level-up rewards (`TheBattle.cs:4486-4506`).
+/// Player stats needed to settle exp/level-up rewards.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct PlayerSnapshot {
     pub texp: i64,
@@ -67,6 +66,7 @@ pub struct PlayerSnapshot {
 
 impl<'a> BattleData<'a> {
     /// Build data from live references (tests provide their own tables).
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         npcs: &'a HashMap<i64, Npc>,
         skills: &'a HashMap<i64, Skill>,
@@ -92,7 +92,7 @@ impl<'a> BattleData<'a> {
     }
 }
 
-/// DB stat being written (C# `Data.PlayerUpdateDataId` / `Data.PetUpdateData`).
+/// DB stat being written (player row or pet row).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Stat {
     Hp,
@@ -125,15 +125,15 @@ pub struct DbUpdate {
 /// One event produced by the battle engine.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Out {
-    /// Send to every living player-team member (C# `SendSKillingToParty`).
+    /// Send to every living player-team member.
     Broadcast(String),
-    /// Send directly to one player (C# `Server.SendToClient`).
+    /// Send directly to one player.
     ToPlayer(i64, String),
-    /// Send to every client on `player`'s map except `player` (`SendToAllClientMapid`).
+    /// Send to every client on `player`'s map except `player`.
     MapBroadcast { player: i64, frame: String },
     /// Persist a player/pet stat (HP/SP/exp/level).
     Db(DbUpdate),
-    /// Grant an item to a player's inventory (`Data.HomdoAddItem`).
+    /// Grant an item to a player's inventory.
     Drop {
         item_id: i64,
         npc_row: u8,
@@ -142,7 +142,7 @@ pub enum Out {
         col: u8,
         owner: i64,
     },
-    /// A pet catch succeeded — `Data.Addpet(owner, npc_id)`.
+    /// A pet catch succeeded (pet added to the owner).
     Catch { owner: i64, npc_id: i64 },
     /// A party member fled; restore HP/pets and exit battle for `player`.
     Fled { player: i64 },
@@ -153,7 +153,7 @@ pub enum Out {
         x: i64,
         y: i64,
     },
-    /// Pet exp grant at battle end (`Data.PetUpdateData(_Texp, ...)`).
+    /// Pet exp grant at battle end.
     PetExp { owner: i64, stt: i64, exp: i64 },
 }
 
@@ -166,7 +166,7 @@ pub enum Outcome {
     PlayerFled,
 }
 
-/// Per-turn accumulators (C# local state of `Battling()`).
+/// Per-turn accumulators.
 #[derive(Debug, Default)]
 struct TurnState {
     avg1: Option<f64>,
@@ -188,7 +188,7 @@ struct TurnState {
     last_target: (u8, u8),
 }
 
-/// Always-allowed skill ids (`TheBattle.cs:1563`).
+/// Always-allowed skill ids.
 const ALWAYS_ALLOWED: [i64; 8] = [10000, 15001, 15002, 15003, 17001, 18001, 18002, 19001];
 
 const DROP_PERCENTS: [i64; 6] = [25, 23, 20, 4, 3, 1];
@@ -217,7 +217,7 @@ impl Battle {
         commands: &HashMap<i64, BattleCommand>,
         out: &mut Vec<Out>,
     ) -> Outcome {
-        // Outcome check at loop top (`TheBattle.cs:1025-1036`).
+        // Outcome check at loop top.
         if self.all_enemies_dead() {
             return Outcome::PlayerWin;
         }
@@ -233,7 +233,7 @@ impl Battle {
             return outcome;
         }
 
-        // Leader SP regen (`IL_caac`, TheBattle.cs:4146-4247): when the
+        // Leader SP regen: when the
         // battle-initiating leader has a designated quan-su (`_My_IdQS`), the
         // leader's and every party-member's Sp regen by
         // `Round((QS.Int + QS.Int2) / 15.0)` per turn, capped at SpMax, both
@@ -430,7 +430,7 @@ impl Battle {
         }
     }
 
-    /// Apply HP loss with the C# DB-write rules (players/pets get a clamped
+    /// Apply HP loss with the standard DB-write rules (players/pets get a clamped
     /// DB write; npc types 3/7 just subtract).
     fn apply_hp_loss(&self, c: &mut WarInfo, dmg: i64, out: &mut Vec<Out>) {
         if !matches!(c.typ, 3 | 7) {
@@ -496,7 +496,7 @@ impl Battle {
         }
     }
 
-    /// Op 0x32 sub 2 — use a potion in battle (`Client.cs:7775-7846`).
+    /// Op 0x32 sub 2 — use a potion in battle.
     ///
     /// Heals the target cell's `_Hp`/`_Sp` (capped to its max) plus the active
     /// pet of the owner, both via the item record's `_Hp`/`_Sp`. Inventory
@@ -515,7 +515,7 @@ impl Battle {
         self.write_hp(c, c.hp, out);
         self.write_sp(c, c.sp, out);
 
-        // Active pet heal (C# DB writes for the active pet Stt — the leader's
+        // Active pet heal (DB writes target the active pet Stt — the leader's
         // lowest-stt pet cell, which is the first one loaded in `AddToBattle`).
         let owner = if c.id_char != 0 { c.id_char } else { c.id };
         if let Some(pet) = self
@@ -605,7 +605,7 @@ impl Battle {
         ts: &mut TurnState,
         out: &mut Vec<Out>,
     ) -> Outcome {
-        // Force-set attacked (C# line 1443-1455).
+        // Force-set attacked before execution.
         for cell in self.list_war.values_mut() {
             cell.attacked = true;
         }
@@ -645,7 +645,7 @@ impl Battle {
         let col_attack = attacker.col_attack;
         let hp2 = attacker.hp;
 
-        // --- SP cost gate (`TheBattle.cs:1535-1558`). ---
+        // --- SP cost gate. ---
         if attacker.type3_id == 0 && attacker.attacked {
             let cost = data.skills.get(&skill).map(|s| s.sp).unwrap_or(0);
             if attacker.sp >= cost {
@@ -672,7 +672,7 @@ impl Battle {
             }
         }
 
-        // --- Skill validity gate (`TheBattle.cs:1560-1590`). ---
+        // --- Skill validity gate. ---
         let skill_ok = hp2 > 0
             && skill > 0
             && row_attack < 4
@@ -716,7 +716,7 @@ impl Battle {
             skill_lv = 3;
         }
 
-        // Inherited combo from the previous entity (`TheBattle.cs:1607-1612`).
+        // Inherited combo from the previous entity.
         if ts.combo_active == 1 {
             num37 *= 1.3;
         }
@@ -726,7 +726,7 @@ impl Battle {
             data, ts, team, row_attack, col_attack, num34, skill_type, skill, skill_lv, &attacker,
         );
 
-        // Combo detection (`TheBattle.cs:1768-1908`).
+        // Combo detection.
         if idx + 1 < sorted.len() && skill_type == 1 {
             self.detect_combo(data, ts, sorted, idx, &attacker, &mut num37);
         }
@@ -906,7 +906,7 @@ impl Battle {
             self.write_cell(&mut attacker, (row, col));
         }
 
-        // --- Turn packet assembly (`TheBattle.cs:3593-3623`). ---
+        // --- Turn packet assembly. ---
         if !ts.text10.is_empty() {
             if ts.heal > 0 {
                 let n = count + 1;
@@ -989,7 +989,7 @@ impl Battle {
             .insert(crate::battle::engine::war_key(pos.0, pos.1), cell.clone());
     }
 
-    /// Combo detection (`TheBattle.cs:1768-1908`).
+    /// Combo detection.
     fn detect_combo(
         &mut self,
         data: &BattleData,
@@ -1062,7 +1062,7 @@ impl Battle {
         ts.combo_active = 0;
     }
 
-    /// Target list selection for a skill (`TheBattle.cs:1606-1767`).
+    /// Target list selection for a skill.
     #[allow(clippy::too_many_arguments)]
     fn pick_targets(
         &self,
@@ -1155,7 +1155,7 @@ impl Battle {
 
     // ---- Skill-type implementations --------------------------------------
 
-    /// Type 1 — physical attack (`TheBattle.cs:1953-2386`).
+    /// Type 1 — physical attack.
     #[allow(clippy::too_many_arguments)]
     fn apply_physical(
         &mut self,
@@ -1345,7 +1345,7 @@ impl Battle {
         ts.reflect = 0;
     }
 
-    /// Shield (20006) damage path — applies to the rear cell (`TheBattle.cs:1979-2145`).
+    /// Shield (20006) damage path — applies to the rear cell.
     #[allow(clippy::too_many_arguments)]
     fn apply_damage_to_rear(
         &mut self,
@@ -1463,7 +1463,7 @@ impl Battle {
         self.write_cell(&mut rear, (rr, rc));
     }
 
-    /// Type 2 — magic attack (`TheBattle.cs:2387-2668`).
+    /// Type 2 — magic attack.
     #[allow(clippy::too_many_arguments)]
     fn apply_magic(
         &mut self,
@@ -1569,7 +1569,7 @@ impl Battle {
         }
     }
 
-    /// Type 3 — Type3 debuff (`TheBattle.cs:2669-2812`).
+    /// Type 3 — Type3 debuff.
     #[allow(clippy::too_many_arguments)]
     fn apply_status3(
         &mut self,
@@ -1704,7 +1704,7 @@ impl Battle {
         }
     }
 
-    /// Type 4 — Type4 buff (`TheBattle.cs:2813-2844`).
+    /// Type 4 — Type4 buff.
     fn apply_buff4(
         &mut self,
         data: &BattleData,
@@ -1734,7 +1734,7 @@ impl Battle {
             .push_str(&packets::skilling_int(r, c, hit, adl, 1, byte_val, 0, 1));
     }
 
-    /// Type 5 — dispel Type4 / cure (`TheBattle.cs:2845-2922`).
+    /// Type 5 — dispel Type4 / cure.
     fn apply_dispel5(
         &mut self,
         data: &BattleData,
@@ -1855,7 +1855,8 @@ impl Battle {
         }
     }
 
-    /// Type 6 — SP restore (`TheBattle.cs:2923-2977`).
+    /// Type 6 — SP restore.
+    #[allow(clippy::too_many_arguments)]
     fn apply_sp_restore(
         &mut self,
         data: &BattleData,
@@ -1902,7 +1903,8 @@ impl Battle {
         ));
     }
 
-    /// Type 7 — HP restore (`TheBattle.cs:2978-3024`).
+    /// Type 7 — HP restore.
+    #[allow(clippy::too_many_arguments)]
     fn apply_hp_restore(
         &mut self,
         data: &BattleData,
@@ -1943,7 +1945,7 @@ impl Battle {
         ));
     }
 
-    /// Type 8 — revive (`TheBattle.cs:3025-3051`).
+    /// Type 8 — revive.
     fn apply_revive(
         &mut self,
         data: &BattleData,
@@ -1979,7 +1981,7 @@ impl Battle {
         ));
     }
 
-    /// Type 11 — catch pet (`TheBattle.cs:3052-3100`).
+    /// Type 11 — catch pet.
     fn apply_catch(
         &mut self,
         data: &BattleData,
@@ -2015,14 +2017,14 @@ impl Battle {
             if caster == attacker.id_char {
                 roll = 0; // pets cannot catch
             }
-            let free_slot = slots.iter().any(|&s| s == 0);
+            let free_slot = slots.contains(&0);
             if roll == 1 && free_slot {
                 self.clear_cell(target.row, target.col);
                 out.push(Out::Catch {
                     owner: caster,
                     npc_id: target.id,
                 });
-                // C# ends the battle as a win after catching.
+                // A successful catch ends the battle as a win.
                 return Outcome::PlayerWin;
             }
         }
@@ -2041,7 +2043,7 @@ impl Battle {
         Outcome::Running
     }
 
-    /// Type 12 — flee (`TheBattle.cs:3101-3222`).
+    /// Type 12 — flee.
     fn apply_flee(
         &mut self,
         data: &BattleData,
@@ -2117,7 +2119,8 @@ impl Battle {
         Outcome::Running
     }
 
-    /// Type 14 — heal HP + SP (`TheBattle.cs:3223-3309`).
+    /// Type 14 — heal HP + SP.
+    #[allow(clippy::too_many_arguments)]
     fn apply_heal14(
         &mut self,
         data: &BattleData,
@@ -2186,7 +2189,7 @@ impl Battle {
             .push_str(&format!("1A{}00", encoder::le16(sp as u16)));
     }
 
-    /// Type 15 — Type15 buff/debuff (`TheBattle.cs:3310-3391`).
+    /// Type 15 — Type15 buff/debuff.
     #[allow(clippy::too_many_arguments)]
     fn apply_buff15(
         &mut self,
@@ -2282,7 +2285,7 @@ impl Battle {
         }
     }
 
-    /// Type 16 — dispel Type4 pair (`TheBattle.cs:3392-3424`).
+    /// Type 16 — dispel Type4 pair.
     fn apply_dispel16(
         &mut self,
         data: &BattleData,
@@ -2319,7 +2322,8 @@ impl Battle {
         ));
     }
 
-    /// Type 18 — cleanse + heal (`TheBattle.cs:3425-3540`).
+    /// Type 18 — cleanse + heal.
+    #[allow(clippy::too_many_arguments)]
     fn apply_cleanse18(
         &mut self,
         data: &BattleData,
@@ -2419,7 +2423,7 @@ impl Battle {
         }
     }
 
-    /// Type 19 — Type19 debuff (`TheBattle.cs:3541-3577`).
+    /// Type 19 — Type19 debuff.
     fn apply_buff19(
         &mut self,
         data: &BattleData,
@@ -2456,16 +2460,16 @@ impl Battle {
 
     // ---- HP/SP DB write helpers ------------------------------------------
 
-    /// Leader SP regen block (`IL_caac`, TheBattle.cs:4146-4247).
+    /// Leader SP regen block.
     ///
     /// When the battle's initiating leader has a designated quan-su member
     /// (`leader_id_qs > 0`), the leader cell, the leader's pet cell
     /// (`row ^ 1`, `col`), and every party-member cell + pet cell regen Sp by
     /// `Round((qs.Int + qs.Int2) / 15.0)` capped at SpMax, with DB writes.
     ///
-    /// Fidelity notes: C# gates the member cells by `_My_IdMem1..4` + online
-    /// (TheBattle.cs:4208); this port snapshots the leader's QS at spawn and
-    /// does not add party members to the grid (`npc_battle`/`teamdef_battle`
+    /// Party members are gated by their online designation; this port
+    /// snapshots the leader's QS at spawn and does not add party members to
+    /// the grid (`npc_battle`/`teamdef_battle`)
     /// load the leader only), so the row scan below effectively hits the leader
     /// cell (+ pet) alone — the gate is vacuous until members are grid cells.
     fn leader_sp_regen(&mut self, out: &mut Vec<Out>) {
@@ -2545,7 +2549,7 @@ impl Battle {
         target.hp -= dmg;
     }
 
-    /// Register a hit type-7 npc for drop/exp processing (`TheBattle.cs:2315-2333`).
+    /// Register a hit type-7 npc for drop/exp processing.
     fn note_npc_hit(&self, ts: &mut TurnState, attacker: &mut WarInfo, npc: &WarInfo) {
         if npc.typ == 7 {
             let entry = format!("{}.{}/{}", npc.row, npc.col, npc.lv);
@@ -2563,7 +2567,7 @@ impl Battle {
         }
     }
 
-    /// Drop & exp accumulation per flushed turn (§3.6, TheBattle.cs:3621-3905).
+    /// Drop & exp accumulation per flushed turn (§3.6).
     fn process_kills(
         &mut self,
         data: &BattleData,
@@ -2673,8 +2677,8 @@ impl Battle {
         let Some(world) = data.world else {
             return;
         };
-        // Read `_Delay` BEFORE drawing `random_2` (RNG-ordering, C# reads the
-        // instance at TheBattle.cs:4701 then draws at :4719). A non-zero delay
+        // Read `_Delay` BEFORE drawing `random_2` (draw order matters for RNG
+        // reproducibility). A non-zero delay
         // means the npc is still in respawn cooldown → skip (no RNG draw).
         let entry = match world.read() {
             Ok(g) => match g.get(data.map_id, talking) {
@@ -2690,8 +2694,8 @@ impl Battle {
         let x = i64::from(self.rng.random_2.next_range(lo_x as i32, hi_x as i32));
         let y = i64::from(self.rng.random_2.next_range(lo_y as i32, hi_y as i32));
         // Write the respawn-cooldown marker back (`_Delay = 10`, next walk will
-        // decrement it each 900 ms tick). C# does NOT store the drawn coords
-        // (TheBattle.cs:4723) — they are broadcast to the map only.
+        // decrement it each 900 ms tick). The drawn coords are NOT stored —
+        // they are broadcast to the map only.
         if let Ok(mut g) = world.write() {
             if let Some(e) = g.get_mut(data.map_id, talking) {
                 e.delay = 10;
@@ -2705,7 +2709,7 @@ impl Battle {
         });
     }
 
-    /// End-of-battle: player rewards + cleanup packets (§3.8, TheBattle.cs:4458-4949).
+    /// End-of-battle: player rewards + cleanup packets (§3.8).
     ///
     /// `per_exp` = `Server.PerEXP` (usually 1). `fled` suppresses exp. Emits the
     /// hide/reposition frames, battle-exit UI packets, player exp Db writes
@@ -2827,8 +2831,8 @@ impl Battle {
             });
         }
 
-        // Win-path map-npc respawn (C# TheBattle.cs:4689-4724 — same `_Delay==0`
-        // gate + `_Delay=10` write + map-wide `F44406001603`/`F44408001605`).
+        // Win-path map-npc respawn — same `_Delay==0` gate + `_Delay=10`
+        // write + map-wide `F44406001603`/`F44408001605` frames.
         // The flee path already respawned in `apply_flee` (runner.rs:2075);
         // a defeat (players all dead) does not respawn the npc.
         if won {
@@ -2901,562 +2905,4 @@ fn parse_cell_entry(entry: &str) -> (u8, u8, i64) {
     let col = entry[dot + 1..slash].parse::<u8>().unwrap_or(0);
     let lv = entry[slash + 1..].parse::<i64>().unwrap_or(0);
     (row, col, lv)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::battle::engine::get_hp_max;
-    use std::collections::HashMap;
-
-    fn skill(id: i64, skill_type: i64, do_manh: i64, sl_danh: i64, delay: i64) -> Skill {
-        Skill {
-            id,
-            sp: if skill_type == 1 || skill_type == 2 {
-                5
-            } else {
-                10
-            },
-            thuoctinh: 1,
-            lv_max: 10,
-            skill_type,
-            do_manh,
-            sl_danh,
-            combo: 0,
-            delay,
-            ..Default::default()
-        }
-    }
-
-    fn npc(id: i64, lv: i64, hp: i64, atk: i64, def: i64, agi: i64) -> Npc {
-        Npc {
-            id,
-            lv,
-            hp,
-            sp: 100,
-            thuoctinh: 1,
-            atk,
-            def,
-            agi,
-            int1: 10,
-            skill: [10000, 0, 0, 0],
-            ..Default::default()
-        }
-    }
-
-    fn scenario() -> (Battle, BattleData<'static>) {
-        // Leak static tables so their references are 'static for the test.
-        let mut skills: HashMap<i64, Skill> = HashMap::new();
-        skills.insert(10000, skill(10000, 1, 10, 1, 1000));
-        skills.insert(11007, skill(11007, 7, 0, 1, 800));
-        let skills = Box::leak(Box::new(skills));
-        let mut npcs: HashMap<i64, Npc> = HashMap::new();
-        npcs.insert(9001, npc(9001, 10, 500, 20, 10, 10));
-        let npcs = Box::leak(Box::new(npcs));
-        let items: HashMap<i64, Item> = HashMap::new();
-        let items = Box::leak(Box::new(items));
-        let pets: HashMap<i64, [i64; 4]> = HashMap::new();
-        let pets = Box::leak(Box::new(pets));
-        let players: HashMap<i64, PlayerSnapshot> = HashMap::new();
-        let players = Box::leak(Box::new(players));
-        let texps = crate::data::texps::compute_texps();
-        let texps = Box::leak(Box::new(texps));
-        let data = BattleData::new(npcs, skills, items, pets, players, texps, None, 0, 0);
-        let battle = Battle::with_seeds(1, 112, 1, 2, 3);
-        (battle, data)
-    }
-
-    fn add_player(battle: &mut Battle) -> crate::server::session::Session {
-        let mut session = crate::server::session::Session::new();
-        session.id = 300001;
-        session.level = 10;
-        session.hp = 1000;
-        session.hp_max = 1000;
-        session.sp = 100;
-        session.sp_max = 100;
-        session.atk = 100;
-        session.def = 20;
-        session.agi = 50;
-        session.int1 = 30;
-        session.thuoctinh = 1;
-        session.hpx = 10;
-        battle.add_player(&session, session.id as i64, 3, 2);
-        session
-    }
-
-    fn add_npc(battle: &mut Battle, data: &BattleData) {
-        let npc = data.npcs.get(&9001).unwrap();
-        battle.add_npc(npc, 1, 0, 2, 3);
-    }
-
-    fn basic_command() -> HashMap<i64, BattleCommand> {
-        let mut cmds = HashMap::new();
-        cmds.insert(
-            300001,
-            BattleCommand {
-                row: 3,
-                col: 2,
-                skill_id: 10000,
-                skill_lv: 1,
-                row_attack: 0,
-                col_attack: 2,
-                use_item: 0,
-            },
-        );
-        cmds
-    }
-
-    #[test]
-    fn player_basic_attack_kills_npc() {
-        let (mut battle, data) = scenario();
-        add_player(&mut battle);
-        add_npc(&mut battle, &data);
-        let cmds = basic_command();
-
-        let mut out = Vec::new();
-        let outcome = battle.run_battle(&data, &cmds, &mut out);
-        assert_eq!(outcome, Outcome::PlayerWin);
-        // NPC dead.
-        assert!(battle.cell(0, 2).unwrap().hp <= 0);
-        // A turn action frame was broadcast.
-        assert!(out
-            .iter()
-            .any(|o| matches!(o, Out::Broadcast(f) if f.contains("3201"))));
-    }
-
-    #[test]
-    fn player_without_command_eventually_loses() {
-        let (mut battle, data) = scenario();
-        add_player(&mut battle);
-        add_npc(&mut battle, &data);
-        let cmds = HashMap::new();
-
-        let mut out = Vec::new();
-        let outcome = battle.run_battle(&data, &cmds, &mut out);
-        assert_eq!(outcome, Outcome::PlayerLose);
-        assert!(battle.cell(3, 2).unwrap().hp <= 0);
-        // DB HP write for the player happened.
-        assert!(out.iter().any(|o| matches!(
-            o,
-            Out::Db(DbUpdate {
-                target: DbTarget::Player(300001),
-                stat: Stat::Hp,
-                ..
-            })
-        )));
-    }
-
-    #[test]
-    fn burn_tick_damages_and_broadcasts() {
-        let (mut battle, data) = scenario();
-        add_player(&mut battle);
-        add_npc(&mut battle, &data);
-        // Give the player a burn debuff (10004, lv 3 → 10+6=16/turn).
-        battle.cell_mut(3, 2).unwrap().type3_id = 10004;
-        battle.cell_mut(3, 2).unwrap().type3_lv = 3;
-        battle.cell_mut(3, 2).unwrap().type3_turn = 2;
-        let cmds = basic_command();
-
-        let mut out = Vec::new();
-        battle.run_battle(&data, &cmds, &mut out);
-        // Burn broadcast uses skill 20001 (LE16 "214E").
-        assert!(out
-            .iter()
-            .any(|o| matches!(o, Out::Broadcast(f) if f.contains("214E"))));
-    }
-
-    #[test]
-    fn turn_action_frame_structure() {
-        let (mut battle, data) = scenario();
-        add_player(&mut battle);
-        add_npc(&mut battle, &data);
-        let cmds = basic_command();
-
-        let mut out = Vec::new();
-        let _ = battle.run_battle(&data, &cmds, &mut out);
-        let frame = out
-            .iter()
-            .find_map(|o| match o {
-                Out::Broadcast(f) if f.contains("3201") => Some(f.clone()),
-                _ => None,
-            })
-            .unwrap();
-        // F444 + LE16 length + 3201 + block(LE16 len + row col skill sl_danh count + effects)
-        assert!(frame.starts_with("F444"));
-        assert!(frame.contains("3201"));
-        // Skill 10000 = 0x2710 -> LE16 "1027".
-        assert!(frame.contains("1027"));
-    }
-
-    #[test]
-    fn heal_skill_restores_hp() {
-        let (mut battle, data) = scenario();
-        add_player(&mut battle);
-        add_npc(&mut battle, &data);
-        // Damage the player first.
-        battle.cell_mut(3, 2).unwrap().hp = 500;
-        let mut cmds = basic_command();
-        cmds.insert(
-            300001,
-            BattleCommand {
-                row: 3,
-                col: 2,
-                skill_id: 11007,
-                skill_lv: 3,
-                row_attack: 3,
-                col_attack: 2,
-                use_item: 0,
-            },
-        );
-
-        let mut out = Vec::new();
-        let _ = battle.run_turn(&data, &cmds, &mut out);
-        // A DB HP write for the player with value > 500 proves the heal applied
-        // (11007 lv3: round(int*0.2*lv)=round(30*0.6)=18).
-        let healed = out.iter().any(|o| {
-            matches!(
-                o,
-                Out::Db(DbUpdate { target: DbTarget::Player(300001), stat: Stat::Hp, value }) if *value > 500
-            )
-        });
-        assert!(healed, "expected a heal DB write for the player");
-    }
-
-    #[test]
-    fn flee_by_leader_ends_battle() {
-        let (mut battle, data) = scenario();
-        add_player(&mut battle);
-        add_npc(&mut battle, &data);
-        // Skill 14002 always flees.
-        let mut skills = HashMap::new();
-        skills.insert(10000, skill(10000, 1, 10, 1, 1000));
-        skills.insert(14002, skill(14002, 12, 0, 1, 0));
-        let mut npcs = HashMap::new();
-        npcs.insert(9001, npc(9001, 10, 500, 20, 10, 10));
-        let items = HashMap::new();
-        let pets = HashMap::new();
-        let players = HashMap::new();
-        let texps = crate::data::texps::compute_texps();
-        let data = BattleData::new(&npcs, &skills, &items, &pets, &players, &texps, None, 0, 0);
-
-        let mut cmds = HashMap::new();
-        cmds.insert(
-            300001,
-            BattleCommand {
-                row: 3,
-                col: 2,
-                skill_id: 14002,
-                skill_lv: 1,
-                row_attack: 0,
-                col_attack: 2,
-                use_item: 0,
-            },
-        );
-        let mut out = Vec::new();
-        let outcome = battle.run_battle(&data, &cmds, &mut out);
-        assert_eq!(outcome, Outcome::PlayerFled);
-    }
-
-    #[test]
-    fn use_item_heals_cell_and_pet() {
-        let (mut battle, mut data_with_items) = scenario();
-        // Add a potion to the item table.
-        let items: HashMap<i64, Item> = {
-            let mut m = HashMap::new();
-            m.insert(
-                26001,
-                Item {
-                    id: 26001,
-                    hp: 500,
-                    sp: 200,
-                    ..Default::default()
-                },
-            );
-            m
-        };
-        let items = Box::leak(Box::new(items));
-        let npcs = Box::leak(Box::new(data_with_items.npcs.clone()));
-        let skills = Box::leak(Box::new(data_with_items.skills.clone()));
-        let pets = Box::leak(Box::new(data_with_items.pet_slots.clone()));
-        let players = Box::leak(Box::new(data_with_items.players.clone()));
-        let texps = Box::leak(Box::new(crate::data::texps::compute_texps()));
-        data_with_items = BattleData::new(npcs, skills, items, pets, players, texps, None, 0, 0);
-
-        let mut session = crate::server::session::Session::new();
-        session.id = 300001;
-        session.level = 10;
-        session.hp = 1000;
-        session.hp_max = 1000;
-        session.sp = 100;
-        session.sp_max = 100;
-        session.atk = 100;
-        session.def = 20;
-        session.agi = 50;
-        session.int1 = 30;
-        battle.add_player(&session, session.id as i64, 3, 2);
-        // Attach a pet at (2,1).
-        let mut pet = crate::server::session::PetState::default();
-        pet.stt = 1;
-        pet.id = 9001;
-        pet.hp = 200;
-        pet.hp_max = 500;
-        pet.sp = 100;
-        pet.sp_max = 500;
-        battle.add_pet(&pet, session.id as i64, session.id as i64, 3, 2, 1);
-
-        let add_npc = {
-            let n = data_with_items.npcs.get(&9001).unwrap();
-            battle.add_npc(n, 1, 0, 2, 3);
-        };
-        let _ = add_npc;
-
-        // Damage the player then use potion 26001 on the player cell.
-        battle.cell_mut(3, 2).unwrap().hp = 700;
-        battle.cell_mut(3, 2).unwrap().sp = 40;
-        let mut cmds = HashMap::new();
-        cmds.insert(
-            300001,
-            BattleCommand {
-                row: 3,
-                col: 2,
-                skill_id: 0,
-                skill_lv: 0,
-                row_attack: 0,
-                col_attack: 2,
-                use_item: 26001,
-            },
-        );
-        let mut out = Vec::new();
-        let _ = battle.run_turn(&data_with_items, &cmds, &mut out);
-        let cell = battle.cell(3, 2).unwrap();
-        // 700 + 500 capped to 1000; 40 + 200 capped to 100.
-        assert_eq!(cell.hp, 1000);
-        assert_eq!(cell.sp, 100);
-        // Pet DB write fired (heal the owner's active pet).
-        assert!(out.iter().any(|o| matches!(
-            o,
-            Out::Db(DbUpdate {
-                target: DbTarget::Pet { owner: 300001, .. },
-                stat: Stat::Hp,
-                ..
-            })
-        )));
-    }
-
-    #[test]
-    fn hp_max_formula_matches() {
-        // getHpMax(rb=0, job, lvl=10, hpx=6): floor((10^0.35+1)*12 + 80 + 10).
-        let v = get_hp_max(0, 0, 10, 6);
-        assert!(v > 0);
-    }
-
-    #[test]
-    fn finish_grants_teamdef_exp_and_exit_packets() {
-        // A TeamDef (type-7) kill accumulates exp; finish pays it out.
-        let (mut battle, data) = scenario();
-        add_player(&mut battle);
-        // Use a type-7 npc instead of the scenario's type-3.
-        battle.clear_cell(0, 2);
-        let n = data.npcs.get(&9001).unwrap();
-        battle.add_npc(n, 1, 0, 2, 7);
-        let cmds = basic_command();
-
-        let mut out = Vec::new();
-        let outcome = battle.run_battle(&data, &cmds, &mut out);
-        assert_eq!(outcome, Outcome::PlayerWin);
-        let hp = battle.cell(3, 2).unwrap().hp;
-        let _ = hp;
-
-        let mut fin = Vec::new();
-        battle.finish(&data, 1, false, true, &mut fin);
-        // A Texp write for the player on a type-7 kill.
-        assert!(fin.iter().any(|o| matches!(
-            o,
-            Out::Db(DbUpdate {
-                target: DbTarget::Player(300001),
-                stat: Stat::Texp,
-                ..
-            })
-        )));
-        // Exit UI frames.
-        assert!(fin
-            .iter()
-            .any(|o| matches!(o, Out::Broadcast(f) if *f == packets::battle_exit_move())));
-        assert!(fin
-            .iter()
-            .any(|o| matches!(o, Out::Broadcast(f) if *f == packets::battle_exit_talk())));
-        // Player stays alive and unarmed after battle.
-        assert!(battle.cell(3, 2).unwrap().hp > 0);
-    }
-
-    #[test]
-    fn leader_sp_regen_restores_leader_and_pet_sp() {
-        let (mut battle, data) = scenario();
-        let mut session = add_player(&mut battle);
-        battle.add_npc(&data.npcs.get(&9001).unwrap(), 1, 0, 2, 3);
-        // Designate a quan-su: QS int 30 → num109 = round(30/15.0) = 2.
-        session.id_qs = 300002;
-        session.int1 = 30;
-        battle.leader_id_qs = 300002;
-        battle.leader_qs_int = 30;
-        // Drain the leader's SP below max so the regen is observable.
-        battle.cell_mut(3, 2).unwrap().sp = 90;
-        battle.cell_mut(3, 2).unwrap().sp_max = 100;
-        let cmds = HashMap::new(); // no commands; the regen still runs.
-        let mut out = Vec::new();
-        let _ = battle.run_turn(&data, &cmds, &mut out);
-        // Leader SP 90 + 2 = 92.
-        assert_eq!(battle.cell(3, 2).unwrap().sp, 92);
-        // A Db Sp write for the leader was emitted.
-        assert!(out.iter().any(|o| matches!(
-            o,
-            Out::Db(DbUpdate {
-                target: DbTarget::Player(300001),
-                stat: Stat::Sp,
-                value: 92,
-            })
-        )));
-    }
-
-    #[test]
-    fn leader_sp_regen_skips_when_no_quan_su() {
-        let (mut battle, data) = scenario();
-        add_player(&mut battle);
-        battle.add_npc(&data.npcs.get(&9001).unwrap(), 1, 0, 2, 3);
-        battle.cell_mut(3, 2).unwrap().sp = 90;
-        let cmds = HashMap::new();
-        let mut out = Vec::new();
-        let _ = battle.run_turn(&data, &cmds, &mut out);
-        // No QS → no regen.
-        assert_eq!(battle.cell(3, 2).unwrap().sp, 90);
-        // The leader's own action may legitimately write Sp (basic attack cost);
-        // the assertion is scoped to the regen: SP must be exactly 90, never
-        // bumped by a +2 quan-su regen.
-        let mut regen_sp = out.iter().filter_map(|o| match o {
-            Out::Db(DbUpdate {
-                target: DbTarget::Player(300001),
-                stat: Stat::Sp,
-                value,
-            }) => Some(*value),
-            _ => None,
-        });
-        assert!(
-            regen_sp.all(|v| v == 90),
-            "SP writes must reflect the un-regened value; got: {:?}",
-            out.iter()
-                .filter_map(|o| match o {
-                    Out::Db(DbUpdate {
-                        target: DbTarget::Player(300001),
-                        stat: Stat::Sp,
-                        value,
-                    }) => Some(*value),
-                    _ => None,
-                })
-                .collect::<Vec<_>>()
-        );
-    }
-
-    #[test]
-    fn finish_win_respawns_npc_with_delay_lifecycle() {
-        // G2: the win path must respawn the map npc when its instance exists
-        // and `_Delay == 0`, drawing `random_2` and writing `_Delay = 10`.
-        use crate::battle::npc_world::NpcWorld;
-        use crate::data::tables::NpcOnMap;
-        use std::sync::{Arc, RwLock};
-
-        let rows = vec![NpcOnMap {
-            map_id: 12001,
-            id: 7,
-            npc_id: 9001,
-            x: 400,
-            y: 500,
-            coord: 10,
-            so_luong: 1,
-        }];
-        let world = Arc::new(RwLock::new(NpcWorld::new(&rows)));
-
-        let (mut battle, data) = scenario();
-        let mut session = add_player(&mut battle);
-        session.talking_battle = 7;
-        session.map_id = 12001;
-        battle.add_npc(&data.npcs.get(&9001).unwrap(), 1, 0, 2, 3);
-        let cmds = basic_command();
-        let mut out = Vec::new();
-        let _ = battle.run_battle(&data, &cmds, &mut out);
-        let mut fin = Vec::new();
-        let data2 = BattleData::new(
-            data.npcs,
-            data.skills,
-            data.items,
-            data.pet_slots,
-            data.players,
-            data.texps,
-            Some(world.as_ref()),
-            7,
-            12001,
-        );
-        battle.finish(&data2, 1, false, true, &mut fin);
-        // The npc was respawned: delay set to 10 and a Respawn out produced.
-        let guard = world.read().unwrap();
-        let e = guard.get(12001, 7).unwrap();
-        assert_eq!(e.delay, 10);
-        assert!(fin.iter().any(|o| matches!(
-            o,
-            Out::Respawn {
-                npc_id: 7,
-                map_id: 12001,
-                ..
-            }
-        )));
-    }
-
-    #[test]
-    fn finish_lose_does_not_respawn_npc() {
-        // A defeat (players all dead) must NOT respawn the map npc.
-        use crate::battle::npc_world::NpcWorld;
-        use crate::data::tables::NpcOnMap;
-        use std::sync::{Arc, RwLock};
-
-        let rows = vec![NpcOnMap {
-            map_id: 12001,
-            id: 7,
-            npc_id: 9001,
-            x: 400,
-            y: 500,
-            coord: 10,
-            so_luong: 1,
-        }];
-        let world = Arc::new(RwLock::new(NpcWorld::new(&rows)));
-
-        let (mut battle, data) = scenario();
-        let mut session = add_player(&mut battle);
-        session.talking_battle = 7;
-        session.map_id = 12001;
-        // A far stronger npc: the player dies without a command.
-        let mut npc = data.npcs.get(&9001).unwrap().clone();
-        npc.atk = 50_000;
-        npc.hp = 1_000_000;
-        battle.add_npc(&npc, 1, 0, 2, 3);
-        let cmds = HashMap::new();
-        let mut out = Vec::new();
-        let outcome = battle.run_battle(&data, &cmds, &mut out);
-        assert_eq!(outcome, Outcome::PlayerLose);
-        let mut fin = Vec::new();
-        let data2 = BattleData::new(
-            data.npcs,
-            data.skills,
-            data.items,
-            data.pet_slots,
-            data.players,
-            data.texps,
-            Some(world.as_ref()),
-            7,
-            12001,
-        );
-        battle.finish(&data2, 1, false, false, &mut fin);
-        let guard = world.read().unwrap();
-        let e = guard.get(12001, 7).unwrap();
-        assert_eq!(e.delay, 0, "defeat must not respawn the npc");
-        assert!(!fin.iter().any(|o| matches!(o, Out::Respawn { .. })));
-    }
 }

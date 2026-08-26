@@ -4,7 +4,7 @@ use super::encoder;
 
 /// Minimal Packet builder producing the `F444` + len + opcode/sub + payload
 /// frames. Officially the wire is `F444` + length(LE u16 bytes-after-header)
-/// + payload; `SEND(hex)` in the C# code builds this framing automatically.
+/// + payload; every outgoing send builds this framing automatically.
 #[derive(Debug, Clone, Default)]
 pub struct Packet(String);
 
@@ -49,25 +49,5 @@ impl Packet {
     /// Build as on-wire (XOR) bytes.
     pub fn build_wire(self) -> crate::error::Result<Vec<u8>> {
         super::frame::encode_to_wire(&self.build())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn build_frame_length() {
-        // opcode 0x03 sub 0x01, empty body -> F44402000301
-        let p = Packet::opcode(0x03, 0x01).build();
-        assert_eq!(p, "F44402000301");
-    }
-
-    #[test]
-    fn full_frame_length_field() {
-        // body = opcode/sub 00 00 + payload 01 00 = 4 bytes -> len 4 "0400"
-        let p = Packet::opcode(0x00, 0x00).raw("0100").build();
-        assert_eq!(p, "F444040000000100");
-        assert_eq!(p.len(), 16);
     }
 }

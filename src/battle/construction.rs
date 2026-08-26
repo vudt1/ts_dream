@@ -1,8 +1,7 @@
 //! Battle construction (Chapter 6 §6.1).
 //!
 //! Creates a new battle grid, populates cells with players/NPCs/pets, and
-//! manages the IdBattle counter. Faithful port of `TheBattle.cs` `CreatNewBattle`
-//! (line 32), `ChangedWar` (73), `AddToBattle` (116) and `AddNPCToBattle` (424).
+//! manages the global battle-id counter.
 
 use crate::battle::engine::{war_key, WarInfo};
 use crate::battle::packets;
@@ -14,16 +13,16 @@ use std::collections::HashMap;
 /// One battle-start packet, tagged with its recipient routing.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StartPacket {
-    /// Send directly to `player` (`Server.SendToClient`).
+    /// Send directly to `player`.
     To { player: i64, frame: String },
-    /// Send to every client on `player`'s map, excluding `player` (`SendToAllClientMapid`).
+    /// Send to every client on `player`'s map, excluding `player`.
     Map { player: i64, frame: String },
 }
 
 /// A live battle instance.
 #[derive(Debug)]
 pub struct Battle {
-    /// Unique battle id (assigned from `IdBattleCount` before increment).
+    /// Unique battle id (assigned from the global counter before increment).
     pub id_battle: i32,
     /// Terrain id.
     pub diahinh: i32,
@@ -36,10 +35,10 @@ pub struct Battle {
     /// Spectator/join slots (1..50).
     pub list_qs: HashMap<i32, i32>,
     /// The battle-initiating leader's designated quan-su id (`_My_IdQS`),
-    /// captured at spawn (C# reads it live; this port snapshots it).
+    /// captured at spawn (snapshotted rather than read live each turn).
     pub leader_id_qs: i64,
     /// The designated quan-su member's `Int + Int2` sum for the per-turn SP
-    /// regen block (C# `IL_caac` `num108`), captured at spawn.
+    /// regen block, captured at spawn.
     pub leader_qs_int: i64,
 }
 
@@ -119,9 +118,9 @@ impl Battle {
 
     /// Load the leader's up-to-4 battle pets.
     ///
-    /// C# `AddToBattle` (TheBattle.cs:135-238): leader pets at `(row^1, col)` for
-    /// cols `1,3,0,4` using pet Stt `active .. active+3`. Later member pets
-    /// overwrite overlapping cells (dict insertion order wins).
+    /// Leader pets sit at `(row^1, col)` for cols `1,3,0,4` using pet Stt
+    /// `active .. active+3`. Later member pets overwrite overlapping cells
+    /// (dict insertion order wins).
     pub fn load_leader_pets(&mut self, session: &Session, leader_id: i64, row: u8) {
         let team = if row == 0 { 2 } else { 1 };
         let base = session.active_pet_stt as i64;
@@ -136,7 +135,7 @@ impl Battle {
     }
 
     /// Load one battle pet for a party member at `(row^1, col)` when the member's
-    /// active pet Stt is in 1..=4 (C# AddToBattle member block, line 251-283).
+    /// active pet Stt is in 1..=4.
     pub fn load_member_pet(&mut self, session: &Session, leader_id: i64, row: u8, col: u8) {
         let team = if row == 0 { 2 } else { 1 };
         let stt = session.active_pet_stt as i64;
@@ -321,7 +320,7 @@ impl Battle {
     }
 
     /// Generate the battle-start packets for an NPC battle (leader view + each
-    /// member's own open frame), mirroring `BattleNpc` (`TheBattle.cs:676-712`).
+    /// member's own open frame).
     ///
     /// Returns packets tagged with their recipient (`StartPacket::To`) or the
     /// "show on map" broadcast (`StartPacket::Map`).
@@ -383,7 +382,7 @@ impl Battle {
                         }
                     }
 
-                    // Member's own battle frame (SendBattleMem1 equivalent)
+                    // Member's own battle frame
                     out.extend(self.member_battle_frame(diahinh, member.id));
                 } else if let Some(pet) = self.cell(2, col) {
                     // Member absent: still send their (leader-row) pet cell if set.
@@ -414,9 +413,9 @@ impl Battle {
         out
     }
 
-    /// The member's own `0BFA` battle frame (`SendBattleMem1`, TheBattle.cs:756-1000).
+    /// The member's own `0BFA` battle frame.
     ///
-    /// Packet order mirrors the C#: show leader → show other members → the `0BFA`
+    /// Packet order: show leader → show other members → the `0BFA`
     /// frame → map broadcast of self → own pet entity → enemy entities.
     /// Markers inside the frame: `05`+self, `03`+leader(+leader pet),
     /// `64`+each other member(+their pet).
@@ -537,6 +536,7 @@ impl BattleCounter {
     }
 
     /// Get the next battle ID (assigns before incrementing).
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> i32 {
         let id = self.next_id;
         self.next_id += 1;
@@ -546,17 +546,16 @@ impl BattleCounter {
 
 /// Diahinh constants for the four trigger types (Ch6 §6.1).
 pub mod trigger_diahinh {
-    /// PK challenge (`Client.cs:1300`) and NPC attack (`Client.cs:1323`).
+    /// PK challenge and NPC attack battles.
     pub const PK_AND_NPC: i32 = 112;
-    /// Active-NPC (so-luong) battle (`Data.cs:5026-5080`).
+    /// Active-NPC (so-luong) battle.
     pub const ACTIVE_NPC: i32 = 4712;
-    /// Quest/TeamDef battle — Diahinh comes from `dataTalkTeamDefs[0]`.
+    /// Quest/TeamDef battle — Diahinh comes from the quest talk definition.
     pub const TEAMDEF: i32 = 0;
 }
 
 impl Battle {
-    /// Build a player-vs-NPC battle (`TheBattle(IdLeader, IdNpc, IdNpcOnMap, 112)`,
-    /// TheBattle.cs:485). Enemy is a hostile NPC (Type 3) at (0,2).
+    /// Build a player-vs-NPC battle. Enemy is a hostile NPC (Type 3) at (0,2).
     pub fn npc_battle(
         id_battle: i32,
         leader: &Session,
@@ -572,8 +571,7 @@ impl Battle {
         battle
     }
 
-    /// Build a TeamDef battle (`TheBattle(IdLeader, TeamDeffender, DiaHinh)`,
-    /// TheBattle.cs:526). `defenders` are placed at rows 0-1 in the C# order
+    /// Build a TeamDef battle. `defenders` are placed at rows 0-1 in id order
     /// with Type 7. Pass `members` to include party members (leader-only if empty).
     pub fn teamdef_battle(
         id_battle: i32,
@@ -612,306 +610,5 @@ impl Battle {
             battle.add_npc(npc, (i + 1) as i64, r, c, 7);
         }
         battle
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::server::session::Session;
-
-    #[test]
-    fn create_battle_grid() {
-        let battle = Battle::new(1, 112);
-        assert_eq!(battle.list_war.len(), 20);
-        assert_eq!(battle.keys.len(), 20);
-        assert_eq!(battle.list_qs.len(), 50);
-    }
-
-    #[test]
-    fn add_player_and_npc() {
-        let mut battle = Battle::new(1, 112);
-        let session = Session::new();
-
-        battle.add_player(&session, session.id as i64, 3, 2);
-
-        let cell = battle.cell(3, 2).unwrap();
-        assert_eq!(cell.typ, 2);
-        assert_eq!(cell.team, 1);
-        assert_eq!(cell.row, 3);
-        assert_eq!(cell.col, 2);
-
-        let npc = Npc {
-            id: 1001,
-            hp: 500,
-            sp: 200,
-            lv: 10,
-            thuoctinh: 1,
-            atk: 50,
-            def: 30,
-            agi: 20,
-            int1: 15,
-            ..Default::default()
-        };
-        battle.add_npc(&npc, 1, 0, 2, 3);
-
-        let enemy = battle.cell(0, 2).unwrap();
-        assert_eq!(enemy.typ, 3);
-        assert_eq!(enemy.team, 2);
-        assert_eq!(enemy.hp, 500);
-        assert_eq!(enemy.id, 1001);
-    }
-
-    #[test]
-    fn leader_pets_loaded_at_expected_cells() {
-        let mut battle = Battle::new(1, 112);
-        let mut session = Session::new();
-        session.id = 300001;
-        session.active_pet_stt = 1;
-        for stt in 1..=4u8 {
-            let mut pet = PetState::default();
-            pet.stt = stt;
-            pet.id = 9000 + u16::from(stt);
-            pet.hp_max = 100;
-            pet.hp = 100;
-            pet.level = 5;
-            session.pets.push(pet);
-        }
-        battle.add_player(&session, session.id as i64, 3, 2);
-        battle.load_leader_pets(&session, session.id as i64, 3);
-
-        // Leader pets at (2,1), (2,3), (2,0), (2,4) with Stt 1,2,3,4.
-        for (i, col) in [1u8, 3, 0, 4].iter().enumerate() {
-            let cell = battle.cell(2, *col).unwrap();
-            assert_eq!(cell.typ, 4, "pet cell (2,{col})");
-            assert_eq!(cell.id, 9000 + i as i64 + 1);
-            assert_eq!(cell.id_char, 300001);
-            assert_eq!(cell.id_npc_on_map, i as i64 + 1);
-        }
-    }
-
-    #[test]
-    fn member_pet_overwrites_leader_pet() {
-        let mut battle = Battle::new(1, 112);
-        let mut leader = Session::new();
-        leader.id = 300001;
-        leader.active_pet_stt = 1;
-        let mut pet = PetState::default();
-        pet.stt = 1;
-        pet.id = 9001;
-        leader.pets.push(pet);
-
-        let mut member = Session::new();
-        member.id = 300002;
-        member.active_pet_stt = 1;
-        let mut mp = PetState::default();
-        mp.stt = 1;
-        mp.id = 8002;
-        member.pets.push(mp);
-
-        battle.add_player(&leader, leader.id as i64, 3, 2);
-        battle.load_leader_pets(&leader, leader.id as i64, 3);
-        battle.add_player(&member, leader.id as i64, 3, 1);
-        battle.load_member_pet(&member, leader.id as i64, 3, 1);
-
-        // Member processed later overwrites the leader's pet at (2,1).
-        let cell = battle.cell(2, 1).unwrap();
-        assert_eq!(cell.id, 8002);
-    }
-
-    #[test]
-    fn teamdef_npcs() {
-        let mut battle = Battle::new(1, 100);
-        let npc = Npc {
-            id: 2001,
-            hp: 300,
-            sp: 100,
-            lv: 5,
-            thuoctinh: 2,
-            ..Default::default()
-        };
-
-        // TeamDef: id1→(0,0), id2→(0,1), ..., id6→(1,0), etc.
-        let positions: [(u8, u8); 10] = [
-            (0, 0),
-            (0, 1),
-            (0, 2),
-            (0, 3),
-            (0, 4),
-            (1, 0),
-            (1, 1),
-            (1, 2),
-            (1, 3),
-            (1, 4),
-        ];
-        for (i, &(r, c)) in positions.iter().enumerate() {
-            battle.add_npc(&npc, (i + 1) as i64, r, c, 7);
-        }
-
-        for &(r, c) in &positions {
-            let cell = battle.cell(r, c).unwrap();
-            assert_eq!(cell.typ, 7);
-            assert_eq!(cell.team, 2);
-        }
-    }
-
-    #[test]
-    fn win_lose_checks() {
-        let mut battle = Battle::new(1, 112);
-
-        // Initially all empty → both sides "dead"
-        assert!(battle.all_enemies_dead());
-        assert!(battle.all_players_dead());
-
-        // Add a player
-        let mut session = Session::new();
-        session.id = 300001;
-        session.hp = 100;
-        session.hp_max = 100;
-        battle.add_player(&session, 1, 3, 2);
-        assert!(!battle.all_players_dead());
-        assert!(battle.all_enemies_dead());
-
-        // Add an NPC
-        let npc = Npc {
-            id: 1,
-            hp: 100,
-            ..Default::default()
-        };
-        battle.add_npc(&npc, 1, 0, 2, 3);
-        assert!(!battle.all_enemies_dead());
-        assert_eq!(battle.count_enemies_alive(), 1);
-        assert_eq!(battle.count_players_alive(), 1);
-    }
-
-    #[test]
-    fn battle_counter() {
-        let mut counter = BattleCounter::new();
-        assert_eq!(counter.next(), 1);
-        assert_eq!(counter.next(), 2);
-        assert_eq!(counter.next(), 3);
-    }
-
-    #[test]
-    fn turn_order_sorts_correctly() {
-        let mut battle = Battle::with_seeds(1, 112, 42, 43, 44);
-
-        if let Some(cell) = battle.cell_mut(3, 2) {
-            cell.id = 1;
-            cell.agi = 100;
-            cell.attacked = true;
-            cell.random = 50;
-        }
-        if let Some(cell) = battle.cell_mut(0, 2) {
-            cell.id = 2;
-            cell.agi = 200;
-            cell.attacked = true;
-            cell.random = 30;
-        }
-
-        let order = battle.turn_order();
-        assert_eq!(order[0], (0, 2)); // agi=200 higher
-        assert_eq!(order[1], (3, 2));
-    }
-
-    #[test]
-    fn npc_battle_start_packets() {
-        let mut battle = Battle::new(1, 112);
-        let mut session = Session::new();
-        session.id = 300001;
-        session.hp = 100;
-        session.hp_max = 100;
-        session.sp = 50;
-        session.sp_max = 50;
-        session.level = 10;
-        session.thuoctinh = 1;
-        battle.add_player(&session, session.id as i64, 3, 2);
-
-        let npc = Npc {
-            id: 1001,
-            hp: 500,
-            sp: 200,
-            lv: 10,
-            thuoctinh: 1,
-            ..Default::default()
-        };
-        battle.add_npc(&npc, 1, 0, 2, 3);
-
-        let packets = battle.npc_battle_start_packets(112);
-        assert!(packets.len() >= 3); // open + show on map + enemy entity
-        match &packets[0] {
-            StartPacket::To { frame, .. } => assert!(frame.starts_with("F4441C000BFA")),
-            _ => panic!("first packet must be the leader open frame"),
-        }
-    }
-
-    #[test]
-    fn npc_battle_constructor() {
-        let leader = Session::new();
-        let npc = Npc {
-            id: 1001,
-            hp: 500,
-            lv: 10,
-            thuoctinh: 1,
-            ..Default::default()
-        };
-        let battle = Battle::npc_battle(1, &leader, 300001, &npc, 7, trigger_diahinh::PK_AND_NPC);
-        assert_eq!(battle.diahinh, 112);
-        assert_eq!(battle.cell(3, 2).unwrap().id, leader.id as i64);
-        assert_eq!(battle.cell(0, 2).unwrap().typ, 3);
-    }
-
-    #[test]
-    fn teamdef_battle_constructor() {
-        let mut leader = Session::new();
-        leader.id = 300001;
-        let mut member = Session::new();
-        member.id = 300002;
-        let npcs: Vec<Npc> = (1..=3)
-            .map(|i| Npc {
-                id: 1000 + i,
-                hp: 300,
-                lv: 5,
-                thuoctinh: 2,
-                ..Default::default()
-            })
-            .collect();
-        let defs: Vec<&Npc> = npcs.iter().collect();
-        let battle = Battle::teamdef_battle(1, &leader, 300001, &[&member], &defs, 4712);
-        // Defenders at (0,0),(0,1),(0,2) Type 7.
-        assert_eq!(battle.cell(0, 0).unwrap().typ, 7);
-        assert_eq!(battle.cell(0, 0).unwrap().id, 1001);
-        assert_eq!(battle.cell(0, 2).unwrap().id, 1003);
-        // Member placed at col 1.
-        assert_eq!(battle.cell(3, 1).unwrap().id, 300002);
-    }
-
-    #[test]
-    fn member_frame_has_markers() {
-        let mut battle = Battle::new(1, 112);
-        let mut leader = Session::new();
-        leader.id = 300001;
-        battle.add_player(&leader, leader.id as i64, 3, 2);
-
-        let mut member = Session::new();
-        member.id = 300002;
-        member.hp = 100;
-        member.hp_max = 100;
-        battle.add_player(&member, leader.id as i64, 3, 1);
-
-        let frames = battle.member_battle_frame(112, 300002);
-        assert!(!frames.is_empty());
-        // Find the 0BFA open frame among the member packets.
-        let open = frames
-            .iter()
-            .filter_map(|p| match p {
-                StartPacket::To { frame, .. } => Some(frame),
-                _ => None,
-            })
-            .find(|f| f.contains("0BFA"))
-            .expect("member open frame present");
-        assert!(open.contains("05")); // self marker
-        assert!(open.contains("03")); // leader marker
-        assert!(open.ends_with("F44403000B0A01"));
     }
 }

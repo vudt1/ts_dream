@@ -73,8 +73,8 @@ pub fn use_item_data() -> GameData {
 }
 
 /// Data fixture with a mall catalog item (op 0x42). The golden request reads
-/// the item from **raw packet bytes 9..10** (id `0x2711`, price `0xC8`) per C#
-/// `ShoppingMall` — so the fixture must own that item for the corrected offsets.
+/// the item from **raw packet bytes 9..10** (id `0x2711`, price `0xC8`) per the
+/// legacy mall handler — so the fixture must own that item for the corrected offsets.
 pub fn mall_data() -> GameData {
     let mut data = GameData::default();
     data.items.insert(
@@ -222,7 +222,7 @@ pub fn all_scenarios() -> Vec<Scenario<'static>> {
         Scenario::new(
             "14-pet",
             game_data(),
-            // Summon 15001 (0x3A99) via LE32 pet id (C# smethod_10, packet[6..9]).
+            // Summon 15001 (0x3A99) via LE32 pet id (legacy summon layout, packet[6..9]).
             vec![
                 "F44406001301993A0000".to_string(),
                 "F4440300130200".to_string(),

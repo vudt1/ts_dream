@@ -1,28 +1,28 @@
-//! Reborn-by-item (C# 46170, 46247-46250) — `Client.cs:5052-5124`.
+//! Reborn-by-item (46170, 46247-46250).
 //!
 //! These do a hard `UPDATE players SET …` (level reset to 1, rebuilds HP/SP,
-//! sets Reborn) and then CLOSE the client socket. The Rust port mutates the
+//! sets Reborn) and then CLOSE the client socket. This port mutates the
 //! session in-memory, persists the columns, and sets `out.shutdown = true` so
 //! the connection loop tears the socket down. Runs first in the use-item chain
-//! (matching C# order, where the reborn gate precedes the skill-book family).
+//! (the reborn gate precedes the skill-book family).
 
 use super::UseCtx;
 use crate::db::persist;
 
 /// Handle the reborn family. Returns true when the item id was a reborn item
-/// (whether or not its gate passed — the C# branch always `break`s out).
+/// (whether or not its gate passed — the branch always stops the chain).
 async fn reborn1(ctx: &mut UseCtx<'_>) -> bool {
     if ctx.id != 46170 {
         return false;
     }
     let ok = u16::from(ctx.conn.session.level) >= 120 && ctx.conn.session.reborn == 0;
     if !ok {
-        return true; // gate failed: C# still breaks, nothing happens
+        return true; // gate failed: chain stops, nothing happens
     }
     ctx.consume().await;
     let pid = ctx.conn.session.id;
-    // C# `UPDATE Player SET Lv=1, Point=20, Hp=181, HpMax=181, Sp=111,
-    // SpMax=111, Texp=13, Reborn=1, Hair=10 WHERE Id = …`.
+    // Hard reset: Lv=1, Point=20, Hp=181, HpMax=181, Sp=111, SpMax=111,
+    // Texp=13, Reborn=1, Hair=10.
     ctx.conn.session.level = 1;
     ctx.conn.session.point = 20;
     ctx.conn.session.hp = 181;
@@ -45,7 +45,7 @@ async fn reborn1(ctx: &mut UseCtx<'_>) -> bool {
     true
 }
 
-/// Reborn-2 items (C# 46247-46250): require `Lv>=120 && Reborn==1`, each maps
+/// Reborn-2 items (46247-46250): require `Lv>=120 && Reborn==1`, each maps
 /// to a job (1..4) with its own Hp/Sp reset values, and closes the socket.
 async fn reborn2(ctx: &mut UseCtx<'_>) -> bool {
     let (hpmax, spmax, job) = match ctx.id {
@@ -57,11 +57,11 @@ async fn reborn2(ctx: &mut UseCtx<'_>) -> bool {
     };
     let ok = u16::from(ctx.conn.session.level) >= 120 && ctx.conn.session.reborn == 1;
     if !ok {
-        return true; // gate failed → C# break, nothing happens
+        return true; // gate failed → chain stops, nothing happens
     }
     ctx.consume().await;
     let pid = ctx.conn.session.id;
-    // C# hard reset: Lv=1, Point=40, Hp/HpMax=…, Sp/SpMax=…, Texp=13, Reborn=2, Job=N.
+    // Hard reset: Lv=1, Point=40, Hp/HpMax=…, Sp/SpMax=…, Texp=13, Reborn=2, Job=N.
     ctx.conn.session.level = 1;
     ctx.conn.session.point = 40;
     ctx.conn.session.hp = hpmax;
@@ -84,7 +84,7 @@ async fn reborn2(ctx: &mut UseCtx<'_>) -> bool {
     true
 }
 
-/// Entry: handle the reborn family (in C# order: 46170 first, then 46247-46250).
+/// Entry: handle the reborn family (46170 first, then 46247-46250).
 pub async fn handle(ctx: &mut UseCtx<'_>) -> bool {
     if reborn1(ctx).await {
         return true;

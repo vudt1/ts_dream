@@ -140,7 +140,7 @@ impl ItemDatLoader {
 
     /// Load all item definitions from binary slice of `Item.dat`.
     pub fn load(bytes: &[u8]) -> Result<HashMap<u16, ItemDef>> {
-        if bytes.len() % Self::FIELD_LENGTH != 0 {
+        if !bytes.len().is_multiple_of(Self::FIELD_LENGTH) {
             return Err(TsError::Data(format!(
                 "Invalid Item.dat size {} (not multiple of {})",
                 bytes.len(),
@@ -201,9 +201,9 @@ impl ItemDatLoader {
             let special_ability = Self::dec8(chunk[49]) as u16;
 
             let mut male_color_tints = [0u32; 4];
-            for j in 0..4 {
+            for (j, tint) in male_color_tints.iter_mut().enumerate() {
                 let off = 50 + j * 4;
-                male_color_tints[j] = Self::dec32(u32::from_le_bytes([
+                *tint = Self::dec32(u32::from_le_bytes([
                     chunk[off],
                     chunk[off + 1],
                     chunk[off + 2],
@@ -211,9 +211,9 @@ impl ItemDatLoader {
                 ]));
             }
             let mut female_color_tints = [0u32; 4];
-            for j in 0..4 {
+            for (j, tint) in female_color_tints.iter_mut().enumerate() {
                 let off = 66 + j * 4;
-                female_color_tints[j] = Self::dec32(u32::from_le_bytes([
+                *tint = Self::dec32(u32::from_le_bytes([
                     chunk[off],
                     chunk[off + 1],
                     chunk[off + 2],

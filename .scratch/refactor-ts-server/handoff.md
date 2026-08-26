@@ -24,8 +24,8 @@ Toàn bộ ràng buộc cốt lõi của TS PC được bảo toàn 100%:
 | [`05`](.scratch/refactor-ts-server/issues/05-eve-script-engine-and-auto-chain.md) | **4-Tier Eve Script Engine** | **COMPLETED ✅** | 47 tests pass 100% (`tests/eve_engine.rs`), `src/eve/` (state/evaluator/resolver/group/auto_chain) |
 | [`06`](.scratch/refactor-ts-server/issues/06-mysql-schema-migration-and-repositories.md) | **MySQL Schema 3NF & Repositories** | **COMPLETED ✅** | 12 tests (`tests/db_repositories.rs`, unit luôn chạy; integration DB gate qua `TS_TEST_DB_URL`), `migrations/0002_modern_schema.sql` + `src/db/modern/` |
 | [`07`](.scratch/refactor-ts-server/issues/07-two-tier-dispatcher-and-modular-handlers.md) | **Two-Tier Dispatcher & Handlers** | **COMPLETED ✅** | 18 tests (`tests/handlers_test.rs`), `response.rs` / `player_state.rs` / `trade_system.rs` / `auto_save.rs` / `handlers/npc_event.rs`; golden suite vẫn pass 100% |
-| [`08`](.scratch/refactor-ts-server/issues/08-test-migration-and-csharp-comment-cleanup.md) | **Test Migration & C# Cleanup** | **QUEUED** | Blocked by 07 |
-| [`09`](.scratch/refactor-ts-server/issues/09-documentation-and-domain-updates.md) | **Documentation & Domain Updates** | **QUEUED** | Blocked by 08 |
+| [`08`](.scratch/refactor-ts-server/issues/08-test-migration-and-csharp-comment-cleanup.md) | **Test Migration & C# Cleanup** | **COMPLETED ✅** | 331 unit tests chuyển khỏi `src/` vào 6 tệp `tests/` chuyên trách; 431 tests pass 100%, clippy 0 warning, golden pass |
+| [`09`](.scratch/refactor-ts-server/issues/09-documentation-and-domain-updates.md) | **Documentation & Domain Updates** | **UNBLOCKED / READY** | Unblocked — 08 completed |
 
 ---
 
@@ -85,8 +85,18 @@ Toàn bộ ràng buộc cốt lõi của TS PC được bảo toàn 100%:
 
 Ticket đang ở trạng thái **UNBLOCKED / READY TO IMPLEMENT**:
 
-### Triển khai Ticket 08 — `08-test-migration-and-csharp-comment-cleanup.md`
-- **Mục tiêu**: Chuyển toàn bộ khối `#[cfg(test)]` inline trong `src/` sang các tệp chuyên trách trong `tests/`, xóa sạch chú thích tham chiếu C# legacy, bảo đảm toàn bộ test suite + golden diffing pass 100%.
+### Triển khai Ticket 09 — `09-documentation-and-domain-updates.md`
+- **Mục tiêu**: Cập nhật tài liệu miền (CONTEXT.md, docs/adr/) và các mô tả kiến trúc sau khi toàn bộ refactor kỹ thuật hoàn tất.
+
+### Thành phẩm mới sau Ticket 08 (Test Migration & Cleanup)
+- **Không còn unit test inline**: toàn bộ `#[cfg(test)]` đã rời `src/` (0 khối còn lại); lib test binary giờ chạy 0 tests — mọi test nằm trong `tests/` và truy cập public API qua `ts_dream::...`.
+- **6 tệp test chuyên trách mới/mở rộng**:
+  - `tests/protocol_test.rs` (60) · `tests/battle_engine_test.rs` (80) · `tests/data_loader_test.rs` (16) · `tests/db_persist_test.rs` (7) · `tests/server_state_test.rs` (46) · `tests/handlers_test.rs` (140, gồm 122 chuyển từ handlers/** + 18 cũ ticket 07).
+- **Chống flaky global-state**: `map_drops::clear_map(map_id)` mới (reset scoped thay cho `clear_all` trong test); các test dùng registry chia nhau id dải riêng (77xx map drops, player id ≥ 300002 / 930001+, map 61_001); `tests/server_state_test.rs` có `REGISTRY_LOCK` (tokio Mutex) cho nhóm test registry.
+- **C# provenance sạch 100%**: comment/doc/assert message không còn `C#`, `.cs`, `smethod_NN`, `.kt`; `grep -rn 'C#' src tests` → rỗng.
+- **Clippy --all-targets = 0 warning** (đã sửa ~42 warning cũ; các allow `too_many_arguments` còn lại đều có lý do wire-layout kèm chú thích).
+- **Lưu ý môi trường**: `Data/Skills.txt` không có sẵn trong repo checkout này (chỉ có `Skill.Dat`) — `tests/data.rs::loads_real_data_with_expected_counts` skip phần assert skills khi thiếu file (lỗi môi trường có từ trước ticket 08).
+- **Xác thực cuối ticket 08**: `cargo test --all-targets --no-fail-fast` → 16 target, 431 tests, 100% pass, 0 warning; golden diffing pass.
 
 ### Thành phẩm mới sau Ticket 07 (Two-Tier Dispatcher & Domain Systems)
 - **Level-1 dispatcher thuần opcode**: nhánh sub inline của op `0x17` đã dồn xuống `handlers/inventory.rs` (player-shop 30..=33, storage 51|52, base ops) — dispatcher chỉ match Main Opcode.

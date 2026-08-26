@@ -51,6 +51,9 @@ pub fn login_start() -> Vec<String> {
 }
 
 /// Player self-appear frame — op 0x03 sub 0x03 (Logined  step 2).
+// Positional mirror of the fixed frame layout: each argument maps to one
+// field of the wire body, so the long parameter list is intentional.
+#[allow(clippy::too_many_arguments)]
 pub fn player_appear(
     id: u32,
     sex: u8,
@@ -86,8 +89,8 @@ pub fn player_appear(
     body.push_str(&format!("{:02X}{:02X}", reborn, job));
     body.push_str(&encoder::strhex(name));
 
-    // Frame: F444 + len + 03 + body. The C# Logined1 emits a single opcode
-    // byte `03` (no sub byte — Client.cs:8060), so len counts 1 + body_len,
+    // Frame: F444 + len + 03 + body. A single opcode byte `03` is emitted
+    // (no sub byte), so len counts 1 + body_len,
     // i.e. `33 + equipped*2 + nameLen` (§2.4.1 step 2).
     crate::protocol::frame("03", &body)
 }
@@ -95,6 +98,9 @@ pub fn player_appear(
 /// Stats frame — op 0x05 sub 0x03 (Logined  step 3). `skills_hex` = the
 /// player's skill list hex (`««SKILL_ID Lv` pairs are handled by the caller
 /// via [`skill_list`]). Length counts `skills/2 + 113` bytes.
+// Positional mirror of the fixed frame layout: each argument maps to one
+// field of the wire body, so the long parameter list is intentional.
+#[allow(clippy::too_many_arguments)]
 pub fn stats(
     thuoctinh: u8,
     hp: u16,
@@ -135,7 +141,7 @@ pub fn stats(
         encoder::le32(texp),
         encoder::le16(skill_point),
         encoder::le16(point),
-        // C# Logined1 emits Tiengtam via `smethod_12` = LE32 (Client.cs:8061).
+        // Tiengtam travels as LE32.
         encoder::le32(u32::from(tiengtam)),
         encoder::le16(hp_max),
         encoder::le16(sp_max),
@@ -195,9 +201,8 @@ pub fn chat_frame(sub: u8, id: u32, chat_raw: &[u8]) -> String {
 
 /// Shared banner builder for server-authored text (op 0x02 sub 0x0B/0x0C).
 ///
-/// Routes the message through `smethod_17` (§4.4 item 3) so proper-Unicode
-/// Vietnamese becomes single-byte VISCII on the wire (Đ→0xD0, not `'?'`), the
-/// same path the C# server uses for banners and `/where` (Class5.smethod_17).
+/// Encodes proper-Unicode Vietnamese as single-byte VISCII on the wire
+/// (Đ→0xD0, not `'?'`) — the same treatment banners and `/where` replies get.
 fn text_banner(op: &str, msg: &str) -> String {
     let visc = crate::encoding::viscii_encode(msg);
     let mut body = String::from("00000000");
@@ -234,8 +239,8 @@ pub fn session_offline_frame(id: u32) -> String {
     format!("F44408000B00{}0000", encoder::le32(id))
 }
 
-/// God / HP store / SP store frame (`method_0`): op 0x23 sub 0x04 + point + 12
-/// zero bytes (C# `"F44412002304" + le32(point) + "000000000000000000000000"`).
+/// God / HP store / SP store frame: op 0x23 sub 0x04 + point + 12 zero bytes
+/// (`F44412002304 + le32(point) + "00"×12`).
 pub fn store_frame(point: u32) -> String {
     let mut body = String::new();
     body.push_str(&encoder::le32(point));
@@ -243,12 +248,12 @@ pub fn store_frame(point: u32) -> String {
     crate::protocol::frame("2304", &body)
 }
 
-/// Pet summary frames (C# `Data.SendStatusAllPet`, Logined1 step 5).
+/// Pet summary frames (Logined1 step 5).
 ///
-/// Emits **nothing** when the player owns no active pet (C# guards on
-/// `text.Length > 0`). With pets (stt 1..4, id > 0) it builds the `0F08`
+/// Emits **nothing** when the player owns no active pet (guards on an empty
+/// active list). With pets (stt 1..4, id > 0) it builds the `0F08`
 /// per-pet stat entries, the `0F14` slot summary, and the fixed stable-open
-/// trailer — byte-for-byte the C# layout (Client.cs / Data.SendStatusAllPet).
+/// trailer — byte-for-byte the fixed legacy layout.
 pub fn pet_summary(s: &Session) -> Vec<String> {
     let active: Vec<&crate::server::session::PetState> = s
         .pets
@@ -275,8 +280,8 @@ pub fn pet_summary(s: &Session) -> Vec<String> {
     ]
 }
 
-/// Per-pet `0F08` stat body — the exact C# `Data.SendStatusPet` layout
-/// (Data.cs:2270, mirrored by `Data.SendStatusAllPet`).
+/// Per-pet `0F08` stat body — the fixed legacy layout shared by
+/// [`pet_summary`] and [`pet_status_single`].
 fn pet_stat_entry(s: &Session, p: &crate::server::session::PetState) -> String {
     let stt = p.stt;
     let lv_skill = [
@@ -326,8 +331,8 @@ fn pet_slot_entry(p: &crate::server::session::PetState) -> String {
     format!("{:02X}0000", p.stt)
 }
 
-/// Single-pet status + trailer (C# `Data.SendStatusPet`, Data.cs:2212-2278).
-/// Returns an empty vector when the pet does not exist or has id 0.
+/// Single-pet status + trailer. Returns an empty vector when the pet does not
+/// exist or has id 0.
 pub fn pet_status_single(s: &Session, stt: u8) -> Vec<String> {
     let Some(p) = s.pets.iter().find(|p| p.stt == stt && p.id > 0) else {
         return Vec::new();
@@ -346,7 +351,7 @@ pub fn pet_status_single(s: &Session, stt: u8) -> Vec<String> {
 
 /// Build the full 22-step `Logined1` sequence frames for a logged-in session,
 /// sourced from the session's actual state (props, stats, inventory, gold,
-/// hotkeys, stores) so it matches a real C# `Logined1` byte-for-byte.
+/// hotkeys, stores) so it reproduces the canonical Logined1 byte stream.
 pub fn build_logined_sequence_session(s: &Session) -> Vec<String> {
     let mut frames = Vec::new();
 
@@ -407,7 +412,7 @@ pub fn build_logined_sequence_session(s: &Session) -> Vec<String> {
     // 4. Step 4: SendPlayerOnline — broadcast to the map, owned by the server loop.
 
     // 5. Step 5: Pet summary (0x0F08/0F14 + trailer) — only when pets exist
-    //    (C# `SendStatusAllPet` sends nothing for a petless character).
+    //    (a petless character receives nothing).
     frames.extend(pet_summary(s));
 
     // 6. Step 6: Party frames (none for new login).
@@ -484,111 +489,4 @@ pub fn logined_sequence(ok: Vec<String>, _id: u32) -> HandleOutcome {
         out.send(f);
     }
     out
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn pet_summary_empty_for_petless_session() {
-        let s = Session::new();
-        assert!(pet_summary(&s).is_empty(), "C# sends no pet frames with no pets");
-    }
-
-    #[test]
-    fn pet_summary_builds_0f08_0f14_for_active_pet() {
-        let mut s = Session::new();
-        s.pets.push(crate::server::session::PetState {
-            stt: 1,
-            id: 15001,
-            name: b"PET1".to_vec(),
-            level: 2,
-            hp: 100,
-            sp: 50,
-            int1: 10,
-            atk: 20,
-            def: 30,
-            agi: 40,
-            hpx: 50,
-            spx: 60,
-            fai: 70,
-            texp: 1234,
-            skill_point: 5,
-            quest: 0,
-            skills: [(10001, 1), (0, 0), (0, 0), (0, 0)],
-            ..Default::default()
-        });
-        // Pet equipment lives in the Trangbi table at slot `stt*10+1` (11).
-        s.trangbi.push(crate::server::session::InventoryItem {
-            slot: 11,
-            id: 20001,
-            ..Default::default()
-        });
-
-        let frames = pet_summary(&s);
-        assert_eq!(frames.len(), 8);
-        // 0F14 slot summary: stt(01) + 0000 → 3 bytes → length 0x05.
-        assert_eq!(frames[1], "F44405000F14010000");
-        assert_eq!(frames[2], "F44402000F0A");
-        assert_eq!(frames[3], "F44405000F12010000");
-        assert_eq!(frames[4], "F44405000F12020000");
-        assert_eq!(frames[5], "F44405000F12030000");
-        assert_eq!(frames[6], "F44405000F12040000");
-        assert_eq!(frames[7], "F44404000F130100");
-
-        // 0F08: fixed prefix `00` + stt, id le32, texp le32.
-        assert!(frames[0].starts_with("F444"));
-        assert!(frames[0].contains("01993A0000D2040000"), "got {}", frames[0]);
-        assert!(frames[0].contains("50455431"), "pet name PET1 embedded: {}", frames[0]);
-        // Pet equipment slot 1 id (20001 = 0x4E21) + 6 zero bytes.
-        assert!(frames[0].contains("214E0000"), "pet equip id: {}", frames[0]);
-    }
-
-    #[test]
-    fn pet_summary_skips_stable_slots_and_id_zero() {
-        let mut s = Session::new();
-        // Stable slot (stt 7) and a zero-id pet must not appear.
-        s.pets.push(crate::server::session::PetState {
-            stt: 7,
-            id: 15002,
-            ..Default::default()
-        });
-        s.pets.push(crate::server::session::PetState {
-            stt: 2,
-            id: 0,
-            ..Default::default()
-        });
-        assert!(pet_summary(&s).is_empty());
-    }
-
-    #[test]
-    fn session_offline_frame_is_leave_hide_packet() {
-        // Same literal as golden/13-battle-leave: F444 0800 0B00 + id + 0000.
-        assert_eq!(session_offline_frame(300001), "F44408000B00E19304000000");
-    }
-
-    #[test]
-    fn sys_msg_frame_never_emits_utf8() {
-        // ASCII text is unchanged on the wire.
-        assert_eq!(sys_msg_frame("TSVN"), "F4440A00020B000000005453564E");
-        // Latin-1 accented é (U+00E9) travels as the single byte 0xE9 — never
-        // as the two-byte UTF-8 pair C3 A9. The reverse map covers ≤0xFF.
-        let f = sys_msg_frame("café");
-        assert!(f.ends_with("636166E9"), "got {f}"); // 63 61 66 E9
-        assert!(!f.contains("C3A9"), "got {f}");
-        // Proper-Unicode Đ (U+0110) maps through smethod_17 to VISCII 0xD0;
-        // ậ (U+1EAD) is 0xA7 in the positional table.
-        let cfg = sys_msg_frame("Đậu2");
-        assert!(cfg.ends_with("D0A77532"), "got {cfg}"); // Đ ậ u 2
-        assert!(!cfg.contains("C490"), "got {cfg}");
-    }
-
-    #[test]
-    fn server_name_frame_counts_viscii_bytes_not_utf8() {
-        // "câu" = c(63) â(0xE2) u(75) → name_len = 3 VISCII bytes, hex 63 E2 75.
-        let n = server_name_frame(1, "câu");
-        assert!(n.ends_with("0363E275"), "got {n}");
-        assert!(!n.contains("C3A2"), "got {n}");
-    }
 }

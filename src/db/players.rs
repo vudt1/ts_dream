@@ -13,7 +13,8 @@ use sqlx::{FromRow, MySqlPool};
 /// Load a character's row + all per-player data into `s`.
 ///
 /// Returns `false` when the account has no character (the login handler then
-/// shows the create-character screen). Mirrors the C# `Logined1` data load.
+/// shows the create-character screen). Loads the full login data set: the row,
+/// skills, hotkeys, item tables, pets and quest steps.
 pub async fn load(pool: &MySqlPool, s: &mut Session) -> Result<bool, sqlx::Error> {
     let id = i64::from(s.id);
     let Some(row) = PlayerRow::fetch(pool, id).await? else {
@@ -42,7 +43,7 @@ fn assign_items(s: &mut Session, table: &str, items: Vec<InventoryItem>) {
 }
 
 /// Delete a character and all of its per-player gameplay rows in one
-/// transaction (C# `PlayerDeleteDataId` + the per-table deletes, op 0x23 sub 2).
+/// transaction (the per-table deletes plus the `players` row, op 0x23 sub 2).
 ///
 /// Every statement is scoped by `player_id`. The `players` row and the six
 /// gameplay tables (`homdo`, `trangbi`, `pet`, `quest`, `skill`, `skillsave`)
@@ -126,7 +127,7 @@ pub struct CreateCharacter {
 pub async fn create(pool: &MySqlPool, c: &CreateCharacter) -> Result<(), sqlx::Error> {
     let mut tx = pool.begin().await?;
 
-    // 1. players row — every column explicit (Ch5 §5.4), same layout as C#.
+    // 1. players row — every column explicit (Ch5 §5.4).
     sqlx::query(
         "INSERT INTO players (\
          player_id, Name, Lv, Hp, HpMax, Sp, SpMax, Point, SkillPoint, `Int`, Atk, Def, \
@@ -170,9 +171,10 @@ pub async fn create(pool: &MySqlPool, c: &CreateCharacter) -> Result<(), sqlx::E
         .execute(&mut *tx)
         .await?;
 
-    // 4. Seed starter Homdo/Trangbi rows (C# NewChar.accdb template). Every
-    // numeric column the item loader reads (Lv/DoBen/Long/GiatriLong/Khang/
-    // Texp) is written explicitly so the row round-trips with non-NULL values.
+    // 4. Seed starter Homdo/Trangbi rows (the new-character inventory
+    // template). Every numeric column the item loader reads
+    // (Lv/DoBen/Long/GiatriLong/Khang/Texp) is written explicitly so the row
+    // round-trips with non-NULL values.
     for row in starter_rows() {
         let Some(table) = item_table(row.table) else {
             continue;
@@ -192,7 +194,7 @@ pub async fn create(pool: &MySqlPool, c: &CreateCharacter) -> Result<(), sqlx::E
             .await?;
     }
 
-    // 5. accounts pass1/pass2 (C# `Data.MemberChangedPass`).
+    // 5. accounts pass1/pass2.
     sqlx::query("UPDATE accounts SET pass1 = ?, pass2 = ? WHERE player_id = ?")
         .bind(c.pass1.as_slice())
         .bind(c.pass2.as_slice())
@@ -203,20 +205,19 @@ pub async fn create(pool: &MySqlPool, c: &CreateCharacter) -> Result<(), sqlx::E
     tx.commit().await
 }
 
-/// New-character HP/SP (C# num25/num26): reborn 0, job 0, lv 1.
+/// New-character HP/SP: reborn 0, job 0, level 1.
 pub fn starting_hp_sp(hpx: u8, spx: u8) -> (i64, i64) {
     let hp = get_hp_max(0, 0, 1, i64::from(hpx));
     let sp = get_sp_max(0, 0, 1, i64::from(spx));
     (hp, sp)
 }
 
-/// One starter inventory row a freshly created character owns. Mirrors the C#
-/// `NewChar.accdb` template (`ts_server_old/CSDL/NewChar_init.sql`).
+/// One starter inventory row a freshly created character owns (the
+/// new-character inventory template).
 ///
-/// The C# server is per-player-file: it grows a character by copying
-/// `NewChar.accdb`. Because MySQL uses one shared schema (Ch5 §5.4), the Rust
-/// port carries those template rows as data and INSERTs them (scoped by
-/// `player_id`) inside the same atomic create transaction.
+/// The shared MySQL schema (Ch5 §5.4) carries the template rows as data:
+/// they are INSERTed (scoped by `player_id`) inside the same atomic create
+/// transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StarterRow {
     pub table: &'static str,
@@ -227,7 +228,7 @@ pub struct StarterRow {
     pub loai: i64,
 }
 
-/// The starter inventory for a new character (C# `NewChar_init.sql`):
+/// The starter inventory for a new character:
 /// - `Homdo` slot 1: item 32012 × 4 (the starter potion "Đăng các");
 /// - `Trangbi` slot 2: item 19737 × 1, Agi1=1, Loai=2 (the starter armor).
 ///
@@ -255,8 +256,9 @@ pub fn starter_rows() -> Vec<StarterRow> {
 }
 
 /// Whitelist the item tables the starter seed may write (never interpolate
-/// client input into `{table}`).
-fn item_table(table: &'static str) -> Option<&'static str> {
+/// client input into `{table}`). Public so the moved integration test can
+/// verify every starter row targets a whitelisted table.
+pub fn item_table(table: &'static str) -> Option<&'static str> {
     match table {
         "homdo" => Some("homdo"),
         "trangbi" => Some("trangbi"),
@@ -605,48 +607,4 @@ async fn load_items(
         .into_iter()
         .map(InventoryItem::from)
         .collect())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn starter_rows_match_newchar_template() {
-        // Literals transcribed from ts_server_old/CSDL/NewChar_init.sql — the
-        // two behavioral rows of the NewChar.accdb template.
-        assert_eq!(
-            starter_rows(),
-            vec![
-                StarterRow {
-                    table: "homdo",
-                    slot: 1,
-                    id: 32012,
-                    count: 4,
-                    agi1: 0,
-                    loai: 0
-                },
-                StarterRow {
-                    table: "trangbi",
-                    slot: 2,
-                    id: 19737,
-                    count: 1,
-                    agi1: 1,
-                    loai: 2
-                },
-            ]
-        );
-    }
-
-    #[test]
-    fn starter_tables_are_whitelisted_for_insert() {
-        for row in starter_rows() {
-            assert!(
-                item_table(row.table).is_some(),
-                "{} not whitelisted",
-                row.table
-            );
-        }
-        assert!(item_table("tientrang").is_none());
-    }
 }

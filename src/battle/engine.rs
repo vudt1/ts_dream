@@ -94,7 +94,7 @@ fn clamp_u8(v: i64) -> u8 {
     v.clamp(0, 0xFF) as u8
 }
 
-/// `getHpMax(rb, job, lvl, hpx)` (Data.cs:5537) — resolved exactly (§6.6).
+/// Max-HP formula `(rb, job, lvl, hpx)` — resolved exactly (§6.6).
 pub fn get_hp_max(rb: i64, job: i64, lvl: i64, hpx: i64) -> i64 {
     let lv = lvl as f64;
     let p = lv.powf(0.35);
@@ -111,7 +111,7 @@ pub fn get_hp_max(rb: i64, job: i64, lvl: i64, hpx: i64) -> i64 {
     val.floor() as i64
 }
 
-/// `getSpMax(rb, job, lvl, spx)` (Data.cs:5553) (§6.6).
+/// Max-SP formula `(rb, job, lvl, spx)` (§6.6).
 pub fn get_sp_max(rb: i64, job: i64, lvl: i64, spx: i64) -> i64 {
     let lv = lvl as f64;
     let p = lv.powf(0.25);
@@ -125,38 +125,4 @@ pub fn get_sp_max(rb: i64, job: i64, lvl: i64, spx: i64) -> i64 {
         },
     };
     val.floor() as i64
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn packet_hex_23_bytes() {
-        let w = WarInfo {
-            typ: 2,
-            id: 300003,
-            hp_max: 311,
-            sp_max: 411,
-            hp: 311,
-            sp: 411,
-            lv: 101,
-            thuoctinh: 1,
-            ..Default::default()
-        };
-        let hex = w.packet_hex();
-        assert_eq!(hex.len(), 46); // 23 bytes
-    }
-
-    #[test]
-    fn hpmax_floor() {
-        // rb 0, job, lvl 1, hpx 6: floor((1+1)*12+80+1)=floor(105)=105
-        assert_eq!(get_hp_max(0, 0, 1, 6), 105);
-    }
-
-    #[test]
-    fn spmax_floor() {
-        // rb 0, lvl 1, spx 6: floor((1)*12+60+1)=floor(73)=73
-        assert_eq!(get_sp_max(0, 0, 1, 6), 73);
-    }
 }

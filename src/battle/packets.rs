@@ -1,6 +1,6 @@
 //! Battle packet builders (Chapter 6 §6.8).
 //!
-//! All packets are hex strings matching the C# output byte-for-byte.
+//! All packets are hex strings, byte-for-byte stable.
 //! Key frames use the `F444` magic + LE16 length encoding.
 
 use crate::protocol::encoder;
@@ -164,6 +164,7 @@ pub fn battle_exit_talk() -> String {
 
 /// Skilling effect (10 bytes):
 /// row + col + miss_attack + atk_def_lantranh + count_hieuung + troi_hp_sp + LE16(damage) + buff_or_attack.
+#[allow(clippy::too_many_arguments)]
 pub fn skilling_int(
     row: u8,
     col: u8,
@@ -187,7 +188,7 @@ pub fn skilling_int(
     )
 }
 
-/// Full `Skilling` effect (17 bytes) — `TheBattle.cs:9318-9321`:
+/// Full `Skilling` effect (17 bytes):
 /// `0F00` + row + col + LE16(skillId) + SLdanh + skillType + rowAttack + colAttack +
 /// miss + adl + count + troi + LE16(damage) + buff.
 ///
@@ -227,18 +228,18 @@ pub fn skilling_full(
     )
 }
 
-/// Short `Skilling` (4 bytes) — row + col + miss + adl (`TheBattle.cs:9328-9331`).
+/// Short `Skilling` (4 bytes) — row + col + miss + adl.
 pub fn skilling_short(row: u8, col: u8, miss_attack: u8, adl: u8) -> String {
     format!("{:02X}{:02X}{:02X}{:02X}", row, col, miss_attack, adl)
 }
 
-/// `SkillingHieuUng` (3 bytes) — troi + LE16(damage) + buff (`TheBattle.cs:9333-9336`).
+/// `SkillingHieuUng` (3 bytes) — troi + LE16(damage) + buff.
 pub fn skilling_effect(troi: u8, damage: u16, buff: u8) -> String {
     format!("{:02X}{}{:02X}", troi, encoder::le16(damage), buff)
 }
 
-/// Skill-20007 combo footer sent after a combo turn flush
-/// (`TheBattle.cs:3921`): `F444130032010F00` + row + col + LE16(20007) + `0101` + row + col + `01030119000000`.
+/// Skill-20007 combo footer sent after a combo turn flush:
+/// `F444130032010F00` + row + col + LE16(20007) + `0101` + row + col + `01030119000000`.
 pub fn combo_footer_20007(row: u8, col: u8) -> String {
     format!(
         "F444130032010F00{:02X}{:02X}{}0101{:02X}{:02X}01030119000000",
@@ -255,7 +256,7 @@ pub fn skilling_full_frame(payload: &str) -> String {
     format!("F44413003201{payload}")
 }
 
-/// TroiBuffHpSp byte constants (DataStructure.cs:1481-1509).
+/// TroiBuffHpSp byte constants.
 pub mod troi_byte {
     pub const MISS: u8 = 0x00;
     pub const TYPE3: u8 = 0xDD; // 221
@@ -302,74 +303,4 @@ pub mod stat_byte {
     pub const TEXP: u8 = 0x24;
     pub const SKILL_POINT: u8 = 0x25;
     pub const POINT: u8 = 0x26;
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn battle_open_leader_format() {
-        let pkt = battle_open_leader(112, "02AABBCCDD");
-        assert!(pkt.starts_with("F4441C000BFA"));
-        assert!(pkt.ends_with("F44403000B0A01"));
-    }
-
-    #[test]
-    fn entity_packet_format() {
-        let npc = entity_npc("ABCDEF");
-        assert_eq!(npc, "F4441A000B0503ABCDEF");
-
-        let player = entity_player("123456");
-        assert_eq!(player, "F4441A000B0505123456");
-    }
-
-    #[test]
-    fn hide_and_show() {
-        let hide = hide_from_map(300001);
-        assert!(hide.starts_with("F44408000B00"));
-        assert!(hide.ends_with("0000"));
-
-        let show = show_player_on_map(300001);
-        assert!(show.starts_with("F4440A000B0402"));
-        assert!(show.ends_with("000003"));
-    }
-
-    #[test]
-    fn your_turn_exact() {
-        assert_eq!(your_turn(), "F44402003401");
-    }
-
-    #[test]
-    fn acting_format() {
-        assert_eq!(acting(3, 2), "F444040035050302");
-    }
-
-    #[test]
-    fn status_update_positive() {
-        let s = status_update(stat_byte::HP, 100);
-        assert!(s.starts_with("F4440C00080119"));
-        assert!(s.contains("01")); // positive sign
-    }
-
-    #[test]
-    fn skilling_int_format() {
-        let eff = skilling_int(0, 2, 1, 0, 1, troi_byte::HP, 50, 1);
-        assert_eq!(eff.len(), 18); // 9 bytes = 18 hex chars (row col miss adl count troi LE16 buff)
-    }
-
-    #[test]
-    fn skilling_full_is_17_bytes() {
-        let eff = skilling_full(0, 2, 10000, 1, 1, 0, 2, 1, 0, 1, troi_byte::HP, 50, 1);
-        assert_eq!(eff.len(), 34); // 17 bytes
-        assert!(eff.starts_with("0F00"));
-    }
-
-    #[test]
-    fn combo_footer_20007_format() {
-        let f = combo_footer_20007(2, 3);
-        assert!(f.starts_with("F444130032010F00"));
-        assert!(f.contains("274E")); // LE16(20007) = 0x4E27 -> "274E"
-        assert!(f.ends_with("01030119000000"));
-    }
 }

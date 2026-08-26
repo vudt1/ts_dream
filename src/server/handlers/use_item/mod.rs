@@ -1,15 +1,15 @@
-//! Use item handler (Op 0x17 sub 15) — C# `Update_H17` case 15 (Client.cs:3801-5361).
+//! Use item handler (Op 0x17 sub 15).
 //!
-//! Full case-15 parity port, split into focused modules for maintainability:
+//! Full sub-15 behavior, split into focused modules for maintainability:
 //! - `rewards` — lucky-box random rewards + fixed multi-item packs (99999…46953 family).
 //! - `books`   — skill books, Texp/god books, stat books, pet-stat books, HP/SP store items.
 //! - `misc`    — doll summon, dice items, special frames, no-op ids, full-heal.
 //! - `reborn`  — reborn-by-item (46170, 46247-46250) which hard-reset + close the socket.
 //!
-//! Dispatch order mirrors the C# branch order (warp → add-pet → sleep → the big else
+//! Dispatch order follows the legacy branch order (warp → add-pet → sleep → the main
 //! chain → point books → party buffs → generic potion). Random branches source their
-//! RNG from an injected `.NET`-compatible `DotNetRandom` (`battle/rng.rs`) so unit
-//! tests can seed it deterministically and prod uses `time_seeded()`.
+//! RNG from an injected `DotNetRandom` (`battle/rng.rs`) so tests can seed it
+//! deterministically and prod uses `time_seeded()`.
 
 use crate::battle::rng::DotNetRandom;
 use crate::data::loader::GameData;
@@ -23,8 +23,8 @@ mod misc;
 mod reborn;
 mod rewards;
 
-/// Warp items: item id → (map_id, x, y). Source: C# case-15 warp table
-/// (Client.cs:3821-3971). Item 46016 warps to the save map (here: current map).
+/// Warp items: item id → (map_id, x, y) — the sub-15 warp table.
+/// Item 46016 warps to the save map (here: current map).
 fn warp_target(id: u16, current_map: u16) -> Option<(u16, u16, u16)> {
     Some(match id {
         46016 => (current_map, 410, 510),
@@ -62,26 +62,26 @@ pub(crate) struct UseCtx<'a> {
     pub out: &'a mut HandleOutcome,
     pub pool: Option<&'a sqlx::MySqlPool>,
     pub data: &'a GameData,
-    /// Homdo slot (C# `packet[6]`).
+    /// Homdo slot (packet byte 6).
     pub slot: u8,
-    /// Used count (C# `packet[7]`).
+    /// Used count (packet byte 7).
     pub count: u16,
-    /// Use-type / pet slot (C# `packet[8]`): 0 = player, 1..4 = pet.
+    /// Use-type / pet slot (packet byte 8): 0 = player, 1..4 = pet.
     pub use_type: u8,
-    /// Item id (C# `_ID`).
+    /// Item id.
     pub id: u16,
     pub rng: &'a mut DotNetRandom,
 }
 
 impl UseCtx<'_> {
     /// Player stat update frame `F4440C000801` + type + sign + le32 + `00000000`
-    /// (C# `PlayerUpdateDataId` stat-emitting branches; Type_Status codes).
+    /// (stat-emitting branches; Type_Status codes).
     pub fn stat(&mut self, ty: u8, val: i32) {
         self.out.send(crate::server::handlers::stats::build_stat_update(ty, val));
     }
 
     /// Pet stat update frame `F4440F00080204` + le16(stt) + type + sign + le32
-    /// + `00000000` (C# `Data.PetUpdateData`, Data.cs:2689).
+    /// + `00000000` (pet status layout).
     pub fn pet_stat(&mut self, stt: u8, ty: u8, val: i32) {
         let (sign, abs) = if val >= 0 {
             ("01", val as u32)
@@ -98,7 +98,7 @@ impl UseCtx<'_> {
         self.out.send(crate::protocol::frame("0802", &body));
     }
 
-    /// Add `count` of `item_id` to Homdo (C# `HomdoAddItem`): emits the
+    /// Add `count` of `item_id` to Homdo: emits the
     /// `F4440E001706`+id+count+`000000000000000000` reward frame, or
     /// `F44403001B0102` (inventory full). Returns whether the item was added.
     pub async fn add_reward(&mut self, item_id: u16, count: u8) -> bool {
@@ -122,8 +122,8 @@ impl UseCtx<'_> {
     }
 
     /// Consume `count` of the item at `slot` and emit the standard end feedback
-    /// `F44404001709` + slot + used-count + `F4440200170F` (C# `HomdoUseHPSPFAI`,
-    /// Data.cs:3638). Returns true when the item was consumed.
+    /// `F44404001709` + slot + used-count + `F4440200170F`.
+    /// Returns true when the item was consumed.
     pub async fn consume(&mut self) -> bool {
         let Some(pos) = self.conn.session.homdo.iter().position(|i| i.slot == self.slot) else {
             return false;
@@ -159,7 +159,7 @@ impl UseCtx<'_> {
     }
 
     /// Emit only the standard end feedback without consuming the item
-    /// (C# no-op ids 46013/46014/46015/46042/46091 and point books 50010/50011).
+    /// (no-op ids 46013/46014/46015/46042/46091 and point books 50010/50011).
     pub fn end_feedback(&mut self) {
         self.out
             .send(format!("F44404001709{:02X}{:02X}", self.slot, self.count));
@@ -206,7 +206,7 @@ impl UseCtx<'_> {
     }
 }
 
-/// Op 0x17 sub 15 — use item at `slot`, `count` times (C# case 15).
+/// Op 0x17 sub 15 — use item at `slot`, `count` times.
 pub async fn use_item(
     conn: &mut Conn,
     payload: &[u8],
@@ -246,7 +246,7 @@ pub async fn use_item_rng(
     };
     let item = conn.session.homdo[pos].clone();
     let id = item.id;
-    // C# case-15 gate: `iD12 > 0 && num61 > 0` and the slot must hold enough.
+    // Sub-15 gate: item id > 0, requested count > 0, and the slot must hold enough.
     if id == 0 || item.count == 0 || u16::from(item.count) < count {
         return;
     }
@@ -264,9 +264,9 @@ pub async fn use_item_rng(
     dispatch(&mut ctx).await;
 }
 
-/// The C# case-15 dispatch chain, in the exact C# branch order.
+/// The sub-15 dispatch chain, in legacy branch order.
 async fn dispatch(ctx: &mut UseCtx<'_>) {
-    // --- 1. Warp items (C# flag2 table): consume + warp, no 170F tail. ---
+    // --- 1. Warp items (flag2 table): consume + warp, no 170F tail. ---
     if let Some((map_id, x, y)) = warp_target(ctx.id, ctx.conn.session.map_id) {
         ctx.conn.session.map_id = map_id;
         ctx.conn.session.map_x = x;
@@ -285,7 +285,7 @@ async fn dispatch(ctx: &mut UseCtx<'_>) {
         return;
     }
 
-    // --- 2. Add-pet items (C# `_AddPet > 10000`). ---
+    // --- 2. Add-pet items (`add_pet > 10000`). ---
     let add_pet = ctx
         .data
         .items
@@ -321,7 +321,7 @@ async fn dispatch(ctx: &mut UseCtx<'_>) {
         }
     }
 
-    // --- 3. Leader-only sleep item (C# 46167). ---
+    // --- 3. Leader-only sleep item (46167). ---
     if ctx.id == 46167 {
         let leader_ok = ctx.conn.session.id == ctx.conn.session.id_leader
             || ctx.conn.session.id_leader == 0;
@@ -332,7 +332,7 @@ async fn dispatch(ctx: &mut UseCtx<'_>) {
         return;
     }
 
-    // --- 4. The big else chain (C# 4039-5353), in order. ---
+    // --- 4. The main else chain, in order. ---
     if reborn::handle(ctx).await {
         return;
     }
@@ -346,7 +346,7 @@ async fn dispatch(ctx: &mut UseCtx<'_>) {
         return;
     }
 
-    // --- 5. Point / SkillPoint books (C# case 50010/50011). No consume. ---
+    // --- 5. Point / SkillPoint books (50010/50011). No consume. ---
     match ctx.id {
         50010 => {
             ctx.conn.session.point += 1;
@@ -377,7 +377,7 @@ async fn dispatch(ctx: &mut UseCtx<'_>) {
         _ => {}
     }
 
-    // --- 6. Party-buff / special frames (C# 46092 / 46041 / 46093). ---
+    // --- 6. Party-buff / special frames (46092 / 46041 / 46093). ---
     match ctx.id {
         46092 => {
             ctx.out.send("F44404000B0702FF".to_string());
@@ -392,14 +392,14 @@ async fn dispatch(ctx: &mut UseCtx<'_>) {
         _ => {}
     }
 
-    // --- 7. Generic potion path (C# default: `Hp*Sp*Fai1` × count). ---
+    // --- 7. Generic potion path (default: `Hp*Sp*Fai1` × count). ---
     potion(ctx).await;
 }
 
-/// Generic potion restore (C# `Client.cs:5187-5323`). In battle: silent return.
+/// Generic potion restore. In battle: silent return.
 /// Use-type 0 = player (Hp/Sp only; Fai ignored), 1..4 = pet slot (Hp/Sp/Fai,
-/// Fai capped at 100). A potion with Hp/Sp>0 is always consumed (C# trailing
-/// `HomdoUseHPSPFAI`), sending stat packets even when already at max. A truly
+/// Fai capped at 100). A potion with Hp/Sp>0 is always consumed (trailing end
+/// feedback), sending stat packets even when already at max. A truly
 /// statless unknown item ends silently (no frames, no consume).
 async fn potion(ctx: &mut UseCtx<'_>) {
     if ctx.conn.session.battle_id > 0 {
@@ -418,7 +418,7 @@ async fn potion(ctx: &mut UseCtx<'_>) {
 
     match ctx.use_type {
         0 => {
-            // Player: C# handles Hp and Sp only (Fai ignored for players).
+            // Player: Hp and Sp only (Fai ignored for players).
             let mut touched = false;
             if hp_amt > 0 {
                 if ctx.conn.session.hp < ctx.conn.session.hp_max {
@@ -433,7 +433,7 @@ async fn potion(ctx: &mut UseCtx<'_>) {
                     )
                     .await;
                 }
-                // C# always re-broadcasts the Hp stat (current or new value).
+                // Always re-broadcast the Hp stat (current or new value).
                 ctx.stat(0x19, i32::from(ctx.conn.session.hp));
                 touched = true;
             }
@@ -458,7 +458,7 @@ async fn potion(ctx: &mut UseCtx<'_>) {
             }
         }
         1..=4 => {
-            // Pet: require the pet slot to exist (C# `PetGetData(_ID) <= 0 → break`).
+            // Pet: require the pet slot to exist.
             let stt = ctx.use_type;
             let Some(pet_idx) = ctx.conn.session.pets.iter().position(|p| p.stt == stt) else {
                 return;
@@ -517,220 +517,5 @@ async fn potion(ctx: &mut UseCtx<'_>) {
             }
         }
         _ => {}
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::server::session::InventoryItem;
-
-    fn item(id: u16, count: u8) -> InventoryItem {
-        InventoryItem {
-            slot: 1,
-            id,
-            count,
-            ..Default::default()
-        }
-    }
-
-    fn seeded() -> DotNetRandom {
-        DotNetRandom::new(42)
-    }
-
-    #[tokio::test]
-    async fn potion_restores_hp_and_ends_standard() {
-        let mut conn = Conn::new();
-        conn.session.hp = 50;
-        conn.session.hp_max = 200;
-        conn.session.sp = 30;
-        conn.session.sp_max = 200;
-        conn.session.homdo.push(item(30001, 5));
-        let mut data = GameData::default();
-        data.items.insert(
-            30001,
-            crate::data::tables::Item {
-                id: 30001,
-                hp: 100,
-                sp: 50,
-                ..Default::default()
-            },
-        );
-        let mut out = HandleOutcome::default();
-        let mut rng = seeded();
-        // slot 1, count 2, use_type 0
-        use_item_rng(&mut conn, &[1, 2, 0], &mut out, None, &data, &mut rng).await;
-
-        assert_eq!(conn.session.hp, 200); // 50 + 200 capped
-        assert_eq!(conn.session.sp, 130); // 30 + 100
-        assert_eq!(conn.session.homdo[0].count, 3); // 5 - 2
-        assert_eq!(
-            out.outgoing,
-            vec![
-                "F4440C0008011901C800000000000000".to_string(), // Hp -> 200
-                "F4440C0008011A018200000000000000".to_string(), // Sp -> 130
-                "F444040017090102".to_string(),                 // 1709 slot 1, used 2
-                "F4440200170F".to_string(),
-            ]
-        );
-    }
-
-    #[tokio::test]
-    async fn warp_item_moves_map_and_consumes() {
-        let mut conn = Conn::new();
-        conn.session.id = 300001;
-        conn.session.map_id = 12001;
-        conn.session.map_x = 400;
-        conn.session.map_y = 500;
-        conn.session.homdo.push(item(46022, 1));
-        let data = GameData::default();
-        let mut out = HandleOutcome::default();
-        let mut rng = seeded();
-        use_item_rng(&mut conn, &[1, 1], &mut out, None, &data, &mut rng).await;
-
-        assert_eq!(conn.session.map_id, 12403);
-        assert_eq!(conn.session.map_x, 442);
-        assert_eq!(conn.session.map_y, 375);
-        assert!(conn.session.homdo.is_empty(), "warp item consumed");
-        assert!(out.outgoing.iter().any(|f| f.contains("17090101")));
-        assert!(out.outgoing.iter().any(|f| f.starts_with("F4440D000C")));
-    }
-
-    #[tokio::test]
-    async fn add_pet_item_gives_pet() {
-        let mut conn = Conn::new();
-        conn.session.homdo.push(item(46001, 1));
-        let mut data = GameData::default();
-        data.items.insert(
-            46001,
-            crate::data::tables::Item {
-                id: 46001,
-                add_pet: 10001,
-                ..Default::default()
-            },
-        );
-        let mut out = HandleOutcome::default();
-        let mut rng = seeded();
-        use_item_rng(&mut conn, &[1, 1], &mut out, None, &data, &mut rng).await;
-
-        assert_eq!(conn.session.pets.len(), 1);
-        assert_eq!(conn.session.pets[0].id, 10001);
-        assert!(conn.session.homdo.is_empty(), "pet item consumed");
-    }
-
-    #[tokio::test]
-    async fn point_book_adds_point_and_keeps_item() {
-        let mut conn = Conn::new();
-        conn.session.homdo.push(item(50010, 1));
-        let data = GameData::default();
-        let mut out = HandleOutcome::default();
-        let mut rng = seeded();
-        use_item_rng(&mut conn, &[1, 1], &mut out, None, &data, &mut rng).await;
-
-        assert_eq!(conn.session.point, 1);
-        assert_eq!(
-            conn.session.homdo.len(),
-            1,
-            "point book is not consumed (C# quirk)"
-        );
-        assert!(out
-            .outgoing
-            .iter()
-            .any(|f| f.starts_with("F4440C0008012601")));
-    }
-
-    #[tokio::test]
-    async fn unknown_zero_effect_item_is_silent() {
-        // Truly statless unknown item: no frames, no consume (C# edge).
-        let mut conn = Conn::new();
-        conn.session.homdo.push(item(40001, 1));
-        let data = GameData::default();
-        let mut out = HandleOutcome::default();
-        let mut rng = seeded();
-        use_item_rng(&mut conn, &[1, 1], &mut out, None, &data, &mut rng).await;
-        assert_eq!(conn.session.homdo.len(), 1, "not consumed");
-        assert!(out.outgoing.is_empty(), "silent: no frames");
-    }
-
-    #[tokio::test]
-    async fn noop_ids_send_end_frame_without_consume() {
-        for id in [46013u16, 46014, 46015, 46042, 46091] {
-            let mut conn = Conn::new();
-            conn.session.homdo.push(item(id, 1));
-            let data = GameData::default();
-            let mut out = HandleOutcome::default();
-            let mut rng = seeded();
-            use_item_rng(&mut conn, &[1, 1], &mut out, None, &data, &mut rng).await;
-            assert_eq!(conn.session.homdo.len(), 1, "id {id}: not consumed");
-            assert!(
-                out.outgoing.iter().any(|f| f == "F444040017090101"),
-                "id {id}: end feedback present"
-            );
-            assert!(out.outgoing.iter().any(|f| f == "F4440200170F"));
-        }
-    }
-
-    #[tokio::test]
-    async fn skill_book_learns_at_level_ten() {
-        let mut conn = Conn::new();
-        conn.session.homdo.push(item(46230, 1));
-        let mut data = GameData::default();
-        data.skills.insert(
-            10016,
-            crate::data::tables::Skill {
-                id: 10016,
-                name: "Ky Nang".into(),
-                sp: 10,
-                ..Default::default()
-            },
-        );
-        let mut out = HandleOutcome::default();
-        let mut rng = seeded();
-        use_item_rng(&mut conn, &[1, 1], &mut out, None, &data, &mut rng).await;
-        assert_eq!(conn.session.skills.len(), 1);
-        assert_eq!(conn.session.skills[0], (10016, 10));
-        assert!(conn.session.homdo.is_empty(), "skill book consumed");
-        assert!(out
-            .outgoing
-            .iter()
-            .any(|f| f.starts_with("F4440C0008016E01")));
-    }
-
-    #[tokio::test]
-    async fn texp_book_adds_exp() {
-        let mut conn = Conn::new();
-        conn.session.homdo.push(item(46211, 1));
-        let data = GameData::default();
-        let mut out = HandleOutcome::default();
-        let mut rng = seeded();
-        use_item_rng(&mut conn, &[1, 1], &mut out, None, &data, &mut rng).await;
-        assert_eq!(conn.session.texp, 106); // session starts at texp 6 + 100
-        assert!(conn.session.homdo.is_empty());
-    }
-
-    #[tokio::test]
-    async fn potion_at_full_still_consumes() {
-        let mut conn = Conn::new();
-        conn.session.hp = 200;
-        conn.session.hp_max = 200;
-        conn.session.sp = 200;
-        conn.session.sp_max = 200;
-        conn.session.homdo.push(item(30001, 5));
-        let mut data = GameData::default();
-        data.items.insert(
-            30001,
-            crate::data::tables::Item {
-                id: 30001,
-                hp: 100,
-                sp: 50,
-                ..Default::default()
-            },
-        );
-        let mut out = HandleOutcome::default();
-        let mut rng = seeded();
-        use_item_rng(&mut conn, &[1, 1], &mut out, None, &data, &mut rng).await;
-        assert_eq!(conn.session.hp, 200);
-        assert_eq!(conn.session.homdo[0].count, 4, "consumed even at full");
-        assert!(out.outgoing.iter().any(|f| f == "F444040017090101"));
     }
 }

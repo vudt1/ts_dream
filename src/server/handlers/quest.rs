@@ -173,7 +173,7 @@ pub fn try_quest_h6(conn: &mut Conn, data: &GameData, out: &mut HandleOutcome) -
 /// Evaluate `[REQUIRES]` conditions (Level/Reborn/Thuoctinh/Quests/Wears/Items)
 /// against the session. Returns the failure packet or `None` (pass).
 ///
-/// The failure packet follows §2.6.3 / FTalk.cs:2720-2739:
+/// The failure packet follows §2.6.3:
 /// - missing item -> `F444110014010000000101070000000000000077A7`;
 /// - a `Dict`-style id>0 fail -> `F44411001401000000020103`+id+`…BB`.
 pub fn evaluate_requirements(conn: &Conn, quest: &crate::data::tables::QuestDef) -> Option<String> {
@@ -222,7 +222,7 @@ pub fn evaluate_requirements(conn: &Conn, quest: &crate::data::tables::QuestDef)
             );
         }
     }
-    // Require items to possess at entry (C# `genTalkInfoReQuireItem`): the
+    // Require items to possess at entry: the
     // `[OnWin] RequireItems` tuples read from the `[REQUIRES].Items` line.
     for &(item_id, count, _remove) in &quest.on_win.require_items {
         if item_id <= 0 || count <= 0 {
@@ -245,7 +245,7 @@ pub fn evaluate_requirements(conn: &Conn, quest: &crate::data::tables::QuestDef)
 }
 
 /// Operator comparison for `[REQUIRES]` conditions (`0` `=`, `1` `>=`, `2` `>`,
-/// `3` `<=`, `4` `<`, `5` `!=`) — C# `genTalkInfoCondition`.
+/// `3` `<=`, `4` `<`, `5` `!=`).
 fn cmp_op(a: i64, b: i64, op: i64) -> bool {
     match op {
         0 => a == b,
@@ -258,7 +258,7 @@ fn cmp_op(a: i64, b: i64, op: i64) -> bool {
     }
 }
 
-/// Full ordered `BattleQuestWin` side effects (Data.cs:5812-5998, spec §6.7).
+/// Full ordered battle-win side effects (spec §6.7).
 ///
 /// Runs when a quest/TeamDef battle ends with a player win and the leader has
 /// a pending `talking_battle`. `member` resolves a party member's shared
@@ -280,8 +280,7 @@ pub fn battle_quest_win(
 }
 
 /// Same OnWin runner as [`battle_quest_win`], but resolved against the *current
-/// talk* NPC (`idtalking`) — the C# `BattleQuestWin(Client, Key_Talk)` entry
-/// used by the player-reborn flow (Client.cs:5730-5744 / Data.cs:5812).
+/// talk* NPC (`idtalking`) — the entry used by the player-reborn flow.
 pub fn battle_quest_win_talk(
     session: &mut Session,
     idtalking: i32,
@@ -328,7 +327,7 @@ fn battle_quest_win_impl(
     };
     let result = &quest.on_win;
 
-    // Win dialogs take precedence over the reward pipeline (TheBattle.cs:4742).
+    // Win dialogs take precedence over the reward pipeline.
     if !result.dialogs.is_empty() {
         for part in result.dialogs.split("F444") {
             if !part.is_empty() {
@@ -417,16 +416,15 @@ fn battle_quest_win_impl(
                 encoder::le16(item_id as u16)
             ));
             session.remove_homdo_item(item_id as u16, 1);
-            // Capture pre-recompute HP/SP so the status burst can mirror C#'s
-            // `UpdateStatusWhenUseItem` clamp (if old > new max, resync client).
+            // Capture pre-recompute HP/SP so the status burst can resync the
+            // client when an old value exceeds its new max.
             let old_hp = session.hp;
             let old_sp = session.sp;
             session.recompute_stats();
-            // Wire-fidelity burst mirroring C# `UpdateStatusWhenUseItem`:
-            // `PlayerUpdateDataId(_Int2)`, `_Atk2`, `_Def2`, `_Hpx2`, `_Spx2`,
-            // `_Agi2` (always) then `_Hp`/`_Sp` only when the old value
-            // exceeded the freshly recomputed max. `_Hpmax`/`_Spmax` are
-            // client-only stores in C# and emit no packet.
+            // Wire-fidelity status burst: Int2/Atk2/Def2/Hpx2/Spx2/Agi2
+            // (always) then Hp/Sp only when the old value exceeded the freshly
+            // recomputed max. Hpmax/Spmax are client-only stores that emit no
+            // packet.
             frames.push(build_stat_update(0xD4, session.int2 as i32));
             frames.push(build_stat_update(0xD2, session.atk2 as i32));
             frames.push(build_stat_update(0xD3, session.def2 as i32));
@@ -642,14 +640,13 @@ pub fn quest_lose_frames(session: &mut Session, data: &GameData, frames: &mut Ve
     clear_quest_talk(session);
 }
 
-/// Daily quest generator (map 12711, 21 RNG draws — §2.6.2 / research 06 §(6),
-/// C# FTalk.cs:385-658).
+/// Daily quest generator (map 12711, 21 RNG draws — §2.6.2 / research 06 §(6)).
 ///
 /// Uses a fresh time-seeded Random (NOT the battle streams).
-/// Exactly 21 `random.Next` draws consumed in order, even if unused. The menu
+/// Exactly 21 draws consumed in order, even if unused. The menu
 /// actions are data-driven: `add pet from item`, `exchange 65517 ×20 → skill
 /// book`, `level/skillpoint boosts` — keyed by `(idtalking, select_menu)` per
-/// the C# H6 table (FTalk.cs:511-644).
+/// the H6 table.
 pub fn generate_daily_quest(conn: &mut Conn, data: &GameData, out: &mut HandleOutcome) {
     let mut rng = DotNetRandom::time_seeded();
 
@@ -686,7 +683,7 @@ pub fn generate_daily_quest(conn: &mut Conn, data: &GameData, out: &mut HandleOu
     let idtalking = conn.session.idtalking;
     let select_menu = conn.session.select_menu;
 
-    // Map 12711 — pet-shop rows (C# `case 12711`, FTalk.cs:511-644).
+    // Map 12711 — pet-shop rows.
     if idtalking == 1 {
         let pet_items = [
             (30, 31044, 18016),
@@ -719,7 +716,7 @@ pub fn generate_daily_quest(conn: &mut Conn, data: &GameData, out: &mut HandleOu
         }
     }
     if idtalking == 6 || idtalking == 7 {
-        // `65517 ×10` for each 62705..62712 medal item (C# 12711 case 6/7).
+        // `65517 ×10` for each 62705..62712 medal item.
         let medal = match (idtalking, select_menu) {
             (6, 30) => Some(62705),
             (6, 31) => Some(62706),
@@ -751,7 +748,7 @@ pub fn generate_daily_quest(conn: &mut Conn, data: &GameData, out: &mut HandleOu
         }
     }
     // idtalking 8..10: exchange 65517×20 for a skill book (6210x + num4*100).
-    if matches!(idtalking, 8 | 9 | 10) && select_menu == 31 {
+    if matches!(idtalking, 8..=10) && select_menu == 31 {
         let has = conn.session.homdo.iter().any(|i| i.id == 65517);
         if has {
             conn.session
@@ -766,8 +763,8 @@ pub fn generate_daily_quest(conn: &mut Conn, data: &GameData, out: &mut HandleOu
         }
     }
     if idtalking == 11 {
-        // Map 12711 idtalking 11: level/skillpoint/point boosts (C# case 12003
-        // is the *other* daily map; the review keeps both maps on 21 draws).
+        // Map 12711 idtalking 11: level/skillpoint/point boosts (the other
+        // daily map's case 12003 keeps both maps on 21 draws).
         match select_menu {
             30 => {
                 conn.session.level = conn.session.level.saturating_add(1).min(200);
@@ -815,7 +812,7 @@ pub fn is_pet_reborn_key(map_id: i64, map_object_id: i64) -> bool {
         || (map_id == 59011 && map_object_id == 1)
 }
 
-/// Quest requirement failure packets (§2.6.3, FTalk.cs:2720-2739).
+/// Quest requirement failure packets (§2.6.3).
 ///
 /// When `idtalking > 0`: `F44411001401000000020103` + id:X2 + `00000000000000BB`.
 /// When `idtalking <= 0`: `F4441100140100000001010700000000000000493C`.
@@ -844,9 +841,9 @@ pub fn handle_warp_confirm(conn: &mut Conn, data: &GameData, out: &mut HandleOut
     let map_id = conn.session.map_id;
     let idtalking = conn.session.idtalking;
 
-    // C# H8 (FTalk.cs:3258-3287): check the WARP-type talk data first. When a
-    // per-step entry exists we drive its dialogs / TEAMDEF / OnWin directly and
-    // do NOT fall through to the simple warp, mirroring `GetDataTalkExits`.
+    // Check the WARP-type talk data first. When a per-step entry exists we
+    // drive its dialogs / TEAMDEF / OnWin directly and do NOT fall through to
+    // the simple warp.
     let talk_key = format!("{}:WARP:{}:0", map_id, idtalking);
     if let Some(quest) = data.talks.get(&talk_key) {
         if !quest.dialogs.is_empty() {
@@ -933,484 +930,5 @@ pub fn handle_warp_confirm(conn: &mut Conn, data: &GameData, out: &mut HandleOut
         end_talk(conn, out);
     } else {
         end_talk(conn, out);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::data::tables::{QuestDef, QuestResult, Skill};
-
-    #[test]
-    fn daily_quest_21_draws() {
-        // Verify that exactly 21 RNG draws are consumed
-        let mut conn = Conn::new();
-        let mut out = HandleOutcome::default();
-        generate_daily_quest(&mut conn, &GameData::default(), &mut out);
-        // No crash = all 21 draws succeeded
-    }
-
-    /// Run `battle_quest_win` against a fresh session with the given OnWin
-    /// result (talk key `10916:NPC:1:0`), returning the emitted frames.
-    fn run_quest_win(result: QuestResult, mut data: GameData) -> (Session, Vec<String>) {
-        let mut session = Session::new();
-        session.id = 300001;
-        session.map_id = 10916;
-        session.talking_battle = 1;
-        data.talks.insert(
-            "10916:NPC:1:0".to_string(),
-            QuestDef {
-                map_id: 10916,
-                id: 1,
-                on_win: result,
-                ..Default::default()
-            },
-        );
-        let mut frames = Vec::new();
-        battle_quest_win(&mut session, &data, &mut frames, &mut |_| None);
-        (session, frames)
-    }
-
-    #[test]
-    fn quest_win_rewards() {
-        let result = QuestResult {
-            rewards: vec![(46001, 5, 0)],
-            ..Default::default()
-        };
-        let (session, _) = run_quest_win(result, GameData::default());
-        assert_eq!(session.homdo.len(), 1);
-        assert_eq!(session.homdo[0].id, 46001);
-        assert_eq!(session.homdo[0].count, 5);
-    }
-
-    #[test]
-    fn quest_win_random_reward() {
-        let result = QuestResult {
-            random_rewards: vec![(46001, 1, 0), (46002, 2, 0), (46003, 3, 0)],
-            ..Default::default()
-        };
-        let (session, _) = run_quest_win(result, GameData::default());
-        assert_eq!(session.homdo.len(), 1);
-        // Should be one of the three items
-        let item_id = session.homdo[0].id;
-        assert!(
-            item_id == 46001 || item_id == 46002 || item_id == 46003,
-            "unexpected item: {}",
-            item_id
-        );
-    }
-
-    #[test]
-    fn quest_win_add_skill() {
-        let mut data = GameData::default();
-        data.skills.insert(
-            10001,
-            Skill {
-                id: 10001,
-                name: "Kiem".to_string(),
-                ..Default::default()
-            },
-        );
-        let result = QuestResult {
-            add_skill: vec![(10001, 1)],
-            ..Default::default()
-        };
-        let (session, frames) = run_quest_win(result, data);
-        assert_eq!(session.skills.len(), 1);
-        assert_eq!(session.skills[0], (10001, 1));
-        // Learn packet present.
-        assert!(frames.iter().any(|f| f.contains("6E01")));
-    }
-
-    #[test]
-    fn pet_reborn_npc_handled() {
-        let mut conn = Conn::new();
-        conn.session.idtalking = 3;
-        conn.session.select_menu = 30;
-        let mut out = HandleOutcome::default();
-
-        // Map 55002 + object 3 is a pet-reborn key.
-        let handled = handle_pet_reborn_npc(&mut conn, 55002, 3, &mut out);
-        assert!(handled);
-        assert!(!out.outgoing.is_empty());
-    }
-
-    #[test]
-    fn pet_reborn_npc_not_handled() {
-        let mut conn = Conn::new();
-        let mut out = HandleOutcome::default();
-
-        // Wrong map/object pair -> not a pet-reborn key.
-        let handled = handle_pet_reborn_npc(&mut conn, 55002, 2, &mut out);
-        assert!(!handled);
-    }
-
-    #[test]
-    fn requirement_fail_packet() {
-        let mut conn = Conn::new();
-        let mut out = HandleOutcome::default();
-        send_requirement_fail(&mut conn, 42, &mut out);
-        assert_eq!(
-            out.outgoing[0],
-            "F444110014010000000201032A00000000000000BB"
-        );
-        // Followed by EndTalk + SelectMenu reset to 40
-        assert_eq!(out.outgoing[1], "F44402001408");
-        assert_eq!(conn.session.select_menu, 40);
-        assert_eq!(conn.session.idtalking, 0);
-    }
-
-    #[test]
-    fn requirement_fail_packet_zero_id() {
-        let mut conn = Conn::new();
-        let mut out = HandleOutcome::default();
-        send_requirement_fail(&mut conn, 0, &mut out);
-        assert_eq!(
-            out.outgoing[0],
-            "F4441100140100000001010700000000000000493C"
-        );
-        assert_eq!(out.outgoing[1], "F44402001408");
-    }
-
-    #[test]
-    fn quest_save_leader_quests() {
-        let result = QuestResult {
-            save_leader_quests: vec![(100, 1, 0, 1)],
-            ..Default::default()
-        };
-        let (session, _) = run_quest_win(result, GameData::default());
-        assert_eq!(session.quest_steps, vec![(100, 1)]);
-    }
-
-    #[test]
-    fn quest_win_use_items_status_burst() {
-        // G4: the self use-item branch must emit the wire-fidelity status
-        // burst mirroring C# `UpdateStatusWhenUseItem` (gear stats always,
-        // Hp/Spmax are client-only, Hp/Sp only when old exceeds new max).
-        let mut session = Session::new();
-        session.id = 300001;
-        session.map_id = 10916;
-        session.talking_battle = 1;
-        session.add_homdo_item(crate::server::session::InventoryItem {
-            id: 19001,
-            count: 3,
-            loai: 1,
-            doben: 100,
-            ..Default::default()
-        });
-        let mut data = GameData::default();
-        data.talks.insert(
-            "10916:NPC:1:0".to_string(),
-            QuestDef {
-                map_id: 10916,
-                id: 1,
-                on_win: QuestResult {
-                    use_items: vec![(19001, 0)],
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
-        );
-        let mut frames = Vec::new();
-        battle_quest_win(&mut session, &data, &mut frames, &mut |_| None);
-
-        // Six gear status bursts (Int2, Atk2, Def2, Hpx2, Spx2, Agi2).
-        assert!(frames
-            .iter()
-            .any(|f| f == &build_stat_update(0xD4, session.int2 as i32)));
-        assert!(frames
-            .iter()
-            .any(|f| f == &build_stat_update(0xD2, session.atk2 as i32)));
-        assert!(frames
-            .iter()
-            .any(|f| f == &build_stat_update(0xD3, session.def2 as i32)));
-        assert!(frames
-            .iter()
-            .any(|f| f == &build_stat_update(0xCF, session.hpx2 as i32)));
-        assert!(frames
-            .iter()
-            .any(|f| f == &build_stat_update(0xD0, session.spx2 as i32)));
-        assert!(frames
-            .iter()
-            .any(|f| f == &build_stat_update(0xD6, session.agi2 as i32)));
-        // Hpmax/Spmax are client-only in C# and emit no packet; Hp/Sp only when
-        // the old value exceeded the freshly recomputed max (not the case here).
-        assert!(!frames.iter().any(|f| f.starts_with("F4440C00080119")));
-        assert!(!frames.iter().any(|f| f.starts_with("F4440C0008011A")));
-    }
-
-    #[test]
-    fn quest_win_use_items_consumed() {
-        let mut session = Session::new();
-        session.id = 300001;
-        session.map_id = 10916;
-        session.talking_battle = 1;
-        // Seed a use-item requirement into inventory
-        session.add_homdo_item(crate::server::session::InventoryItem {
-            id: 19001,
-            count: 3,
-            loai: 1,
-            doben: 100,
-            ..Default::default()
-        });
-        let mut data = GameData::default();
-        data.talks.insert(
-            "10916:NPC:1:0".to_string(),
-            QuestDef {
-                map_id: 10916,
-                id: 1,
-                on_win: QuestResult {
-                    use_items: vec![(19001, 0)],
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
-        );
-        let mut frames = Vec::new();
-        battle_quest_win(&mut session, &data, &mut frames, &mut |_| None);
-        // 3 - 1 = 2 remaining
-        let left = session.homdo.iter().map(|i| i.count).sum::<u8>();
-        assert_eq!(left, 2);
-        // Self use-item frame `F44403001711`+slot present.
-        assert!(frames.iter().any(|f| f.starts_with("F44403001711")));
-    }
-
-    #[test]
-    fn quest_win_add_pet() {
-        let result = QuestResult {
-            add_pet: vec![18017],
-            ..Default::default()
-        };
-        let (session, _) = run_quest_win(result, GameData::default());
-        assert_eq!(session.pets.len(), 1);
-        assert_eq!(session.pets[0].id, 18017);
-    }
-
-    #[test]
-    fn quest_win_click_npc_id() {
-        let result = QuestResult {
-            click_npc_id: 59011,
-            ..Default::default()
-        };
-        let (session, _) = run_quest_win(result, GameData::default());
-        assert_eq!(session.click_npc_id, 59011);
-    }
-
-    #[test]
-    fn quest_win_warp_leader() {
-        let result = QuestResult {
-            warp_to: vec![12001, 400, 500],
-            ..Default::default()
-        };
-        let (session, frames) = run_quest_win(result, GameData::default());
-        assert_eq!(session.map_id, 12001);
-        assert_eq!(session.map_x, 400);
-        assert_eq!(session.map_y, 500);
-        assert!(frames.iter().any(|f| f.starts_with("F4440D000C")));
-    }
-
-    #[test]
-    fn quest_win_end_talk_without_warp() {
-        let result = QuestResult::default();
-        let (session, frames) = run_quest_win(result, GameData::default());
-        assert!(frames.iter().any(|f| f == "F44402001408"));
-        assert_eq!(session.talking_battle, 0);
-    }
-
-    #[test]
-    fn quest_win_dialogs_take_precedence() {
-        // Non-empty dialogs skip the reward pipeline entirely (TheBattle.cs:4742).
-        let result = QuestResult {
-            dialogs: "F44411001401000000010103010000000000009E28".to_string(),
-            rewards: vec![(46001, 5, 0)],
-            ..Default::default()
-        };
-        let (session, frames) = run_quest_win(result, GameData::default());
-        assert!(frames
-            .iter()
-            .any(|f| f.starts_with("F44411001401000000010103")));
-        assert!(frames.iter().any(|f| f == "F44402001408"));
-        assert!(session.homdo.is_empty(), "no rewards when dialogs present");
-    }
-
-    #[test]
-    fn select_menu_mismatch_sends_lose_dialog() {
-        let mut conn = Conn::new();
-        conn.session.map_id = 10916;
-        conn.session.idtalking = 1;
-        conn.session.select_menu = 20; // wrong menu
-        let mut data = crate::data::loader::GameData::default();
-        data.talks.insert(
-            "10916:NPC:1:0".to_string(),
-            QuestDef {
-                map_id: 10916,
-                id: 1,
-                dialogs: "F44411001401000000010603010000000000000100".to_string(),
-                require_select_menu: 30,
-                on_lose: QuestResult {
-                    dialogs: "F44411001401000000010103010000000000009E28".to_string(),
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
-        );
-
-        let mut out = HandleOutcome::default();
-
-        let handled = try_quest_h6(&mut conn, &data, &mut out);
-        assert!(handled, "expected handled quest path");
-        assert_eq!(conn.session.select_menu, 40);
-        assert_eq!(out.outgoing.len(), 1);
-        assert_eq!(
-            out.outgoing[0],
-            "F44411001401000000010103010000000000009E28"
-        );
-    }
-
-    #[test]
-    fn warp_talk_teamdef_triggers_battle() {
-        let mut conn = Conn::new();
-        conn.session.map_id = 11011;
-        conn.session.idtalking = 3;
-        let mut data = crate::data::loader::GameData::default();
-        data.talks.insert(
-            "11011:WARP:3:0".to_string(),
-            QuestDef {
-                map_id: 11011,
-                talk_type: "WARP".to_string(),
-                id: 3,
-                teamdef: vec![121, 0, 17177, 14073, 17177, 0, 0, 0, 0, 0, 0],
-                ..Default::default()
-            },
-        );
-
-        let mut out = HandleOutcome::default();
-        handle_warp_confirm(&mut conn, &data, &mut out);
-        assert!(out.battle_trigger.is_some(), "expected battle trigger");
-        let t = out.battle_trigger.as_ref().unwrap();
-        assert_eq!(t.diahinh, 121);
-        assert_eq!(conn.session.talking_battle, 3);
-    }
-
-    #[test]
-    fn warp_talk_plain_warp() {
-        let mut conn = Conn::new();
-        conn.session.map_id = 11011;
-        conn.session.idtalking = 2;
-        let mut data = crate::data::loader::GameData::default();
-        data.warps.insert(
-            (11011, 2),
-            crate::data::tables::Warp {
-                map1: 11011,
-                warpid: 2,
-                map2: 12001,
-                x: 400,
-                y: 500,
-            },
-        );
-
-        let mut out = HandleOutcome::default();
-        handle_warp_confirm(&mut conn, &data, &mut out);
-        assert!(out.battle_trigger.is_none());
-        assert_eq!(conn.session.map_id, 12001);
-        assert_eq!(conn.session.map_x, 400);
-    }
-
-    #[test]
-    fn warp_talk_teamdef_missing_uses_gate() {
-        let mut conn = Conn::new();
-        conn.session.map_id = 59841;
-        conn.session.idtalking = 1;
-        let mut data = crate::data::loader::GameData::default();
-        data.warps.insert(
-            (59841, 1),
-            crate::data::tables::Warp {
-                map1: 59841,
-                warpid: 1,
-                map2: 60000,
-                x: 10,
-                y: 20,
-            },
-        );
-        data.battle_gates.insert(
-            (59841, 1),
-            crate::data::tables::BattleGate {
-                mapid1: 59841,
-                warpid: 1,
-                diahinh: 365,
-                defenders: [1001, 1002, 0, 0, 0, 0, 0, 0, 0, 0],
-            },
-        );
-
-        let mut out = HandleOutcome::default();
-        handle_warp_confirm(&mut conn, &data, &mut out);
-        assert!(out.battle_trigger.is_some(), "expected gate battle trigger");
-        let t = out.battle_trigger.as_ref().unwrap();
-        assert_eq!(t.diahinh, 365);
-    }
-
-    #[test]
-    fn quest_key_roundtrips_type_and_step() {
-        let key = quest_key(10916, "NPC", 3, 7);
-        assert_eq!(key, "10916:NPC:3:7");
-        // Keywords differ by step — never collapse to step 0.
-        assert_ne!(quest_key(10916, "NPC", 3, 7), quest_key(10916, "NPC", 3, 0));
-    }
-
-    #[test]
-    fn pet_reborn_keys_are_map_object_pairs() {
-        assert!(is_pet_reborn_key(55002, 3));
-        assert!(is_pet_reborn_key(59102, 1));
-        assert!(is_pet_reborn_key(59011, 1));
-        // Template-id-only leaks (old bug) must be false.
-        assert!(!is_pet_reborn_key(55002, 0));
-        assert!(!is_pet_reborn_key(0, 3));
-    }
-
-    #[test]
-    fn requirements_level_gate_fails() {
-        let mut conn = Conn::new();
-        conn.session.level = 5;
-        let quest = crate::data::tables::QuestDef {
-            require_level: Some((50, 1)), // level >= 50
-            ..Default::default()
-        };
-        assert!(
-            evaluate_requirements(&conn, &quest).is_some(),
-            "level 5 must fail a >= 50 requirement"
-        );
-    }
-
-    #[test]
-    fn requirements_level_gate_passes() {
-        let mut conn = Conn::new();
-        conn.session.level = 60;
-        let quest = crate::data::tables::QuestDef {
-            require_level: Some((50, 1)), // level >= 50
-            ..Default::default()
-        };
-        assert!(evaluate_requirements(&conn, &quest).is_none());
-    }
-
-    #[test]
-    fn daily_quest_draws_consume_21_and_branch() {
-        let mut conn = Conn::new();
-        conn.session.idtalking = 1; // pet-shop row
-        conn.session.select_menu = 30;
-        conn.session.homdo.push(crate::server::session::InventoryItem {
-            slot: 1,
-            id: 31044,
-            count: 1,
-            ..Default::default()
-        });
-        let mut out = HandleOutcome::default();
-        generate_daily_quest(&mut conn, &GameData::default(), &mut out);
-        // Menu 30 + item 31044 -> the pet 18016 is granted.
-        assert!(
-            conn.session.pets.iter().any(|p| p.id == 18016),
-            "daily pet-shop item must grant pet 18016"
-        );
-        // And the consumed item is removed from the bag.
-        assert!(!conn.session.homdo.iter().any(|i| i.id == 31044));
     }
 }

@@ -1,6 +1,6 @@
 //! AutoSaveService: background task that batch-persists dirty sessions.
 //!
-//! Every cycle (default 3 minutes, mirroring the C# auto-save cadence) the
+//! Every cycle (default 3 minutes, mirroring the legacy auto-save cadence) the
 //! service scans the online-session registry, fingerprints each authed
 //! session's volatile state (gold, HP/SP, stats, bag/equipment rows, pets,
 //! quest steps), and writes the sessions whose fingerprint changed since the

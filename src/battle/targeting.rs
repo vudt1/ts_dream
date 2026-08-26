@@ -1,7 +1,6 @@
 //! Targeting pickers for the battle engine (Chapter 6 §6.4).
 //!
-//! Faithful port of `TheBattle.cs` `GetPosRandom*` / `GetPosAttack*` family
-//! (lines 7271-9230). Each picker selects an anchor via its own qualification
+//! Each picker selects an anchor via its own qualification
 //! rule, then expands it by the skill's `SLDanh` into the target list. The
 //! expansions are byte-identical across variants; only the anchor rule differs.
 //! Terrain (`_Diahinh`) never influences targeting or damage.
@@ -33,16 +32,16 @@ pub struct CellInfo {
 /// Anchor qualification rules (one per `GetPosRandom*` variant).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AnchorRule {
-    /// Default hostile (`GetPosRandom`): enemy team, hp>0, type4 ∉ {13005,13025,13032}.
+    /// Default hostile anchor: enemy team, hp>0, type4 ∉ {13005,13025,13032}.
     Hostile,
-    /// `GetPosRandomTG`: enemy team, hp>0, no type4 exclusion.
+    /// Hostile variant: enemy team, hp>0, no type4 exclusion.
     HostileAnyType4,
-    /// `GetPosRandomCombo`: requested cell qualifies with `id>0 && enemy` only
+    /// Combo anchor: requested cell qualifies with `id>0 && enemy` only
     /// (may be dead); the fallback scan uses the full Hostile rule.
     Combo,
-    /// `GetPosRandom_Type4` / `GetPosRandom_honLoan`: same team, hp>0.
+    /// Friendly anchor: same team, hp>0.
     Friendly,
-    /// `GetPosRandom_GiaiTru`: any entity with id>0 (no team/hp requirement).
+    /// Any-entity anchor: any entity with id>0 (no team/hp requirement).
     Any,
 }
 
@@ -92,7 +91,7 @@ pub fn pick_anchor(cells: &[CellInfo], myteam: i64, row: u8, col: u8, rule: Anch
 /// Expand an anchor position into a target list based on `sl_danh` (§4 in research).
 ///
 /// The `alive_at` closure checks whether the cell at (row, col) has hp > 0 and id > 0.
-/// Expansion rules mirror `TheBattle.cs` `GetPosAttack` switch:
+/// Expansion rules:
 ///   1 = anchor; 2 = +opposite-row; 3 = +left/right; 4 = +left/right (dead→anchor);
 ///   5 = +left/right+opposite; 6 = +left/right+opposite+opposite-diagonals;
 ///   7 = all alive cells of the anchor ROW (all columns); 8 = anchor row + opposite row.
@@ -174,7 +173,7 @@ where
             }
         }
         7 => {
-            // C# case 7 iterates `Y = 0..4` keeping X = anchor row.
+            // Area 7 iterates columns 0..4 keeping the anchor row.
             for col in 0..5u8 {
                 if alive_at(r, col) {
                     targets.push(GridPos::new(r, col));
@@ -212,7 +211,7 @@ pub fn is_valid_target(pos: GridPos) -> bool {
 /// Column iteration order for anchor selection: 2, 1, 3, 0, 4.
 pub const COL_ORDER: [u8; 5] = [2, 1, 3, 0, 4];
 
-/// Run one full `GetPosAttack` picker: anchor selection + SLDanh expansion.
+/// Run one full picker: anchor selection + SLDanh expansion.
 pub fn get_pos_attack(
     cells: &[CellInfo],
     myteam: i64,
@@ -233,7 +232,7 @@ pub fn get_pos_attack(
     expand_sl_danh(anchor, sl_danh, alive_at)
 }
 
-/// `GetPosAttack` — default hostile targeting.
+/// Default hostile targeting.
 pub fn get_pos_attack_default(
     cells: &[CellInfo],
     myteam: i64,
@@ -244,7 +243,7 @@ pub fn get_pos_attack_default(
     get_pos_attack(cells, myteam, row, col, sl_danh, AnchorRule::Hostile)
 }
 
-/// `GetPosAttackCombo` — same expansion, combo anchor rule.
+/// Same expansion, combo anchor rule.
 pub fn get_pos_attack_combo(
     cells: &[CellInfo],
     myteam: i64,
@@ -255,7 +254,7 @@ pub fn get_pos_attack_combo(
     get_pos_attack(cells, myteam, row, col, sl_danh, AnchorRule::Combo)
 }
 
-/// `GetPosAttackTG` — hostile with no type4 exclusion.
+/// Hostile with no type4 exclusion.
 pub fn get_pos_attack_tg(
     cells: &[CellInfo],
     myteam: i64,
@@ -273,7 +272,7 @@ pub fn get_pos_attack_tg(
     )
 }
 
-/// `GetPosAttack3_15` — default hostile rule (same as `get_pos_attack_default`).
+/// Default hostile rule (same as `get_pos_attack_default`).
 pub fn get_pos_attack_3_15(
     cells: &[CellInfo],
     myteam: i64,
@@ -284,7 +283,7 @@ pub fn get_pos_attack_3_15(
     get_pos_attack(cells, myteam, row, col, sl_danh, AnchorRule::Hostile)
 }
 
-/// `GetPosAttack_GiaiTru` — any-entity targeting (dispel/cleanse).
+/// Any-entity targeting (dispel/cleanse).
 pub fn get_pos_attack_giai_tru(
     cells: &[CellInfo],
     myteam: i64,
@@ -295,7 +294,7 @@ pub fn get_pos_attack_giai_tru(
     get_pos_attack(cells, myteam, row, col, sl_danh, AnchorRule::Any)
 }
 
-/// `GetPosAttack_Type4` — own-team buffs/heals.
+/// Own-team buffs/heals.
 pub fn get_pos_attack_type4(
     cells: &[CellInfo],
     myteam: i64,
@@ -306,7 +305,7 @@ pub fn get_pos_attack_type4(
     get_pos_attack(cells, myteam, row, col, sl_danh, AnchorRule::Friendly)
 }
 
-/// `GetPosAttack_honLoan` — own-team splash (berserk).
+/// Own-team splash (berserk).
 pub fn get_pos_attack_hon_loan(
     cells: &[CellInfo],
     myteam: i64,
@@ -315,114 +314,4 @@ pub fn get_pos_attack_hon_loan(
     sl_danh: i64,
 ) -> Vec<GridPos> {
     get_pos_attack(cells, myteam, row, col, sl_danh, AnchorRule::Friendly)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn cells_from(rows: &[(u8, u8, i64, i64, i64)]) -> Vec<CellInfo> {
-        // (row, col, id, hp, team)
-        let mut out = Vec::new();
-        for (r, c, id, hp, team) in rows {
-            out.push(CellInfo {
-                row: *r,
-                col: *c,
-                id: *id,
-                hp: *hp,
-                team: *team,
-                type4_id: 0,
-            });
-        }
-        out
-    }
-
-    #[test]
-    fn expand_single_target() {
-        let targets = expand_sl_danh(GridPos::new(0, 2), 1, |_, _| true);
-        assert_eq!(targets.len(), 1);
-        assert_eq!(targets[0], GridPos::new(0, 2));
-    }
-
-    #[test]
-    fn expand_two_target() {
-        let targets = expand_sl_danh(GridPos::new(0, 2), 2, |_, _| true);
-        assert_eq!(targets.len(), 2);
-        assert_eq!(targets[1], GridPos::new(1, 2)); // opposite row
-    }
-
-    #[test]
-    fn expand_three_target_edges() {
-        // Anchor at col=0, only right is alive
-        let targets = expand_sl_danh(GridPos::new(0, 0), 3, |r, c| r == 0 && c == 1);
-        assert_eq!(targets.len(), 2); // anchor + right
-    }
-
-    #[test]
-    fn expand_seven_targets_anchor_row() {
-        // C# case 7: all alive cells of the anchor ROW (columns 0..4).
-        let targets = expand_sl_danh(GridPos::new(0, 2), 7, |r, _| r == 0);
-        assert_eq!(targets.len(), 5);
-        assert_eq!(targets[0], GridPos::new(0, 0));
-        assert_eq!(targets[4], GridPos::new(0, 4));
-    }
-
-    #[test]
-    fn no_target_sentinel() {
-        assert!(!is_valid_target(NO_TARGET));
-        assert!(is_valid_target(GridPos::new(0, 0)));
-    }
-
-    #[test]
-    fn picker_default_hostile() {
-        // Enemy at (0,2) alive; requested (0,2).
-        let cells = cells_from(&[(0, 2, 9001, 100, 2), (3, 2, 300001, 100, 1)]);
-        let t = get_pos_attack_default(&cells, 1, 0, 2, 1);
-        assert_eq!(t, vec![GridPos::new(0, 2)]);
-    }
-
-    #[test]
-    fn picker_default_skips_hidden_type4() {
-        // Enemy type4=13005 (frozen) should not be picked; falls back to other enemy.
-        let mut cells = cells_from(&[(0, 2, 9001, 100, 2), (0, 4, 9002, 100, 2)]);
-        cells[0].type4_id = 13005;
-        let t = get_pos_attack_default(&cells, 1, 0, 2, 1);
-        assert_eq!(t, vec![GridPos::new(0, 4)]);
-    }
-
-    #[test]
-    fn picker_friendly_targets_own_team() {
-        // Heal/buff picks own team; requested cell is friendly.
-        let cells = cells_from(&[
-            (0, 2, 9001, 100, 2),
-            (3, 2, 300001, 100, 1),
-            (3, 1, 300002, 100, 1),
-        ]);
-        let t = get_pos_attack_type4(&cells, 1, 3, 2, 3);
-        // Anchor (3,2) then left (3,1) alive.
-        assert_eq!(t, vec![GridPos::new(3, 2), GridPos::new(3, 1)]);
-    }
-
-    #[test]
-    fn picker_combo_accepts_dead_requested() {
-        // Requested enemy is dead (hp 0) but combo rule only needs id>0 + enemy.
-        let cells = cells_from(&[(0, 2, 9001, 0, 2), (3, 2, 300001, 100, 1)]);
-        let t = get_pos_attack_combo(&cells, 1, 0, 2, 1);
-        assert_eq!(t, vec![GridPos::new(0, 2)]);
-    }
-
-    #[test]
-    fn picker_any_ignores_team() {
-        let cells = cells_from(&[(0, 2, 9001, 0, 2), (3, 2, 300001, 100, 1)]);
-        let t = get_pos_attack_giai_tru(&cells, 1, 0, 2, 1);
-        // Requested (0,2) qualifies (id>0) even though dead.
-        assert_eq!(t, vec![GridPos::new(0, 2)]);
-    }
-
-    #[test]
-    fn no_target_returns_empty() {
-        let cells = cells_from(&[(3, 2, 300001, 100, 1)]);
-        let t = get_pos_attack_default(&cells, 1, 0, 2, 1);
-        assert!(t.is_empty());
-    }
 }

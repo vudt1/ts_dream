@@ -1,10 +1,9 @@
 //! `quest` table repository (Chapter 5 §5.4 — the 9th gameplay table).
 //!
-//! C# stored per-player quest progress in the member file; the shared MySQL
-//! schema stores rows keyed `(player_id, QuestId)`. Every statement is scoped
-//! by `player_id`. Only the login read is exercised today; the H6 `DELETE`
-//! patterns (FTalk.cs:789-955) must each carry `AND player_id = ?` when the
-//! compiled H6 table lands.
+//! Quest progress is stored per player: rows keyed `(player_id, QuestId)` in
+//! the shared MySQL schema. Every statement is scoped by `player_id`. Only
+//! the login read is exercised today; future H6 conversation-driven deletes
+//! must each carry `AND player_id = ?` when the compiled H6 table lands.
 
 use sqlx::MySqlPool;
 

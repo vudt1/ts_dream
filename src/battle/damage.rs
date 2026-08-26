@@ -1,14 +1,13 @@
 //! Damage pipeline (Chapter 6 §6.5) — element tables, physical/magic formulas,
 //! miss rolls, and per-level reward helpers.
 //!
-//! Faithful port of `TheBattle.cs` (element tables at 7191-7269, damage
-//! pipeline at 1953-3560, RNG helpers at 9348-9503). All arithmetic mirrors the
-//! C# `double` + `Math.Round` (banker's rounding) exactly.
+//! All arithmetic uses double precision with banker's rounding (round half
+//! to even), matching the reference implementation exactly.
 
 use crate::battle::rng::DotNetRandom;
 use crate::data::tables::Npc;
 
-/// Element damage multiplier table `GetDamageThuoctinh(attacker, defender)` (§5.1).
+/// Element damage multiplier table (§5.1).
 /// Elements: 1=earth, 2=water, 3=fire, 4=wind.
 pub fn get_damage_thuoctinh(att_tt: i64, def_tt: i64) -> f64 {
     match (att_tt, def_tt) {
@@ -32,10 +31,10 @@ pub fn get_damage_thuoctinh(att_tt: i64, def_tt: i64) -> f64 {
     }
 }
 
-/// Per-level additive element component `GetDamageSkillInt(skill_tt, def_tt)` (§5.1).
+/// Per-level additive element component (§5.1).
 ///
-/// C# (`TheBattle.cs:7231-7269`) returns a per-row default for an unknown
-/// defender element: row 1→18, 2→19, 3→27, 4→42; unknown skill row → 10.
+/// Returns a per-row default for an unknown defender element: row 1→18,
+/// 2→19, 3→27, 4→42; unknown skill row → 10.
 pub fn get_damage_skill_int(skill_tt: i64, def_tt: i64) -> i64 {
     match skill_tt {
         1 => match def_tt {
@@ -70,7 +69,7 @@ pub fn get_damage_skill_int(skill_tt: i64, def_tt: i64) -> i64 {
     }
 }
 
-/// Element relation `GetThuoctinhKhac(t1, t2)`: 2 if t1 beats t2, 1 if t2 beats t1, else 0.
+/// Element relation: 2 if t1 beats t2, 1 if t2 beats t1, else 0.
 /// Beat graph: 1→4, 2→1, 3→2, 4→3.
 pub fn get_thuoctinh_khac(t1: i64, t2: i64) -> i64 {
     match (t1, t2) {
@@ -80,7 +79,7 @@ pub fn get_thuoctinh_khac(t1: i64, t2: i64) -> i64 {
     }
 }
 
-/// .NET `Math.Round` — banker's rounding (round half to even).
+/// Banker's rounding (round half to even).
 pub fn banker_round(x: f64) -> f64 {
     x.round_ties_even()
 }
@@ -114,11 +113,12 @@ fn refine_base(
 
 /// Physical damage (skill Type 1) base pipeline.
 ///
-/// The C# final base term always uses `round(num80 * Element * 2.0 - Def * 1.6)`
-/// where `num80 = Atk` normally (or the skill's Combo field == 84) and `num80 = Int`
+/// The final base term always uses `round(stat * Element * 2.0 - Def * 1.6)`
+/// where the stat is `Atk` normally (or the skill's Combo field == 84) and `Int`
 /// when the skill's Combo field == 87. Callers resolve `stat` accordingly.
 ///
 /// The `* num37` multiplier only appears for physical (Type 1) skills.
+#[allow(clippy::too_many_arguments)]
 pub fn calc_physical_damage_stat(
     stat: i64,
     def: i64,
@@ -138,6 +138,7 @@ pub fn calc_physical_damage_stat(
 }
 
 /// Backward-compatible wrapper: physical damage using `atk` as the base stat.
+#[allow(clippy::too_many_arguments)]
 pub fn calc_physical_damage(
     atk: i64,
     def: i64,
@@ -158,6 +159,7 @@ pub fn calc_physical_damage(
 /// Magic damage (skill Type 2) base pipeline — uses `_Int`, and never applies
 /// `num37`. Skills 12016..12019 (multi-hit magic) use a special AoE refactor:
 /// `round(num36 / (num34*0.5)) + skillLv*50` instead of the `/ (num34*0.75)`.
+#[allow(clippy::too_many_arguments)]
 pub fn calc_magic_damage(
     int_stat: i64,
     def: i64,
@@ -184,7 +186,7 @@ pub fn calc_magic_damage(
     num36 as i64
 }
 
-/// Ordered physical/magic buff modifiers (§5.2). Mirrors the C# non-shield
+/// Ordered physical/magic buff modifiers (§5.2). Canonical non-shield
 /// ordering — buffs first, AoE falloff last.
 ///
 /// `num34` = skill SLDanh (area). `sl_danh` = `GetDataSkill(_Type19_Id, _SLdanh)`,
@@ -242,7 +244,7 @@ pub fn apply_buff_modifiers(
     }
 }
 
-/// `GetRandomMissAttack(lv1, lv2, lvtb1, lvtb2)` — returns `1` (hit) or `0` (miss).
+/// Attack miss roll — returns `1` (hit) or `0` (miss).
 /// `percent = 100 + round((lv1-lv2)/10) + round((lvtb1-lvtb2)/10)`.
 pub fn get_random_miss_attack(
     rng: &mut DotNetRandom,
@@ -257,7 +259,7 @@ pub fn get_random_miss_attack(
     randomize_with_percent(rng, 1, 0, percent)
 }
 
-/// `GetRandomMissTroi(...)` — status-effect land roll. Returns 1 (lands) / 0 (miss).
+/// Status-effect land roll. Returns 1 (lands) / 0 (miss).
 /// `percent = 30 + max(int1,atk1)/30 - spx2/30 + round((lv1-lv2)/20) + round((lvtb1-lvtb2)/20) + reborn1*5 - reborn2*5`.
 #[allow(clippy::too_many_arguments)]
 pub fn get_random_miss_troi(
@@ -284,7 +286,7 @@ pub fn get_random_miss_troi(
     randomize_with_percent(rng, 1, 0, percent)
 }
 
-/// `GetRandomMissChayTron(...)` — flee roll. `percent = 60 + (lv1-lv2) + (lvtb1-lvtb2)`.
+/// Flee roll. `percent = 60 + (lv1-lv2) + (lvtb1-lvtb2)`.
 pub fn get_random_miss_flee(
     rng: &mut DotNetRandom,
     lv1: i64,
@@ -295,16 +297,16 @@ pub fn get_random_miss_flee(
     let num = lv1 - lv2;
     let num2 = lvtb1 - lvtb2;
     let percent = 60 + num + num2;
-    // Flee percent may exceed 100 → clamp (C# clamps in RandomizeArrayWithPercent).
+    // Flee percent may exceed 100 → clamp (the percent roll clamps to [0,100]).
     randomize_with_percent(rng, 1, 0, percent)
 }
 
-/// `GetRandomMissCombo` — always hits (percent 100) => returns 1.
+/// Combo roll — always hits (percent 100) => returns 1.
 pub fn get_random_miss_combo(rng: &mut DotNetRandom) -> i64 {
     randomize_with_percent(rng, 1, 0, 100)
 }
 
-/// `RandomizeArray` — sequentially fold `RandomizeArrayWithPercent(prev, item, 50)`.
+/// Sequentially fold pairwise 50% rolls across `items`.
 /// Returns the surviving element of `items` (0 when empty).
 pub fn randomize_array(rng: &mut DotNetRandom, items: &[i64]) -> i64 {
     if items.is_empty() {
@@ -317,7 +319,7 @@ pub fn randomize_array(rng: &mut DotNetRandom, items: &[i64]) -> i64 {
     value
 }
 
-/// `RandomizeArrayWithPercent(value1, value2, percent)` — clamped to [0,100].
+/// Pairwise percent pick between `value1`/`value2` — clamped to [0,100].
 /// negative percent behaves like 0 (roll `<= p*10` always false → value2).
 pub fn randomize_with_percent(
     rng: &mut DotNetRandom,
@@ -334,8 +336,8 @@ pub fn randomize_with_percent(
     }
 }
 
-/// `GetRandomSkillNPC(lv, reborn, skill1..3)` — default missing skills to 10000.
-/// Draws fresh `random_0.Next(1,100)` per roll (RNG-parity sensitive).
+/// NPC skill pick — defaults missing skills to 10000.
+/// Draws a fresh 1..100 roll per attempt (RNG-parity sensitive).
 pub fn get_random_skill_npc(
     rng: &mut DotNetRandom,
     _lv: i64,
@@ -361,8 +363,8 @@ pub fn get_random_skill_npc(
     s1
 }
 
-/// `GetRandomMissDrop(npcId)` — band roll against cumulative drop percent widths.
-/// `percents` = `[percent_item1..6]` (C# Server defaults 25,23,20,4,3,1). Returns the
+/// Drop band roll against cumulative drop percent widths.
+/// `percents` = `[percent_item1..6]` (server defaults 25,23,20,4,3,1). Returns the
 /// granted item id (from npc `item[0..6]`) or 0 when the roll falls past the bands.
 pub fn get_random_drop(rng: &mut DotNetRandom, npc: &Npc, percents: &[i64; 6]) -> i64 {
     let item: [i64; 6] = npc.item;
@@ -400,7 +402,7 @@ pub fn get_random_drop_slot(roll: i32) -> usize {
 }
 
 /// In-turn per-hit exp for TeamDef (type-7) targets.
-/// `round(npcLv / 2.0 + (npcLv - attackerLv))` — `TheBattle.cs:2323`.
+/// `round(npcLv / 2.0 + (npcLv - attackerLv))`.
 pub fn hit_exp(attacker_lv: i64, npc_lv: i64) -> i64 {
     banker_round(npc_lv as f64 / 2.0 + (npc_lv - attacker_lv) as f64) as i64
 }
@@ -432,7 +434,7 @@ pub fn calc_combo_exp(base_exp: i64) -> i64 {
     banker_round(base_exp as f64 * 1.086) as i64
 }
 
-/// `GetTurn(IdSkill, LvSKill)` — buff/debuff duration in turns (§5.4).
+/// Buff/debuff duration in turns (§5.4).
 pub fn get_turn(id_skill: i64, lv_skill: i64) -> i64 {
     // GROUP_a: {13002,14008,13003,13005,13012}
     if matches!(id_skill, 13002 | 14008 | 13003 | 13005 | 13012) {
@@ -519,144 +521,5 @@ pub fn get_turn(id_skill: i64, lv_skill: i64) -> i64 {
             _ => 3,
         },
         _ => 3,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn element_table_identity() {
-        assert_eq!(get_damage_thuoctinh(1, 1), 1.0);
-        assert_eq!(get_damage_thuoctinh(3, 4), 1.9);
-    }
-
-    #[test]
-    fn element_skill_int() {
-        assert_eq!(get_damage_skill_int(1, 2), 27);
-        assert_eq!(get_damage_skill_int(4, 1), 54);
-        assert_eq!(get_damage_skill_int(1, 0), 18); // per-row default
-        assert_eq!(get_damage_skill_int(3, 0), 27);
-        assert_eq!(get_damage_skill_int(0, 2), 10); // unknown row default
-    }
-
-    #[test]
-    fn element_relation() {
-        assert_eq!(get_thuoctinh_khac(1, 4), 2); // earth beats wind
-        assert_eq!(get_thuoctinh_khac(1, 2), 1); // earth loses to water
-        assert_eq!(get_thuoctinh_khac(1, 3), 0); // neutral
-    }
-
-    #[test]
-    fn basic_physical_damage() {
-        let dmg = calc_physical_damage(100, 50, 1, 1, 10, 10, 1, 10, 1, 2.0);
-        assert!(dmg > 0, "should produce positive damage");
-    }
-
-    #[test]
-    fn physical_uses_int_stat_for_combo_87() {
-        // Same element, same level: higher stat → strictly more damage.
-        let with_atk = calc_physical_damage_stat(200, 50, 1, 1, 10, 10, 1, 10, 1, 2.0);
-        let with_int = calc_physical_damage_stat(50, 50, 1, 1, 10, 10, 1, 10, 1, 2.0);
-        assert!(with_atk > with_int);
-    }
-
-    #[test]
-    fn magic_damage_uses_int() {
-        let dmg = calc_magic_damage(100, 50, 1, 1, 10, 10, 1, 10, 1, 12345, 1);
-        assert!(dmg > 0, "should produce positive damage");
-    }
-
-    #[test]
-    fn magic_multi_hit_aoe() {
-        // 12016 with sl_danh 3 → divide by 1.5 then + skillLv*50.
-        let dmg = calc_magic_damage(100, 50, 1, 1, 10, 10, 1, 10, 2, 12016, 3);
-        assert!(dmg > 0);
-    }
-
-    #[test]
-    fn get_turn_groups() {
-        assert_eq!(get_turn(13002, 1), 3); // GROUP_a
-        assert_eq!(get_turn(10033, 3), 3); // GROUP_b
-        assert_eq!(get_turn(10004, 5), 3); // GROUP_c
-        assert_eq!(get_turn(13015, 1), 4); // GROUP_d
-        assert_eq!(get_turn(11014, 1), 5); // GROUP_e
-        assert_eq!(get_turn(20025, 10), 5); // GROUP_f max lv
-        assert_eq!(get_turn(14021, 3), 4); // 14021 specific
-        assert_eq!(get_turn(14013, 7), 4); // 14013 falls through to GROUP_f ladder
-        assert_eq!(get_turn(99999, 1), 3); // default
-    }
-
-    #[test]
-    fn kill_exp_basic() {
-        let exp = calc_kill_exp(10, 10);
-        assert_eq!(exp, 7); // round(5 + 10/5) = round(7) = 7
-    }
-
-    #[test]
-    fn kill_exp_too_far() {
-        assert_eq!(calc_kill_exp(50, 10), 0); // diff 40 > 20
-    }
-
-    #[test]
-    fn kill_exp_lower_level() {
-        // npc higher than caster → round((npc-caster) + npc/5)
-        let exp = calc_kill_exp(10, 15);
-        assert_eq!(exp, 8); // round(5 + 3) = 8
-    }
-
-    #[test]
-    fn hit_exp_teamdef_formula() {
-        // round(npcLv/2 + (npcLv - attackerLv))
-        assert_eq!(hit_exp(10, 20), 20); // round(10 + 10) = 20
-        assert_eq!(hit_exp(10, 11), 6); // round(5.5 + 1) = 6 (banker's: 6.5->6)
-    }
-
-    #[test]
-    fn combo_exp_bonus() {
-        assert_eq!(calc_combo_exp(10), 11); // round(10 * 1.086) = round(10.86) = 11
-    }
-
-    #[test]
-    fn drop_slots() {
-        assert_eq!(get_random_drop_slot(1), 1);
-        assert_eq!(get_random_drop_slot(25), 1);
-        assert_eq!(get_random_drop_slot(26), 2);
-        assert_eq!(get_random_drop_slot(48), 2);
-        assert_eq!(get_random_drop_slot(76), 6);
-        assert_eq!(get_random_drop_slot(77), 0);
-        assert_eq!(get_random_drop_slot(999), 0);
-    }
-
-    #[test]
-    fn miss_attack_high_avg_hits() {
-        // Same level, equal avg => percent 100 => hit.
-        let mut rng = DotNetRandom::new(7);
-        assert_eq!(get_random_miss_attack(&mut rng, 10, 10, 10, 10), 1);
-    }
-
-    #[test]
-    fn flee_percent_clamped() {
-        // Huge favorable diff => percent clamped to 100 => always flee success.
-        let mut rng = DotNetRandom::new(9);
-        let roll = get_random_miss_flee(&mut rng, 100, 1, 100, 1);
-        assert_eq!(roll, 1);
-    }
-
-    #[test]
-    fn skill_npc_defaults_to_10000() {
-        let mut rng = DotNetRandom::new(11);
-        // No skills -> after failed rolls returns 10000.
-        let skill = get_random_skill_npc(&mut rng, 10, 0, [0, 0, 0, 0]);
-        assert!(skill == 10000 || skill >= 0);
-    }
-
-    #[test]
-    fn randomize_array_fold() {
-        // percent 50 always -> first element survives 50% of the folds. Just check bounds.
-        let mut rng = DotNetRandom::new(13);
-        let v = randomize_array(&mut rng, &[2, 1, 3, 4]);
-        assert!([1, 2, 3, 4].contains(&v));
     }
 }

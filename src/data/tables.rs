@@ -28,7 +28,7 @@ pub struct Npc {
 
 impl Npc {
     /// Wire-name hex: `None` aborts the packet (3-digit garble); `Some` is the
-    /// exact hex the C# emits (garble override, else clean VISCII bytes).
+    /// exact wire hex to emit (garble override, else clean VISCII bytes).
     pub fn wire_name_hex(&self) -> Option<String> {
         crate::encoding::name_wire_hex(&self.name, &self.garble)
     }
@@ -68,7 +68,7 @@ pub struct Item {
 
 impl Item {
     /// Wire-name hex: `None` aborts the packet (3-digit garble, e.g. item 48101);
-    /// `Some` is the exact hex the C# emits (garble override, else clean bytes).
+    /// `Some` is the exact wire hex to emit (garble override, else clean bytes).
     pub fn wire_name_hex(&self) -> Option<String> {
         crate::encoding::name_wire_hex(&self.name, &self.garble)
     }
@@ -142,7 +142,7 @@ pub struct QuestDef {
     /// `[REQUIRES] SelectMenu` — the menu choice that must be set (0 if absent).
     pub require_select_menu: i64,
     /// `[REQUIRES] Level` — `Some((value, opIndex))`; op 0 `=` 1 `>=` 2 `>`
-    /// 3 `<=` 4 `<` 5 `!=`. `None` = key absent = no requirement (C# `int[0]`).
+    /// 3 `<=` 4 `<` 5 `!=`. `None` = key absent = no requirement.
     pub require_level: Option<(i64, i64)>,
     /// `[REQUIRES] Reborn` — `Some((value, opIndex))`, `None` when absent.
     pub require_reborn: Option<(i64, i64)>,
@@ -214,11 +214,11 @@ pub struct ItemOnMap {
     pub delay: i64,
 }
 
-/// A spawned static drop (`Data.ItemDropOnMap`), created by `CreatMapItem`.
+/// A spawned static drop, created while loading ItemOnMap.txt.
 ///
 /// Pre-filled as empty slots 1..255 per map; each ItemOnMap.txt row spawns one
-/// with a full copy of the item's stats (C# `SystemDropItem`, Data.cs:5278-5345)
-/// and `_Delay = 999999` (never auto-removed). Keyed `(map_id, slot)`.
+/// with a full copy of the item's stats and `_Delay = 999999`
+/// (never auto-removed). Keyed `(map_id, slot)`.
 #[derive(Debug, Clone, Default)]
 pub struct ItemDropOnMap {
     pub map_id: i64,
@@ -228,7 +228,7 @@ pub struct ItemDropOnMap {
     pub map_y: i64,
     pub delay: i64,
     pub count: i64,
-    /// The spawned item carries a copy of `Data_Items` stats (C# `_ItemDropOnMap`).
+    /// The spawned item carries a full copy of its stats.
     pub lv: i64,
     pub doben: i64,
     pub int1: i64,
@@ -254,7 +254,7 @@ pub struct ItemDropOnMap {
     pub giatri_thuoctinh: i64,
     pub loai: i64,
     pub texp: i64,
-    /// C# always sets `_Gold = 3` on spawned drops (Data.cs:5341).
+    /// Spawned drops always carry `_Gold = 3`.
     pub gold: i64,
 }
 

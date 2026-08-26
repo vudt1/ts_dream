@@ -1,6 +1,6 @@
 //! Formula loader for `Formula.Dat`.
 //!
-//! Maps to Kotlin `FormulaDatLoader` / `Calculator.lua`.
+//! Feeds the stat / HP / SP / damage calculators.
 
 use crate::data::reader::DatReader;
 use crate::error::{Result, TsError};

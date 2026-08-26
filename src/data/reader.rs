@@ -143,21 +143,9 @@ impl DatReader {
 
         if compute_xor {
             match size {
-                1 => {
-                    if self.xor1 != 0 {
-                        result ^= self.xor1 as u64;
-                    }
-                }
-                2 => {
-                    if self.xor2 != 0 {
-                        result ^= self.xor2 as u64;
-                    }
-                }
-                4 => {
-                    if self.xor4 != 0 {
-                        result ^= self.xor4 as u64;
-                    }
-                }
+                1 if self.xor1 != 0 => result ^= self.xor1 as u64,
+                2 if self.xor2 != 0 => result ^= self.xor2 as u64,
+                4 if self.xor4 != 0 => result ^= self.xor4 as u64,
                 _ => {}
             }
         }
@@ -376,38 +364,5 @@ impl DatReader {
 
         self.data = decoded;
         self.position = 0;
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_basic_numeric_reads() {
-        let bytes = vec![0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0];
-        let mut reader = DatReader::new(bytes);
-        assert_eq!(reader.read_u8(), 0x12);
-        assert_eq!(reader.read_u16(), 0x5634);
-        assert_eq!(reader.read_u32(), 0xDEBC9A78);
-    }
-
-    #[test]
-    fn test_offset_and_xor() {
-        // Test with offset = 3, xor1 = 211
-        let val: u8 = 10;
-        let encoded: u8 = (val + 3) ^ 211;
-        let mut reader = DatReader::with_keys(vec![encoded], 3, 211, 0, 0);
-        assert_eq!(reader.read_u8(), 10);
-    }
-
-    #[test]
-    fn test_pc_reversed_string() {
-        // 1 byte count=4, 6 bytes buffer, reversed string at the end
-        // String "ABCD" -> bytes [4, padding: 0x00, 0x00, 'D', 'C', 'B', 'A']
-        let bytes = vec![4, 0x00, 0x00, b'D', b'C', b'B', b'A'];
-        let mut reader = DatReader::new(bytes);
-        let s = reader.read_string(6);
-        assert_eq!(s, "ABCD");
     }
 }

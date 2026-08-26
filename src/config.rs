@@ -35,7 +35,7 @@ impl Default for Config {
     }
 }
 
-fn parse_u16(s: &str) -> std::result::Result<u16, String> {
+pub fn parse_u16(s: &str) -> std::result::Result<u16, String> {
     s.trim()
         .parse::<u16>()
         .map_err(|e| format!("invalid u16: {e}"))
@@ -45,7 +45,7 @@ fn parse_u32(s: &str) -> std::result::Result<u32, String> {
         .parse::<u32>()
         .map_err(|e| format!("invalid u32: {e}"))
 }
-fn parse_bool(s: &str) -> std::result::Result<bool, String> {
+pub fn parse_bool(s: &str) -> std::result::Result<bool, String> {
     match s.trim().to_ascii_lowercase().as_str() {
         "true" | "1" | "yes" | "on" => Ok(true),
         "false" | "0" | "no" | "off" => Ok(false),
@@ -108,7 +108,7 @@ impl Config {
     }
 
     /// Candidate resolution, injectable for tests (no `current_exe()`).
-    fn resolve_data_dir_with(data_dir: &Path, exe_dir: Option<PathBuf>) -> PathBuf {
+    pub fn resolve_data_dir_with(data_dir: &Path, exe_dir: Option<PathBuf>) -> PathBuf {
         if data_dir.exists() {
             return data_dir.to_path_buf();
         }
@@ -126,7 +126,7 @@ impl Config {
 /// Read + validate + parse a TOML file (no env overrides). Rejects the removed
 /// SQLite-era keys. Extracted from [`Config::load`] so rejection is testable
 /// against a single file without touching `TS_*` env vars.
-fn from_file(path: &std::path::Path) -> Result<Config> {
+pub fn from_file(path: &std::path::Path) -> Result<Config> {
     let raw = std::fs::read_to_string(path)
         .map_err(|e| TsError::Config(format!("read {}: {}", path.display(), e)))?;
     // Reject the removed SQLite keys if present.
@@ -139,95 +139,4 @@ fn from_file(path: &std::path::Path) -> Result<Config> {
         }
     }
     toml::from_str(&raw).map_err(|e| TsError::Config(format!("parse {}: {}", path.display(), e)))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn default_config_values() {
-        let cfg = Config::default();
-        assert_eq!(cfg.game_port, 6414);
-        assert_eq!(cfg.web_port, 8090);
-        assert_eq!(cfg.perexp_default, 0);
-        assert!(cfg.database_url.contains("ts_dream"));
-        assert!(cfg.db_auto_create, "auto-create defaults to true");
-    }
-
-    #[test]
-    fn parse_bool_accepts_true_false_forms() {
-        assert!(parse_bool("true").unwrap());
-        assert!(parse_bool("1").unwrap());
-        assert!(parse_bool("YES").unwrap());
-        assert!(!parse_bool("false").unwrap());
-        assert!(!parse_bool("0").unwrap());
-        assert!(!parse_bool("Off").unwrap());
-        assert!(parse_bool("maybe").is_err());
-    }
-
-    #[test]
-    fn parse_u16_rejects_bad() {
-        assert_eq!(parse_u16("6414").unwrap(), 6414);
-        assert!(parse_u16("abc").is_err());
-    }
-
-    #[test]
-    fn from_file_rejects_sqlite_era_keys() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("ts_dream.toml");
-        for key in ["account_db_path", "template_db_path", "member_dir"] {
-            std::fs::write(&path, format!("{key} = \"/old/path\"\n")).unwrap();
-            let err = from_file(&path).unwrap_err();
-            assert!(
-                err.to_string().contains("removed"),
-                "rejection message must flag the removed key; got: {err}"
-            );
-        }
-    }
-
-    #[test]
-    fn from_file_parses_valid_toml() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("ts_dream.toml");
-        std::fs::write(&path, "game_port = 7000\nweb_port = 8100\n").unwrap();
-        let cfg = from_file(&path).unwrap();
-        assert_eq!(cfg.game_port, 7000);
-        assert_eq!(cfg.web_port, 8100);
-    }
-
-    #[test]
-    fn resolve_data_dir_prefers_existing_configured_path() {
-        let dir = tempfile::tempdir().unwrap();
-        // An absolute data_dir that exists is returned unchanged.
-        let cfg = Config {
-            data_dir: dir.path().to_path_buf(),
-            ..Config::default()
-        };
-        assert_eq!(cfg.resolve_data_dir(), dir.path().to_path_buf());
-    }
-
-    #[test]
-    fn resolve_data_dir_falls_back_to_exe_adjacent_bundle() {
-        let dir = tempfile::tempdir().unwrap();
-        let exe_dir = dir.path().join("bin");
-        std::fs::create_dir_all(&exe_dir).unwrap();
-        // The build.rs-packaged `Data/` sits next to the executable.
-        let bundled = exe_dir.join("bundle");
-        std::fs::create_dir_all(&bundled).unwrap();
-
-        // The configured relative path does NOT exist in the CWD here, but the
-        // exe-adjacent one does -> resolve to `exe_dir/bundle`.
-        let got = Config::resolve_data_dir_with(&std::path::PathBuf::from("bundle"), Some(exe_dir));
-        assert_eq!(got, bundled);
-    }
-
-    #[test]
-    fn resolve_data_dir_returns_configured_when_none_exist() {
-        // Neither the configured path nor an exe-adjacent bundle exists ->
-        // the configured path is returned unchanged (caller reports it).
-        let got =
-            Config::resolve_data_dir_with(&std::path::PathBuf::from("does-not-exist-data"), None);
-        assert_eq!(got, std::path::PathBuf::from("does-not-exist-data"));
-    }
 }

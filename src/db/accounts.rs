@@ -1,9 +1,10 @@
 //! `accounts` repository (Chapter 5 §5.8).
 //!
 //! Accounts are created exclusively through the web dashboard; there is no
-//! import of `Member.ini` at bootstrap. Passwords stay plaintext (parity with
-//! the C# server). The PK column is `player_id` (also the character/login id).
-//! Every access is scoped by `player_id` — never the C# unscoped query.
+//! bootstrap import of external account files. Passwords stay plaintext
+//! (parity with the original server). The PK column is `player_id` (also the
+//! character/login id). Every access is scoped by `player_id` — never an
+//! unscoped query.
 
 use sqlx::MySqlPool;
 
@@ -59,8 +60,8 @@ pub async fn passwords(
     .await
 }
 
-/// Update both passwords for a `player_id` in one transaction (C#
-/// `MemberChangedPass`, op 0x23 sub 1). Returns `false` when the account does
+/// Update both passwords for a `player_id` in one transaction
+/// (op 0x23 sub 1). Returns `false` when the account does
 /// not exist (no rows updated).
 pub async fn change_pass(
     pool: &MySqlPool,

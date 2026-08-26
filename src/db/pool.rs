@@ -59,7 +59,7 @@ pub async fn bootstrap(database_url: &str, auto_create: bool) -> Result<MySqlPoo
 /// Return the connection URL with any trailing `/database` path and query
 /// string removed (e.g. `mysql://u:p@h:3306/ts_dream` -> `mysql://u:p@h:3306`),
 /// so a connection can be opened to the server itself rather than a schema.
-fn strip_database_path(database_url: &str) -> String {
+pub fn strip_database_path(database_url: &str) -> String {
     let mut end = database_url.len();
     if let Some(q) = database_url.find('?') {
         end = end.min(q);
@@ -80,7 +80,7 @@ async fn pool_options(opts: MySqlConnectOptions) -> Result<MySqlPool> {
         .max_connections(MAX_CONNECTIONS)
         .connect_with(opts)
         .await
-        .map_err(|e| TsError::Db(e))
+        .map_err(TsError::Db)
 }
 
 /// Parse + apply the latin1 connection charset for the given URL.
@@ -131,42 +131,4 @@ pub fn spawn_liveness_probe(pool: MySqlPool, app: Arc<RwLock<AppState>>, interva
             sleep(interval).await;
         }
     });
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn strip_database_path_removes_path() {
-        assert_eq!(
-            strip_database_path("mysql://user:pass@localhost:3306/ts_dream"),
-            "mysql://user:pass@localhost:3306"
-        );
-    }
-
-    #[test]
-    fn strip_database_path_removes_query_too() {
-        assert_eq!(
-            strip_database_path("mysql://u:p@localhost/ts_dream?ssl=true"),
-            "mysql://u:p@localhost"
-        );
-    }
-
-    #[test]
-    fn strip_database_path_keeps_url_without_path() {
-        assert_eq!(
-            strip_database_path("mysql://user:pass@localhost:3306"),
-            "mysql://user:pass@localhost:3306"
-        );
-    }
-
-    #[test]
-    fn probe_next_state_maps_ping_result() {
-        assert_eq!(probe_next_state(DbStatus::Connecting, true), DbStatus::Connected);
-        assert_eq!(
-            probe_next_state(DbStatus::Connected, false),
-            DbStatus::Disconnected
-        );
-    }
 }
