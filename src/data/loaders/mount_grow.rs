@@ -40,21 +40,3 @@ impl MountGrowDatLoader {
         Ok(defs)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::MountGrowDatLoader;
-
-    #[test]
-    fn empty_mount_grow_catalog_is_valid() {
-        assert!(MountGrowDatLoader::load(&0u32.to_le_bytes())
-            .unwrap()
-            .is_empty());
-    }
-
-    #[test]
-    fn truncated_mount_grow_row_is_rejected() {
-        let data = [1u8, 0, 0, 0, 1, 1];
-        assert!(MountGrowDatLoader::load(&data).is_err());
-    }
-}

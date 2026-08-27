@@ -26,10 +26,9 @@ pub trait AccountRepository {
 
 /// Character lifecycle against `characters` + `character_money`.
 ///
-/// The PC server is strictly 1 account : 1 character (enforced by the UNIQUE
-/// key on `characters.account_id`); the plural-looking methods below still
-/// return collections so the API survives a future multi-character build
-/// without breaking callers.
+/// Shared PK: `characters.character_id = accounts.player_id` (1:1, PK is FK).
+/// The plural-looking methods below still return collections so the API
+/// survives a future multi-character build without breaking callers.
 pub trait CharacterRepository {
     /// Creates the character row plus its empty money ledger; returns the new
     /// character id. Atomic: both inserts commit or roll back together.

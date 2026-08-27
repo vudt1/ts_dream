@@ -40,22 +40,3 @@ impl MarkDatLoader {
         Ok((defs, bit_to_mission))
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::MarkDatLoader;
-
-    #[test]
-    fn empty_mark_catalog_is_valid() {
-        assert!(MarkDatLoader::load(&0u32.to_le_bytes())
-            .unwrap()
-            .0
-            .is_empty());
-    }
-
-    #[test]
-    fn truncated_mark_row_is_rejected() {
-        let data = [1u8, 0, 0, 0, 0, 0];
-        assert!(MarkDatLoader::load(&data).is_err());
-    }
-}

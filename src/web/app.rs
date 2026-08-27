@@ -379,13 +379,12 @@ async fn create_account(
         &headers,
         || {
             format!(
-                "<tr><td><strong>{}</strong></td><td>legacy_{}</td><td>0</td><td>no</td></tr>",
-                player_id, player_id
+                "<tr><td><strong>{}</strong></td><td>0</td><td>no</td></tr>",
+                player_id
             )
         },
         json!({
             "player_id": player_id,
-            "account": format!("legacy_{player_id}"),
             "gm_level": 0,
             "is_suspended": false
         }),

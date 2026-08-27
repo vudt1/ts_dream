@@ -114,7 +114,7 @@ pub async fn redeem_special_gift(
     let mut tx = pool.begin().await?;
 
     let tanthu = sqlx::query_scalar::<_, i64>(
-        "SELECT tanthu FROM characters WHERE account_id = ? FOR UPDATE",
+        "SELECT tanthu FROM characters WHERE character_id = ? FOR UPDATE",
     )
     .bind(player_id)
     .fetch_optional(&mut *tx)
@@ -139,7 +139,7 @@ pub async fn redeem_special_gift(
         return Ok(RedeemOutcome::AlreadyGifted);
     }
 
-    sqlx::query("UPDATE characters SET tanthu = 1 WHERE account_id = ?")
+    sqlx::query("UPDATE characters SET tanthu = 1 WHERE character_id = ?")
         .bind(player_id)
         .execute(&mut *tx)
         .await?;

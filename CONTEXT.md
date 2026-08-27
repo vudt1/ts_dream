@@ -11,12 +11,14 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 ## 1. Thuật ngữ Bounded Context & Miền Nghiệp vụ
 
 ### Account (Tài khoản)
-- **Định nghĩa**: Thực thể quản trị danh tính người dùng trên hệ thống, chứa thông tin đăng nhập (username, password), quyền hạn (User / Admin) và trạng thái tài khoản.
-- **Tránh dùng các từ mơ hồ**: *User*, *Login Info*, *Client Account*.
+- **Định nghĩa**: Thực thể gốc định danh người dùng, PK là `player_id` (BIGINT AUTO_INCREMENT, `accounts.player_id`, wire dùng làm `player_id`). Chứa `pass1`/`pass2` (latin1_bin, so sánh byte-exact qua HEX), `gm_level`, trạng thái treo. Không có cột `account` riêng — identity duy nhất là `player_id`.
+- **Ràng buộc (Invariants)**: PK duy nhất là `player_id`; mọi FK nhân vật là shared PK `characters.character_id = accounts.player_id` (1:1, PK đồng thời là FK).
+- **Tránh dùng các từ mơ hồ**: *User*, *Login Info*, *Client Account*, *id* (thay bằng `player_id`), *account* (không tồn tại cột riêng).
 
 ### Character / Player (Nhân vật / Người chơi)
-- **Định nghĩa**: Đại diện avatar của người chơi trong thế giới game TS Online. Một Account có thể sở hữu nhân vật với các chỉ số (Level, HP, SP, Atk, Def, Agi, Int), danh sách Kỹ năng, Túi đồ và Vị trí trên bản đồ.
+- **Định nghĩa**: Đại diện avatar duy nhất của một Account trong thế giới game TS Online (PC server **1 Account : 1 Character**, shared PK `character_id = player_id`). Mang chỉ số (Level, HP, SP, Atk, Def, Agi, Int), Kỹ năng, Túi đồ và Vị trí.
 - **Ràng buộc (Invariants)**:
+  - Quan hệ 1:1 Account–Character (`characters.character_id = accounts.player_id`, PK shared).
   - Cấp độ tối đa của Nhân vật là 200.
   - Tên nhân vật và dữ liệu hội thoại trên giao thức truyền thông tuân thủ bảng mã VISCII 1.1.
 

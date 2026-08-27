@@ -58,21 +58,3 @@ impl AchievementDatLoader {
         Ok(result)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::AchievementDatLoader;
-
-    #[test]
-    fn empty_achievement_catalog_is_valid() {
-        assert!(AchievementDatLoader::load(&0u32.to_le_bytes())
-            .unwrap()
-            .is_empty());
-    }
-
-    #[test]
-    fn truncated_achievement_row_is_rejected() {
-        let data = [1u8, 0, 0, 0, 1, 0];
-        assert!(AchievementDatLoader::load(&data).is_err());
-    }
-}

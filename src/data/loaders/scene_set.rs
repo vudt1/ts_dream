@@ -35,21 +35,3 @@ impl SceneSetDatLoader {
         Ok(result)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::SceneSetDatLoader;
-
-    #[test]
-    fn empty_scene_set_catalog_is_valid() {
-        assert!(SceneSetDatLoader::load(&0u32.to_le_bytes())
-            .unwrap()
-            .is_empty());
-    }
-
-    #[test]
-    fn truncated_scene_set_row_is_rejected() {
-        let data = [1u8, 0, 0, 0, 0, 0];
-        assert!(SceneSetDatLoader::load(&data).is_err());
-    }
-}

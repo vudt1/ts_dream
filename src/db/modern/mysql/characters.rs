@@ -15,24 +15,24 @@ impl MySqlCharacterRepository<'_> {
         name: &[u8],
         seed: &CharacterSeed,
     ) -> RepoResult<i64> {
+        // Shared PK: characters.character_id = accounts.player_id (1:1, no account_id column)
         let mut tx = self.pool.begin().await?;
-        let row = sqlx::query(
-            "INSERT INTO characters (account_id, name, level, sex, hair, element, map_id, map_x, map_y) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        sqlx::query(
+            "INSERT INTO characters (character_id, name, level, sex, hair, element, map_id, map_x, map_y) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(account_id).bind(name).bind(seed.level).bind(seed.sex).bind(seed.hair)
         .bind(seed.element).bind(seed.map_id).bind(seed.map_x).bind(seed.map_y)
         .execute(&mut *tx).await?;
-        let id = row.last_insert_id() as i64;
         sqlx::query("INSERT INTO character_money (character_id) VALUES (?)")
-            .bind(id)
+            .bind(account_id)
             .execute(&mut *tx)
             .await?;
         tx.commit().await?;
-        Ok(id)
+        Ok(account_id)
     }
 
     pub async fn find_id_by_name(&self, name: &[u8]) -> RepoResult<Option<i64>> {
-        sqlx::query_scalar::<_, i64>("SELECT id FROM characters WHERE HEX(name) = HEX(?) LIMIT 1")
+        sqlx::query_scalar::<_, i64>("SELECT character_id FROM characters WHERE HEX(name) = HEX(?) LIMIT 1")
             .bind(name)
             .fetch_optional(self.pool)
             .await
@@ -66,7 +66,7 @@ impl MySqlCharacterRepository<'_> {
             .bind(character_id)
             .execute(&mut *tx)
             .await?;
-        sqlx::query("DELETE FROM characters WHERE id = ?")
+        sqlx::query("DELETE FROM characters WHERE character_id = ?")
             .bind(character_id)
             .execute(&mut *tx)
             .await?;
@@ -97,9 +97,9 @@ impl CharacterRepository for MySqlCharacterRepository<'_> {
     async fn create(&self, account_id: i64, name: &[u8], seed: &CharacterSeed) -> RepoResult<i64> {
         let mut tx = self.pool.begin().await?;
 
-        let row = sqlx::query(
+        sqlx::query(
             "INSERT INTO characters \
-             (account_id, name, level, sex, hair, element, map_id, map_x, map_y) \
+             (character_id, name, level, sex, hair, element, map_id, map_x, map_y) \
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(account_id)
@@ -113,21 +113,20 @@ impl CharacterRepository for MySqlCharacterRepository<'_> {
         .bind(seed.map_y)
         .execute(&mut *tx)
         .await?;
-        let character_id = row.last_insert_id();
 
         sqlx::query("INSERT INTO character_money (character_id) VALUES (?)")
-            .bind(character_id)
+            .bind(account_id)
             .execute(&mut *tx)
             .await?;
 
         tx.commit().await?;
-        Ok(character_id as i64)
+        Ok(account_id)
     }
 
     async fn list_by_account(&self, account_id: i64) -> RepoResult<Vec<CharacterSummary>> {
         let rows = sqlx::query(
-            "SELECT id, name, level, sex, hair, element FROM characters \
-             WHERE account_id = ? ORDER BY id",
+            "SELECT character_id AS id, name, level, sex, hair, element FROM characters \
+             WHERE character_id = ? ORDER BY character_id",
         )
         .bind(account_id)
         .fetch_all(self.pool)
@@ -148,7 +147,7 @@ impl CharacterRepository for MySqlCharacterRepository<'_> {
 
     async fn find_id_by_name(&self, name: &[u8]) -> RepoResult<Option<i64>> {
         let found = sqlx::query_scalar::<_, i64>(
-            "SELECT id FROM characters WHERE HEX(name) = HEX(?) LIMIT 1",
+            "SELECT character_id FROM characters WHERE HEX(name) = HEX(?) LIMIT 1",
         )
         .bind(name)
         .fetch_optional(self.pool)
@@ -195,7 +194,7 @@ impl CharacterRepository for MySqlCharacterRepository<'_> {
             .execute(&mut *tx)
             .await?;
 
-        sqlx::query("DELETE FROM characters WHERE id = ?")
+        sqlx::query("DELETE FROM characters WHERE character_id = ?")
             .bind(character_id)
             .execute(&mut *tx)
             .await?;

@@ -1,8 +1,8 @@
 //! Modern-only write-through persistence for the live Rust server.
 //!
 //! The public functions retain the handler-facing API, but every SQL statement
-//! targets the normalized 0002/0005 tables. `player_id` means the protocol
-//! account id; it resolves to `characters.id` through `characters.account_id`.
+//! targets the normalized 0001 tables. `player_id` is the shared PK
+//! `accounts.player_id = characters.character_id` (1:1).
 
 use crate::server::session::{InventoryItem, PetState, Session};
 use sqlx::{MySqlPool, MySqlTransaction};
@@ -11,7 +11,7 @@ async fn character_id_tx(
     tx: &mut MySqlTransaction<'_>,
     account_id: i64,
 ) -> Result<Option<i64>, sqlx::Error> {
-    sqlx::query_scalar("SELECT id FROM characters WHERE account_id = ? FOR UPDATE")
+    sqlx::query_scalar("SELECT character_id FROM characters WHERE character_id = ? FOR UPDATE")
         .bind(account_id)
         .fetch_optional(&mut **tx)
         .await
@@ -70,7 +70,7 @@ pub async fn update_player(pool: Option<&MySqlPool>, player_id: u32, column: &st
             _ => unreachable!(),
         };
         let sql = format!(
-            "INSERT INTO character_money (character_id, {field}) SELECT id, ? FROM characters WHERE account_id = ? ON DUPLICATE KEY UPDATE {field} = VALUES({field})"
+            "INSERT INTO character_money (character_id, {field}) SELECT character_id, ? FROM characters WHERE character_id = ? ON DUPLICATE KEY UPDATE {field} = VALUES({field})"
         );
         if let Err(e) = sqlx::query(&sql)
             .bind(value)
@@ -86,7 +86,7 @@ pub async fn update_player(pool: Option<&MySqlPool>, player_id: u32, column: &st
         tracing::warn!("skipped unknown modern character column write: {column}");
         return;
     };
-    let sql = format!("UPDATE characters SET {field} = ? WHERE account_id = ?");
+    let sql = format!("UPDATE characters SET {field} = ? WHERE character_id = ?");
     if let Err(e) = sqlx::query(&sql)
         .bind(value)
         .bind(account_id)
@@ -102,7 +102,7 @@ pub async fn update_skillsave(pool: Option<&MySqlPool>, player_id: u32, slot: u8
     let Some(pool) = pool else { return };
     let result = sqlx::query(
         "INSERT INTO character_hotkeys (character_id, slot, skill_id)
-         SELECT id, ?, ? FROM characters WHERE account_id = ?
+         SELECT character_id, ?, ? FROM characters WHERE character_id = ?
          ON DUPLICATE KEY UPDATE skill_id = VALUES(skill_id)",
     )
     .bind(i64::from(slot))
@@ -131,7 +131,7 @@ pub async fn clear_items(pool: Option<&MySqlPool>, player_id: u32, table: &str) 
     let Some(storage) = storage_type(table) else {
         return;
     };
-    let sql = "DELETE i FROM inventories i JOIN characters c ON c.id = i.character_id WHERE c.account_id = ? AND i.storage_type = ?";
+    let sql = "DELETE i FROM inventories i JOIN characters c ON c.character_id = i.character_id WHERE c.character_id = ? AND i.storage_type = ?";
     if let Err(e) = sqlx::query(sql)
         .bind(i64::from(player_id))
         .bind(storage)
@@ -294,7 +294,7 @@ async fn update_money_tx(
         "shop_point" => "shop_point",
         _ => return Ok(()),
     };
-    let sql = format!("INSERT INTO character_money (character_id, {field}) SELECT id, ? FROM characters WHERE account_id = ? ON DUPLICATE KEY UPDATE {field}=VALUES({field})");
+    let sql = format!("INSERT INTO character_money (character_id, {field}) SELECT character_id, ? FROM characters WHERE character_id = ? ON DUPLICATE KEY UPDATE {field}=VALUES({field})");
     sqlx::query(&sql)
         .bind(value)
         .bind(account_id)
@@ -355,17 +355,17 @@ pub async fn upsert_skill(
     save: u8,
 ) {
     let Some(pool) = pool else { return };
-    if let Err(e) = sqlx::query("INSERT INTO character_skills (character_id, skill_id, level, sp, save_flag) SELECT id, ?, ?, ?, ? FROM characters WHERE account_id = ? ON DUPLICATE KEY UPDATE level=VALUES(level), sp=VALUES(sp), save_flag=VALUES(save_flag)")
+    if let Err(e) = sqlx::query("INSERT INTO character_skills (character_id, skill_id, level, sp, save_flag) SELECT character_id, ?, ?, ?, ? FROM characters WHERE character_id = ? ON DUPLICATE KEY UPDATE level=VALUES(level), sp=VALUES(sp), save_flag=VALUES(save_flag)")
         .bind(i64::from(skill_id)).bind(i64::from(lv)).bind(i64::from(sp)).bind(i64::from(save)).bind(i64::from(player_id)).execute(pool).await { tracing::warn!("modern upsert_skill failed: {e}"); }
 }
 
 pub async fn delete_reborn_skills(pool: Option<&MySqlPool>, player_id: u32) {
     let Some(pool) = pool else { return };
-    if let Err(e) = sqlx::query("DELETE s FROM character_skills s JOIN characters c ON c.id=s.character_id WHERE c.account_id=? AND s.skill_id BETWEEN 10001 AND 13033 AND s.skill_id NOT IN (10016,10017,10018,10019,11016,11017,11018,11019,12016,12017,12018,12019,13015,13016,13017,13018)")
+    if let Err(e) = sqlx::query("DELETE s FROM character_skills s JOIN characters c ON c.character_id=s.character_id WHERE c.character_id=? AND s.skill_id BETWEEN 10001 AND 13033 AND s.skill_id NOT IN (10016,10017,10018,10019,11016,11017,11018,11019,12016,12017,12018,12019,13015,13016,13017,13018)")
         .bind(i64::from(player_id)).execute(pool).await { tracing::warn!("modern delete_reborn_skills failed: {e}"); }
 }
 
-pub const DELETE_SYSTEM_SKILLS_SQL: &str = "DELETE s FROM character_skills s JOIN characters c ON c.id = s.character_id WHERE c.account_id = ? AND s.skill_id >= 0 AND s.skill_id <= 9";
+pub const DELETE_SYSTEM_SKILLS_SQL: &str = "DELETE s FROM character_skills s JOIN characters c ON c.character_id = s.character_id WHERE c.character_id = ? AND s.skill_id >= 0 AND s.skill_id <= 9";
 
 pub async fn delete_system_skills(pool: Option<&MySqlPool>, player_id: u32) {
     let Some(pool) = pool else { return };
@@ -387,7 +387,7 @@ pub async fn upsert_pet(pool: Option<&MySqlPool>, player_id: u32, pet: &PetState
         pet.stt.saturating_sub(4)
     };
     let [s1, s2, s3, s4] = pet.skills;
-    let result = sqlx::query("INSERT INTO character_pets (character_id, storage_type, slot, pet_id, name, level, element, reborn, hp, hp_max, sp, sp_max, int_attr, atk, def, hpx, spx, agi, fai, int2, atk2, def2, hpx2, spx2, agi2, thd, texp, skill_point, quest, skill1_id, skill1_level, skill2_id, skill2_level, skill3_id, skill3_level, skill4_id, skill4_level) SELECT id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM characters WHERE account_id = ? ON DUPLICATE KEY UPDATE pet_id=VALUES(pet_id), name=VALUES(name), level=VALUES(level), element=VALUES(element), reborn=VALUES(reborn), hp=VALUES(hp), hp_max=VALUES(hp_max), sp=VALUES(sp), sp_max=VALUES(sp_max), int_attr=VALUES(int_attr), atk=VALUES(atk), def=VALUES(def), hpx=VALUES(hpx), spx=VALUES(spx), agi=VALUES(agi), fai=VALUES(fai), int2=VALUES(int2), atk2=VALUES(atk2), def2=VALUES(def2), hpx2=VALUES(hpx2), spx2=VALUES(spx2), agi2=VALUES(agi2), thd=VALUES(thd), texp=VALUES(texp), skill_point=VALUES(skill_point), quest=VALUES(quest), skill1_id=VALUES(skill1_id), skill1_level=VALUES(skill1_level), skill2_id=VALUES(skill2_id), skill2_level=VALUES(skill2_level), skill3_id=VALUES(skill3_id), skill3_level=VALUES(skill3_level), skill4_id=VALUES(skill4_id), skill4_level=VALUES(skill4_level)")
+    let result = sqlx::query("INSERT INTO character_pets (character_id, storage_type, slot, pet_id, name, level, element, reborn, hp, hp_max, sp, sp_max, int_attr, atk, def, hpx, spx, agi, fai, int2, atk2, def2, hpx2, spx2, agi2, thd, texp, skill_point, quest, skill1_id, skill1_level, skill2_id, skill2_level, skill3_id, skill3_level, skill4_id, skill4_level) SELECT character_id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM characters WHERE character_id = ? ON DUPLICATE KEY UPDATE pet_id=VALUES(pet_id), name=VALUES(name), level=VALUES(level), element=VALUES(element), reborn=VALUES(reborn), hp=VALUES(hp), hp_max=VALUES(hp_max), sp=VALUES(sp), sp_max=VALUES(sp_max), int_attr=VALUES(int_attr), atk=VALUES(atk), def=VALUES(def), hpx=VALUES(hpx), spx=VALUES(spx), agi=VALUES(agi), fai=VALUES(fai), int2=VALUES(int2), atk2=VALUES(atk2), def2=VALUES(def2), hpx2=VALUES(hpx2), spx2=VALUES(spx2), agi2=VALUES(agi2), thd=VALUES(thd), texp=VALUES(texp), skill_point=VALUES(skill_point), quest=VALUES(quest), skill1_id=VALUES(skill1_id), skill1_level=VALUES(skill1_level), skill2_id=VALUES(skill2_id), skill2_level=VALUES(skill2_level), skill3_id=VALUES(skill3_id), skill3_level=VALUES(skill3_level), skill4_id=VALUES(skill4_id), skill4_level=VALUES(skill4_level)")
         .bind(storage).bind(i64::from(slot)).bind(i64::from(pet.id)).bind(&pet.name).bind(i64::from(pet.level)).bind(i64::from(pet.thuoctinh)).bind(i64::from(pet.reborn)).bind(i64::from(pet.hp)).bind(i64::from(pet.hp_max)).bind(i64::from(pet.sp)).bind(i64::from(pet.sp_max)).bind(i64::from(pet.int1)).bind(i64::from(pet.atk)).bind(i64::from(pet.def)).bind(i64::from(pet.hpx)).bind(i64::from(pet.spx)).bind(i64::from(pet.agi)).bind(i64::from(pet.fai)).bind(i64::from(pet.int2)).bind(i64::from(pet.atk2)).bind(i64::from(pet.def2)).bind(i64::from(pet.hpx2)).bind(i64::from(pet.spx2)).bind(i64::from(pet.agi2)).bind(i64::from(pet.thd)).bind(i64::from(pet.texp)).bind(i64::from(pet.skill_point)).bind(i64::from(pet.quest)).bind(i64::from(s1.0)).bind(i64::from(s1.1)).bind(i64::from(s2.0)).bind(i64::from(s2.1)).bind(i64::from(s3.0)).bind(i64::from(s3.1)).bind(i64::from(s4.0)).bind(i64::from(s4.1)).bind(i64::from(player_id)).execute(pool).await;
     if let Err(e) = result {
         tracing::warn!("modern upsert_pet(stt {}) failed: {e}", pet.stt);

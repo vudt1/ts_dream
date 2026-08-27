@@ -29,31 +29,18 @@ Single-context layout — one [`CONTEXT.md`](CONTEXT.md) + `docs/adr/` at the re
 
 ## Hướng Dẫn Kiểm Thử (Testing Guide)
 
-Toàn bộ test suite được tổ chức tập trung trong thư mục `tests/` (không chứa khối `#[cfg(test)]` inline trong `src/`):
+> **Trạng thái hiện tại: TẠM THỜI KHÔNG CẦN TEST.** Toàn bộ test source đã được xóa (`tests/` trống). Quy định dưới đây áp dụng khi agent cần tạo lại test trong tương lai.
 
-- **Chạy toàn bộ tests**:
+- **Vị trí duy nhất cho test**: Mọi unit test / integration test mới **phải** đặt trong thư mục `tests/` ở repo root. **Cấm** `#[cfg(test)]` inline trong `src/` (kể cả `mod tests` nhỏ). Nếu cần test pure-logic, tạo file `tests/<feature>_test.rs` và import qua `ts_dream::...` public API.
+- **Test liên quan DB — dùng fake/dump, không khởi MySQL thật**: Để tránh treo lâu chờ DB khởi động, test chạm DB phải dùng dump, fixture file, hoặc fake object / mock repository (implement `AccountRepository`/`CharacterRepository` trait với in-memory struct). Không `cargo test` với `MySqlPool` thật trong harness tự động.
+- **MySQL thật do người dùng test thủ công**: Khi cần kiểm chứng MySQL, người dùng tự chạy thủ công:
+  ```bash
+  TS_TEST_DB_URL=mysql://root:password@localhost:3306/ts_dream_test cargo test --test db_repositories
+  ```
+  Agent **không** tự khởi MySQL hay chạy test nhóm `db_*` khi chưa được user cho phép.
+- **Khi chạy lại test suite** (sau khi scaffold lại):
   ```bash
   cargo test --all-targets --no-fail-fast
-  ```
-- **Chạy nhóm Golden Packet Diffing (Replay không cần DB)**:
-  ```bash
-  cargo test --test golden --test golden_suite --test battle_golden
-  ```
-- **Chạy nhóm Eve Script Engine**:
-  ```bash
-  cargo test --test eve_engine
-  ```
-- **Chạy nhóm Binary Codecs & Data Loaders**:
-  ```bash
-  cargo test --test codecs --test data --test data_loader_test
-  ```
-- **Chạy nhóm Handlers & Systems**:
-  ```bash
-  cargo test --test handlers_test --test server_state_test --test protocol_test --test battle_engine_test
-  ```
-- **Chạy kiểm thử Database Repositories (với MySQL sống)**:
-  ```bash
-  TS_TEST_DB_URL=mysql://root:password@localhost:3306/ts_dream_test cargo test --test db_repositories --test db_persist_test
   ```
 
 ---
@@ -76,23 +63,12 @@ ts_dream/
 ├── spec/
 │   └── codebase_design.md      # Thiết kế kiến trúc ban đầu
 ├── migrations/
-│   ├── 0001_init.sql           # SQLx migration schema legacy MySQL 8
-│   └── 0002_modern_schema.sql  # SQLx migration schema 3NF MySQL 8 (characters 1:1, inventories 20-col, character_pets 4 kho, missions, flags)
-├── golden/                     # 18 golden packets (01-hello → 18-player-trade) để diffing khi test
-├── tests/                      # Toàn bộ Integration & Unit Tests tập trung
-│   ├── golden.rs / golden_suite.rs / battle_golden.rs  # Golden diffing (replay không cần DB)
-│   ├── codecs.rs               # Test ThingData (35B), PlayerCard, FriendExtra, BattleRoleSerializer
-│   ├── data.rs                 # Test nạp dữ liệu tĩnh (.Dat) & container eve.emg
-│   ├── data_loader_test.rs     # Test chi tiết từng bộ Data Loader nhị phân
-│   ├── eve_engine.rs           # Test 4-tier Eve Script Engine & AutoChain
-│   ├── protocol_test.rs        # Test PacketReader, PacketWriter, Codec, Framing
-│   ├── handlers_test.rs        # Test các modular opcode handlers
-│   ├── battle_engine_test.rs   # Test Battle Engine, grid, turns, targeting, RNG, damage
-│   ├── server_state_test.rs    # Test session state, registry, character sheet, drops
-│   ├── db_repositories.rs      # Test MySQL 3NF Repositories & Transactions
-│   ├── db_persist_test.rs      # Test persistence layer
-│   ├── web_dashboard.rs        # Test Web admin dashboard
-│   └── common/mod.rs           # Test harness & helpers dùng chung
+│   ├── 0001_init.sql           # SQLx migration schema legacy MySQL 8 (accounts PK = player_id)
+│   ├── 0002_modern_schema.sql  # SQLx migration schema 3NF MySQL 8 (characters 1:1, inventories 20-col, character_pets 4 kho, missions, flags)
+│   └── 0003_production_domain.sql # Mở rộng production (guilds, world_boss, trade_sessions, static_assets, admin)
+├── golden/                     # 18 golden packets (01-hello → 18-player-trade) để diffing khi test (giữ lại, không phải test source)
+├── tests/                      # Thư mục test tập trung — **hiện trống** (tạm thời không cần test)
+│   └── .gitkeep                # Scaffold sẵn cho test tương lai; mọi test mới phải đặt ở đây, cấm #[cfg(test)] trong src/
 └── src/
     ├── main.rs                 # Entry point: Config → MySQL bootstrap → seed map drops → Web Admin (8090) + Game TCP (6414) + AutoSave
     ├── lib.rs                  # Module root cho thư viện ts_dream

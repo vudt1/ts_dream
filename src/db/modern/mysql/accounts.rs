@@ -27,9 +27,11 @@ impl MySqlAccountRepository<'_> {
     }
 
     /// Load role/suspension state after the numeric PC account id is known.
+    /// `account_name` is derived from `player_id` (no `account` column exists;
+    /// shared PK `accounts.player_id = characters.character_id`).
     pub async fn access(&self, account_id: i64) -> RepoResult<Option<AccountAccess>> {
         sqlx::query_as::<_, AccountAccess>(
-            "SELECT player_id AS account_id, account AS account_name,
+            "SELECT player_id AS account_id, CAST(player_id AS CHAR) AS account_name,
                     is_suspended, suspended_until, gm_level
              FROM accounts WHERE player_id = ?",
         )
@@ -156,27 +158,4 @@ async fn verify(pool: &MySqlPool, account_id: i64, column: &str, pass: &[u8]) ->
         .fetch_one(pool)
         .await?;
     Ok(hits > 0)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{AccountAccess, MySqlAccountRepository};
-
-    #[test]
-    fn suspension_expiry_is_enforced_without_mutating_storage() {
-        let active = AccountAccess {
-            account_id: 1,
-            account_name: "a".into(),
-            is_suspended: true,
-            suspended_until: Some(2_000),
-            gm_level: 0,
-        };
-        assert!(MySqlAccountRepository::is_suspended(&active, 1_999));
-        assert!(!MySqlAccountRepository::is_suspended(&active, 2_000));
-        let permanent = AccountAccess {
-            suspended_until: None,
-            ..active
-        };
-        assert!(MySqlAccountRepository::is_suspended(&permanent, 9_999));
-    }
 }

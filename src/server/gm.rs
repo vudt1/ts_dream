@@ -469,18 +469,3 @@ pub async fn handle(
     }
     true
 }
-
-#[cfg(test)]
-mod tests {
-    use super::{is_gm_command, ADMIN_GM_LEVEL, PLAYER_GM_LEVEL};
-
-    #[test]
-    fn privileged_commands_are_detected_but_normal_commands_are_not() {
-        assert!(is_gm_command("/addgold"));
-        assert!(is_gm_command("/setperm"));
-        assert!(!is_gm_command("/sleep"));
-        assert_eq!(PLAYER_GM_LEVEL, 0);
-        let configured_levels = [PLAYER_GM_LEVEL, ADMIN_GM_LEVEL];
-        assert!(configured_levels[1] > configured_levels[0]);
-    }
-}

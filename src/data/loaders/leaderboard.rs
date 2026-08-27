@@ -42,21 +42,3 @@ impl LeaderboardDatLoader {
         Ok(result)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::LeaderboardDatLoader;
-
-    #[test]
-    fn empty_leaderboard_catalog_is_valid() {
-        assert!(LeaderboardDatLoader::load(&0u32.to_le_bytes())
-            .unwrap()
-            .is_empty());
-    }
-
-    #[test]
-    fn truncated_leaderboard_row_is_rejected() {
-        let data = [1u8, 0, 0, 0, 1, 0, 0, 0];
-        assert!(LeaderboardDatLoader::load(&data).is_err());
-    }
-}

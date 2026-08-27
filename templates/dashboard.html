@@ -290,7 +290,6 @@
                 <thead>
                     <tr>
                         <th>Player ID</th>
-                        <th>Account</th>
                         <th>GM Level</th>
                         <th>Suspended</th>
                     </tr>
@@ -299,7 +298,6 @@
                     {% for acc in accounts %}
                     <tr>
                         <td><strong>{{ acc.player_id }}</strong></td>
-                        <td>{{ acc.account }}</td>
                         <td>{{ acc.gm_level }}</td>
                         <td>{% if acc.is_suspended %}yes{% else %}no{% endif %}</td>
                     </tr>

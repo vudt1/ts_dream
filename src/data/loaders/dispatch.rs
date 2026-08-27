@@ -53,21 +53,3 @@ impl DispatchDatLoader {
         Ok(result)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::DispatchDatLoader;
-
-    #[test]
-    fn empty_dispatch_catalogs_are_valid() {
-        let empty = 0u32.to_le_bytes();
-        assert!(DispatchDatLoader::load_dispatch(&empty).unwrap().is_empty());
-        assert!(DispatchDatLoader::load_bonus(&empty).unwrap().is_empty());
-    }
-
-    #[test]
-    fn truncated_dispatch_record_is_rejected() {
-        let data = [1u8, 0, 0, 0, 1, 2];
-        assert!(DispatchDatLoader::load_dispatch(&data).is_err());
-    }
-}

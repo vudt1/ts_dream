@@ -1,4 +1,5 @@
-//! Session-level adapter for the modern 0002 schema.
+//! Session-level adapter for the modern 0001 schema.
+//! Shared PK: `accounts.player_id = characters.character_id`.
 //!
 //! Network/account ids remain in `Session.id`; the normalized database primary
 //! key is carried by `Session.db_character_id`.
@@ -13,10 +14,10 @@ pub struct MySqlSessionRepository<'a> {
 
 impl MySqlSessionRepository<'_> {
     /// Load the character selected by its account id and hydrate the complete
-    /// wire-visible session from 0002 tables.
+    /// wire-visible session from 0001 tables. `account_id` is the shared PK (`character_id`).
     pub async fn load(&self, account_id: i64, session: &mut Session) -> Result<bool, sqlx::Error> {
         let Some(row) = sqlx::query(
-            "SELECT id, name, level, job, sex, hair, element, reborn, hp, hp_max, sp, sp_max,
+            "SELECT character_id AS id, name, level, job, sex, hair, element, reborn, hp, hp_max, sp, sp_max,
                     stat_point, skill_point, int_attr, atk, def, hpx, spx, agi, map_id, map_x,
                     map_y, int2, atk2, def2, hpx2, spx2, agi2, texp,
                     COALESCE(m.gold, 0) AS gold, COALESCE(m.bank_gold, 0) AS bank_gold,
@@ -24,8 +25,8 @@ impl MySqlSessionRepository<'_> {
                     god, tiengtam, gocnhin, pk, tham_chien, hp_store, sp_store, tanthu, savemap,
                     color, fight_npc_id, title_id
              FROM characters c
-             LEFT JOIN character_money m ON m.character_id = c.id
-             WHERE c.account_id = ?
+             LEFT JOIN character_money m ON m.character_id = c.character_id
+             WHERE c.character_id = ?
              LIMIT 1",
         )
         .bind(account_id)
@@ -257,7 +258,7 @@ impl MySqlSessionRepository<'_> {
             "UPDATE characters SET level=?, job=?, sex=?, hair=?, element=?, reborn=?, hp=?, hp_max=?, sp=?, sp_max=?,
              stat_point=?, skill_point=?, int_attr=?, atk=?, def=?, hpx=?, spx=?, agi=?, map_id=?, map_x=?, map_y=?,
              int2=?, atk2=?, def2=?, hpx2=?, spx2=?, agi2=?, texp=?, god=?, tiengtam=?, gocnhin=?, pk=?, tham_chien=?,
-             hp_store=?, sp_store=?, tanthu=?, savemap=?, color=? WHERE id=?",
+             hp_store=?, sp_store=?, tanthu=?, savemap=?, color=? WHERE character_id=?",
         )
         .bind(i64::from(session.level)).bind(i64::from(session.job)).bind(i64::from(session.sex)).bind(i64::from(session.hair))
         .bind(i64::from(session.thuoctinh)).bind(i64::from(session.reborn)).bind(i64::from(session.hp)).bind(i64::from(session.hp_max))

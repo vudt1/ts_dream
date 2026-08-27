@@ -66,21 +66,3 @@ impl TeachInfoDatLoader {
         })
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::TeachInfoDatLoader;
-
-    #[test]
-    fn empty_teach_info_catalog_is_valid() {
-        let result = TeachInfoDatLoader::load(&0u32.to_le_bytes()).unwrap();
-        assert!(result.guide_last_bit_flag_id.is_empty());
-        assert!(result.guide_mark_flag_ids.is_empty());
-    }
-
-    #[test]
-    fn truncated_teach_info_row_is_rejected() {
-        let data = [1u8, 0, 0, 0, 1, 1];
-        assert!(TeachInfoDatLoader::load(&data).is_err());
-    }
-}

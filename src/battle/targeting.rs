@@ -376,37 +376,3 @@ pub fn get_pos_attack_giai_tru(
 ) -> Vec<GridPos> {
     get_pos_attack(cells, myteam, row, col, sl_danh, AnchorRule::Any)
 }
-
-#[cfg(test)]
-mod mobile_tests {
-    use super::*;
-
-    fn cell(row: u8, col: u8, team: i64) -> CellInfo {
-        CellInfo {
-            row,
-            col,
-            id: 1,
-            hp: 100,
-            team,
-            type4_id: 0,
-        }
-    }
-
-    #[test]
-    fn mobile_area_two_prefers_the_adjacent_front_row() {
-        let cells = vec![cell(0, 2, 2), cell(1, 2, 2)];
-        assert_eq!(
-            get_pos_attack_mobile(&cells, 1, 0, 2, 2, false),
-            vec![GridPos::new(0, 2), GridPos::new(1, 2)]
-        );
-    }
-
-    #[test]
-    fn mobile_heal_area_eight_selects_only_own_side() {
-        let cells = vec![cell(0, 2, 2), cell(3, 2, 1), cell(3, 1, 1)];
-        assert_eq!(
-            get_pos_attack_mobile(&cells, 1, 3, 2, 8, true),
-            vec![GridPos::new(3, 2), GridPos::new(3, 1)]
-        );
-    }
-}

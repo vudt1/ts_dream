@@ -7,10 +7,10 @@
 use sqlx::MySqlPool;
 
 /// One `accounts` row as exposed by the dashboard.
+/// PK là `player_id` (shared PK với `characters.character_id`).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, sqlx::FromRow)]
 pub struct AccountRow {
     pub player_id: i64,
-    pub account: String,
     #[serde(skip_serializing)]
     pub pass1: String,
     #[serde(skip_serializing)]
@@ -24,38 +24,30 @@ pub struct AccountRow {
 /// List every account, newest first (the dashboard table order).
 pub async fn list(pool: &MySqlPool) -> Result<Vec<AccountRow>, sqlx::Error> {
     sqlx::query_as::<_, AccountRow>(
-        "SELECT player_id, account, pass1, pass2, is_suspended, gm_level,
-                created_at, last_login_at
+        "SELECT player_id, pass1, pass2, is_suspended, gm_level,
+                 created_at, last_login_at
          FROM accounts ORDER BY player_id DESC",
     )
     .fetch_all(pool)
     .await
 }
 
-/// Create a legacy-compatible PC account plus the new mobile-aligned metadata.
-/// A UUID-derived temporary name is replaced with `legacy_<player_id>` in one
-/// transaction, keeping the new NOT NULL unique account column satisfied.
+/// Create a PC account — chỉ cần `pass1`/`pass2`, PK `player_id` tự tăng.
+/// Không còn cột `account`; identity duy nhất là `player_id` và được dùng làm
+/// `characters.character_id` (shared PK 1:1).
 pub async fn create(pool: &MySqlPool, pass1: &str, pass2: &str) -> Result<i64, sqlx::Error> {
     let now = chrono::Utc::now().timestamp_millis();
-    let mut tx = pool.begin().await?;
     let row = sqlx::query(
-        "INSERT INTO accounts (pass1, pass2, account, created_at, updated_at)
-         VALUES (?, ?, CONCAT('pending_', UUID()), ?, ?)",
+        "INSERT INTO accounts (pass1, pass2, created_at, updated_at)
+         VALUES (?, ?, ?, ?)",
     )
     .bind(pass1)
     .bind(pass2)
     .bind(now)
     .bind(now)
-    .execute(&mut *tx)
+    .execute(pool)
     .await?;
-    let player_id = row.last_insert_id() as i64;
-    sqlx::query("UPDATE accounts SET account = ? WHERE player_id = ?")
-        .bind(format!("legacy_{player_id}"))
-        .bind(player_id)
-        .execute(&mut *tx)
-        .await?;
-    tx.commit().await?;
-    Ok(player_id)
+    Ok(row.last_insert_id() as i64)
 }
 
 /// Resolve `pass1` for a `player_id` (login gate). Returns `None` when the
