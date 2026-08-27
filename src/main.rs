@@ -123,6 +123,14 @@ async fn main() -> anyhow::Result<()> {
         data.talks.len(),
         data_dir.display()
     );
+    if data.is_loaded() {
+        let assets = data.binary_asset_metadata();
+        if let Err(e) = ts_dream::db::catalog::replace_asset_catalog(&pool, &assets).await {
+            tracing::warn!("failed to persist binary asset catalog: {e}");
+        } else {
+            tracing::info!("persisted {} binary asset provenance rows", assets.len());
+        }
+    }
 
     // Set DataLoaded flag in AppState
     app_state.write().await.data_loaded = data.is_loaded();

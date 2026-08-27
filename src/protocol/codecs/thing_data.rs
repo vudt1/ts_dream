@@ -25,10 +25,10 @@
 //! - affix3 (1B u8)
 //! - styleLv (1B u8)
 
-use serde::{Deserialize, Serialize};
 use crate::error::Result;
 use crate::protocol::reader::PacketReader;
 use crate::protocol::writer::PacketWriter;
+use serde::{Deserialize, Serialize};
 
 /// Total wire size of a single ThingData struct in bytes.
 pub const THING_DATA_SIZE: usize = 35;

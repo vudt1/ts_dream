@@ -8,5 +8,5 @@
 
 pub mod model;
 pub mod mysql;
-pub mod transactions;
 pub mod traits;
+pub mod transactions;

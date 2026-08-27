@@ -31,7 +31,10 @@ fn on_lose_warpto_reads_onwin() {
 fn value_capped() {
     let long = "x".repeat(5000);
     let ini = Ini::parse(&format!("[S]\nK={}", long));
-    assert_eq!(ini.get_raw("S", "K").unwrap().len(), ts_dream::data::ini::VALUE_CAP);
+    assert_eq!(
+        ini.get_raw("S", "K").unwrap().len(),
+        ts_dream::data::ini::VALUE_CAP
+    );
 }
 
 // ── data::reader ──
@@ -180,7 +183,7 @@ fn warps_skip_empty_destination_column() {
             b"//map1\twarpid\tmap2\tx\ty\n1\t2\t\t3\t4\n5\t6\t7\t8\t9\n",
         )],
     );
-    let d = GameData::load(dir.path()).expect("load");
+    let d = GameData::load_legacy_text(dir.path()).expect("load legacy fixture");
     // The row with an empty map2 column is silently dropped.
     assert_eq!(d.warps.len(), 1);
     assert!(d.warps.contains_key(&(5, 6)));
@@ -199,7 +202,7 @@ fn npcs_missing_reborn_column_is_load_failure() {
         bytes.extend_from_slice(&u.to_le_bytes());
     }
     seed_temp_dir(dir.path(), &[("Npcs.txt", &bytes)]);
-    assert!(GameData::load(dir.path()).is_err());
+    assert!(GameData::load_legacy_text(dir.path()).is_err());
 }
 
 #[test]
@@ -255,14 +258,19 @@ fn require_items_survive_onwin_rebuild() {
 
 // ── data::loaders::eve ──
 
-use ts_dream::data::loaders::eve::{EveConditionClass, EveFightEnemy, EveResultClass, EveResultType};
+use ts_dream::data::loaders::eve::{
+    EveConditionClass, EveFightEnemy, EveResultClass, EveResultType,
+};
 
 #[test]
 fn test_eve_enums_and_models() {
     assert_eq!(EveConditionClass::from(0), EveConditionClass::Unconditional);
     assert_eq!(EveConditionClass::from(1), EveConditionClass::BagItem);
     assert_eq!(EveConditionClass::from(2), EveConditionClass::QuestStep);
-    assert_eq!(EveConditionClass::from(7), EveConditionClass::PlayerAttribute);
+    assert_eq!(
+        EveConditionClass::from(7),
+        EveConditionClass::PlayerAttribute
+    );
     assert_eq!(EveConditionClass::from(8), EveConditionClass::BattleResult);
     assert_eq!(EveConditionClass::from(9), EveConditionClass::FollowPet);
     assert_eq!(EveConditionClass::from(10), EveConditionClass::DialogChoice);
@@ -295,4 +303,30 @@ fn test_eve_enums_and_models() {
     };
     assert_eq!(enemy.col(), 1);
     assert_eq!(enemy.row(), 2);
+}
+
+#[test]
+fn production_loader_is_binary_only() {
+    let dir = tempdir().unwrap();
+    write_dataset(dir.path());
+    let err = GameData::load(dir.path())
+        .expect_err("text-only fixture must not be accepted by production loader");
+    assert!(err.to_string().contains("binary Item.dat"));
+}
+
+#[test]
+fn production_loader_inventory_accepts_only_binary_extensions() {
+    let dir = tempdir().unwrap();
+    let item = dir.path().join("Item.dat");
+    let npc = dir.path().join("Npc.dat");
+    std::fs::write(&item, b"not-a-valid-item-dat").unwrap();
+    std::fs::write(&npc, b"not-a-valid-npc-dat").unwrap();
+    std::fs::write(dir.path().join("ignored.txt"), b"text").unwrap();
+    std::fs::write(dir.path().join("ignored.mmg"), b"legacy-map").unwrap();
+
+    let names = GameData::binary_asset_inventory(dir.path()).expect("inventory");
+    assert!(names.iter().any(|name| name == "Item.dat"));
+    assert!(names.iter().any(|name| name == "Npc.dat"));
+    assert!(!names.iter().any(|name| name == "ignored.txt"));
+    assert!(!names.iter().any(|name| name == "ignored.mmg"));
 }

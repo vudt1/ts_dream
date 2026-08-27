@@ -1,5 +1,6 @@
 //! Static data loading (Chapter 3). Loads the `Data/` directory byte-identical
 //! into the in-memory tables, following each file's encoding + row convention.
+#![allow(clippy::chunks_exact_to_as_chunks)]
 //! `Loaded()` sets `DataLoaded=true` (the TCP accept gate).
 
 use crate::data::ini::{Ini, NOTHING};
@@ -7,6 +8,7 @@ use crate::data::tables::*;
 use crate::data::texps::compute_texps;
 use crate::encoding;
 use crate::error::{Result, TsError};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -16,6 +18,21 @@ pub struct GameData {
     pub npcs: HashMap<i64, Npc>,
     pub items: HashMap<i64, Item>,
     pub skills: HashMap<i64, Skill>,
+    /// Rich mobile-compatible binary skill definitions from Skill.Dat.
+    pub binary_skill_defs: HashMap<u16, BinarySkillDef>,
+    /// Mission-mark definitions and the mobile reverse bit index.
+    pub mark_defs: HashMap<u16, MarkDef>,
+    pub bit_to_mission_id: HashMap<u16, u16>,
+    pub mount_defs: HashMap<u16, MountDef>,
+    pub mount_grow_defs: HashMap<u8, MountGrowDef>,
+    pub achievement_defs: HashMap<u16, AchievementDef>,
+    pub dispatch_defs: HashMap<u8, HashMap<u8, DispatchDef>>,
+    pub dispatch_bonus_defs: HashMap<u8, DispatchBonusDef>,
+    pub leaderboard_defs: HashMap<u8, LeaderboardDef>,
+    pub scene_set_defs: HashMap<u16, SceneSetDef>,
+    pub guide_last_bit_flag_id: HashMap<u8, u16>,
+    pub guide_mark_flag_ids: HashMap<u8, u16>,
+    pub mark_flag_to_guide_id: HashMap<u16, u8>,
     pub warps: HashMap<(i64, i64), Warp>,
     pub battle_gates: HashMap<(i64, i64), BattleGate>,
     pub dolls: HashMap<i64, Doll>,
@@ -38,7 +55,19 @@ pub struct GameData {
     pub npc_defs: HashMap<u16, NpcDef>,
     pub warp_defs: HashMap<usize, WarpDef>,
     pub scene_eve_data: HashMap<u32, SceneEveData>,
+    /// Raw bytes for every accepted binary asset. Typed loaders project the
+    /// known catalogs above; untyped catalogs remain available for the next
+    /// typed port without ever admitting text files into production boot.
+    pub raw_binary_assets: HashMap<String, Vec<u8>>,
     pub loaded: bool,
+}
+
+/// Deterministic metadata for an accepted binary asset.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct BinaryAssetMeta {
+    pub source_file: String,
+    pub byte_size: usize,
+    pub sha256: String,
 }
 
 /// Helper to locate a file in `data_dir`, checking exact name, lowercase/uppercase extension, and `_C.dat` variants.
@@ -107,8 +136,20 @@ fn num_at(idx: usize, f: &[&str], file: &str) -> Result<i64> {
 }
 
 impl GameData {
-    /// Load the entire dataset under `data_dir`.
+    /// Load the production dataset. Only binary assets with `.dat`, `.emg`, or
+    /// `.mng` extensions are considered; text fallbacks are intentionally not
+    /// part of the production boot path.
     pub fn load(data_dir: &Path) -> Result<Self> {
+        let mut d = Self::default();
+        d.load_binary(data_dir)?;
+        d.texps = compute_texps();
+        d.loaded = true;
+        Ok(d)
+    }
+
+    /// Load the legacy text-compatible dataset for migration fixtures only.
+    /// Production code must call [`GameData::load`] instead.
+    pub fn load_legacy_text(data_dir: &Path) -> Result<Self> {
         let mut d = Self::default();
 
         // 1. Items: Item.dat (binary) preferred, fallback to Items.txt
@@ -230,6 +271,168 @@ impl GameData {
         d.texps = compute_texps();
         d.loaded = true;
         Ok(d)
+    }
+
+    fn load_binary(&mut self, data_dir: &Path) -> Result<()> {
+        self.load_binary_asset_inventory(data_dir)?;
+
+        let item_path = resolve_data_file(data_dir, "Item.dat").ok_or_else(|| {
+            TsError::Data(format!("missing binary Item.dat in {}", data_dir.display()))
+        })?;
+        let item_bytes = std::fs::read(&item_path)
+            .map_err(|e| TsError::Data(format!("read {}: {}", item_path.display(), e)))?;
+        self.item_defs = ItemDatLoader::load(&item_bytes)?;
+        for def in self.item_defs.values() {
+            self.items.insert(def.id as i64, def.to_item());
+        }
+
+        let npc_path = resolve_data_file(data_dir, "Npc.dat").ok_or_else(|| {
+            TsError::Data(format!("missing binary Npc.dat in {}", data_dir.display()))
+        })?;
+        let npc_bytes = std::fs::read(&npc_path)
+            .map_err(|e| TsError::Data(format!("read {}: {}", npc_path.display(), e)))?;
+        self.npc_defs = NpcDatLoader::load(&npc_bytes)?;
+        for def in self.npc_defs.values() {
+            self.npcs.insert(def.id as i64, def.to_npc());
+        }
+
+        let optional_binary: [(&str, &str); 18] = [
+            ("Formula.Dat", "formula"),
+            ("BlissBag.Dat", "bliss_bag"),
+            ("Compound.Dat", "compound"),
+            ("Astrolabe.Dat", "astrolabe"),
+            ("CityEx.Dat", "city_ex"),
+            ("EVOStatus.Dat", "evo_status"),
+            ("Warp.Dat", "warp"),
+            // The supplied PC Skill.Dat has a different, unverified layout. Only
+            // an explicitly supplied mobile-compatible Skill_C.dat may be parsed.
+            ("Skill_C.dat", "skill"),
+            ("Mark.Dat", "mark"),
+            ("Mounts.Dat", "mount"),
+            ("MountsGrow.Dat", "mount_grow"),
+            ("AchievementData.Dat", "achievement"),
+            ("Dispatch.Dat", "dispatch"),
+            ("DispatchBonus.Dat", "dispatch_bonus"),
+            ("LeaderboardInfo.Dat", "leaderboard"),
+            ("SceneSet.Dat", "scene_set"),
+            ("TeachInfo.Dat", "teach_info"),
+            ("eve.emg", "eve"),
+        ];
+        for (file_name, _) in optional_binary {
+            let Some(path) = resolve_data_file(data_dir, file_name) else {
+                continue;
+            };
+            let bytes = std::fs::read(&path)
+                .map_err(|e| TsError::Data(format!("read {}: {}", path.display(), e)))?;
+            match file_name.to_ascii_lowercase().as_str() {
+                "formula.dat" => self.formula_params = Some(FormulaDatLoader::load(&bytes)?),
+                "blissbag.dat" => self.bliss_bags = BlissBagDatLoader::load(&bytes)?,
+                "compound.dat" => self.compounds = CompoundDatLoader::load(&bytes)?,
+                "astrolabe.dat" => self.astrolabes = AstrolabeDatLoader::load(&bytes)?,
+                "cityex.dat" => self.city_ex = CityExDatLoader::load(&bytes)?,
+                "evostatus.dat" => self.evo_statuses = EVOStatusDatLoader::load(&bytes)?,
+                "warp.dat" => self.warp_defs = WarpDatLoader::load(&bytes)?,
+                "skill_c.dat" => self.binary_skill_defs = SkillDatLoader::load(&bytes)?,
+                "mark.dat" => {
+                    let (defs, reverse) = MarkDatLoader::load(&bytes)?;
+                    self.mark_defs = defs;
+                    self.bit_to_mission_id = reverse;
+                }
+                "mounts.dat" => self.mount_defs = MountDatLoader::load(&bytes)?,
+                "mountsgrow.dat" => self.mount_grow_defs = MountGrowDatLoader::load(&bytes)?,
+                "achievementdata.dat" => {
+                    self.achievement_defs = AchievementDatLoader::load(&bytes)?;
+                }
+                "dispatch.dat" => self.dispatch_defs = DispatchDatLoader::load_dispatch(&bytes)?,
+                "dispatchbonus.dat" => {
+                    self.dispatch_bonus_defs = DispatchDatLoader::load_bonus(&bytes)?;
+                }
+                "leaderboardinfo.dat" => {
+                    self.leaderboard_defs = LeaderboardDatLoader::load(&bytes)?;
+                }
+                "sceneset.dat" => self.scene_set_defs = SceneSetDatLoader::load(&bytes)?,
+                "teachinfo.dat" => {
+                    let result = TeachInfoDatLoader::load(&bytes)?;
+                    self.guide_last_bit_flag_id = result.guide_last_bit_flag_id;
+                    self.guide_mark_flag_ids = result.guide_mark_flag_ids;
+                    self.mark_flag_to_guide_id = self
+                        .guide_mark_flag_ids
+                        .iter()
+                        .map(|(&guide_id, &mark_flag_id)| (mark_flag_id, guide_id))
+                        .collect();
+                }
+                "eve.emg" => self.scene_eve_data = EveDataLoader::load(&bytes)?,
+                _ => unreachable!("optional binary list contains unknown file"),
+            }
+        }
+        Ok(())
+    }
+
+    /// Return accepted binary asset names without parsing their record format.
+    /// This is used by diagnostics and tests; production boot still calls
+    /// [`GameData::load`] and validates the required typed catalogs.
+    pub fn binary_asset_inventory(data_dir: &Path) -> Result<Vec<String>> {
+        Ok(Self::binary_asset_metadata_from_dir(data_dir)?
+            .into_iter()
+            .map(|asset| asset.source_file)
+            .collect())
+    }
+
+    /// Compute sorted SHA-256 metadata for accepted root-level binary assets.
+    pub fn binary_asset_metadata_from_dir(data_dir: &Path) -> Result<Vec<BinaryAssetMeta>> {
+        let mut data = Self::default();
+        data.load_binary_asset_inventory(data_dir)?;
+        Ok(data.binary_asset_metadata())
+    }
+
+    pub fn binary_asset_metadata(&self) -> Vec<BinaryAssetMeta> {
+        let mut assets: Vec<_> = self
+            .raw_binary_assets
+            .iter()
+            .map(|(source_file, bytes)| {
+                let digest = Sha256::digest(bytes);
+                BinaryAssetMeta {
+                    source_file: source_file.clone(),
+                    byte_size: bytes.len(),
+                    sha256: format!("{digest:x}"),
+                }
+            })
+            .collect();
+        assets.sort_by(|a, b| a.source_file.cmp(&b.source_file));
+        assets
+    }
+
+    fn load_binary_asset_inventory(&mut self, data_dir: &Path) -> Result<()> {
+        let entries = std::fs::read_dir(data_dir)
+            .map_err(|e| TsError::Data(format!("read data dir {}: {}", data_dir.display(), e)))?;
+        for entry in entries {
+            let entry = entry.map_err(|e| {
+                TsError::Data(format!("read data entry {}: {}", data_dir.display(), e))
+            })?;
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let accepted = path
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .map(|ext| matches!(ext.to_ascii_lowercase().as_str(), "dat" | "emg" | "mng"))
+                .unwrap_or(false);
+            if !accepted {
+                continue;
+            }
+            let name = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .ok_or_else(|| {
+                    TsError::Data(format!("non-UTF8 binary filename: {}", path.display()))
+                })?
+                .to_string();
+            let bytes = std::fs::read(&path)
+                .map_err(|e| TsError::Data(format!("read {}: {}", path.display(), e)))?;
+            self.raw_binary_assets.insert(name, bytes);
+        }
+        Ok(())
     }
 
     pub fn is_loaded(&self) -> bool {
@@ -1024,4 +1227,3 @@ fn parse_add_pet(s: &str, _file: &str) -> Result<Vec<i64>> {
     }
     Ok(out)
 }
-

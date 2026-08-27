@@ -58,4 +58,3 @@ pub fn texp_get_lv_up(texps: &[TexpRow], lv: i64, reborn: usize, texp: i64) -> i
     }
     result
 }
-

@@ -1,4 +1,5 @@
 //! Cross-player trade, storage transfer, and bank operations.
+#![allow(clippy::chunks_exact_to_as_chunks)]
 //!
 //! The settlement engine lives in [`crate::server::trade_system`]; this module
 //! keeps only wire formatting, registry plumbing, and DB persistence.

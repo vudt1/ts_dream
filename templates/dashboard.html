@@ -249,6 +249,9 @@
             <button class="tab-btn" onclick="showTab('tab-accounts', this)">Accounts Manager</button>
             <button class="tab-btn" onclick="showTab('tab-online', this)">Online Players</button>
             <button class="tab-btn" onclick="showTab('tab-npcs', this)">NPC Database ({{ npcs_count }})</button>
+            <button class="tab-btn" onclick="showTab('tab-assets', this)">Data Integrity ({{ assets.len() }})</button>
+            <button class="tab-btn" onclick="showTab('tab-guilds', this)">Guilds ({{ guilds.len() }})</button>
+            <button class="tab-btn" onclick="showTab('tab-bosses', this)">World Bosses ({{ world_bosses.len() }})</button>
         </div>
 
         <!-- Tab 1: Live SSE Log Console -->
@@ -287,16 +290,18 @@
                 <thead>
                     <tr>
                         <th>Player ID</th>
-                        <th>Pass 1</th>
-                        <th>Pass 2</th>
+                        <th>Account</th>
+                        <th>GM Level</th>
+                        <th>Suspended</th>
                     </tr>
                 </thead>
                 <tbody id="accounts-table-body">
                     {% for acc in accounts %}
                     <tr>
                         <td><strong>{{ acc.player_id }}</strong></td>
-                        <td>{{ acc.pass1 }}</td>
-                        <td>{{ acc.pass2 }}</td>
+                        <td>{{ acc.account }}</td>
+                        <td>{{ acc.gm_level }}</td>
+                        <td>{% if acc.is_suspended %}yes{% else %}no{% endif %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -358,6 +363,52 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+
+        <!-- Tab 5: Binary Data Integrity -->
+        <div id="tab-assets" class="tab-content">
+            <div class="card">
+                <div class="card-header">Accepted Binary Assets (.dat / .emg / .mng)</div>
+                <p style="color: var(--text-secondary); margin-bottom: 12px;">Only binary assets are admitted by the production loader. Hashes below identify the exact files used for this process.</p>
+                <table class="data-table">
+                    <thead><tr><th>Source file</th><th>Bytes</th><th>SHA-256</th></tr></thead>
+                    <tbody>
+                    {% for asset in assets %}
+                    <tr><td><strong>{{ asset.source_file }}</strong></td><td>{{ asset.byte_size }}</td><td style="font-family: monospace; font-size: 12px;">{{ asset.sha256 }}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab 6: Guilds -->
+        <div id="tab-guilds" class="tab-content">
+            <div class="card">
+                <div class="card-header">Guild Administration</div>
+                <table class="data-table">
+                    <thead><tr><th>ID</th><th>Name</th><th>Leader</th><th>Level</th><th>Experience</th><th>Treasury</th><th>Members</th><th>Status</th></tr></thead>
+                    <tbody>
+                    {% for guild in guilds %}
+                    <tr><td>{{ guild.guild_id }}</td><td><strong>{{ guild.name }}</strong></td><td>{{ guild.leader_id }}</td><td>{{ guild.level }}</td><td>{{ guild.experience }}</td><td>{{ guild.treasury }}</td><td>{{ guild.member_count }}</td><td>{{ guild.status }}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab 7: World Bosses -->
+        <div id="tab-bosses" class="tab-content">
+            <div class="card">
+                <div class="card-header">World Boss Operations</div>
+                <table class="data-table">
+                    <thead><tr><th>ID</th><th>NPC</th><th>Scene</th><th>State</th><th>HP</th><th>HP Max</th><th>Participants</th><th>Window</th></tr></thead>
+                    <tbody>
+                    {% for boss in world_bosses %}
+                    <tr><td>{{ boss.boss_id }}</td><td>{{ boss.npc_id }}</td><td>{{ boss.scene_id }}</td><td>{{ boss.state }}</td><td>{{ boss.hp }}</td><td>{{ boss.hp_max }}</td><td>{{ boss.participant_count }}</td><td>{{ boss.starts_at }} — {{ boss.ends_at }}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 

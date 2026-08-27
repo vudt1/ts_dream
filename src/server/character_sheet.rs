@@ -39,12 +39,11 @@ impl GearBonuses {
             b.hpx2 += item.hpx1.max(0) as u32 + item.hpx2.max(0) as u32;
             b.spx2 += item.spx1.max(0) as u32 + item.spx2.max(0) as u32;
             b.agi2 += item.agi1.max(0) as u32 + item.agi2.max(0) as u32;
-            let thuoctinh_bonus =
-                if item.thuoctinh == player_element || item.thuoctinh == 5 {
-                    u32::from(item.giatri_thuoctinh)
-                } else {
-                    0
-                };
+            let thuoctinh_bonus = if item.thuoctinh == player_element || item.thuoctinh == 5 {
+                u32::from(item.giatri_thuoctinh)
+            } else {
+                0
+            };
             let long_bonus = if item.long_val == player_element || item.long_val == 5 {
                 u32::from(item.giatri_long)
             } else {

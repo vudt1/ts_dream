@@ -24,7 +24,11 @@ struct CodeRow {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RedeemOutcome {
     /// Code was unused and the reward has been granted (item now in `homdo`).
-    Granted { item_id: i64, count: i64, tanthu: bool },
+    Granted {
+        item_id: i64,
+        count: i64,
+        tanthu: bool,
+    },
     /// Code did not exist, or was already redeemed by someone (`player_id != 0`).
     InvalidOrUsed,
     /// The once-only `TSVN123/TSVN456` gift was already claimed.
@@ -110,7 +114,7 @@ pub async fn redeem_special_gift(
     let mut tx = pool.begin().await?;
 
     let tanthu = sqlx::query_scalar::<_, i64>(
-        "SELECT tanthu FROM players WHERE player_id = ? FOR UPDATE",
+        "SELECT tanthu FROM characters WHERE account_id = ? FOR UPDATE",
     )
     .bind(player_id)
     .fetch_optional(&mut *tx)
@@ -135,7 +139,7 @@ pub async fn redeem_special_gift(
         return Ok(RedeemOutcome::AlreadyGifted);
     }
 
-    sqlx::query("UPDATE players SET tanthu = 1 WHERE player_id = ?")
+    sqlx::query("UPDATE characters SET tanthu = 1 WHERE account_id = ?")
         .bind(player_id)
         .execute(&mut *tx)
         .await?;

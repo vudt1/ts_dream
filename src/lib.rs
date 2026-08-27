@@ -22,18 +22,19 @@ pub mod data {
 
 pub mod db {
     pub mod accounts;
+    pub mod catalog;
+    pub mod domain;
     pub mod item_code;
     pub mod modern;
     pub mod persist;
-    pub mod players;
     pub mod pool;
-    pub mod quest;
 }
 
 pub mod server {
     pub mod auto_save;
     pub mod character_sheet;
     pub mod dispatcher;
+    pub mod gm;
     pub mod handlers;
     pub mod inventory;
     pub mod map_drops;
@@ -55,6 +56,7 @@ pub mod battle {
     pub mod damage;
     pub mod engine;
     pub mod manager;
+    pub mod mobile_damage;
     pub mod npc_world;
     pub mod packets;
     pub mod rng;

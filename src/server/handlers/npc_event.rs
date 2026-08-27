@@ -22,7 +22,62 @@ use crate::data::loaders::SceneEveData;
 use crate::eve::auto_chain::{AutoChainResult, EveAutoChainEngine, EventSession};
 use crate::eve::resolver::resolve_event;
 use crate::eve::state::{EveStateBuilder, PlayerEventState, PlayerStateInputs};
+use crate::server::dispatcher::OpcodeCtx;
 use crate::server::session::Session;
+
+/// PC/aLogin 0x1A request shapes proven by static payload analysis. These are
+/// deliberately not named with mobile `mainKind` semantics: the selector
+/// meaning is still not proven by a live PC capture.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PcTalkRequest {
+    SelectorOnly(u8),
+    SelectorU8 { selector: u8, value: u8 },
+    SelectorU16 { selector: u8, value: u16 },
+    SelectorU32 { selector: u8, value: u32 },
+}
+
+/// Parse the PC 0x1A body (`ctx.payload`, after opcode and sub byte) using only
+/// the schemas present in `opcode_1A_full_payloads.md`.
+#[must_use]
+pub fn parse_pc_talk_request(payload: &[u8]) -> Option<PcTalkRequest> {
+    let selector = *payload.first()?;
+    match (selector, payload.len()) {
+        (0x00..=0x0A, 1) => Some(PcTalkRequest::SelectorOnly(selector)),
+        (0x09, 2) => Some(PcTalkRequest::SelectorU8 {
+            selector,
+            value: payload[1],
+        }),
+        (0x08 | 0x0A, 3) => Some(PcTalkRequest::SelectorU16 {
+            selector,
+            value: u16::from_le_bytes([payload[1], payload[2]]),
+        }),
+        (0x01 | 0x02 | 0x05 | 0x06, 5) => Some(PcTalkRequest::SelectorU32 {
+            selector,
+            value: u32::from_le_bytes([payload[1], payload[2], payload[3], payload[4]]),
+        }),
+        _ => None,
+    }
+}
+
+/// PC 0x1A/Talk boundary. The selector/value parser is live and strict, while
+/// Eve execution remains opt-in until a PC selector-to-trigger mapping,
+/// result serializer, and event-session persistence contract are verified.
+pub async fn handle_pc_talk(ctx: &mut OpcodeCtx<'_>) {
+    let Some(request) = parse_pc_talk_request(ctx.payload) else {
+        tracing::debug!(
+            "reject malformed PC 0x1A payload: {} bytes",
+            ctx.payload.len()
+        );
+        return;
+    };
+    if !eve_events_enabled() {
+        return;
+    }
+    tracing::warn!(
+        ?request,
+        "PC 0x1A selector accepted at typed boundary; Eve execution is disabled until selector semantics are verified"
+    );
+}
 
 static EVE_EVENTS_ENABLED: AtomicBool = AtomicBool::new(false);
 
@@ -140,8 +195,7 @@ fn activate(
         if EveAutoChainEngine::should_skip_event(events, eve_no, event_data, state) {
             continue;
         }
-        let Some(resolved) = resolve_event(event_data, state, &scene.group_datas, rng, None)
-        else {
+        let Some(resolved) = resolve_event(event_data, state, &scene.group_datas, rng, None) else {
             continue;
         };
         return Some(EventSession {
@@ -182,4 +236,45 @@ pub fn auto_chain_after(
     }
     let state = snapshot_state(session);
     EveAutoChainEngine::try_auto_chain(scene, completed, &state, rng)
+}
+
+#[cfg(test)]
+mod pc_talk_tests {
+    use super::{parse_pc_talk_request, PcTalkRequest};
+
+    #[test]
+    fn accepts_only_corpus_proven_shapes() {
+        assert_eq!(
+            parse_pc_talk_request(&[0x00]),
+            Some(PcTalkRequest::SelectorOnly(0x00))
+        );
+        assert_eq!(
+            parse_pc_talk_request(&[0x09, 0x7F]),
+            Some(PcTalkRequest::SelectorU8 {
+                selector: 0x09,
+                value: 0x7F
+            })
+        );
+        assert_eq!(
+            parse_pc_talk_request(&[0x08, 0x34, 0x12]),
+            Some(PcTalkRequest::SelectorU16 {
+                selector: 0x08,
+                value: 0x1234
+            })
+        );
+        assert_eq!(
+            parse_pc_talk_request(&[0x01, 0x44, 0x33, 0x22, 0x11]),
+            Some(PcTalkRequest::SelectorU32 {
+                selector: 0x01,
+                value: 0x11223344
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_mobile_like_or_trailing_payloads() {
+        assert!(parse_pc_talk_request(&[0x06, 0x34, 0x12]).is_none());
+        assert!(parse_pc_talk_request(&[0x09, 0x01, 0x00]).is_none());
+        assert!(parse_pc_talk_request(&[0x0B]).is_none());
+    }
 }

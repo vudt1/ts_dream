@@ -245,8 +245,7 @@ impl ItemDatLoader {
             let spare5 = Self::dec8(chunk[108]);
             let role_count_index = Self::dec16(u16::from_le_bytes([chunk[109], chunk[110]]));
             let sort = Self::dec8(chunk[111]);
-            let role_count_value =
-                Self::dec16(u16::from_le_bytes([chunk[112], chunk[113]])) as i32;
+            let role_count_value = Self::dec16(u16::from_le_bytes([chunk[112], chunk[113]])) as i32;
             let btn_state = Self::dec8(chunk[114]);
 
             // Description at offset 115..370

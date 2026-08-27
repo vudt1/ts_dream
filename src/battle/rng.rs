@@ -124,6 +124,9 @@ pub struct BattleRng {
     pub random_1: DotNetRandom,
     /// Stream 2: npc respawn coordinates.
     pub random_2: DotNetRandom,
+    /// Dedicated stream for mobile damage hit/critical/status/random factors.
+    /// Keeping it separate preserves existing drop and NPC-AI draw ordering.
+    pub random_damage: DotNetRandom,
 }
 
 impl BattleRng {
@@ -134,6 +137,7 @@ impl BattleRng {
             random_0: DotNetRandom::time_seeded(),
             random_1: DotNetRandom::time_seeded(),
             random_2: DotNetRandom::time_seeded(),
+            random_damage: DotNetRandom::time_seeded(),
         }
     }
 
@@ -143,6 +147,7 @@ impl BattleRng {
             random_0: DotNetRandom::new(s0),
             random_1: DotNetRandom::new(s1),
             random_2: DotNetRandom::new(s2),
+            random_damage: DotNetRandom::new(s0.wrapping_add(7_919)),
         }
     }
 }

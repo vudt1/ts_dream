@@ -310,7 +310,11 @@ fn binary_loaders_load_all_dat_files() {
 
     // 9. eve.emg
     assert!(!d.scene_eve_data.is_empty(), "eve.emg loaded");
-    assert!(d.scene_eve_data.len() > 1000, "eve.emg non-empty scenes count > 1000 (actual: {})", d.scene_eve_data.len());
+    assert!(
+        d.scene_eve_data.len() > 1000,
+        "eve.emg non-empty scenes count > 1000 (actual: {})",
+        d.scene_eve_data.len()
+    );
 }
 
 #[test]
@@ -336,8 +340,14 @@ fn eve_loader_loads_major_scenes() {
         scene_10801.fight_datas.len()
     );
     assert!(!scene_10801.npcs.is_empty(), "Scene 10801 has NPCs");
-    assert!(!scene_10801.scene_infos.is_empty(), "Scene 10801 has Scene Infos");
-    assert!(!scene_10801.fight_datas.is_empty(), "Scene 10801 has FightDatas");
+    assert!(
+        !scene_10801.scene_infos.is_empty(),
+        "Scene 10801 has Scene Infos"
+    );
+    assert!(
+        !scene_10801.fight_datas.is_empty(),
+        "Scene 10801 has FightDatas"
+    );
 
     // 2. Trác Quận (Scene 12001)
     let scene_12001 = d.scene_eve_data.get(&12001).expect("Scene 12001 present");
@@ -361,6 +371,3 @@ fn eve_loader_loads_major_scenes() {
         assert!(scene_info.eve_no > 0);
     }
 }
-
-
-

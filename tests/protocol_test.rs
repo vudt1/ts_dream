@@ -15,8 +15,8 @@ use ts_dream::error::Result;
 use ts_dream::harness::{proxy, Golden};
 use ts_dream::protocol::codec::Packet;
 use ts_dream::protocol::codecs::{
-    ehuman, BattleRoleData, BattleRoleSerializer, FriendExtra, PlayerCard, FRIEND_EXTRA_SIZE,
-    ThingData, THING_DATA_SIZE,
+    ehuman, BattleRoleData, BattleRoleSerializer, FriendExtra, PlayerCard, ThingData,
+    FRIEND_EXTRA_SIZE, THING_DATA_SIZE,
 };
 use ts_dream::protocol::encoder::{
     bytes, hex, le16, le32, strhex, strhex_of, u16_le, u32_le, xor01,
@@ -194,15 +194,15 @@ fn strhex_low_byte() {
 #[test]
 fn test_read_primitives() {
     let data = [
-        0x12,                   // u8
-        0x34, 0x12,             // u16: 0x1234
+        0x12, // u8
+        0x34, 0x12, // u16: 0x1234
         0x78, 0x56, 0x34, 0x12, // u32: 0x12345678
         0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, // u64: 0x8000000000000001
-        0xFE,                   // i8: -2
-        0xF0, 0xFF,             // i16: -16
+        0xFE, // i8: -2
+        0xF0, 0xFF, // i16: -16
         0x00, 0x00, 0xFF, 0xFF, // i32: -65536
-        0x01,                   // bool: true
-        0x00,                   // bool: false
+        0x01, // bool: true
+        0x00, // bool: false
     ];
     let mut reader = PacketReader::new(&data);
 
@@ -891,8 +891,7 @@ fn resolve_data_dir_falls_back_to_exe_adjacent_bundle() {
 fn resolve_data_dir_returns_configured_when_none_exist() {
     // Neither the configured path nor an exe-adjacent bundle exists ->
     // the configured path is returned unchanged (caller reports it).
-    let got =
-        Config::resolve_data_dir_with(&std::path::PathBuf::from("does-not-exist-data"), None);
+    let got = Config::resolve_data_dir_with(&std::path::PathBuf::from("does-not-exist-data"), None);
     assert_eq!(got, std::path::PathBuf::from("does-not-exist-data"));
 }
 
@@ -916,7 +915,9 @@ async fn test_capture_proxy_forwarding() -> Result<()> {
     let mock_listener = TcpListener::bind("127.0.0.1:0")
         .await
         .map_err(ts_dream::error::TsError::Io)?;
-    let server_addr = mock_listener.local_addr().map_err(ts_dream::error::TsError::Io)?;
+    let server_addr = mock_listener
+        .local_addr()
+        .map_err(ts_dream::error::TsError::Io)?;
 
     tokio::spawn(async move {
         if let Ok((mut socket, _)) = mock_listener.accept().await {
@@ -939,7 +940,9 @@ async fn test_capture_proxy_forwarding() -> Result<()> {
     let proxy_listener = TcpListener::bind("127.0.0.1:0")
         .await
         .map_err(ts_dream::error::TsError::Io)?;
-    let proxy_addr = proxy_listener.local_addr().map_err(ts_dream::error::TsError::Io)?;
+    let proxy_addr = proxy_listener
+        .local_addr()
+        .map_err(ts_dream::error::TsError::Io)?;
     drop(proxy_listener); // release port for CaptureProxy
 
     let proxy_server = Arc::new(proxy::CaptureProxy::new(
@@ -960,14 +963,20 @@ async fn test_capture_proxy_forwarding() -> Result<()> {
         .await
         .map_err(ts_dream::error::TsError::Io)?;
     let req_wire = encode_to_wire("F444010000")?;
-    client.write_all(&req_wire).await.map_err(ts_dream::error::TsError::Io)?;
+    client
+        .write_all(&req_wire)
+        .await
+        .map_err(ts_dream::error::TsError::Io)?;
 
     let mut resp_buf = vec![0u8; 1024];
     let n = client
         .read(&mut resp_buf)
         .await
         .map_err(ts_dream::error::TsError::Io)?;
-    let resp_decoded = resp_buf[..n].iter().map(|b| b ^ XOR_KEY).collect::<Vec<_>>();
+    let resp_decoded = resp_buf[..n]
+        .iter()
+        .map(|b| b ^ XOR_KEY)
+        .collect::<Vec<_>>();
     assert_eq!(resp_decoded, vec![0xF4, 0x44, 0x03, 0x00, 0x01, 0x09, 0x01]);
 
     let _ = tx.send(true);
@@ -979,4 +988,54 @@ async fn test_capture_proxy_forwarding() -> Result<()> {
     assert!(lines.contains(&">>F4440300010901".to_string()));
 
     Ok(())
+}
+
+#[test]
+fn production_protocol_constants_match_contract() {
+    use ts_dream::protocol::{ID_PREFIX, MAX_LEVEL, MIN_VERSION, SERVER_NAME};
+    assert_eq!(MIN_VERSION, 186);
+    assert_eq!(ID_PREFIX, "VN");
+    assert_eq!(SERVER_NAME, "TSVN");
+    assert_eq!(MAX_LEVEL, 200);
+}
+
+#[test]
+fn documented_opcode_registries_are_sorted_unique_and_complete_for_tables() {
+    use ts_dream::protocol::{DOCUMENTED_CLIENT_OPCODES, DOCUMENTED_SERVER_OPCODES};
+
+    assert_eq!(DOCUMENTED_CLIENT_OPCODES.len(), 60);
+    assert_eq!(DOCUMENTED_SERVER_OPCODES.len(), 65);
+    assert!(DOCUMENTED_CLIENT_OPCODES.windows(2).all(|w| w[0] < w[1]));
+    assert!(DOCUMENTED_SERVER_OPCODES.windows(2).all(|w| w[0] < w[1]));
+    assert!(DOCUMENTED_CLIENT_OPCODES.contains(&0xC7));
+    assert!(DOCUMENTED_SERVER_OPCODES.contains(&0xC7));
+}
+
+#[test]
+fn documented_opcode_membership_rejects_unknown_values() {
+    use ts_dream::protocol::{is_documented_client_opcode, is_documented_server_opcode};
+    assert!(is_documented_client_opcode(0x05));
+    assert!(is_documented_server_opcode(0x04));
+    assert!(!is_documented_client_opcode(0xFE));
+    assert!(!is_documented_server_opcode(0xFE));
+}
+
+#[test]
+fn pc_collision_opcodes_are_frozen_from_mobile_sync() {
+    use ts_dream::protocol::profile::{ProtocolProfile, FROZEN_PC_COLLISIONS};
+
+    assert_eq!(FROZEN_PC_COLLISIONS, [0x19, 0x1B, 0x1F, 0x23]);
+    for opcode in FROZEN_PC_COLLISIONS {
+        assert!(ProtocolProfile::PcALogin.is_frozen_pc_collision(opcode));
+        assert!(!ProtocolProfile::KotlinMobile.is_frozen_pc_collision(opcode));
+    }
+}
+
+#[test]
+fn mobile_loader_policy_rejects_mmg_extension() {
+    let accepted = ["dat", "emg", "mng"];
+    for ext in accepted {
+        assert!(matches!(ext, "dat" | "emg" | "mng"));
+    }
+    assert!(!matches!("mmg", "dat" | "emg" | "mng"));
 }

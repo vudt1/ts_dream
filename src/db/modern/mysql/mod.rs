@@ -8,10 +8,9 @@ pub mod characters;
 pub mod inventories;
 pub mod pets;
 pub mod quests;
+pub mod session;
 
-use crate::db::modern::traits::{
-    AccountRepository, CharacterRepository, InventoryRepository, PetRepository, QuestRepository,
-};
+use crate::db::modern::traits::{InventoryRepository, PetRepository, QuestRepository};
 
 /// Bundles the concrete pool-backed implementations behind the trait objects
 /// callers actually depend on. Construct once at boot and hand references to
@@ -26,11 +25,11 @@ impl MySqlRepositories {
         Self { pool }
     }
 
-    pub fn accounts(&self) -> impl AccountRepository + '_ {
+    pub fn accounts(&self) -> accounts::MySqlAccountRepository<'_> {
         accounts::MySqlAccountRepository { pool: &self.pool }
     }
 
-    pub fn characters(&self) -> impl CharacterRepository + '_ {
+    pub fn characters(&self) -> characters::MySqlCharacterRepository<'_> {
         characters::MySqlCharacterRepository { pool: &self.pool }
     }
 
@@ -44,5 +43,9 @@ impl MySqlRepositories {
 
     pub fn quests(&self) -> impl QuestRepository + '_ {
         quests::MySqlQuestRepository { pool: &self.pool }
+    }
+
+    pub fn sessions(&self) -> session::MySqlSessionRepository<'_> {
+        session::MySqlSessionRepository { pool: &self.pool }
     }
 }

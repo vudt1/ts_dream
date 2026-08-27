@@ -2,14 +2,16 @@
 //!
 //! One battle runs on its own `tokio::spawn` task. Player commands (op 0x32)
 //! arrive through a per-battle `mpsc` channel; the task collects them each turn
-//! (with a per-turn timeout, default ≤21 s), runs the deterministic
+//! (with a per-turn timeout, default 20 s), runs the mobile-compatible
 //! `Battle::run_turn`, and dispatches every `runner::Out` through a `BattleSink`.
 //! The grid + RNG live only inside the task, so battle state is race-free.
 
 use crate::battle::construction::Battle;
 use crate::battle::npc_world::NpcWorld;
-use crate::battle::runner::{BattleCommand, BattleData, DbUpdate, Out, Outcome, PlayerSnapshot};
-use crate::data::tables::{Item, Npc, Skill, TexpRow};
+use crate::battle::runner::{
+    BattleCommand, BattleCommands, BattleData, DbUpdate, Out, Outcome, PlayerSnapshot,
+};
+use crate::data::tables::{BinarySkillDef, Item, Npc, Skill, TexpRow};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Arc, RwLock as StdRwLock};
@@ -33,6 +35,8 @@ pub trait BattleSink: Send + Sync + 'static {
     fn apply_fled(&self, player: i64);
     fn apply_respawn(&self, npc_id: i64, map_id: i64, x: i64, y: i64);
     fn apply_pet_exp(&self, owner: i64, stt: i64, exp: i64);
+    /// Apply a mobile PvE gold reward. The default is a no-op for test sinks.
+    fn apply_gold(&self, _owner: i64, _amount: i64) {}
     /// The battle task finished (`PlayerWin`/`PlayerLose`/`PlayerFled`).
     fn battle_ended(&self, id: i32, outcome: Outcome);
 }
@@ -69,7 +73,10 @@ impl BattleManager {
         BattleManager {
             battles: RwLock::new(HashMap::new()),
             next_id: AtomicI32::new(1),
-            default_timeout: std::time::Duration::from_secs(21),
+            // Mobile BattleConstants.COUNTDOWN_NORMAL = 20 seconds.
+            // Keep this as a business-rule timeout; custom timeouts remain
+            // available for deterministic tests and special battle modes.
+            default_timeout: std::time::Duration::from_secs(20),
         }
     }
 
@@ -99,6 +106,7 @@ impl BattleManager {
         battle: Battle,
         npcs: Arc<HashMap<i64, Npc>>,
         skills: Arc<HashMap<i64, Skill>>,
+        mobile_skills: Arc<HashMap<u16, BinarySkillDef>>,
         items: Arc<HashMap<i64, Item>>,
         pet_slots: Arc<HashMap<i64, [i64; 4]>>,
         players: Arc<HashMap<i64, PlayerSnapshot>>,
@@ -113,6 +121,7 @@ impl BattleManager {
             battle,
             npcs,
             skills,
+            mobile_skills,
             items,
             pet_slots,
             players,
@@ -133,6 +142,7 @@ impl BattleManager {
         battle: Battle,
         npcs: Arc<HashMap<i64, Npc>>,
         skills: Arc<HashMap<i64, Skill>>,
+        mobile_skills: Arc<HashMap<u16, BinarySkillDef>>,
         items: Arc<HashMap<i64, Item>>,
         pet_slots: Arc<HashMap<i64, [i64; 4]>>,
         players: Arc<HashMap<i64, PlayerSnapshot>>,
@@ -163,7 +173,8 @@ impl BattleManager {
                 world.as_ref().map(|w| w.as_ref()),
                 talking_battle,
                 map_id,
-            );
+            )
+            .with_mobile_skills(&mobile_skills);
             let mut out: Vec<Out> = Vec::new();
             loop {
                 out.clear();
@@ -198,38 +209,94 @@ async fn collect_commands(
     rx: &mut mpsc::UnboundedReceiver<PlayerInput>,
     timeout: std::time::Duration,
     battle: &Battle,
-) -> HashMap<i64, BattleCommand> {
-    let mut commands = HashMap::new();
+) -> BattleCommands {
+    let mut commands = BattleCommands::new();
     let deadline = tokio::time::Instant::now() + timeout;
     loop {
-        // Every living player-type cell needs a command (auto actions are handled
-        // inside run_turn for NPCs, so only human players gate the wait).
-        let waiting_players: Vec<i64> = (0..4u8)
+        // Every living player-controlled cell needs a command. This includes
+        // follow-NPC/pet cells (typ=4), matching the mobile battle state machine.
+        let waiting_cells: Vec<(u8, u8)> = (0..4u8)
             .flat_map(|r| (0..5u8).map(move |c| (r, c)))
-            .filter_map(|(r, c)| {
-                let cell = battle.cell(r, c)?;
-                if cell.hp > 0 && cell.typ == 2 {
-                    Some(cell.id)
-                } else {
-                    None
-                }
-            })
+            .filter(|&(r, c)| battle.cell(r, c).is_some_and(is_living_player_controlled))
             .collect();
-        let all_ready = waiting_players.iter().all(|p| commands.contains_key(p));
+        let all_ready = waiting_cells.iter().all(|cell| commands.contains_key(cell));
         if all_ready {
             return commands;
         }
         if tokio::time::Instant::now() >= deadline {
+            fill_timeout_commands(&mut commands, battle, &waiting_cells);
             return commands;
         }
         let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
         match tokio::time::timeout(remaining, rx.recv()).await {
             Ok(Some(input)) => {
-                commands.insert(input.player, input.cmd);
+                // The owner id remains the authorization identity, while the
+                // source cell is the command identity. Invalid ownership or
+                // malformed source coordinates never satisfy readiness.
+                if owns_commandable_cell(battle, input.player, &input.cmd) {
+                    commands.insert((input.cmd.row, input.cmd.col), input.cmd);
+                }
             }
-            _ => return commands, // channel closed / timeout
+            _ => {
+                fill_timeout_commands(&mut commands, battle, &waiting_cells);
+                return commands;
+            }
         }
     }
+}
+
+fn fill_timeout_commands(
+    commands: &mut BattleCommands,
+    battle: &Battle,
+    waiting_cells: &[(u8, u8)],
+) {
+    // Mobile auto-confirms a basic attack for every living, non-stunned
+    // player-controlled fighter that timed out. The command still uses the
+    // unchanged PC 0x32 source/target fields.
+    for &(row, col) in waiting_cells {
+        if commands.contains_key(&(row, col)) {
+            continue;
+        }
+        let Some(source) = battle.cell(row, col) else {
+            continue;
+        };
+        let Some(target) = first_living_enemy(battle, source.team) else {
+            continue;
+        };
+        commands.insert(
+            (row, col),
+            BattleCommand {
+                row,
+                col,
+                skill_id: 10000,
+                skill_lv: 1,
+                row_attack: target.0,
+                col_attack: target.1,
+                use_item: 0,
+            },
+        );
+    }
+}
+
+fn is_living_player_controlled(cell: &crate::battle::engine::WarInfo) -> bool {
+    cell.id > 0 && cell.hp > 0 && (cell.typ == 2 || (cell.typ == 4 && cell.id_char > 0))
+}
+
+fn owns_commandable_cell(battle: &Battle, player: i64, cmd: &BattleCommand) -> bool {
+    battle.cell(cmd.row, cmd.col).is_some_and(|cell| {
+        is_living_player_controlled(cell)
+            && ((cell.typ == 2 && cell.id == player) || (cell.typ == 4 && cell.id_char == player))
+    })
+}
+
+fn first_living_enemy(battle: &Battle, team: i64) -> Option<(u8, u8)> {
+    (0..4u8)
+        .flat_map(|r| (0..5u8).map(move |c| (r, c)))
+        .find(|&(r, c)| {
+            battle
+                .cell(r, c)
+                .is_some_and(|cell| cell.id > 0 && cell.hp > 0 && cell.team != team)
+        })
 }
 
 fn dispatch(out: &[Out], sink: &dyn BattleSink) {
@@ -264,6 +331,134 @@ fn dispatch(out: &[Out], sink: &dyn BattleSink) {
                 y,
             } => sink.apply_respawn(*npc_id, *map_id, *x, *y),
             PetExp { owner, stt, exp } => sink.apply_pet_exp(*owner, *stt, *exp),
+            Gold { owner, amount } => sink.apply_gold(*owner, *amount),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn source_cell_commands_keep_player_and_owned_pet_actions_separate() {
+        let mut battle = Battle::new(1, 112);
+        {
+            let player = battle.cell_mut(3, 2).expect("player cell");
+            player.typ = 2;
+            player.id = 7001;
+            player.hp = 100;
+            player.team = 1;
+        }
+        {
+            let pet = battle.cell_mut(2, 2).expect("pet cell");
+            pet.typ = 4;
+            pet.id = 8001;
+            pet.id_char = 7001;
+            pet.hp = 100;
+            pet.team = 1;
+        }
+
+        let player_cmd = BattleCommand {
+            row: 3,
+            col: 2,
+            skill_id: 10000,
+            skill_lv: 1,
+            row_attack: 0,
+            col_attack: 2,
+            use_item: 0,
+        };
+        let pet_cmd = BattleCommand {
+            row: 2,
+            col: 2,
+            skill_id: 10001,
+            skill_lv: 2,
+            row_attack: 0,
+            col_attack: 2,
+            use_item: 0,
+        };
+
+        assert!(owns_commandable_cell(&battle, 7001, &player_cmd));
+        assert!(owns_commandable_cell(&battle, 7001, &pet_cmd));
+        assert!(!owns_commandable_cell(&battle, 7002, &pet_cmd));
+
+        let mut commands = BattleCommands::new();
+        commands.insert((player_cmd.row, player_cmd.col), player_cmd);
+        commands.insert((pet_cmd.row, pet_cmd.col), pet_cmd);
+        assert_eq!(commands.len(), 2);
+        assert_eq!(commands[&(2, 2)].skill_id, 10001);
+    }
+
+    #[test]
+    fn timeout_auto_confirms_all_living_player_controlled_cells() {
+        let mut battle = Battle::new(1, 112);
+        for (row, col, typ, id, owner, team) in [
+            (3, 2, 2, 7001, 0, 1),
+            (2, 2, 4, 8001, 7001, 1),
+            (0, 2, 3, 9001, 0, 2),
+        ] {
+            let cell = battle.cell_mut(row, col).expect("battle cell");
+            cell.typ = typ;
+            cell.id = id;
+            cell.id_char = owner;
+            cell.hp = 100;
+            cell.team = team;
+        }
+
+        let waiting = vec![(3, 2), (2, 2)];
+        let mut commands = BattleCommands::new();
+        fill_timeout_commands(&mut commands, &battle, &waiting);
+
+        assert_eq!(commands.len(), 2);
+        assert_eq!(commands[&(3, 2)].skill_id, 10000);
+        assert_eq!(commands[&(2, 2)].skill_id, 10000);
+        assert_eq!(
+            (commands[&(3, 2)].row_attack, commands[&(3, 2)].col_attack),
+            (0, 2)
+        );
+    }
+}
+
+#[cfg(test)]
+mod async_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn collect_commands_accepts_player_and_pet_actions_from_one_owner() {
+        let mut battle = Battle::new(1, 112);
+        for (row, col, typ, id, owner, team) in [
+            (3, 2, 2, 7001, 0, 1),
+            (2, 2, 4, 8001, 7001, 1),
+            (0, 2, 3, 9001, 0, 2),
+        ] {
+            let cell = battle.cell_mut(row, col).expect("battle cell");
+            cell.typ = typ;
+            cell.id = id;
+            cell.id_char = owner;
+            cell.hp = 100;
+            cell.team = team;
+        }
+
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        for (row, col, skill_id) in [(3, 2, 10000), (2, 2, 10001)] {
+            tx.send(PlayerInput {
+                player: 7001,
+                cmd: BattleCommand {
+                    row,
+                    col,
+                    skill_id,
+                    skill_lv: 1,
+                    row_attack: 0,
+                    col_attack: 2,
+                    use_item: 0,
+                },
+            })
+            .expect("command channel");
+        }
+
+        let commands = collect_commands(&mut rx, std::time::Duration::from_secs(1), &battle).await;
+        assert_eq!(commands.len(), 2);
+        assert_eq!(commands[&(3, 2)].skill_id, 10000);
+        assert_eq!(commands[&(2, 2)].skill_id, 10001);
     }
 }

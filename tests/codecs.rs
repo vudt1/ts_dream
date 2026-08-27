@@ -42,7 +42,9 @@ fn test_thing_data_codec_35_bytes_exact() {
     assert_eq!(writer.len(), 35);
 
     let mut reader = PacketReader::new(writer.as_slice());
-    let reader_decoded = reader.read_thing_data().expect("PacketReader read_thing_data failed");
+    let reader_decoded = reader
+        .read_thing_data()
+        .expect("PacketReader read_thing_data failed");
     assert_eq!(item, reader_decoded);
     assert_eq!(reader.remaining(), 0);
 }
@@ -163,7 +165,8 @@ fn test_battle_role_player_appearance_roundtrip() {
 
     let bytes = BattleRoleSerializer::serialize(&player_role);
     let mut reader = PacketReader::new(&bytes);
-    let decoded = BattleRoleSerializer::deserialize(&mut reader).expect("Failed to deserialize player BattleRoleData");
+    let decoded = BattleRoleSerializer::deserialize(&mut reader)
+        .expect("Failed to deserialize player BattleRoleData");
 
     assert_eq!(player_role, decoded);
     assert_eq!(reader.remaining(), 0);
@@ -192,7 +195,8 @@ fn test_battle_role_follow_npc_roundtrip() {
 
     let bytes = BattleRoleSerializer::serialize(&pet_role);
     let mut reader = PacketReader::new(&bytes);
-    let decoded = BattleRoleSerializer::deserialize(&mut reader).expect("Failed to deserialize pet BattleRoleData");
+    let decoded = BattleRoleSerializer::deserialize(&mut reader)
+        .expect("Failed to deserialize pet BattleRoleData");
 
     assert_eq!(pet_role, decoded);
     assert_eq!(reader.remaining(), 0);
@@ -223,7 +227,8 @@ fn test_battle_role_mine_npc_roundtrip() {
     assert_eq!(bytes.len(), 42);
 
     let mut reader = PacketReader::new(&bytes);
-    let decoded = BattleRoleSerializer::deserialize(&mut reader).expect("Failed to deserialize mob BattleRoleData");
+    let decoded = BattleRoleSerializer::deserialize(&mut reader)
+        .expect("Failed to deserialize mob BattleRoleData");
 
     assert_eq!(mob, decoded);
     assert_eq!(reader.remaining(), 0);

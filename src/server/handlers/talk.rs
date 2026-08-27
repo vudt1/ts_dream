@@ -63,9 +63,10 @@ pub async fn handle_talk(ctx: &mut OpcodeCtx<'_>) {
 /// on-map instance is rejected with EndTalk (ticket 18 review: "reject
 /// missing/out-of-range before any packet").
 fn resolve_npc(data: &GameData, conn: &Conn, map_object_id: i32) -> Option<(i32, bool)> {
-    let npc = data.npc_on_map.iter().find(|n| {
-        n.map_id == i64::from(conn.session.map_id) && n.id == i64::from(map_object_id)
-    })?;
+    let npc = data
+        .npc_on_map
+        .iter()
+        .find(|n| n.map_id == i64::from(conn.session.map_id) && n.id == i64::from(map_object_id))?;
     let dx = i64::from(conn.session.map_x) - npc.x;
     let dy = i64::from(conn.session.map_y) - npc.y;
     let in_range = (-150..=150).contains(&dx) && (-150..=150).contains(&dy);
@@ -177,7 +178,10 @@ async fn handle_talk_continue(
         match conn.session.select_menu {
             30 => {
                 out.send("F44403001D0900");
-                out.send(format!("F44406001D04{}", encoder::le32(conn.session.bank_gold)));
+                out.send(format!(
+                    "F44406001D04{}",
+                    encoder::le32(conn.session.bank_gold)
+                ));
                 out.send("F44402001D05");
                 out.send("F44402001409");
             }

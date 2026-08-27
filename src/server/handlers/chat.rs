@@ -8,6 +8,7 @@
 use crate::db::persist;
 use crate::protocol::encoder;
 use crate::server::dispatcher::{HandleOutcome, MapBroadcast, OpcodeCtx};
+use crate::server::gm;
 use crate::server::handlers::stats;
 use crate::server::session::{online_sessions, Conn};
 use crate::server::spawn;
@@ -49,6 +50,9 @@ pub async fn handle_chat(ctx: &mut OpcodeCtx<'_>) {
             }
             if text.starts_with('/') {
                 let msg = text.trim();
+                if gm::handle(conn, out, pool, ctx.env.repos, hub, ctx.data, msg).await {
+                    return;
+                }
                 handle_slash(conn, out, pool, hub, msg).await;
                 return;
             }
@@ -128,11 +132,8 @@ fn split_slash(msg: &str) -> (String, Vec<String>) {
     (cmd, args)
 }
 
-/// Dispatch a slash command.
-///
-/// All players are equal — there is no admin role. The legacy admin slash
-/// commands were removed with that role; typing one now falls into the
-/// silent-drop arm.
+/// Dispatch ordinary player slash commands. Privileged commands are handled
+/// by `server::gm` before this function and never reach this fallback.
 async fn handle_slash(
     conn: &mut Conn,
     out: &mut HandleOutcome,
@@ -244,7 +245,11 @@ async fn handle_slash(
                     }
                     persist::update_player(pool, member_id, "Hp", i64::from(m.hp)).await;
                     persist::update_player(pool, member_id, "Sp", i64::from(m.sp)).await;
-                    for pet in m.pets.iter().filter(|p| p.id > 0 && (1..=4).contains(&p.stt)) {
+                    for pet in m
+                        .pets
+                        .iter()
+                        .filter(|p| p.id > 0 && (1..=4).contains(&p.stt))
+                    {
                         persist::upsert_pet(pool, member_id, pet).await;
                     }
                 }

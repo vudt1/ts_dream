@@ -18,8 +18,8 @@
 use crate::battle::construction::{Battle, StartPacket};
 use crate::battle::engine::get_hp_max;
 use crate::battle::manager::{BattleHandle, BattleManager, BattleSink};
-use crate::battle::npc_world::{WorldPlayer, WorldSink};
 use crate::battle::npc_world::NpcWorld;
+use crate::battle::npc_world::{WorldPlayer, WorldSink};
 use crate::battle::packets;
 use crate::battle::runner::{
     BattleCommand, DbTarget, DbUpdate, Out, Outcome, PlayerSnapshot, Stat,
@@ -158,6 +158,19 @@ impl BattleSink for BattleSinkImpl {
         }
     }
 
+    fn apply_gold(&self, owner: i64, amount: i64) {
+        if amount <= 0 {
+            return;
+        }
+        if let Ok(online) = self.online.try_read() {
+            if let Some(p) = online.get(&owner) {
+                if let Ok(mut s) = p.session.try_write() {
+                    s.gold = s.gold.saturating_add(amount as u32);
+                }
+            }
+        }
+    }
+
     fn battle_ended(&self, _id: i32, outcome: Outcome) {
         // Clear battle state for every participant (battle is over) and
         // snapshot their sessions for post-battle persistence.
@@ -255,7 +268,8 @@ impl BattleSink for BattleSinkImpl {
                                 .await;
                             });
                         }
-                    }                }
+                    }
+                }
                 let _ = player;
             }
         }
@@ -380,7 +394,9 @@ impl BattleService {
         let world = if data.npc_on_map.is_empty() {
             None
         } else {
-            Some(Arc::new(std::sync::RwLock::new(NpcWorld::new(&data.npc_on_map))))
+            Some(Arc::new(std::sync::RwLock::new(NpcWorld::new(
+                &data.npc_on_map,
+            ))))
         };
         let sink = Arc::new(BattleSinkImpl {
             online: Arc::clone(&online),
@@ -892,6 +908,7 @@ impl BattleService {
 
         let npcs = Arc::new(self.data.npcs.clone());
         let skills = Arc::new(self.data.skills.clone());
+        let mobile_skills = Arc::new(self.data.binary_skill_defs.clone());
         let items = Arc::new(self.data.items.clone());
         let pet_slots = Arc::new(pet_slots);
         let players = Arc::new(players);
@@ -914,6 +931,7 @@ impl BattleService {
             battle,
             npcs,
             skills,
+            mobile_skills,
             items,
             pet_slots,
             players,

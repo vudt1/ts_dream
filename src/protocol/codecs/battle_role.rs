@@ -5,10 +5,10 @@
 //!
 //! Used for opcodes `0x0B` (`0x0BFA` battle open, `0x0B05` role appear) and `0x32`.
 
-use serde::{Deserialize, Serialize};
 use crate::error::Result;
 use crate::protocol::reader::PacketReader;
 use crate::protocol::writer::PacketWriter;
+use serde::{Deserialize, Serialize};
 
 /// Character entity kind constants — matches `define.lua:EHuman`.
 pub mod ehuman {
@@ -224,7 +224,10 @@ impl BattleRoleData {
     }
 
     /// Reads player appearance details (`ReciveFightAppearenceData`).
-    fn read_player_appearance(reader: &mut PacketReader<'_>, data: &mut BattleRoleData) -> Result<()> {
+    fn read_player_appearance(
+        reader: &mut PacketReader<'_>,
+        data: &mut BattleRoleData,
+    ) -> Result<()> {
         data.name = reader.read_viscii_pascal()?;
         data.sex = reader.read_u8()?;
         let _app_element = reader.read_u8()?;
@@ -292,7 +295,10 @@ impl BattleRoleSerializer {
     }
 
     /// Deserializes `count` instances of `BattleRoleData` from reader.
-    pub fn deserialize_all(reader: &mut PacketReader<'_>, count: usize) -> Result<Vec<BattleRoleData>> {
+    pub fn deserialize_all(
+        reader: &mut PacketReader<'_>,
+        count: usize,
+    ) -> Result<Vec<BattleRoleData>> {
         let mut roles = Vec::with_capacity(count);
         for _ in 0..count {
             roles.push(BattleRoleData::decode(reader)?);

@@ -6,14 +6,12 @@
 //! (golden replay) the handlers run in-memory over the seeded session.
 //! All SQL lives in the `db` repository layer, never inline here.
 
-use crate::db;
 use crate::protocol::encoder;
 use crate::protocol::{ID_PREFIX, MIN_VERSION};
 use crate::server::dispatcher::{HandleOutcome, OpcodeCtx};
 use crate::server::session::Conn;
 use crate::server::spawn;
 use crate::web::server_control::{ClientSender, ServerControl};
-use sqlx::MySqlPool;
 
 /// Op 0x00 — Hello: reply only to the exact `F444010000` frame (opcode 0x00,
 /// length 1, no sub byte). Anything else is silently ignored (§2.3.1).
@@ -51,12 +49,16 @@ pub async fn handle_login(ctx: &mut OpcodeCtx<'_>) {
     conn.session.authed = false;
 
     match ctx.env.pool {
-        Some(pool) => {
-            if login_db(conn, out, pool, ctx.env.hub, ctx.env.sender, password)
-                .await
-                .is_err()
-            {
-                out.shutdown = true; // Handler error -> disconnect
+        Some(_) => {
+            if let Some(repos) = ctx.env.repos {
+                if login_db(conn, out, repos, ctx.env.hub, ctx.env.sender, password)
+                    .await
+                    .is_err()
+                {
+                    out.shutdown = true; // Handler error -> disconnect
+                }
+            } else {
+                out.shutdown = true;
             }
         }
         None => {
@@ -73,7 +75,10 @@ pub async fn handle_login(ctx: &mut OpcodeCtx<'_>) {
                     conn.session.name = conn.session.pending_new_char_name.clone();
                 }
                 let seq = spawn::build_logined_sequence_session(&conn.session);
-                out.outgoing.extend(seq.into_iter().map(crate::server::dispatcher::OutFrame::new));
+                out.outgoing.extend(
+                    seq.into_iter()
+                        .map(crate::server::dispatcher::OutFrame::new),
+                );
             }
         }
     }
@@ -95,12 +100,16 @@ pub async fn handle_enter_game(ctx: &mut OpcodeCtx<'_>) {
         return;
     }
     match ctx.env.pool {
-        Some(pool) => {
+        Some(_) => {
             let pass = conn.session.pending_pass.clone();
-            if login_db(conn, out, pool, ctx.env.hub, ctx.env.sender, &pass)
-                .await
-                .is_err()
-            {
+            if let Some(repos) = ctx.env.repos {
+                if login_db(conn, out, repos, ctx.env.hub, ctx.env.sender, &pass)
+                    .await
+                    .is_err()
+                {
+                    out.shutdown = true;
+                }
+            } else {
                 out.shutdown = true;
             }
         }
@@ -113,7 +122,10 @@ pub async fn handle_enter_game(ctx: &mut OpcodeCtx<'_>) {
                     conn.session.name = conn.session.pending_new_char_name.clone();
                 }
                 let seq = spawn::build_logined_sequence_session(&conn.session);
-                out.outgoing.extend(seq.into_iter().map(crate::server::dispatcher::OutFrame::new));
+                out.outgoing.extend(
+                    seq.into_iter()
+                        .map(crate::server::dispatcher::OutFrame::new),
+                );
             }
         }
     }
@@ -124,27 +136,38 @@ pub async fn handle_enter_game(ctx: &mut OpcodeCtx<'_>) {
 async fn login_db(
     conn: &mut Conn,
     out: &mut HandleOutcome,
-    pool: &MySqlPool,
+    repos: &crate::db::modern::mysql::MySqlRepositories,
     hub: Option<&ServerControl>,
     sender: Option<&ClientSender>,
     password: &[u8],
 ) -> Result<(), sqlx::Error> {
     let id = i64::from(conn.session.id);
 
-    // Account existence (repository `accounts::pass1`).
-    let Some(db_pass) = db::accounts::pass1(pool, id).await? else {
-        out.shutdown = true; // Unknown account -> disconnect (spec §2.3.2)
-        return Ok(());
-    };
-    if db_pass.as_bytes() != password {
+    // Account existence and byte-exact authentication through modern accounts.
+    if !repos.accounts().verify_pass1(id, password).await? {
         out.send(spawn::LOGIN_WRONG_PASS);
         return Ok(());
     }
+    let Some(access) = repos.accounts().access(id).await? else {
+        out.send(spawn::LOGIN_WRONG_PASS);
+        return Ok(());
+    };
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    if crate::db::modern::mysql::accounts::MySqlAccountRepository::is_suspended(&access, now_ms) {
+        // No verified PC/aLogin suspended-account opcode exists in the supplied
+        // corpus, so do not emit a mobile numeric response on the PC dialect.
+        out.send(spawn::sys_msg_frame("Tai khoan dang bi tam khoa."));
+        out.shutdown = true;
+        return Ok(());
+    }
+    conn.session.account_name = access.account_name.as_bytes().to_vec();
+    conn.session.gm_level = access.gm_level.clamp(0, 99);
+    repos.accounts().touch_login(id, now_ms).await?;
 
     // Player existence: an account with no character goes to the create-char
     // screen (and is NOT registered as online — the online registry only gains
     // an entry once a character exists).
-    if !db::players::load(pool, &mut conn.session).await? {
+    if !repos.sessions().load(id, &mut conn.session).await? {
         out.send(spawn::LOGIN_CREATE_CHAR);
         return Ok(());
     }
@@ -161,7 +184,10 @@ async fn login_db(
     conn.session.logined = true;
     conn.session.authed = true;
     let seq = spawn::build_logined_sequence_session(&conn.session);
-    out.outgoing.extend(seq.into_iter().map(crate::server::dispatcher::OutFrame::new));
+    out.outgoing.extend(
+        seq.into_iter()
+            .map(crate::server::dispatcher::OutFrame::new),
+    );
     // The legacy login tail purged the basic `Skill` rows (Id 0..9); the
     // shared schema requires the `player_id` predicate (§5.4 note 2). This
     // would run after the stats frame so the skill list still matches the

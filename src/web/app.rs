@@ -97,6 +97,9 @@ pub struct DashboardTemplate {
     pub online_list: Vec<OnlineEntry>,
     pub accounts: Vec<AccountRow>,
     pub npcs: Vec<NpcRow>,
+    pub assets: Vec<crate::data::loader::BinaryAssetMeta>,
+    pub guilds: Vec<db::domain::GuildRow>,
+    pub world_bosses: Vec<db::domain::WorldBossRow>,
     pub initial_logs: Vec<LogEvent>,
     /// Live MySQL connectivity color token: `green` / `light` / `dark` (Ch7 #22).
     pub db_state: String,
@@ -163,7 +166,10 @@ pub fn router(state: WebState) -> axum::Router {
             get(server_announce).post(server_announce),
         )
         .route("/api/accounts", get(list_accounts).post(create_account))
+        .route("/api/guilds", get(list_guilds))
+        .route("/api/world-bosses", get(list_world_bosses))
         .route("/api/npcs", get(list_npcs))
+        .route("/api/data/assets", get(list_data_assets))
         .route("/api/online", get(list_online))
         .route("/api/log/stream", get(log_stream))
         .route("/api/config/perexp", get(get_perexp).post(set_perexp))
@@ -190,9 +196,22 @@ async fn index(State(s): State<WebState>) -> Response {
     };
 
     let mut npcs = Vec::new();
+    let mut assets = Vec::new();
     if let Some(ref data) = s.data {
         npcs = NpcRow::from_data(data);
+        assets = data.binary_asset_metadata();
     }
+
+    let guilds = match &s.pool {
+        Some(pool) => db::domain::list_guilds(pool).await.unwrap_or_default(),
+        None => Vec::new(),
+    };
+    let world_bosses = match &s.pool {
+        Some(pool) => db::domain::list_world_bosses(pool)
+            .await
+            .unwrap_or_default(),
+        None => Vec::new(),
+    };
 
     let db_state = s.app.read().await.db_status.as_str().to_string();
 
@@ -204,6 +223,9 @@ async fn index(State(s): State<WebState>) -> Response {
         online_list,
         accounts,
         npcs,
+        assets,
+        guilds,
+        world_bosses,
         initial_logs,
         db_state,
     };
@@ -357,16 +379,52 @@ async fn create_account(
         &headers,
         || {
             format!(
-                "<tr><td><strong>{}</strong></td><td>{}</td><td>{}</td></tr>",
-                player_id, payload.pass1, payload.pass2
+                "<tr><td><strong>{}</strong></td><td>legacy_{}</td><td>0</td><td>no</td></tr>",
+                player_id, player_id
             )
         },
         json!({
             "player_id": player_id,
-            "pass1": payload.pass1,
-            "pass2": payload.pass2
+            "account": format!("legacy_{player_id}"),
+            "gm_level": 0,
+            "is_suspended": false
         }),
     )
+}
+
+async fn list_guilds(
+    State(s): State<WebState>,
+) -> Result<Json<Vec<db::domain::GuildRow>>, StatusCode> {
+    match s.pool {
+        Some(ref pool) => db::domain::list_guilds(pool)
+            .await
+            .map(Json)
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR),
+        None => Err(StatusCode::SERVICE_UNAVAILABLE),
+    }
+}
+
+async fn list_world_bosses(
+    State(s): State<WebState>,
+) -> Result<Json<Vec<db::domain::WorldBossRow>>, StatusCode> {
+    match s.pool {
+        Some(ref pool) => db::domain::list_world_bosses(pool)
+            .await
+            .map(Json)
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR),
+        None => Err(StatusCode::SERVICE_UNAVAILABLE),
+    }
+}
+
+async fn list_data_assets(
+    State(s): State<WebState>,
+) -> Json<Vec<crate::data::loader::BinaryAssetMeta>> {
+    let assets = s
+        .data
+        .as_ref()
+        .map(|data| data.binary_asset_metadata())
+        .unwrap_or_default();
+    Json(assets)
 }
 
 async fn list_npcs(State(s): State<WebState>) -> Json<Vec<NpcRow>> {

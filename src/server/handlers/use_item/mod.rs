@@ -77,7 +77,8 @@ impl UseCtx<'_> {
     /// Player stat update frame `F4440C000801` + type + sign + le32 + `00000000`
     /// (stat-emitting branches; Type_Status codes).
     pub fn stat(&mut self, ty: u8, val: i32) {
-        self.out.send(crate::server::handlers::stats::build_stat_update(ty, val));
+        self.out
+            .send(crate::server::handlers::stats::build_stat_update(ty, val));
     }
 
     /// Pet stat update frame `F4440F00080204` + le16(stt) + type + sign + le32
@@ -125,13 +126,21 @@ impl UseCtx<'_> {
     /// `F44404001709` + slot + used-count + `F4440200170F`.
     /// Returns true when the item was consumed.
     pub async fn consume(&mut self) -> bool {
-        let Some(pos) = self.conn.session.homdo.iter().position(|i| i.slot == self.slot) else {
+        let Some(pos) = self
+            .conn
+            .session
+            .homdo
+            .iter()
+            .position(|i| i.slot == self.slot)
+        else {
             return false;
         };
         if self.conn.session.homdo[pos].id == 0 {
             return false;
         }
-        let used = self.count.min(u16::from(self.conn.session.homdo[pos].count));
+        let used = self
+            .count
+            .min(u16::from(self.conn.session.homdo[pos].count));
         if used == 0 {
             return false;
         }
@@ -153,7 +162,8 @@ impl UseCtx<'_> {
                 persist::upsert_item(self.pool, pid, "homdo", &empty).await;
             }
         }
-        self.out.send(format!("F44404001709{:02X}{:02X}", slot, used));
+        self.out
+            .send(format!("F44404001709{:02X}{:02X}", slot, used));
         self.out.send("F4440200170F".to_string());
         true
     }
@@ -306,16 +316,19 @@ async fn dispatch(ctx: &mut UseCtx<'_>) {
             let stt = (1..=4)
                 .find(|s| !ctx.conn.session.pets.iter().any(|p| p.stt == *s))
                 .unwrap_or(1);
-            ctx.conn.session.pets.push(crate::server::session::PetState {
-                stt,
-                id: pet_id,
-                level: 1,
-                hp: 100,
-                hp_max: 100,
-                sp: 100,
-                sp_max: 100,
-                ..Default::default()
-            });
+            ctx.conn
+                .session
+                .pets
+                .push(crate::server::session::PetState {
+                    stt,
+                    id: pet_id,
+                    level: 1,
+                    hp: 100,
+                    hp_max: 100,
+                    sp: 100,
+                    sp_max: 100,
+                    ..Default::default()
+                });
             ctx.consume().await;
             return;
         }
@@ -323,8 +336,8 @@ async fn dispatch(ctx: &mut UseCtx<'_>) {
 
     // --- 3. Leader-only sleep item (46167). ---
     if ctx.id == 46167 {
-        let leader_ok = ctx.conn.session.id == ctx.conn.session.id_leader
-            || ctx.conn.session.id_leader == 0;
+        let leader_ok =
+            ctx.conn.session.id == ctx.conn.session.id_leader || ctx.conn.session.id_leader == 0;
         if leader_ok {
             ctx.sleep().await;
             ctx.consume().await;
@@ -423,15 +436,11 @@ async fn potion(ctx: &mut UseCtx<'_>) {
             if hp_amt > 0 {
                 if ctx.conn.session.hp < ctx.conn.session.hp_max {
                     let new = (i64::from(ctx.conn.session.hp) + hp_amt)
-                        .min(i64::from(ctx.conn.session.hp_max)) as u16;
+                        .min(i64::from(ctx.conn.session.hp_max))
+                        as u16;
                     ctx.conn.session.hp = new;
-                    persist::update_player(
-                        ctx.pool,
-                        ctx.conn.session.id,
-                        "Hp",
-                        i64::from(new),
-                    )
-                    .await;
+                    persist::update_player(ctx.pool, ctx.conn.session.id, "Hp", i64::from(new))
+                        .await;
                 }
                 // Always re-broadcast the Hp stat (current or new value).
                 ctx.stat(0x19, i32::from(ctx.conn.session.hp));
@@ -440,15 +449,11 @@ async fn potion(ctx: &mut UseCtx<'_>) {
             if sp_amt > 0 {
                 if ctx.conn.session.sp < ctx.conn.session.sp_max {
                     let new = (i64::from(ctx.conn.session.sp) + sp_amt)
-                        .min(i64::from(ctx.conn.session.sp_max)) as u16;
+                        .min(i64::from(ctx.conn.session.sp_max))
+                        as u16;
                     ctx.conn.session.sp = new;
-                    persist::update_player(
-                        ctx.pool,
-                        ctx.conn.session.id,
-                        "Sp",
-                        i64::from(new),
-                    )
-                    .await;
+                    persist::update_player(ctx.pool, ctx.conn.session.id, "Sp", i64::from(new))
+                        .await;
                 }
                 ctx.stat(0x1A, i32::from(ctx.conn.session.sp));
                 touched = true;
@@ -470,7 +475,8 @@ async fn potion(ctx: &mut UseCtx<'_>) {
             if hp_amt > 0 {
                 if ctx.conn.session.pets[pet_idx].hp < ctx.conn.session.pets[pet_idx].hp_max {
                     let new = (i64::from(ctx.conn.session.pets[pet_idx].hp) + hp_amt)
-                        .min(i64::from(ctx.conn.session.pets[pet_idx].hp_max)) as u16;
+                        .min(i64::from(ctx.conn.session.pets[pet_idx].hp_max))
+                        as u16;
                     ctx.conn.session.pets[pet_idx].hp = new;
                     persist::upsert_pet(
                         ctx.pool,
@@ -485,7 +491,8 @@ async fn potion(ctx: &mut UseCtx<'_>) {
             if sp_amt > 0 {
                 if ctx.conn.session.pets[pet_idx].sp < ctx.conn.session.pets[pet_idx].sp_max {
                     let new = (i64::from(ctx.conn.session.pets[pet_idx].sp) + sp_amt)
-                        .min(i64::from(ctx.conn.session.pets[pet_idx].sp_max)) as u16;
+                        .min(i64::from(ctx.conn.session.pets[pet_idx].sp_max))
+                        as u16;
                     ctx.conn.session.pets[pet_idx].sp = new;
                     persist::upsert_pet(
                         ctx.pool,
@@ -499,8 +506,8 @@ async fn potion(ctx: &mut UseCtx<'_>) {
             }
             if fai_amt > 0 {
                 if ctx.conn.session.pets[pet_idx].fai < 100 {
-                    let new = (i64::from(ctx.conn.session.pets[pet_idx].fai) + fai_amt).min(100)
-                        as u16;
+                    let new =
+                        (i64::from(ctx.conn.session.pets[pet_idx].fai) + fai_amt).min(100) as u16;
                     ctx.conn.session.pets[pet_idx].fai = new;
                     persist::upsert_pet(
                         ctx.pool,

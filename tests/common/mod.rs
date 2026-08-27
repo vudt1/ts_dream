@@ -261,7 +261,7 @@ pub fn all_scenarios() -> Vec<Scenario<'static>> {
                 c.session.hpx = 0;
             },
         ),
-Scenario::new(
+        Scenario::new(
             "17-hotkey",
             game_data(),
             // C2S op 0x28 sub 0x01: data[7..8]=skill (0x2711), data[9]=slot 3.

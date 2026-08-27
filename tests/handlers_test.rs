@@ -8,17 +8,13 @@ use ts_dream::battle::rng::DotNetRandom;
 use ts_dream::battle::service::BattleService;
 use ts_dream::data::loader::GameData;
 use ts_dream::data::loaders::{EveCondition, EveNpcPlacement, NpcEventData, SceneEveData};
-use ts_dream::data::tables::{
-    BattleGate, Item, Npc, NpcOnMap, QuestDef, QuestResult, Skill, Warp,
-};
+use ts_dream::data::tables::{BattleGate, Item, Npc, NpcOnMap, QuestDef, QuestResult, Skill, Warp};
 use ts_dream::protocol::encoder;
 use ts_dream::server::auto_save;
 use ts_dream::server::dispatcher::{test_ctx, HandleOutcome};
 use ts_dream::server::handlers::battle::{handle_battle, handle_battle_command};
+use ts_dream::server::handlers::character::{apply_to_session, parse_create, CreateCharData};
 use ts_dream::server::handlers::chat::handle_chat;
-use ts_dream::server::handlers::character::{
-    apply_to_session, parse_create, CreateCharData,
-};
 use ts_dream::server::handlers::inventory::handle_inventory;
 use ts_dream::server::handlers::npc_event::{self, NpcTrigger};
 use ts_dream::server::handlers::party::handle_party;
@@ -226,10 +222,7 @@ async fn trade_system_begin_cancel_lifecycle() {
 #[tokio::test]
 async fn trade_system_begin_with_offline_partner_is_offline() {
     let a = register(700_013);
-    assert_eq!(
-        TradeSystem::begin(a, 700_140).await,
-        TradeOutcome::Offline
-    );
+    assert_eq!(TradeSystem::begin(a, 700_140).await, TradeOutcome::Offline);
     unregister(&[a]);
 }
 
@@ -275,7 +268,10 @@ async fn trade_system_accept_swaps_gold_and_items_atomically() {
     assert_eq!(na.gold, 10_000);
     assert_eq!(nb.gold, 10_000);
     // Items swapped: a now holds the row that came from b's bag and vice versa.
-    assert_eq!(na.homdo.iter().find(|i| i.id == 1001).map(|i| i.texp), Some(7));
+    assert_eq!(
+        na.homdo.iter().find(|i| i.id == 1001).map(|i| i.texp),
+        Some(7)
+    );
     assert!(!na.trade.active);
     assert!(!nb.trade.active);
     // Registry reflects the settled sessions.
@@ -347,7 +343,10 @@ fn fingerprint_changes_on_any_persisted_mutation() {
     });
     assert_ne!(auto_save::fingerprint(&s), after_gold);
     // Stable across clones (deterministic field order).
-    assert_eq!(auto_save::fingerprint(&s.clone()), auto_save::fingerprint(&s));
+    assert_eq!(
+        auto_save::fingerprint(&s.clone()),
+        auto_save::fingerprint(&s)
+    );
 }
 
 #[tokio::test]
@@ -435,9 +434,7 @@ fn npc_event_resolves_matching_chain_into_event_session() {
 
 #[test]
 fn npc_event_auto_chain_requires_depth_and_map_consistency() {
-    use ts_dream::eve::auto_chain::{
-        AutoChainResult, EventPhase, EventSession, MAX_CHAIN_DEPTH,
-    };
+    use ts_dream::eve::auto_chain::{AutoChainResult, EventPhase, EventSession, MAX_CHAIN_DEPTH};
 
     let mut session = Session::new();
     session.map_id = 9001;
@@ -671,7 +668,10 @@ async fn join_battle_sub4_joins_and_sends_trailer() {
             got_trailer = true;
         }
     }
-    assert!(got_trailer, "expected battle trailer F44403000B0A01 on join");
+    assert!(
+        got_trailer,
+        "expected battle trailer F44403000B0A01 on join"
+    );
 }
 
 /// G1: op 0x32 sub2 (use-item heal) within a battle. The handler must
@@ -746,7 +746,10 @@ fn parse_maps_color_and_stats_by_offset() {
     let d = parse_create(&p).expect("valid payload");
     assert_eq!(d.thuoctinh, 3, "thuoctinh sits after the 8 color bytes");
     assert_eq!(d.color_hex, "000000000000AB00");
-    assert_eq!((d.int1, d.atk, d.def, d.hpx, d.spx, d.agi), (7, 8, 9, 10, 11, 12));
+    assert_eq!(
+        (d.int1, d.atk, d.def, d.hpx, d.spx, d.agi),
+        (7, 8, 9, 10, 11, 12)
+    );
     assert_eq!(d.pass1, vec![0x41, 0x42]);
     assert_eq!(d.pass2, vec![0x43, 0x44]);
 }
@@ -801,8 +804,7 @@ async fn map_chat_echoes_self() {
     let payload = b"HELLO";
     let data = GameData::default();
     let service = BattleService::new(Arc::new(GameData::default()));
-    let mut ctx =
-        test_ctx(&mut conn, &data, &service, &mut out, 2, payload);
+    let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 2, payload);
     handle_chat(&mut ctx).await;
     assert_eq!(out.outgoing, vec!["F4440B000202E193040048454C4C4F"]);
 }
@@ -815,8 +817,7 @@ async fn long_chat_dropped() {
     let payload = vec![b'X'; 61];
     let data = GameData::default();
     let service = BattleService::new(Arc::new(GameData::default()));
-    let mut ctx =
-        test_ctx(&mut conn, &data, &service, &mut out, 2, &payload);
+    let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 2, &payload);
     handle_chat(&mut ctx).await;
     assert!(out.outgoing.is_empty());
 }
@@ -833,8 +834,7 @@ async fn global_chat_item_selects_0201() {
     let mut out = HandleOutcome::default();
     let data = GameData::default();
     let service = BattleService::new(Arc::new(GameData::default()));
-    let mut ctx =
-        test_ctx(&mut conn, &data, &service, &mut out, 2, b"HI");
+    let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 2, b"HI");
     handle_chat(&mut ctx).await;
     assert_eq!(out.outgoing.len(), 1);
     assert!(out.outgoing[0].starts_with("F44408000201"));
@@ -850,8 +850,7 @@ async fn slash_where_returns_sysmsg() {
     let mut out = HandleOutcome::default();
     let data = GameData::default();
     let service = BattleService::new(Arc::new(GameData::default()));
-    let mut ctx =
-        test_ctx(&mut conn, &data, &service, &mut out, 2, b"/where");
+    let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 2, b"/where");
     handle_chat(&mut ctx).await;
     assert_eq!(out.outgoing.len(), 1);
     assert!(out.outgoing[0].contains("020B"));
@@ -867,14 +866,7 @@ async fn unknown_slash_silently_dropped() {
     let mut out = HandleOutcome::default();
     let data = GameData::default();
     let service = BattleService::new(Arc::new(GameData::default()));
-    let mut ctx = test_ctx(
-        &mut conn,
-        &data,
-        &service,
-        &mut out,
-        2,
-        b"/additem 10001,2",
-    );
+    let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 2, b"/additem 10001,2");
     handle_chat(&mut ctx).await;
     assert!(
         out.outgoing.is_empty(),
@@ -904,8 +896,7 @@ async fn sleep_heals_self_and_pets() {
     let mut out = HandleOutcome::default();
     let data = GameData::default();
     let service = BattleService::new(Arc::new(GameData::default()));
-    let mut ctx =
-        test_ctx(&mut conn, &data, &service, &mut out, 2, b"/sleep");
+    let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 2, b"/sleep");
     handle_chat(&mut ctx).await;
     assert_eq!(conn.session.hp, 100);
     assert_eq!(conn.session.sp, 50);
@@ -927,8 +918,7 @@ async fn sleep_skips_when_in_battle() {
     let mut out = HandleOutcome::default();
     let data = GameData::default();
     let service = BattleService::new(Arc::new(GameData::default()));
-    let mut ctx =
-        test_ctx(&mut conn, &data, &service, &mut out, 2, b"/sleep");
+    let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 2, b"/sleep");
     handle_chat(&mut ctx).await;
     assert!(out.outgoing.is_empty());
     assert_eq!(conn.session.hp, 10);
@@ -949,14 +939,7 @@ async fn openhotel_builds_stable_frames() {
     let mut out = HandleOutcome::default();
     let data = GameData::default();
     let service = BattleService::new(Arc::new(GameData::default()));
-    let mut ctx = test_ctx(
-        &mut conn,
-        &data,
-        &service,
-        &mut out,
-        2,
-        b"/openhotel",
-    );
+    let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 2, b"/openhotel");
     handle_chat(&mut ctx).await;
     let joined: String = out.outgoing.iter().map(|f| f.frame.as_str()).collect();
     assert!(joined.contains("1F06"));
@@ -973,17 +956,13 @@ async fn openbank_uses_bank_gold() {
     let mut out = HandleOutcome::default();
     let data = GameData::default();
     let service = BattleService::new(Arc::new(GameData::default()));
-    let mut ctx = test_ctx(
-        &mut conn,
-        &data,
-        &service,
-        &mut out,
-        2,
-        b"/openbank",
-    );
+    let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 2, b"/openbank");
     handle_chat(&mut ctx).await;
     // 4321 = 0x10E1 → LE bytes E1 10 00 00
-    assert!(out.outgoing.iter().any(|f| f.contains("1D04") && f.contains("E1100000")));
+    assert!(out
+        .outgoing
+        .iter()
+        .any(|f| f.contains("1D04") && f.contains("E1100000")));
 }
 
 #[tokio::test]
@@ -997,8 +976,7 @@ async fn whisper_builds_frame_with_recipient_id() {
     payload.extend_from_slice(b"hey");
     let data = GameData::default();
     let service = BattleService::new(Arc::new(GameData::default()));
-    let mut ctx =
-        test_ctx(&mut conn, &data, &service, &mut out, 3, &payload);
+    let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 3, &payload);
     handle_chat(&mut ctx).await;
     assert_eq!(out.outgoing.len(), 1);
     assert!(out.outgoing[0].starts_with("F44409000203"));
@@ -1013,14 +991,7 @@ async fn party_chat_frame_uses_0205() {
     let mut out = HandleOutcome::default();
     let data = GameData::default();
     let service = BattleService::new(Arc::new(GameData::default()));
-    let mut ctx = test_ctx(
-        &mut conn,
-        &data,
-        &service,
-        &mut out,
-        5,
-        b"hello party",
-    );
+    let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 5, b"hello party");
     handle_chat(&mut ctx).await;
     assert_eq!(out.outgoing.len(), 1);
     assert!(out.outgoing[0].starts_with("F44411000205"));
@@ -1200,10 +1171,7 @@ async fn pickup_adds_item_to_homdo() {
     assert_eq!(conn.session.homdo.len(), 1);
     assert_eq!(conn.session.homdo[0].id, 1001);
     assert_eq!(conn.session.homdo[0].count, 2);
-    assert!(
-        map_drops::get(7702, 1).is_none(),
-        "drop consumed by pickup"
-    );
+    assert!(map_drops::get(7702, 1).is_none(), "drop consumed by pickup");
     assert!(out.outgoing.iter().any(|f| f.contains("1702")));
     assert!(out.outgoing.iter().any(|f| f.contains("1706")));
     map_drops::clear_all();
@@ -1280,10 +1248,7 @@ async fn reborn_resets_stats_retains_special_skills() {
     assert_eq!(conn.session.skill_point, 25); // 24 + (125-120)/5 = 25
     assert_eq!(conn.session.skills.len(), 1);
     assert_eq!(conn.session.skills[0], (10016, 10)); // special skill retained
-    assert!(out
-        .outgoing
-        .iter()
-        .any(|f| f.frame == "F44402002C01"));
+    assert!(out.outgoing.iter().any(|f| f.frame == "F44402002C01"));
     assert!(out
         .outgoing
         .iter()
@@ -1425,7 +1390,10 @@ async fn sub7_roster_to_stable_guards_active() {
     // Active pet cannot be stored: red message + `F44402001F09`, no move.
     assert!(out.outgoing.iter().any(|f| f.ends_with("1F09")));
     assert!(
-        conn.session.pets.iter().any(|p| p.id == 18001 && p.stt == 1),
+        conn.session
+            .pets
+            .iter()
+            .any(|p| p.id == 18001 && p.stt == 1),
         "active pet must not move to the stable"
     );
 }
@@ -1439,7 +1407,10 @@ async fn sub7_non_active_roster_to_stable_moves() {
     handle_pet_actions(&mut ctx).await;
     assert!(out.outgoing.iter().any(|f| f.starts_with("F44407000F02")));
     assert!(
-        conn.session.pets.iter().any(|p| p.id == 18001 && p.stt >= 5),
+        conn.session
+            .pets
+            .iter()
+            .any(|p| p.id == 18001 && p.stt >= 5),
         "roster pet stored into the stable"
     );
 }
@@ -2830,7 +2801,10 @@ fn test_game_points_width_and_gate() {
     let mut out = HandleOutcome::default();
     let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 1, &[]);
     handle_game_points(&mut ctx);
-    assert_eq!(out.outgoing[0], "F4441200230488130000000000000000000000000000");
+    assert_eq!(
+        out.outgoing[0],
+        "F4441200230488130000000000000000000000000000"
+    );
 
     // Sub 2 must be silent.
     let mut out2 = HandleOutcome::default();
@@ -3063,7 +3037,10 @@ async fn accepted_trade_exchanges_both_players_items_and_gold() {
         items: partner.homdo.clone(),
         ..Default::default()
     };
-    online_sessions().lock().unwrap().insert(partner.id, partner);
+    online_sessions()
+        .lock()
+        .unwrap()
+        .insert(partner.id, partner);
     let mut out = HandleOutcome::default();
     let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 3, &[1]);
     handle_trade(&mut ctx).await;
@@ -3105,7 +3082,10 @@ async fn full_trade_destination_is_reported_without_losing_source_item() {
         accepted: true,
         ..Default::default()
     };
-    online_sessions().lock().unwrap().insert(partner.id, partner);
+    online_sessions()
+        .lock()
+        .unwrap()
+        .insert(partner.id, partner);
     let mut out = HandleOutcome::default();
     let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 3, &[1]);
     handle_trade(&mut ctx).await;
@@ -3122,7 +3102,10 @@ async fn transfer_uses_requested_count_and_updates_recipient() {
     conn.session.homdo = vec![storage_item(3, 3003, 5)];
     let mut recipient = Session::new();
     recipient.id = 390_022;
-    online_sessions().lock().unwrap().insert(recipient.id, recipient);
+    online_sessions()
+        .lock()
+        .unwrap()
+        .insert(recipient.id, recipient);
     let mut payload = vec![0; 4];
     payload.extend_from_slice(&390_022u32.to_le_bytes());
     payload.extend_from_slice(&[3, 2]);
@@ -3214,7 +3197,10 @@ async fn accepted_pet_trade_moves_ownership_and_gold() {
         pets: vec![1],
         ..Default::default()
     };
-    online_sessions().lock().unwrap().insert(partner.id, partner);
+    online_sessions()
+        .lock()
+        .unwrap()
+        .insert(partner.id, partner);
     let mut out = HandleOutcome::default();
     let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 12, &[1]);
     handle_trade(&mut ctx).await;
@@ -3362,11 +3348,7 @@ async fn point_book_adds_point_and_keeps_item() {
     use_item_rng(&mut conn, &[1, 1], &mut out, None, &data, &mut rng).await;
 
     assert_eq!(conn.session.point, 1);
-    assert_eq!(
-        conn.session.homdo.len(),
-        1,
-        "point book is not consumed"
-    );
+    assert_eq!(conn.session.homdo.len(), 1, "point book is not consumed");
     assert!(out
         .outgoing
         .iter()

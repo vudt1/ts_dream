@@ -1,7 +1,7 @@
 //! In-memory static data tables (Chapter 3 §3.2/§3.3).
 
-use crate::encoding;
 pub use crate::data::loaders::*;
+use crate::encoding;
 
 /// An NPC record (`Data_Npcs`), from Npcs.txt.
 #[derive(Debug, Clone, Default)]
@@ -91,6 +91,145 @@ pub struct Skill {
     pub combo: i64,
     pub delay: i64,
     pub troi_buff: i64,
+}
+
+/// Scene configuration metadata loaded from mobile-compatible SceneSet.Dat.
+#[derive(Debug, Clone, Default)]
+pub struct SceneSetDef {
+    pub name_id: u32,
+    pub kind: u8,
+    pub max_player: u16,
+    pub limit1: u8,
+    pub limit2: u8,
+    pub effect: u8,
+    pub min_lv: u8,
+    pub max_lv: u8,
+    pub view_setting: u8,
+    pub sub_id: u8,
+    pub limit3: u8,
+}
+
+/// Leaderboard metadata loaded from mobile-compatible LeaderboardInfo.Dat.
+#[derive(Debug, Clone, Default)]
+pub struct LeaderboardDef {
+    pub id: u8,
+    pub main_tag_text: u32,
+    pub sub_tag_text: u32,
+    pub score_text: u32,
+    pub name_text: u32,
+    pub award_id: u8,
+    pub score_format: String,
+    pub state_enable: bool,
+    pub rank_award_flag_ids: [u16; 3],
+    pub bit_function: u8,
+}
+
+/// Dispatch task metadata loaded from mobile-compatible Dispatch.Dat.
+#[derive(Debug, Clone, Default)]
+pub struct DispatchDef {
+    pub min_lv: u8,
+    pub award_id: u16,
+    pub exp_kind: u8,
+    pub exp: u32,
+}
+
+/// Dispatch bonus metadata loaded from mobile-compatible DispatchBonus.Dat.
+#[derive(Debug, Clone, Default)]
+pub struct DispatchBonusDef {
+    pub condition_kind: u8,
+    pub condition_value: u8,
+    pub effect_index: u8,
+    pub effect_kind: u8,
+    pub effect_value: u16,
+    pub effect_content: u32,
+}
+
+/// Achievement metadata loaded from mobile-compatible AchievementData.Dat.
+#[derive(Debug, Clone, Default)]
+pub struct AchievementDef {
+    pub id: u16,
+    pub main_tag: u8,
+    pub sub_tag: u8,
+    pub sort_id: u8,
+    pub show_kind: u8,
+    pub score: u8,
+    pub condition_kind: u8,
+    pub condition_kind_value: u32,
+    pub condition_opr: u8,
+    pub condition_value: u32,
+    pub item_id: u16,
+    pub item_count: u8,
+    pub complete_flag: u16,
+    pub get_flag: u16,
+    pub channel: u8,
+    pub channel_content: u32,
+}
+
+/// One attribute upgrade row from mobile-compatible MountsGrow.Dat.
+#[derive(Debug, Clone, Default)]
+pub struct MountAttributeGrow {
+    pub add_value: u16,
+    pub up_item_id: u16,
+    pub up_item_count: u16,
+}
+
+/// Mount level-growth metadata loaded from mobile-compatible MountsGrow.Dat.
+#[derive(Debug, Clone, Default)]
+pub struct MountGrowDef {
+    pub speed: u8,
+    pub up_item_id: u16,
+    pub up_item_count: u8,
+    pub up_money: u32,
+    pub attributes: Vec<MountAttributeGrow>,
+}
+
+/// Mount metadata loaded from mobile-compatible Mounts.Dat.
+#[derive(Debug, Clone, Default)]
+pub struct MountDef {
+    pub npc_id: u16,
+    pub flag_id: u16,
+    pub source: u32,
+    pub scale: f32,
+}
+
+/// Mission-mark metadata loaded from mobile-compatible Mark.Dat.
+#[derive(Debug, Clone, Default)]
+pub struct MarkDef {
+    pub name: String,
+    pub kind: u8,
+    pub bit_id: u16,
+    pub gain_way: u8,
+    pub description: String,
+}
+
+/// Rich binary skill definition loaded from mobile-compatible Skill.Dat.
+#[derive(Debug, Clone, Default)]
+pub struct BinarySkillDef {
+    pub id: u16,
+    pub name: String,
+    pub kind: u8,
+    pub require_sp: u16,
+    pub element: u8,
+    pub numerical: u32,
+    pub attribute: u8,
+    pub level: u8,
+    pub fight_way: u8,
+    pub fight_area: u8,
+    pub round: u8,
+    pub spend_second: u8,
+    pub hit_status: u8,
+    pub how_much_times: u8,
+    pub limit_lv: u8,
+    pub learn_point: u8,
+    pub level_up_point: u8,
+    pub max_lv: u8,
+    pub pre_skills: Vec<u16>,
+    pub atk_kind: u16,
+    pub turn_kind: u8,
+    pub learn_limit: u8,
+    pub use_limit: u16,
+    pub fight_way_grow_type: u16,
+    pub description: String,
 }
 
 /// A warp record (`Data_Warps`), keyed `(map1, warpid)`.

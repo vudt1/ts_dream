@@ -100,12 +100,14 @@ impl PetRepository for MySqlPetRepository<'_> {
         storage_type: PetStorageType,
         slot: u16,
     ) -> RepoResult<()> {
-        sqlx::query("DELETE FROM character_pets WHERE character_id = ? AND storage_type = ? AND slot = ?")
-            .bind(character_id)
-            .bind(storage_type.value())
-            .bind(slot)
-            .execute(self.pool)
-            .await?;
+        sqlx::query(
+            "DELETE FROM character_pets WHERE character_id = ? AND storage_type = ? AND slot = ?",
+        )
+        .bind(character_id)
+        .bind(storage_type.value())
+        .bind(slot)
+        .execute(self.pool)
+        .await?;
         Ok(())
     }
 }

@@ -20,7 +20,9 @@ pub mod group;
 pub mod resolver;
 pub mod state;
 
-pub use auto_chain::{AutoChainResult, EventPhase, EventSession, EveAutoChainEngine, MAX_CHAIN_DEPTH};
+pub use auto_chain::{
+    AutoChainResult, EveAutoChainEngine, EventPhase, EventSession, MAX_CHAIN_DEPTH,
+};
 pub use evaluator::{compare_step, evaluate};
 pub use group::apply_group_data;
 pub use resolver::{build_chains, resolve, resolve_event, ChainResolveResult};

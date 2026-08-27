@@ -1,13 +1,77 @@
 //! `characters` + `character_money` repository.
 
 use crate::db::modern::model::Money;
-use crate::db::modern::traits::{
-    CharacterRepository, CharacterSeed, CharacterSummary, RepoResult,
-};
+use crate::db::modern::traits::{CharacterRepository, CharacterSeed, CharacterSummary, RepoResult};
 use sqlx::{MySqlPool, Row};
 
 pub struct MySqlCharacterRepository<'a> {
     pub pool: &'a MySqlPool,
+}
+
+impl MySqlCharacterRepository<'_> {
+    pub async fn create(
+        &self,
+        account_id: i64,
+        name: &[u8],
+        seed: &CharacterSeed,
+    ) -> RepoResult<i64> {
+        let mut tx = self.pool.begin().await?;
+        let row = sqlx::query(
+            "INSERT INTO characters (account_id, name, level, sex, hair, element, map_id, map_x, map_y) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(account_id).bind(name).bind(seed.level).bind(seed.sex).bind(seed.hair)
+        .bind(seed.element).bind(seed.map_id).bind(seed.map_x).bind(seed.map_y)
+        .execute(&mut *tx).await?;
+        let id = row.last_insert_id() as i64;
+        sqlx::query("INSERT INTO character_money (character_id) VALUES (?)")
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(id)
+    }
+
+    pub async fn find_id_by_name(&self, name: &[u8]) -> RepoResult<Option<i64>> {
+        sqlx::query_scalar::<_, i64>("SELECT id FROM characters WHERE HEX(name) = HEX(?) LIMIT 1")
+            .bind(name)
+            .fetch_optional(self.pool)
+            .await
+    }
+
+    pub async fn delete(&self, character_id: i64) -> RepoResult<()> {
+        let mut tx = self.pool.begin().await?;
+        for table in [
+            "character_money",
+            "inventories",
+            "character_pets",
+            "character_skills",
+            "character_hotkeys",
+            "character_missions",
+            "character_mission_flags",
+            "character_bit_flags",
+            "character_completed_events",
+            "friends",
+        ] {
+            sqlx::query(&format!("DELETE FROM {table} WHERE character_id = ?"))
+                .bind(character_id)
+                .execute(&mut *tx)
+                .await?;
+        }
+        sqlx::query("DELETE FROM friends WHERE friend_id = ?")
+            .bind(character_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("DELETE FROM mails WHERE receiver_id = ? OR sender_id = ?")
+            .bind(character_id)
+            .bind(character_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("DELETE FROM characters WHERE id = ?")
+            .bind(character_id)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await
+    }
 }
 
 /// The canonical money-row read; shared with the transaction layer so the
@@ -30,12 +94,7 @@ where
 }
 
 impl CharacterRepository for MySqlCharacterRepository<'_> {
-    async fn create(
-        &self,
-        account_id: i64,
-        name: &[u8],
-        seed: &CharacterSeed,
-    ) -> RepoResult<i64> {
+    async fn create(&self, account_id: i64, name: &[u8], seed: &CharacterSeed) -> RepoResult<i64> {
         let mut tx = self.pool.begin().await?;
 
         let row = sqlx::query(

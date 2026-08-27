@@ -128,7 +128,14 @@ pub struct PlayerShopState {
 /// Per-connection game session state.
 #[derive(Debug, Clone)]
 pub struct Session {
+    /// Network/account identifier from the PC protocol.
     pub id: u32,
+    /// Mobile-aligned account display/login name. The PC wire still uses `id`.
+    pub account_name: Vec<u8>,
+    /// Server-authoritative GM level; zero is a normal player.
+    pub gm_level: i32,
+    /// Modern `characters.id`; distinct from `id` after the 0002 cutover.
+    pub db_character_id: i64,
     pub logined: bool,
     pub authed: bool,
     pub idtalking: i32,
@@ -252,6 +259,9 @@ impl Default for Session {
         let sp_max = get_sp_max(0, 0, 1, 0) as u16;
         Self {
             id: 0,
+            account_name: Vec::new(),
+            gm_level: 0,
+            db_character_id: 0,
             logined: false,
             authed: false,
             idtalking: 0,

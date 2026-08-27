@@ -81,7 +81,11 @@ fn select_member(group_data: &EveGroupData, rng: &mut DotNetRandom) -> i32 {
         return KEEP_ALL;
     }
 
-    let total_weight: i32 = group_data.probability_rate_ay.iter().map(|&w| i32::from(w)).sum();
+    let total_weight: i32 = group_data
+        .probability_rate_ay
+        .iter()
+        .map(|&w| i32::from(w))
+        .sum();
     if total_weight <= 0 {
         // All-zero weights mean "designed as one unit" - keep everything.
         return KEEP_ALL;

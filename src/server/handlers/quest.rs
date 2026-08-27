@@ -180,16 +180,12 @@ pub fn evaluate_requirements(conn: &Conn, quest: &crate::data::tables::QuestDef)
     // Level requirement.
     if let Some((value, op)) = quest.require_level {
         if !cmp_op(i64::from(conn.session.level), value, op) {
-            return Some(
-                "F444110014010000000101070000000000000077A7".to_string(),
-            );
+            return Some("F444110014010000000101070000000000000077A7".to_string());
         }
     }
     if let Some((value, op)) = quest.require_reborn {
         if !cmp_op(i64::from(conn.session.reborn), value, op) {
-            return Some(
-                "F444110014010000000101070000000000000077A7".to_string(),
-            );
+            return Some("F444110014010000000101070000000000000077A7".to_string());
         }
     }
     if quest.require_thuoctinh > 0 && conn.session.thuoctinh != quest.require_thuoctinh as u8 {
@@ -203,9 +199,7 @@ pub fn evaluate_requirements(conn: &Conn, quest: &crate::data::tables::QuestDef)
         let done = conn.session.completed_quests.contains(&(map, npc))
             || (warp > 0 && conn.session.completed_quests.contains(&(map, warp)));
         if !done {
-            return Some(
-                "F444110014010000000101070000000000000077A7".to_string(),
-            );
+            return Some("F444110014010000000101070000000000000077A7".to_string());
         }
     }
     // Require wears: one equipped item (`trangbi`) per `(itemId, playerOrPet)`;
@@ -217,9 +211,7 @@ pub fn evaluate_requirements(conn: &Conn, quest: &crate::data::tables::QuestDef)
             .iter()
             .any(|i| i.id == item_id as u16 && i.count > 0);
         if !worn {
-            return Some(
-                "F444110014010000000101070000000000000077A7".to_string(),
-            );
+            return Some("F444110014010000000101070000000000000077A7".to_string());
         }
     }
     // Require items to possess at entry: the
@@ -236,9 +228,7 @@ pub fn evaluate_requirements(conn: &Conn, quest: &crate::data::tables::QuestDef)
             .map(|i| u32::from(i.count))
             .sum();
         if have < count as u32 {
-            return Some(
-                "F444110014010000000101070000000000000077A7".to_string(),
-            );
+            return Some("F444110014010000000101070000000000000077A7".to_string());
         }
     }
     None
@@ -376,7 +366,8 @@ fn battle_quest_win_impl(
             continue;
         }
         let _ = session.add_homdo_item({
-            let mut it = crate::server::inventory::from_template(data, item_id as u16, count.min(255) as u8);
+            let mut it =
+                crate::server::inventory::from_template(data, item_id as u16, count.min(255) as u8);
             it.doben = 100;
             it
         });
@@ -385,7 +376,11 @@ fn battle_quest_win_impl(
                 if let Some(m) = member(i64::from(*mem)) {
                     if let Ok(mut s) = m.try_write() {
                         let _ = s.add_homdo_item({
-                            let mut it = crate::server::inventory::from_template(data, item_id as u16, count.min(255) as u8);
+                            let mut it = crate::server::inventory::from_template(
+                                data,
+                                item_id as u16,
+                                count.min(255) as u8,
+                            );
                             it.doben = 100;
                             it
                         });
@@ -729,19 +724,15 @@ pub fn generate_daily_quest(conn: &mut Conn, data: &GameData, out: &mut HandleOu
             _ => None,
         };
         if let Some(medal_item) = medal {
-            let has = conn
-                .session
-                .homdo
-                .iter()
-                .any(|i| i.id == medal_item as u16);
+            let has = conn.session.homdo.iter().any(|i| i.id == medal_item as u16);
             if has {
                 conn.session
-                    .add_homdo_item(crate::server::inventory::from_template(
-                        data,
-                        65517,
-                        10,
-                    ));
-                crate::server::inventory::remove_item(&mut conn.session.homdo, medal_item as u16, 1);
+                    .add_homdo_item(crate::server::inventory::from_template(data, 65517, 10));
+                crate::server::inventory::remove_item(
+                    &mut conn.session.homdo,
+                    medal_item as u16,
+                    1,
+                );
                 out.send(conn.session.dump_homdo());
                 end_talk(conn, out);
             }
@@ -784,7 +775,12 @@ pub fn generate_daily_quest(conn: &mut Conn, data: &GameData, out: &mut HandleOu
 /// Pet-reborn NPC exceptions — keyed `(map_id, map_object_id)` per the ticket
 /// 19 review: `55002/59102/59011` are **map ids**, not template ids; the right
 /// keys are `(55002,3)`, `(59102,1)`, `(59011,1)` (map 12711's pet shop rows).
-pub fn handle_pet_reborn_npc(conn: &mut Conn, map_id: i64, map_object_id: i64, out: &mut HandleOutcome) -> bool {
+pub fn handle_pet_reborn_npc(
+    conn: &mut Conn,
+    map_id: i64,
+    map_object_id: i64,
+    out: &mut HandleOutcome,
+) -> bool {
     if !is_pet_reborn_key(map_id, map_object_id) {
         return false;
     }

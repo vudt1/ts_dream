@@ -44,17 +44,9 @@ pub async fn handle_pk_war(ctx: &mut OpcodeCtx<'_>) {
         }
         2 => {
             conn.session.tham_chien = flag;
-            db::persist::update_player(
-                ctx.env.pool,
-                conn.session.id,
-                "ThamChien",
-                i64::from(flag),
-            )
-            .await;
-            out.send(format!(
-                "F44404002102{:02X}{:02X}",
-                conn.session.pk, flag
-            ));
+            db::persist::update_player(ctx.env.pool, conn.session.id, "ThamChien", i64::from(flag))
+                .await;
+            out.send(format!("F44404002102{:02X}{:02X}", conn.session.pk, flag));
         }
         _ => {}
     }
@@ -95,6 +87,26 @@ pub fn handle_rank(ctx: &mut OpcodeCtx) {
 pub async fn handle_gm_shop(ctx: &mut OpcodeCtx<'_>) {
     let conn = &mut ctx.conn;
     let out = &mut ctx.out;
+    if ctx.env.profile == crate::protocol::profile::ProtocolProfile::PcALogin
+        && (!conn.session.authed
+            || !conn.session.logined
+            || conn.session.gm_level <= crate::server::gm::PLAYER_GM_LEVEL)
+    {
+        out.send(sys_msg_frame("Ban khong co quyen GM."));
+        if let Some(pool) = ctx.env.pool {
+            let repo = crate::db::modern::mysql::accounts::MySqlAccountRepository { pool };
+            let _ = repo
+                .write_gm_audit(
+                    i64::from(conn.session.id),
+                    conn.session.gm_level,
+                    None,
+                    "deny_opcode_42",
+                    "normal_account_attempted_gm_shop",
+                )
+                .await;
+        }
+        return;
+    }
     let (sub, payload) = (ctx.sub, ctx.payload);
     match sub {
         // Sub 1: Buy item from GM shop
@@ -130,7 +142,8 @@ pub async fn handle_gm_shop(ctx: &mut OpcodeCtx<'_>) {
             let new_points = conn.session.shop_point.saturating_sub(price);
             conn.session.add_homdo_item(item);
             conn.session.shop_point = new_points;
-            let granted = conn.session
+            let granted = conn
+                .session
                 .homdo
                 .iter()
                 .find(|i| i.id == item_id && i.count > 0)
@@ -396,8 +409,11 @@ async fn delete_character_flow(ctx: &mut OpcodeCtx<'_>) {
     ctx.out
         .broadcast(id, crate::battle::packets::hide_from_map(id));
     // Delete the character data in one transaction.
-    if let Some(pool) = ctx.env.pool {
-        let _ = db::players::delete_character(pool, i64::from(id)).await;
+    if let Some(repos) = ctx.env.repos {
+        let character_id = ctx.conn.session.db_character_id;
+        if character_id > 0 {
+            let _ = repos.characters().delete(character_id).await;
+        }
     }
     // Remove the registries and ask for the connection to close.
     crate::server::session::online_sessions()

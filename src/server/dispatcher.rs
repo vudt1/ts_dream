@@ -12,9 +12,10 @@ use crate::battle::service::BattleService;
 use crate::data::loader::GameData;
 use crate::error::Result;
 use crate::protocol::encoder;
+use crate::protocol::profile::ProtocolProfile;
 use crate::server::handlers::{
-    battle, character, chat, expressions, inventory, login, movement, party, pet_actions, shops,
-    skills, stats, system, talk, trade_storage,
+    battle, character, chat, compat, expressions, inventory, login, movement, npc_event, party,
+    pet_actions, shops, skills, stats, system, talk, trade_storage,
 };
 use crate::server::session::Conn;
 use crate::web::server_control::{ClientSender, ServerControl};
@@ -25,16 +26,20 @@ use sqlx::MySqlPool;
 /// in golden replay, where handlers run purely in-memory over a seeded session.
 pub struct ServerEnv<'a> {
     pub pool: Option<&'a MySqlPool>,
+    pub repos: Option<&'a crate::db::modern::mysql::MySqlRepositories>,
     pub hub: Option<&'a ServerControl>,
     pub sender: Option<&'a ClientSender>,
+    pub profile: ProtocolProfile,
 }
 
 impl<'a> ServerEnv<'a> {
     pub fn none() -> Self {
         Self {
             pool: None,
+            repos: None,
             hub: None,
             sender: None,
+            profile: ProtocolProfile::KotlinMobile,
         }
     }
 }
@@ -188,8 +193,10 @@ pub async fn dispatch(
         decoded,
         env: ServerEnv {
             pool: env.pool,
+            repos: env.repos,
             hub: env.hub,
             sender: env.sender,
+            profile: env.profile,
         },
     };
     // Handler errors are swallowed by design: never propagate to the caller.
@@ -239,18 +246,31 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         // Op 0x13 — Pet summon / recall
         0x13 => pet_actions::handle_pet_summon(ctx).await,
 
-        // Op 0x14 — Action / Talk
+        // Op 0x14 — Action / legacy PC talk
         0x14 => talk::handle_talk(ctx).await,
+
+        // Op 0x1A — PC Talk/Eve selector family. This is not mobile mainKind
+        // 20; it has a separate PC/aLogin payload dialect.
+        0x1A => match ctx.env.profile {
+            ProtocolProfile::PcALogin => npc_event::handle_pc_talk(ctx).await,
+            ProtocolProfile::KotlinMobile => compat::handle(ctx),
+        },
 
         // Op 0x17 — Inventory family; Level-2 subcode routing lives in the
         // handler module (base ops, use item, player shop, storage, reborn).
         0x17 => inventory::handle_inventory(ctx).await,
 
-        // Op 0x19 — Trade
-        0x19 => trade_storage::handle_trade(ctx).await,
+        // Op 0x19 — Trade in Kotlin/mobile; SceneManage in the PC table.
+        0x19 => match ctx.env.profile {
+            ProtocolProfile::KotlinMobile => trade_storage::handle_trade(ctx).await,
+            ProtocolProfile::PcALogin => compat::handle(ctx),
+        },
 
-        // Op 0x1B — NPC shop buy/sell
-        0x1B => shops::handle_npc_shop(ctx).await,
+        // Op 0x1B — NPC shop in Kotlin/mobile; Trade in the PC table.
+        0x1B => match ctx.env.profile {
+            ProtocolProfile::KotlinMobile => shops::handle_npc_shop(ctx).await,
+            ProtocolProfile::PcALogin => compat::handle(ctx),
+        },
 
         // Op 0x1C — Learn / upgrade skills
         0x1C => skills::handle_skills(ctx).await,
@@ -261,8 +281,11 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         // Op 0x1E — Storage transfer (TienTrang)
         0x1E => trade_storage::handle_storage_transfer(ctx).await,
 
-        // Op 0x1F — Pet stable menu
-        0x1F => pet_actions::handle_pet_stable(ctx).await,
+        // Op 0x1F — Pet stable in Kotlin/mobile; NPC shop in the PC table.
+        0x1F => match ctx.env.profile {
+            ProtocolProfile::KotlinMobile => pet_actions::handle_pet_stable(ctx).await,
+            ProtocolProfile::PcALogin => compat::handle(ctx),
+        },
 
         // Op 0x20 — Expressions
         0x20 => expressions::handle_expressions(ctx),
@@ -273,8 +296,11 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         // Op 0x22 — Game points / God panel
         0x22 => system::handle_game_points(ctx),
 
-        // Op 0x23 — Account management
-        0x23 => system::handle_account_mgmt(ctx).await,
+        // Op 0x23 — Account management in Kotlin/mobile; Guild in the PC table.
+        0x23 => match ctx.env.profile {
+            ProtocolProfile::KotlinMobile => system::handle_account_mgmt(ctx).await,
+            ProtocolProfile::PcALogin => compat::handle(ctx),
+        },
 
         // Op 0x28 — Hotkey / skill bar
         0x28 => stats::handle_hotkey(ctx).await,
@@ -291,9 +317,14 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         // Op 0x42 — GM / Mall shop
         0x42 => system::handle_gm_shop(ctx).await,
 
-        _ => {
-            // Not yet ported / unknown: silently ignored.
-        }
+        // Documented client opcodes whose full semantics are being ported from
+        // the Kotlin/mobile reference. They are deliberately routed through a
+        // bounded compatibility boundary rather than silently discarded.
+        0x05 | 0x0A | 0x0E | 0x10 | 0x12 | 0x16 | 0x18 | 0x24 | 0x25 | 0x26 | 0x27 | 0x29
+        | 0x2A | 0x2B | 0x2D | 0x2E | 0x36 | 0x37 | 0x39 | 0x3A | 0x3B | 0x3C | 0x3D | 0x3F
+        | 0x40 | 0x43 | 0x44 | 0x45 | 0x46 | 0x47 | 0x48 | 0xC7 => compat::handle(ctx),
+
+        _ => compat::handle(ctx),
     }
     Ok(())
 }

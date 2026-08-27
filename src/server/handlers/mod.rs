@@ -3,6 +3,7 @@
 pub mod battle;
 pub mod character;
 pub mod chat;
+pub mod compat;
 pub mod expressions;
 pub mod inventory;
 pub mod login;

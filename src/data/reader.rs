@@ -1,6 +1,7 @@
 //! Binary `.Dat` reader for TS Online client and server data files.
 //!
 //! Provides Little-Endian numeric reading with optional XOR decryption
+#![allow(clippy::chunks_exact_to_as_chunks)]
 //! and number offsets, PC-style reversed string reading (VISCII/Big5),
 //! Unicode UTF-16LE strings, and `DecodeAll` block decryption.
 
@@ -31,13 +32,7 @@ impl DatReader {
     }
 
     /// Create a new `DatReader` with decryption parameters.
-    pub fn with_keys(
-        data: Vec<u8>,
-        number_offset: i32,
-        xor1: u32,
-        xor2: u32,
-        xor4: u32,
-    ) -> Self {
+    pub fn with_keys(data: Vec<u8>, number_offset: i32, xor1: u32, xor2: u32, xor4: u32) -> Self {
         Self {
             data,
             position: 0,
@@ -364,5 +359,78 @@ impl DatReader {
 
         self.data = decoded;
         self.position = 0;
+    }
+}
+
+/// Strict reader for newly ported mobile catalogs.
+///
+/// Unlike [`DatReader`]'s compatibility API, every primitive and length-prefixed
+/// string read is bounds checked and returns a data-load error on truncation.
+#[derive(Debug, Clone)]
+pub struct StrictDatReader {
+    inner: DatReader,
+}
+
+impl StrictDatReader {
+    pub fn new(data: &[u8]) -> Self {
+        Self {
+            inner: DatReader::new(data.to_vec()),
+        }
+    }
+
+    fn require(&self, size: usize) -> crate::error::Result<()> {
+        if self.inner.remaining() < size {
+            return Err(crate::error::TsError::Data(format!(
+                "truncated binary data at offset {}: need {} bytes, have {}",
+                self.inner.position(),
+                size,
+                self.inner.remaining()
+            )));
+        }
+        Ok(())
+    }
+
+    pub fn read_u8(&mut self) -> crate::error::Result<u8> {
+        self.require(1)?;
+        Ok(self.inner.read_u8_raw())
+    }
+
+    pub fn read_u16(&mut self) -> crate::error::Result<u16> {
+        self.require(2)?;
+        Ok(self.inner.read_u16_raw())
+    }
+
+    pub fn read_u32(&mut self) -> crate::error::Result<u32> {
+        self.require(4)?;
+        Ok(self.inner.read_u32_raw())
+    }
+
+    pub fn read_i16(&mut self) -> crate::error::Result<i16> {
+        self.require(2)?;
+        Ok(i16::from_le_bytes(
+            self.inner.read_bytes(2).try_into().unwrap(),
+        ))
+    }
+
+    pub fn read_bool(&mut self) -> crate::error::Result<bool> {
+        Ok(self.read_u8()? == 1)
+    }
+
+    pub fn read_unicode_string(&mut self) -> crate::error::Result<String> {
+        let byte_len = self.read_u16()? as usize;
+        if !byte_len.is_multiple_of(2) {
+            return Err(crate::error::TsError::Data(format!(
+                "invalid UTF-16LE byte length {} at offset {}",
+                byte_len,
+                self.inner.position().saturating_sub(2)
+            )));
+        }
+        self.require(byte_len)?;
+        let raw = self.inner.read_bytes(byte_len);
+        let values: Vec<u16> = raw
+            .chunks_exact(2)
+            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+            .collect();
+        Ok(String::from_utf16_lossy(&values))
     }
 }

@@ -11,11 +11,7 @@ pub struct MySqlQuestRepository<'a> {
 }
 
 impl QuestRepository for MySqlQuestRepository<'_> {
-    async fn upsert_mission(
-        &self,
-        character_id: i64,
-        mission: &MissionRow,
-    ) -> RepoResult<()> {
+    async fn upsert_mission(&self, character_id: i64, mission: &MissionRow) -> RepoResult<()> {
         sqlx::query(
             "INSERT INTO character_missions (character_id, mission_id, step, state, updated_at) \
              VALUES (?, ?, ?, ?, ?) \

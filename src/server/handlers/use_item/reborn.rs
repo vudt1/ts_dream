@@ -1,6 +1,6 @@
 //! Reborn-by-item (46170, 46247-46250).
 //!
-//! These do a hard `UPDATE players SET …` (level reset to 1, rebuilds HP/SP,
+//! These perform modern `UPDATE characters SET …` writes (level reset to 1, rebuilds HP/SP,
 //! sets Reborn) and then CLOSE the client socket. This port mutates the
 //! session in-memory, persists the columns, and sets `out.shutdown = true` so
 //! the connection loop tears the socket down. Runs first in the use-item chain

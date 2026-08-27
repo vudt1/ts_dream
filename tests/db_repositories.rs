@@ -12,13 +12,11 @@
 
 use sqlx::{MySqlPool, Row};
 use ts_dream::db::modern::model::{
-    InventorySlot, MissionRow, Money, PetRecord, PetSkill, PetStorageType, SkillRow,
-    StorageType,
+    InventorySlot, MissionRow, Money, PetRecord, PetSkill, PetStorageType, SkillRow, StorageType,
 };
 use ts_dream::db::modern::mysql::MySqlRepositories;
 use ts_dream::db::modern::traits::{
-    AccountRepository, CharacterRepository, CharacterSeed, InventoryRepository, PetRepository,
-    QuestRepository,
+    CharacterRepository, CharacterSeed, InventoryRepository, PetRepository, QuestRepository,
 };
 use ts_dream::db::modern::transactions::{bank_transfer, p2p_trade, shop_buy, TxError};
 use ts_dream::protocol::codecs::thing_data::ThingData;
@@ -150,7 +148,9 @@ fn fresh_account_id() -> i64 {
 
 #[tokio::test]
 async fn character_crud_and_money_ledger() {
-    let Some(pool) = test_pool().await else { return };
+    let Some(pool) = test_pool().await else {
+        return;
+    };
     let repos = MySqlRepositories::new(pool.clone());
     let account_id = fresh_account_id();
 
@@ -168,17 +168,37 @@ async fn character_crud_and_money_ledger() {
         .unwrap();
 
     // Byte-exact credential checks (latin1_bin / HEX comparison).
-    assert!(repos.accounts().verify_pass1(account_id, b"abc").await.unwrap());
-    assert!(!repos.accounts().verify_pass1(account_id, b"ABC").await.unwrap());
-    assert!(repos.accounts().verify_pass2(account_id, b"def").await.unwrap());
+    assert!(repos
+        .accounts()
+        .verify_pass1(account_id, b"abc")
+        .await
+        .unwrap());
+    assert!(!repos
+        .accounts()
+        .verify_pass1(account_id, b"ABC")
+        .await
+        .unwrap());
+    assert!(repos
+        .accounts()
+        .verify_pass2(account_id, b"def")
+        .await
+        .unwrap());
 
-    let listed = repos.characters().list_by_account(account_id).await.unwrap();
+    let listed = repos
+        .characters()
+        .list_by_account(account_id)
+        .await
+        .unwrap();
     assert_eq!(listed.len(), 1);
     assert_eq!(listed[0].name, b"TESTCHAR");
     assert_eq!(listed[0].level, 10);
 
     assert_eq!(
-        repos.characters().find_id_by_name(b"TESTCHAR").await.unwrap(),
+        repos
+            .characters()
+            .find_id_by_name(b"TESTCHAR")
+            .await
+            .unwrap(),
         Some(char_id)
     );
 
@@ -190,11 +210,18 @@ async fn character_crud_and_money_ledger() {
         .execute(&pool)
         .await
         .unwrap();
-    assert_eq!(repos.characters().load_money(char_id).await.unwrap().gold, 777);
+    assert_eq!(
+        repos.characters().load_money(char_id).await.unwrap().gold,
+        777
+    );
 
     repos.characters().delete(char_id).await.unwrap();
     assert_eq!(
-        repos.characters().find_id_by_name(b"TESTCHAR").await.unwrap(),
+        repos
+            .characters()
+            .find_id_by_name(b"TESTCHAR")
+            .await
+            .unwrap(),
         None
     );
     sqlx::query("DELETE FROM accounts WHERE player_id = ?")
@@ -206,7 +233,9 @@ async fn character_crud_and_money_ledger() {
 
 #[tokio::test]
 async fn inventory_slot_full_field_roundtrip() {
-    let Some(pool) = test_pool().await else { return };
+    let Some(pool) = test_pool().await else {
+        return;
+    };
     let repos = MySqlRepositories::new(pool.clone());
     let account_id = fresh_account_id();
     sqlx::query("INSERT IGNORE INTO accounts (player_id, pass1, pass2) VALUES (?, 'x', 'y')")
@@ -221,10 +250,18 @@ async fn inventory_slot_full_field_roundtrip() {
         .unwrap();
 
     let item = sample_item(23_145, 3);
-    repos.inventories().save_slot(char_id, &item, &pool).await.unwrap();
+    repos
+        .inventories()
+        .save_slot(char_id, &item, &pool)
+        .await
+        .unwrap();
 
     // Upsert overwrites every column instead of inserting a duplicate row.
-    repos.inventories().save_slot(char_id, &item, &pool).await.unwrap();
+    repos
+        .inventories()
+        .save_slot(char_id, &item, &pool)
+        .await
+        .unwrap();
 
     let loaded = repos
         .inventories()
@@ -234,7 +271,10 @@ async fn inventory_slot_full_field_roundtrip() {
     assert_eq!(loaded.len(), 1);
     assert_eq!(loaded[0], item);
     // Byte-for-byte parity with the wire codec.
-    assert_eq!(loaded[0].item.to_bytes(), sample_item(23_145, 3).item.to_bytes());
+    assert_eq!(
+        loaded[0].item.to_bytes(),
+        sample_item(23_145, 3).item.to_bytes()
+    );
 
     let single = repos
         .inventories()
@@ -271,7 +311,9 @@ async fn inventory_slot_full_field_roundtrip() {
 
 #[tokio::test]
 async fn pet_four_storages_roundtrip() {
-    let Some(pool) = test_pool().await else { return };
+    let Some(pool) = test_pool().await else {
+        return;
+    };
     let repos = MySqlRepositories::new(pool.clone());
     let account_id = fresh_account_id();
     sqlx::query("INSERT IGNORE INTO accounts (player_id, pass1, pass2) VALUES (?, 'x', 'y')")
@@ -324,7 +366,11 @@ async fn pet_four_storages_roundtrip() {
     .into_iter()
     .enumerate()
     {
-        repos.pets().save_pet(char_id, st, &pet(i as u16)).await.unwrap();
+        repos
+            .pets()
+            .save_pet(char_id, st, &pet(i as u16))
+            .await
+            .unwrap();
     }
 
     for (i, st) in [
@@ -341,7 +387,11 @@ async fn pet_four_storages_roundtrip() {
         assert_eq!(loaded[0], pet(i as u16));
     }
 
-    repos.pets().delete_pet(char_id, PetStorageType::Cart, 1).await.unwrap();
+    repos
+        .pets()
+        .delete_pet(char_id, PetStorageType::Cart, 1)
+        .await
+        .unwrap();
     assert!(repos
         .pets()
         .load_storage(char_id, PetStorageType::Cart)
@@ -359,7 +409,9 @@ async fn pet_four_storages_roundtrip() {
 
 #[tokio::test]
 async fn missions_bit_flags_completed_events() {
-    let Some(pool) = test_pool().await else { return };
+    let Some(pool) = test_pool().await else {
+        return;
+    };
     let repos = MySqlRepositories::new(pool.clone());
     let account_id = fresh_account_id();
     sqlx::query("INSERT IGNORE INTO accounts (player_id, pass1, pass2) VALUES (?, 'x', 'y')")
@@ -377,7 +429,12 @@ async fn missions_bit_flags_completed_events() {
         .quests()
         .upsert_mission(
             char_id,
-            &MissionRow { mission_id: 501, step: 1, state: 0, updated_at: 100 },
+            &MissionRow {
+                mission_id: 501,
+                step: 1,
+                state: 0,
+                updated_at: 100,
+            },
         )
         .await
         .unwrap();
@@ -385,7 +442,12 @@ async fn missions_bit_flags_completed_events() {
         .quests()
         .upsert_mission(
             char_id,
-            &MissionRow { mission_id: 501, step: 2, state: 1, updated_at: 200 },
+            &MissionRow {
+                mission_id: 501,
+                step: 2,
+                state: 1,
+                updated_at: 200,
+            },
         )
         .await
         .unwrap();
@@ -396,7 +458,11 @@ async fn missions_bit_flags_completed_events() {
     assert_eq!(missions[0].state, 1);
 
     repos.quests().set_bit_flag(char_id, 17, 999).await.unwrap();
-    repos.quests().set_bit_flag(char_id, 17, 1234).await.unwrap(); // idempotent
+    repos
+        .quests()
+        .set_bit_flag(char_id, 17, 1234)
+        .await
+        .unwrap(); // idempotent
     assert!(repos.quests().has_bit_flag(char_id, 17).await.unwrap());
     assert!(!repos.quests().has_bit_flag(char_id, 18).await.unwrap());
     let set_at: i64 = sqlx::query_scalar(
@@ -408,9 +474,21 @@ async fn missions_bit_flags_completed_events() {
     .unwrap();
     assert_eq!(set_at, 999, "first latch wins forever");
 
-    repos.quests().mark_event_completed(char_id, 601, 555).await.unwrap();
-    assert!(repos.quests().has_completed_event(char_id, 601).await.unwrap());
-    assert!(!repos.quests().has_completed_event(char_id, 602).await.unwrap());
+    repos
+        .quests()
+        .mark_event_completed(char_id, 601, 555)
+        .await
+        .unwrap();
+    assert!(repos
+        .quests()
+        .has_completed_event(char_id, 601)
+        .await
+        .unwrap());
+    assert!(!repos
+        .quests()
+        .has_completed_event(char_id, 602)
+        .await
+        .unwrap());
 
     // replace_skills inside an explicit transaction.
     let mut tx = pool.begin().await.unwrap();
@@ -419,8 +497,18 @@ async fn missions_bit_flags_completed_events() {
         .replace_skills(
             char_id,
             &[
-                SkillRow { skill_id: 10_001, level: 3, sp: 1, save_flag: 0 },
-                SkillRow { skill_id: 10_002, level: 7, sp: 2, save_flag: 1 },
+                SkillRow {
+                    skill_id: 10_001,
+                    level: 3,
+                    sp: 1,
+                    save_flag: 0,
+                },
+                SkillRow {
+                    skill_id: 10_002,
+                    level: 7,
+                    sp: 2,
+                    save_flag: 1,
+                },
             ],
             &mut tx,
         )
@@ -445,7 +533,9 @@ async fn missions_bit_flags_completed_events() {
 
 #[tokio::test]
 async fn bank_transfer_atomic_with_overdraft_guard() {
-    let Some(pool) = test_pool().await else { return };
+    let Some(pool) = test_pool().await else {
+        return;
+    };
     let repos = MySqlRepositories::new(pool.clone());
     let account_id = fresh_account_id();
     sqlx::query("INSERT IGNORE INTO accounts (player_id, pass1, pass2) VALUES (?, 'x', 'y')")
@@ -475,7 +565,11 @@ async fn bank_transfer_atomic_with_overdraft_guard() {
     let money = bank_transfer(&pool, char_id, 400).await.unwrap();
     assert_eq!(
         money,
-        Money { gold: 600, bank_gold: 400, shop_point: 0 }
+        Money {
+            gold: 600,
+            bank_gold: 400,
+            shop_point: 0
+        }
     );
 
     let money = bank_transfer(&pool, char_id, -150).await.unwrap();
@@ -501,7 +595,9 @@ async fn bank_transfer_atomic_with_overdraft_guard() {
 
 #[tokio::test]
 async fn shop_buy_grants_item_only_when_gold_covers_price() {
-    let Some(pool) = test_pool().await else { return };
+    let Some(pool) = test_pool().await else {
+        return;
+    };
     let repos = MySqlRepositories::new(pool.clone());
     let account_id = fresh_account_id();
     sqlx::query("INSERT IGNORE INTO accounts (player_id, pass1, pass2) VALUES (?, 'x', 'y')")
@@ -556,11 +652,16 @@ async fn shop_buy_grants_item_only_when_gold_covers_price() {
 
 #[tokio::test]
 async fn p2p_trade_moves_item_between_characters_atomically() {
-    let Some(pool) = test_pool().await else { return };
+    let Some(pool) = test_pool().await else {
+        return;
+    };
     let repos = MySqlRepositories::new(pool.clone());
     let account_a = fresh_account_id();
     let account_b = fresh_account_id();
-    for (aid, nm) in [(account_a, b"TRADERS".as_slice()), (account_b, b"TRADERE".as_slice())] {
+    for (aid, nm) in [
+        (account_a, b"TRADERS".as_slice()),
+        (account_b, b"TRADERE".as_slice()),
+    ] {
         sqlx::query("INSERT IGNORE INTO accounts (player_id, pass1, pass2) VALUES (?, 'x', 'y')")
             .bind(aid)
             .execute(&pool)
@@ -572,8 +673,18 @@ async fn p2p_trade_moves_item_between_characters_atomically() {
             .await
             .unwrap();
     }
-    let char_a = repos.characters().find_id_by_name(b"TRADERS").await.unwrap().unwrap();
-    let char_b = repos.characters().find_id_by_name(b"TRADERE").await.unwrap().unwrap();
+    let char_a = repos
+        .characters()
+        .find_id_by_name(b"TRADERS")
+        .await
+        .unwrap()
+        .unwrap();
+    let char_b = repos
+        .characters()
+        .find_id_by_name(b"TRADERE")
+        .await
+        .unwrap()
+        .unwrap();
 
     // Source empty -> rejected before anything moves.
     match p2p_trade(
@@ -590,7 +701,11 @@ async fn p2p_trade_moves_item_between_characters_atomically() {
     }
 
     let offer = sample_item(46_001, 1);
-    repos.inventories().save_slot(char_a, &offer, &pool).await.unwrap();
+    repos
+        .inventories()
+        .save_slot(char_a, &offer, &pool)
+        .await
+        .unwrap();
 
     // Destination occupied -> rejected, source still holds the item.
     repos
@@ -669,7 +784,9 @@ async fn p2p_trade_moves_item_between_characters_atomically() {
 /// Sanity: the migration actually produced the ticket's table set.
 #[tokio::test]
 async fn modern_schema_tables_exist() {
-    let Some(pool) = test_pool().await else { return };
+    let Some(pool) = test_pool().await else {
+        return;
+    };
     let expected = [
         "accounts",
         "characters",

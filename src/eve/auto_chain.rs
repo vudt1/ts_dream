@@ -126,8 +126,7 @@ impl EveAutoChainEngine {
                 continue;
             }
 
-            let Some(resolved) =
-                resolve_event(event_data, state, &scene.group_datas, rng, None)
+            let Some(resolved) = resolve_event(event_data, state, &scene.group_datas, rng, None)
             else {
                 continue;
             };
@@ -147,7 +146,8 @@ impl EveAutoChainEngine {
                 matched_condition_no: resolved.matched_condition_no,
             };
 
-            if i32::from(eve_no) == completed.eve_no {                // Guard #1: same condition chain means unchanged player state.
+            if i32::from(eve_no) == completed.eve_no {
+                // Guard #1: same condition chain means unchanged player state.
                 if Self::detect_same_chain(&candidate, completed) {
                     debug!(
                         eve_no,
@@ -191,8 +191,7 @@ impl EveAutoChainEngine {
     /// Guard #2: a Surface appears again although the player just answered.
     #[must_use]
     pub fn detect_re_question(new_session: &EventSession, completed: &EventSession) -> bool {
-        completed.last_choice_code != -1
-            && new_session.results.iter().any(|r| r.result_type == 6)
+        completed.last_choice_code != -1 && new_session.results.iter().any(|r| r.result_type == 6)
     }
 
     /// Guard #3: an interactive result appears although the player just
@@ -210,13 +209,14 @@ impl EveAutoChainEngine {
     /// granted (`resultClass=1 pStyle=1`).
     #[must_use]
     pub fn detect_duplicate_items(new_session: &EventSession, completed: &EventSession) -> bool {
-        let give_items = |results: &[crate::data::loaders::EveResult]| -> std::collections::HashSet<u16> {
-            results
-                .iter()
-                .filter(|r| r.result_class == 1 && r.parameter_style == 1)
-                .map(|r| r.parameter)
-                .collect()
-        };
+        let give_items =
+            |results: &[crate::data::loaders::EveResult]| -> std::collections::HashSet<u16> {
+                results
+                    .iter()
+                    .filter(|r| r.result_class == 1 && r.parameter_style == 1)
+                    .map(|r| r.parameter)
+                    .collect()
+            };
         let completed_give = give_items(&completed.results);
         if completed_give.is_empty() {
             return false;
@@ -235,8 +235,15 @@ impl EveAutoChainEngine {
         event_data: &NpcEventData,
         state: &PlayerEventState,
     ) -> bool {
-        let completed_count = state.completed_eve_counts.get(&(i32::from(eve_no))).copied().unwrap_or(0);
-        let has_completion_condition = event_data.conditions.iter().any(|c| c.condition_class == 12);
+        let completed_count = state
+            .completed_eve_counts
+            .get(&(i32::from(eve_no)))
+            .copied()
+            .unwrap_or(0);
+        let has_completion_condition = event_data
+            .conditions
+            .iter()
+            .any(|c| c.condition_class == 12);
         if completed_count > 0 && !has_completion_condition {
             return true;
         }
@@ -260,7 +267,14 @@ fn has_later_completed_event(events: &[u8], current_eve_no: u8, state: &PlayerEv
             found_current = true;
             continue;
         }
-        if found_current && state.completed_eve_counts.get(&(i32::from(e))).copied().unwrap_or(0) > 0 {
+        if found_current
+            && state
+                .completed_eve_counts
+                .get(&(i32::from(e)))
+                .copied()
+                .unwrap_or(0)
+                > 0
+        {
             return true;
         }
     }
@@ -269,9 +283,20 @@ fn has_later_completed_event(events: &[u8], current_eve_no: u8, state: &PlayerEv
 
 fn event_list_for<'a>(scene: &'a SceneEveData, session: &EventSession) -> Option<&'a [u8]> {
     match session.trigger_kind {
-        1 => Some(scene.npcs.get(&(session.npc_click_id as u16))?.events.as_slice()),
-        4 | 8 => Some(scene.doors.get(&(session.npc_click_id as u16))?.events.as_slice()),
+        1 => Some(
+            scene
+                .npcs
+                .get(&(session.npc_click_id as u16))?
+                .events
+                .as_slice(),
+        ),
+        4 | 8 => Some(
+            scene
+                .doors
+                .get(&(session.npc_click_id as u16))?
+                .events
+                .as_slice(),
+        ),
         _ => None,
     }
 }
-

@@ -75,10 +75,7 @@ pub fn take(map_id: u16, slot: u8) -> Option<DropItem> {
 /// wipes every map's entries and races with parallel tests that own their own
 /// map ids.
 pub fn clear_map(map_id: u16) {
-    registry()
-        .lock()
-        .unwrap()
-        .retain(|(m, _), _| *m != map_id);
+    registry().lock().unwrap().retain(|(m, _), _| *m != map_id);
 }
 
 /// Clear every drop on every map (restart aid; wipes all maps at once).

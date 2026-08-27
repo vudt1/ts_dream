@@ -137,13 +137,19 @@ impl PacketWriter {
     }
 
     /// Write a 20-byte `FriendExtra` struct.
-    pub fn write_friend_extra(&mut self, extra: &crate::protocol::codecs::FriendExtra) -> &mut Self {
+    pub fn write_friend_extra(
+        &mut self,
+        extra: &crate::protocol::codecs::FriendExtra,
+    ) -> &mut Self {
         extra.encode(self);
         self
     }
 
     /// Write a `BattleRoleData` struct.
-    pub fn write_battle_role(&mut self, role: &crate::protocol::codecs::BattleRoleData) -> &mut Self {
+    pub fn write_battle_role(
+        &mut self,
+        role: &crate::protocol::codecs::BattleRoleData,
+    ) -> &mut Self {
         role.encode(self);
         self
     }

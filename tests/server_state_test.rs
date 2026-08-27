@@ -293,22 +293,25 @@ mod session_locks {
     async fn player_locks_block_same_player_but_not_unrelated_player() {
         // Generous windows: only relative ordering matters, never wall-clock speed.
         let held = lock_player_operations([388_881]).await;
-        assert!(
-            tokio::time::timeout(Duration::from_millis(2000), lock_player_operations([388_882]))
-                .await
-                .is_ok()
-        );
-        assert!(
-            tokio::time::timeout(Duration::from_millis(250), lock_player_operations([388_881]))
-                .await
-                .is_err()
-        );
+        assert!(tokio::time::timeout(
+            Duration::from_millis(2000),
+            lock_player_operations([388_882])
+        )
+        .await
+        .is_ok());
+        assert!(tokio::time::timeout(
+            Duration::from_millis(250),
+            lock_player_operations([388_881])
+        )
+        .await
+        .is_err());
         drop(held);
-        assert!(
-            tokio::time::timeout(Duration::from_millis(2000), lock_player_operations([388_881]))
-                .await
-                .is_ok()
-        );
+        assert!(tokio::time::timeout(
+            Duration::from_millis(2000),
+            lock_player_operations([388_881])
+        )
+        .await
+        .is_ok());
     }
 }
 
@@ -370,14 +373,22 @@ mod spawn_frames {
 
         // 0F08: fixed prefix `00` + stt, id le32, texp le32.
         assert!(frames[0].starts_with("F444"));
-        assert!(frames[0].contains("01993A0000D2040000"), "got {}", frames[0]);
+        assert!(
+            frames[0].contains("01993A0000D2040000"),
+            "got {}",
+            frames[0]
+        );
         assert!(
             frames[0].contains("50455431"),
             "pet name PET1 embedded: {}",
             frames[0]
         );
         // Pet equipment slot 1 id (20001 = 0x4E21) + 6 zero bytes.
-        assert!(frames[0].contains("214E0000"), "pet equip id: {}", frames[0]);
+        assert!(
+            frames[0].contains("214E0000"),
+            "pet equip id: {}",
+            frames[0]
+        );
     }
 
     #[test]
@@ -593,7 +604,7 @@ mod character_sheet_math {
         // to each nonzero int field (`_X1` and `_X2` both nonzero → +20).
         let gear = GearBonuses::from_gear(&trangbi, 1);
         assert_eq!(gear.int2, 5 + 7 + 20); //
-        // Player element 2 does not match (nor == 5): no bonus.
+                                           // Player element 2 does not match (nor == 5): no bonus.
         let gear = GearBonuses::from_gear(&trangbi, 2);
         assert_eq!(gear.int2, 5 + 7);
     }

@@ -154,11 +154,7 @@ pub trait PetRepository {
 
 /// Mission bookkeeping: progress rows, permanent bit flags, completed events.
 pub trait QuestRepository {
-    async fn upsert_mission(
-        &self,
-        character_id: i64,
-        mission: &MissionRow,
-    ) -> RepoResult<()>;
+    async fn upsert_mission(&self, character_id: i64, mission: &MissionRow) -> RepoResult<()>;
 
     async fn list_missions(&self, character_id: i64) -> RepoResult<Vec<MissionRow>>;
 

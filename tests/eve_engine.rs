@@ -9,9 +9,11 @@ use ts_dream::battle::rng::DotNetRandom;
 use ts_dream::data::loaders::{
     EveCondition, EveGroupData, EveResult, EveSurfaceData, NpcEventData,
 };
-use ts_dream::eve::{AutoChainResult, EventPhase, EventSession, EveAutoChainEngine, MAX_CHAIN_DEPTH};
-use ts_dream::eve::{compare_step, evaluate, apply_group_data};
+use ts_dream::eve::{apply_group_data, compare_step, evaluate};
 use ts_dream::eve::{build_chains, resolve, resolve_event};
+use ts_dream::eve::{
+    AutoChainResult, EveAutoChainEngine, EventPhase, EventSession, MAX_CHAIN_DEPTH,
+};
 use ts_dream::eve::{EveStateBuilder, PlayerEventState, PlayerStateInputs};
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
@@ -79,7 +81,14 @@ fn event_data(eve_no: u16, conditions: Vec<EveCondition>) -> NpcEventData {
 mod evaluator_tests {
     use super::*;
 
-    fn eval_cls(cls: u8, param: u16, p_style: u8, ops: u8, value: i32, state: &PlayerEventState) -> bool {
+    fn eval_cls(
+        cls: u8,
+        param: u16,
+        p_style: u8,
+        ops: u8,
+        value: i32,
+        state: &PlayerEventState,
+    ) -> bool {
         let mut c = cond(1, cls);
         c.condition_parameter = param;
         c.condition_parameter_style = p_style;
@@ -154,9 +163,15 @@ mod evaluator_tests {
     fn class_7_player_attributes() {
         // param=0 level check — reversed like bag items: `value ops level`,
         // so a "level above T" gate is written ops=2 (<) with val=T.
-        let veteran = PlayerEventState { level: 30, ..PlayerEventState::default() };
+        let veteran = PlayerEventState {
+            level: 30,
+            ..PlayerEventState::default()
+        };
         assert!(eval_cls(7, 0, 0, 2, 24, &veteran));
-        let novice = PlayerEventState { level: 10, ..PlayerEventState::default() };
+        let novice = PlayerEventState {
+            level: 10,
+            ..PlayerEventState::default()
+        };
         assert!(!eval_cls(7, 0, 0, 2, 24, &novice));
 
         // param=3 equipment possession (forward comparison)
@@ -184,7 +199,10 @@ mod evaluator_tests {
 
     #[test]
     fn class_7_reborn_count_reversed() {
-        let reborn = PlayerEventState { reborn_count: 2, ..PlayerEventState::default() };
+        let reborn = PlayerEventState {
+            reborn_count: 2,
+            ..PlayerEventState::default()
+        };
         // "reborn more than once" reads `1 < count`.
         assert!(eval_cls(7, 2, 0, 2, 1, &reborn));
         // Threshold above actual count fails: `5 < 2` is false.
@@ -193,7 +211,10 @@ mod evaluator_tests {
 
     #[test]
     fn class_8_battle_results() {
-        let won = PlayerEventState { battle_result: 1, ..PlayerEventState::default() };
+        let won = PlayerEventState {
+            battle_result: 1,
+            ..PlayerEventState::default()
+        };
         assert!(eval_cls(8, 0, 1, 0, 0, &won));
         assert!(!eval_cls(8, 0, 2, 0, 0, &won));
     }
@@ -274,7 +295,10 @@ mod resolver_tests {
     fn build_chains_single_conditions_independent() {
         let conditions = vec![cond(1, 0), cond(2, 0), cond(3, 0)];
         let chains = build_chains(&conditions);
-        assert_eq!(chains.iter().map(|c| c.len()).collect::<Vec<_>>(), vec![1, 1, 1]);
+        assert_eq!(
+            chains.iter().map(|c| c.len()).collect::<Vec<_>>(),
+            vec![1, 1, 1]
+        );
     }
 
     #[test]
@@ -338,11 +362,7 @@ mod resolver_tests {
         head.and_num = 2;
         head.results = vec![result(1, 1)];
         let unknown_class = cond(2, 99);
-        let resolved = resolve(
-            &[head, unknown_class],
-            &|c| c.condition_class != 99,
-            None,
-        );
+        let resolved = resolve(&[head, unknown_class], &|c| c.condition_class != 99, None);
         assert!(resolved.is_none());
     }
 
@@ -629,11 +649,17 @@ mod auto_chain_tests {
     #[test]
     fn should_attempt_auto_chain_rules() {
         // ClickNpc + eve>0 + depth<cap → allowed
-        assert!(EveAutoChainEngine::should_attempt_auto_chain(&session(4, 1, 0, 0)));
+        assert!(EveAutoChainEngine::should_attempt_auto_chain(&session(
+            4, 1, 0, 0
+        )));
         // MeetDoor allowed
-        assert!(EveAutoChainEngine::should_attempt_auto_chain(&session(2, 8, 5, 0)));
+        assert!(EveAutoChainEngine::should_attempt_auto_chain(&session(
+            2, 8, 5, 0
+        )));
         // fallback Talk (eve=0) never chains
-        assert!(!EveAutoChainEngine::should_attempt_auto_chain(&session(0, 1, 0, 0)));
+        assert!(!EveAutoChainEngine::should_attempt_auto_chain(&session(
+            0, 1, 0, 0
+        )));
         // depth cap reached
         assert!(!EveAutoChainEngine::should_attempt_auto_chain(&session(
             4,
@@ -642,7 +668,9 @@ mod auto_chain_tests {
             0
         )));
         // unsupported trigger kind
-        assert!(!EveAutoChainEngine::should_attempt_auto_chain(&session(4, 99, 0, 0)));
+        assert!(!EveAutoChainEngine::should_attempt_auto_chain(&session(
+            4, 99, 0, 0
+        )));
     }
 
     #[test]
@@ -654,7 +682,12 @@ mod auto_chain_tests {
             completed_eve_counts: HashMap::from([(1, 1)]),
             ..PlayerEventState::default()
         };
-        assert!(EveAutoChainEngine::should_skip_event(&events, 1, &event_data(1, vec![cond(1, 0)]), &done));
+        assert!(EveAutoChainEngine::should_skip_event(
+            &events,
+            1,
+            &event_data(1, vec![cond(1, 0)]),
+            &done
+        ));
 
         // Completed but cls=12 present → still evaluated.
         assert!(!EveAutoChainEngine::should_skip_event(
@@ -669,7 +702,12 @@ mod auto_chain_tests {
             completed_eve_counts: HashMap::from([(2, 1)]),
             ..PlayerEventState::default()
         };
-        assert!(EveAutoChainEngine::should_skip_event(&events, 1, &event_data(1, vec![cond(1, 0)]), &later_done));
+        assert!(EveAutoChainEngine::should_skip_event(
+            &events,
+            1,
+            &event_data(1, vec![cond(1, 0)]),
+            &later_done
+        ));
 
         // Later sibling unfinished → keep evaluating.
         let earlier_done = PlayerEventState {
@@ -710,12 +748,18 @@ mod auto_chain_tests {
             last_choice_code: 20,
             ..session(1, 1, 0, 0)
         };
-        assert!(EveAutoChainEngine::detect_re_question(&new_with_surface, &answered));
+        assert!(EveAutoChainEngine::detect_re_question(
+            &new_with_surface,
+            &answered
+        ));
         let unanswered = EventSession {
             last_choice_code: -1,
             ..session(1, 1, 0, 0)
         };
-        assert!(!EveAutoChainEngine::detect_re_question(&new_with_surface, &unanswered));
+        assert!(!EveAutoChainEngine::detect_re_question(
+            &new_with_surface,
+            &unanswered
+        ));
     }
 
     #[test]
@@ -728,12 +772,18 @@ mod auto_chain_tests {
             battle_result: 1,
             ..session(1, 1, 0, 0)
         };
-        assert!(EveAutoChainEngine::detect_re_battle(&new_with_battle, &fought));
+        assert!(EveAutoChainEngine::detect_re_battle(
+            &new_with_battle,
+            &fought
+        ));
         let untouched = EventSession {
             battle_result: 0,
             ..session(1, 1, 0, 0)
         };
-        assert!(!EveAutoChainEngine::detect_re_battle(&new_with_battle, &untouched));
+        assert!(!EveAutoChainEngine::detect_re_battle(
+            &new_with_battle,
+            &untouched
+        ));
     }
 
     #[test]
@@ -749,9 +799,17 @@ mod auto_chain_tests {
         };
         let gives_nothing = session(1, 1, 0, 0);
 
-        assert!(EveAutoChainEngine::detect_duplicate_items(&gives_a_again, &gives_a));
-        assert!(!EveAutoChainEngine::detect_duplicate_items(&gives_b, &gives_a));
-        assert!(!EveAutoChainEngine::detect_duplicate_items(&gives_a_again, &gives_nothing));
+        assert!(EveAutoChainEngine::detect_duplicate_items(
+            &gives_a_again,
+            &gives_a
+        ));
+        assert!(!EveAutoChainEngine::detect_duplicate_items(
+            &gives_b, &gives_a
+        ));
+        assert!(!EveAutoChainEngine::detect_duplicate_items(
+            &gives_a_again,
+            &gives_nothing
+        ));
     }
 
     /// Full flow: NPC owns events [1, 2]. Event 1 is finished (no cls=12) so
@@ -789,7 +847,12 @@ mod auto_chain_tests {
             ..PlayerEventState::default()
         };
 
-        match EveAutoChainEngine::try_auto_chain(&scene, &completed, &state, &mut DotNetRandom::new(1)) {
+        match EveAutoChainEngine::try_auto_chain(
+            &scene,
+            &completed,
+            &state,
+            &mut DotNetRandom::new(1),
+        ) {
             AutoChainResult::Chained(candidate) => {
                 assert_eq!(candidate.eve_no, 2);
                 assert_eq!(candidate.chain_depth, 1);
@@ -830,7 +893,12 @@ mod auto_chain_tests {
         let state = PlayerEventState::default();
 
         assert!(matches!(
-            EveAutoChainEngine::try_auto_chain(&scene, &completed, &state, &mut DotNetRandom::new(1)),
+            EveAutoChainEngine::try_auto_chain(
+                &scene,
+                &completed,
+                &state,
+                &mut DotNetRandom::new(1)
+            ),
             AutoChainResult::NoMatch
         ));
     }
@@ -870,7 +938,12 @@ mod auto_chain_tests {
             ..PlayerEventState::default()
         };
 
-        match EveAutoChainEngine::try_auto_chain(&scene, &completed, &state, &mut DotNetRandom::new(1)) {
+        match EveAutoChainEngine::try_auto_chain(
+            &scene,
+            &completed,
+            &state,
+            &mut DotNetRandom::new(1),
+        ) {
             AutoChainResult::Chained(candidate) => {
                 assert_eq!(candidate.eve_no, 1);
                 assert_eq!(candidate.matched_condition_no, 2, "higher step chain wins");
@@ -904,7 +977,12 @@ mod auto_chain_tests {
             results: vec![result(2, 1)],
             ..session(9, 4, 0, 0)
         };
-        match EveAutoChainEngine::try_auto_chain(&scene, &completed, &PlayerEventState::default(), &mut DotNetRandom::new(1)) {
+        match EveAutoChainEngine::try_auto_chain(
+            &scene,
+            &completed,
+            &PlayerEventState::default(),
+            &mut DotNetRandom::new(1),
+        ) {
             AutoChainResult::Chained(candidate) => {
                 assert_eq!(candidate.eve_no, 3);
                 assert_eq!(candidate.trigger_kind, 4);
@@ -945,7 +1023,12 @@ mod auto_chain_tests {
         };
 
         assert!(matches!(
-            EveAutoChainEngine::try_auto_chain(&scene, &answered_session, &state, &mut DotNetRandom::new(1)),
+            EveAutoChainEngine::try_auto_chain(
+                &scene,
+                &answered_session,
+                &state,
+                &mut DotNetRandom::new(1)
+            ),
             AutoChainResult::NoMatch
         ));
     }
@@ -959,8 +1042,16 @@ mod auto_chain_tests {
         gate.condition_ops = 2; // count < 1
         gate.condition_value = 1;
         gate.results = vec![
-            EveResult { result_group_no: 1, result_no: 1, ..give_item_result(100) },
-            EveResult { result_group_no: 1, result_no: 2, ..give_item_result(200) },
+            EveResult {
+                result_group_no: 1,
+                result_no: 1,
+                ..give_item_result(100)
+            },
+            EveResult {
+                result_group_no: 1,
+                result_no: 2,
+                ..give_item_result(200)
+            },
         ];
         let event = event_data(4, vec![gate]);
 

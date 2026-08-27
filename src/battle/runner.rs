@@ -8,12 +8,13 @@
 use crate::battle::construction::Battle;
 use crate::battle::damage;
 use crate::battle::engine::WarInfo;
+use crate::battle::mobile_damage::{self, MobileSkillInput};
 use crate::battle::npc_world::NpcWorld;
 use crate::battle::packets;
 use crate::battle::packets::{attack_status, miss_status, troi_byte, troi_end_byte};
 use crate::battle::rng::DotNetRandom;
 use crate::battle::targeting::{self, CellInfo, GridPos};
-use crate::data::tables::{Item, Npc, Skill};
+use crate::data::tables::{BinarySkillDef, Item, Npc, Skill};
 use crate::protocol::encoder;
 use std::collections::HashMap;
 
@@ -32,10 +33,19 @@ pub struct BattleCommand {
     pub use_item: i64,
 }
 
+/// Commands collected for one round, keyed by the commanded source cell.
+///
+/// The source coordinates are already part of the PC `0x32` payload. Keying by
+/// cell preserves separate actions for a player and that player's follow-NPC /
+/// pet instead of allowing one owner-keyed command to overwrite the other.
+pub type BattleCommands = HashMap<(u8, u8), BattleCommand>;
+
 /// Read-only view over the tables the battle engine needs.
 pub struct BattleData<'a> {
     pub npcs: &'a HashMap<i64, Npc>,
     pub skills: &'a HashMap<i64, Skill>,
+    /// Optional mobile `Skill_C.dat` metadata used by the mobile formula.
+    pub mobile_skills: Option<&'a HashMap<u16, BinarySkillDef>>,
     /// Item records — used by in-battle use-item (op 0x32 sub 2) heals.
     pub items: &'a HashMap<i64, Item>,
     /// Per-player pet slot ids `[stt1..stt4]` (0 = empty), used by catch.
@@ -64,6 +74,57 @@ pub struct PlayerSnapshot {
     pub spx2: i64,
 }
 
+fn mobile_skill_def<'a>(data: &'a BattleData<'_>, skill_id: i64) -> Option<&'a BinarySkillDef> {
+    data.mobile_skills
+        .and_then(|skills| skills.get(&(skill_id as u16)))
+}
+
+fn skill_exists(data: &BattleData<'_>, skill_id: i64) -> bool {
+    data.skills.contains_key(&skill_id) || mobile_skill_def(data, skill_id).is_some()
+}
+
+fn skill_sp(data: &BattleData<'_>, skill_id: i64) -> i64 {
+    mobile_skill_def(data, skill_id)
+        .map(|skill| i64::from(skill.require_sp))
+        .or_else(|| data.skills.get(&skill_id).map(|skill| skill.sp))
+        .unwrap_or(0)
+}
+
+fn skill_round(data: &BattleData<'_>, skill_id: i64, skill_lv: i64) -> i64 {
+    mobile_skill_def(data, skill_id)
+        .map(|skill| i64::from(skill.round))
+        .unwrap_or_else(|| damage::get_turn(skill_id, skill_lv))
+}
+
+fn skill_delay(data: &BattleData<'_>, skill_id: i64) -> i64 {
+    mobile_skill_def(data, skill_id)
+        .map(|skill| i64::from(skill.spend_second))
+        .or_else(|| data.skills.get(&skill_id).map(|skill| skill.delay))
+        .unwrap_or(0)
+}
+
+fn mobile_skill_input(data: &BattleData<'_>, skill_id: i64) -> Option<MobileSkillInput> {
+    if skill_id == 10_000 {
+        return None;
+    }
+    if let Some(def) = mobile_skill_def(data, skill_id) {
+        return Some(MobileSkillInput {
+            element: def.element,
+            numerical: i64::from(def.numerical),
+            attribute: def.attribute,
+            round: i64::from(def.round),
+            hit_status: i64::from(def.hit_status),
+        });
+    }
+    data.skills.get(&skill_id).map(|skill| MobileSkillInput {
+        element: skill.thuoctinh.clamp(0, u8::MAX as i64) as u8,
+        numerical: 100,
+        attribute: if skill.skill_type == 2 { 27 } else { 28 },
+        round: 0,
+        hit_status: 0,
+    })
+}
+
 impl<'a> BattleData<'a> {
     /// Build data from live references (tests provide their own tables).
     #[allow(clippy::too_many_arguments)]
@@ -81,6 +142,7 @@ impl<'a> BattleData<'a> {
         BattleData {
             npcs,
             skills,
+            mobile_skills: None,
             items,
             pet_slots,
             world,
@@ -89,6 +151,16 @@ impl<'a> BattleData<'a> {
             players,
             texps,
         }
+    }
+
+    /// Attach the mobile binary skill catalog without changing existing test
+    /// constructors or the PC wire-facing BattleData API.
+    pub fn with_mobile_skills(
+        mut self,
+        mobile_skills: &'a HashMap<u16, BinarySkillDef>,
+    ) -> BattleData<'a> {
+        self.mobile_skills = Some(mobile_skills);
+        self
     }
 }
 
@@ -155,6 +227,8 @@ pub enum Out {
     },
     /// Pet exp grant at battle end.
     PetExp { owner: i64, stt: i64, exp: i64 },
+    /// Mobile PvE gold reward for a defeated NPC.
+    Gold { owner: i64, amount: i64 },
 }
 
 /// Battle outcome.
@@ -199,7 +273,7 @@ impl Battle {
     pub fn run_battle(
         &mut self,
         data: &BattleData,
-        commands: &HashMap<i64, BattleCommand>,
+        commands: &BattleCommands,
         out: &mut Vec<Out>,
     ) -> Outcome {
         loop {
@@ -214,7 +288,7 @@ impl Battle {
     pub fn run_turn(
         &mut self,
         data: &BattleData,
-        commands: &HashMap<i64, BattleCommand>,
+        commands: &BattleCommands,
         out: &mut Vec<Out>,
     ) -> Outcome {
         // Outcome check at loop top.
@@ -453,12 +527,7 @@ impl Battle {
 
     // ---- Phase 2: input / auto actions -----------------------------------
 
-    fn turn_phase2(
-        &mut self,
-        data: &BattleData,
-        commands: &HashMap<i64, BattleCommand>,
-        out: &mut Vec<Out>,
-    ) {
+    fn turn_phase2(&mut self, data: &BattleData, commands: &BattleCommands, out: &mut Vec<Out>) {
         for key in self.keys.clone() {
             let cell = self.list_war[&key].clone();
             if cell.id <= 0 {
@@ -475,8 +544,7 @@ impl Battle {
                 }
 
                 // Apply a submitted player command (op 0x32 sub 1 / sub 2).
-                let owner = if c.typ == 4 { c.id_char } else { c.id };
-                if let Some(cmd) = commands.get(&owner) {
+                if let Some(cmd) = commands.get(&(c.row, c.col)) {
                     if !c.attacked && c.row == cmd.row && c.col == cmd.col {
                         if cmd.use_item > 0 {
                             self.apply_use_item(data, &mut c, cmd.use_item, out);
@@ -559,7 +627,10 @@ impl Battle {
         let npc = data.npcs.get(&c.id).cloned().unwrap_or_default();
         c.id_skill =
             damage::get_random_skill_npc(&mut self.rng.random_0, npc.lv, npc.reborn, npc.skill);
-        c.lv_skill = data.skills.get(&c.id_skill).map(|s| s.lv_max).unwrap_or(1);
+        c.lv_skill = mobile_skill_def(data, c.id_skill)
+            .map(|s| i64::from(s.max_lv))
+            .or_else(|| data.skills.get(&c.id_skill).map(|s| s.lv_max))
+            .unwrap_or(1);
         c.attacked = true;
     }
 
@@ -647,7 +718,7 @@ impl Battle {
 
         // --- SP cost gate. ---
         if attacker.type3_id == 0 && attacker.attacked {
-            let cost = data.skills.get(&skill).map(|s| s.sp).unwrap_or(0);
+            let cost = skill_sp(data, skill);
             if attacker.sp >= cost {
                 if !matches!(attacker.typ, 3 | 7) {
                     let target = if attacker.id_char == 0 {
@@ -677,7 +748,7 @@ impl Battle {
             && skill > 0
             && row_attack < 4
             && col_attack < 5
-            && (data.skills.contains_key(&skill) || matches!(attacker.typ, 3 | 7));
+            && (skill_exists(data, skill) || matches!(attacker.typ, 3 | 7));
         if !skill_ok {
             attacker.attacked = true;
             self.list_war
@@ -703,13 +774,23 @@ impl Battle {
         }
 
         let skill_row = data.skills.get(&skill);
-        let skill_type = skill_row.map(|s| s.skill_type).unwrap_or(0);
+        let mobile_skill = mobile_skill_def(data, skill);
+        let skill_type = mobile_skill
+            .map(|s| i64::from(s.kind))
+            .or_else(|| skill_row.map(|s| s.skill_type))
+            .unwrap_or(0);
         let do_manh = skill_row.map(|s| s.do_manh).unwrap_or(0);
-        let num34 = skill_row.map(|s| s.sl_danh).unwrap_or(1);
+        let num34 = mobile_skill
+            .map(|s| i64::from(s.fight_area))
+            .or_else(|| skill_row.map(|s| s.sl_danh))
+            .unwrap_or(1);
         let combo_field = skill_row.map(|s| s.combo).unwrap_or(0);
         let mut num36 = 0i64;
         let mut num37 = 2.0f64;
-        let skill_tt = skill_row.map(|s| s.thuoctinh).unwrap_or(0);
+        let skill_tt = mobile_skill
+            .map(|s| i64::from(s.element))
+            .or_else(|| skill_row.map(|s| s.thuoctinh))
+            .unwrap_or(0);
 
         if skill == 13008 {
             skill = 13012;
@@ -732,57 +813,39 @@ impl Battle {
         }
 
         let count = targets.len() as u8;
+        let hit_times = mobile_skill
+            .map(|s| usize::from(s.how_much_times.max(1)))
+            .unwrap_or(1);
 
         for tpos in targets {
             ts.last_target = (tpos.row, tpos.col);
             let mut target =
                 self.list_war[&crate::battle::engine::war_key(tpos.row, tpos.col)].clone();
 
-            // Shield (20006): damage applies to the rear cell.
-            let rear_row = tpos.row ^ 1;
-            let rear = self.list_war[&crate::battle::engine::war_key(rear_row, tpos.col)].clone();
-            if (tpos.row == 3 || tpos.row == 0) && rear.id_skill == 20006 && rear.hp > 0 {
-                self.apply_damage_to_rear(
-                    data,
-                    ts,
-                    &mut attacker,
-                    &rear,
-                    tpos,
-                    &mut num36,
-                    &mut num37,
-                    num34,
-                    skill,
-                    skill_lv,
-                    skill_type,
-                    combo_field,
-                    do_manh,
-                    skill_tt,
-                    lv,
-                    atk,
-                    int_stat,
-                    avg1,
-                    avg2,
-                    out,
-                );
-                self.write_cell(&mut target, (tpos.row, tpos.col));
-                self.write_cell(&mut attacker, (row, col));
-                continue;
-            }
+            for _hit in 0..hit_times {
+                if target.hp <= 0 {
+                    break;
+                }
 
-            match skill_type {
-                1 => {
-                    self.apply_physical(
+                // Shield (20006): damage applies to the rear cell.
+                let rear_row = tpos.row ^ 1;
+                let rear =
+                    self.list_war[&crate::battle::engine::war_key(rear_row, tpos.col)].clone();
+                if (tpos.row == 3 || tpos.row == 0) && rear.id_skill == 20006 && rear.hp > 0 {
+                    self.apply_damage_to_rear(
                         data,
                         ts,
                         &mut attacker,
-                        &mut target,
+                        &rear,
+                        tpos,
                         &mut num36,
                         &mut num37,
                         num34,
-                        combo_field,
-                        do_manh,
                         skill,
                         skill_lv,
+                        skill_type,
+                        combo_field,
+                        do_manh,
                         skill_tt,
                         lv,
                         atk,
@@ -791,119 +854,161 @@ impl Battle {
                         avg2,
                         out,
                     );
-                    self.note_npc_hit(ts, &mut attacker, &target);
                     self.write_cell(&mut target, (tpos.row, tpos.col));
                     self.write_cell(&mut attacker, (row, col));
+                    continue;
                 }
-                2 => {
-                    self.apply_magic(
+
+                match skill_type {
+                    1 => {
+                        self.apply_physical(
+                            data,
+                            ts,
+                            &mut attacker,
+                            &mut target,
+                            &mut num36,
+                            &mut num37,
+                            num34,
+                            combo_field,
+                            do_manh,
+                            skill,
+                            skill_lv,
+                            skill_tt,
+                            lv,
+                            atk,
+                            int_stat,
+                            avg1,
+                            avg2,
+                            out,
+                        );
+                        self.note_npc_hit(ts, &mut attacker, &target);
+                        self.write_cell(&mut target, (tpos.row, tpos.col));
+                        self.write_cell(&mut attacker, (row, col));
+                    }
+                    2 => {
+                        self.apply_magic(
+                            data,
+                            ts,
+                            &mut attacker,
+                            &mut target,
+                            &mut num36,
+                            num34,
+                            do_manh,
+                            skill,
+                            skill_lv,
+                            skill_tt,
+                            lv,
+                            int_stat,
+                            avg1,
+                            avg2,
+                            out,
+                        );
+                        self.note_npc_hit(ts, &mut attacker, &target);
+                        self.write_cell(&mut target, (tpos.row, tpos.col));
+                        self.write_cell(&mut attacker, (row, col));
+                    }
+                    3 => self.apply_status3(
                         data,
                         ts,
                         &mut attacker,
                         &mut target,
-                        &mut num36,
-                        num34,
-                        do_manh,
                         skill,
                         skill_lv,
-                        skill_tt,
-                        lv,
-                        int_stat,
+                        row,
+                        col,
                         avg1,
                         avg2,
                         out,
-                    );
-                    self.note_npc_hit(ts, &mut attacker, &target);
-                    self.write_cell(&mut target, (tpos.row, tpos.col));
-                    self.write_cell(&mut attacker, (row, col));
-                }
-                3 => self.apply_status3(
-                    data,
-                    ts,
-                    &mut attacker,
-                    &mut target,
-                    skill,
-                    skill_lv,
-                    row,
-                    col,
-                    avg1,
-                    avg2,
-                    out,
-                ),
-                4 => self.apply_buff4(data, ts, &mut target, skill, skill_lv, out),
-                5 => self.apply_dispel5(data, ts, &mut target, skill, out),
-                6 => self.apply_sp_restore(
-                    data,
-                    ts,
-                    &mut attacker,
-                    &mut target,
-                    skill,
-                    skill_lv,
-                    out,
-                ),
-                7 => self.apply_hp_restore(
-                    data,
-                    ts,
-                    &mut attacker,
-                    &mut target,
-                    skill,
-                    skill_lv,
-                    out,
-                ),
-                8 => self.apply_revive(data, ts, &mut target, skill, skill_lv, out),
-                11 => {
-                    let r = self.apply_catch(data, ts, &mut attacker, &mut target, skill, out);
-                    if r != Outcome::Running {
-                        return r;
+                    ),
+                    4 => self.apply_buff4(data, ts, &mut target, skill, skill_lv, out),
+                    5 => self.apply_dispel5(data, ts, &mut target, skill, out),
+                    6 => self.apply_sp_restore(
+                        data,
+                        ts,
+                        &mut attacker,
+                        &mut target,
+                        skill,
+                        skill_lv,
+                        out,
+                    ),
+                    7 => self.apply_hp_restore(
+                        data,
+                        ts,
+                        &mut attacker,
+                        &mut target,
+                        skill,
+                        skill_lv,
+                        out,
+                    ),
+                    8 => self.apply_revive(data, ts, &mut target, skill, skill_lv, out),
+                    11 => {
+                        let r = self.apply_catch(data, ts, &mut attacker, &mut target, skill, out);
+                        if r != Outcome::Running {
+                            return r;
+                        }
                     }
-                }
-                12 => {
-                    let r = self.apply_flee(data, ts, &mut attacker, &mut target, skill, out);
-                    if r != Outcome::Running {
-                        return r;
+                    12 => {
+                        let r = self.apply_flee(data, ts, &mut attacker, &mut target, skill, out);
+                        if r != Outcome::Running {
+                            return r;
+                        }
                     }
+                    14 => self.apply_heal14(
+                        data,
+                        ts,
+                        &mut attacker,
+                        &mut target,
+                        skill,
+                        skill_lv,
+                        out,
+                    ),
+                    15 => self.apply_buff15(
+                        data,
+                        ts,
+                        &mut attacker,
+                        &mut target,
+                        skill,
+                        skill_lv,
+                        row,
+                        col,
+                        avg1,
+                        avg2,
+                        out,
+                    ),
+                    16 => self.apply_dispel16(data, ts, &mut target, skill, out),
+                    18 => self.apply_cleanse18(
+                        data,
+                        ts,
+                        &mut attacker,
+                        &mut target,
+                        skill,
+                        skill_lv,
+                        out,
+                    ),
+                    19 => self.apply_buff19(data, ts, &mut target, skill, skill_lv, out),
+                    _ => {}
                 }
-                14 => self.apply_heal14(data, ts, &mut attacker, &mut target, skill, skill_lv, out),
-                15 => self.apply_buff15(
-                    data,
-                    ts,
-                    &mut attacker,
-                    &mut target,
-                    skill,
-                    skill_lv,
-                    row,
-                    col,
-                    avg1,
-                    avg2,
-                    out,
-                ),
-                16 => self.apply_dispel16(data, ts, &mut target, skill, out),
-                18 => {
-                    self.apply_cleanse18(data, ts, &mut attacker, &mut target, skill, skill_lv, out)
+
+                // Attacker Type4 13005 drops after acting.
+                if attacker.type4_id == 13005 {
+                    attacker.type4_id = 0;
+                    attacker.type4_lv = 0;
+                    attacker.type4_turn = 0;
+                    out.push(Out::Broadcast(packets::troi_end(
+                        row,
+                        col,
+                        troi_end_byte::TYPE4,
+                    )));
                 }
-                19 => self.apply_buff19(data, ts, &mut target, skill, skill_lv, out),
-                _ => {}
-            }
 
-            // Attacker Type4 13005 drops after acting.
-            if attacker.type4_id == 13005 {
-                attacker.type4_id = 0;
-                attacker.type4_lv = 0;
-                attacker.type4_turn = 0;
-                out.push(Out::Broadcast(packets::troi_end(
-                    row,
-                    col,
-                    troi_end_byte::TYPE4,
-                )));
-            }
+                // Dead attacker loses the 20006 shield.
+                if hp2 <= 0 && skill == 20006 {
+                    attacker.id_skill = 0;
+                }
 
-            // Dead attacker loses the 20006 shield.
-            if hp2 <= 0 && skill == 20006 {
-                attacker.id_skill = 0;
+                self.write_cell(&mut target, (tpos.row, tpos.col));
+                self.write_cell(&mut attacker, (row, col));
             }
-
-            self.write_cell(&mut target, (tpos.row, tpos.col));
-            self.write_cell(&mut attacker, (row, col));
         }
 
         // --- Turn packet assembly. ---
@@ -1078,6 +1183,17 @@ impl Battle {
         attacker: &WarInfo,
     ) -> Vec<GridPos> {
         let cells = self.cell_infos();
+        if let Some(def) = mobile_skill_def(data, skill) {
+            let is_heal = def.element == 2 && def.attribute == 25;
+            return targeting::get_pos_attack_mobile(
+                &cells,
+                team,
+                row_attack,
+                col_attack,
+                def.fight_area,
+                is_heal,
+            );
+        }
         let mut targets = if ts.combo_active == 1 {
             targeting::get_pos_attack_combo(&cells, team, row_attack, col_attack, num34)
         } else {
@@ -1178,41 +1294,27 @@ impl Battle {
         avg2: i64,
         out: &mut Vec<Out>,
     ) {
-        let sd = data.skills.get(&skill).map(|s| s.delay).unwrap_or(0);
+        let sd = skill_delay(data, skill);
         if ts.delay == 0 || ts.delay <= sd {
             ts.delay = sd;
         }
-        let base_stat = if combo_field == 87 { int_stat } else { atk };
-        *num36 = damage::calc_physical_damage_stat(
-            base_stat,
-            target.def,
-            attacker.thuoctinh,
-            target.thuoctinh,
-            lv,
-            target.lv,
-            skill_tt,
-            do_manh,
-            skill_lv,
-            *num37,
+        let _ = (combo_field, num37, num34, do_manh, skill_tt, atk, int_stat);
+        let mobile = mobile_damage::calculate_attack(
+            &mut self.rng.random_damage,
+            attacker,
+            target,
+            mobile_skill_input(data, skill),
         );
-        damage::apply_buff_modifiers(
-            num36,
-            target.type3_id,
-            target.type3_lv,
-            target.type4_id,
-            target.type4_lv,
-            target.type15_id,
-            target.type15_lv,
-            attacker.type4_id,
-            attacker.type4_lv,
-            attacker.type15_id,
-            attacker.type15_lv,
-            attacker.type19_id,
-            attacker.type19_lv,
-            num34,
-        );
-        let mut hit =
-            damage::get_random_miss_attack(&mut self.rng.random_0, lv, target.lv, avg1, avg2);
+        *num36 = mobile.damage;
+        let mut hit = if mobile.hit {
+            if mobile.thunder {
+                2
+            } else {
+                1
+            }
+        } else {
+            0
+        };
         let mut adl = attack_status::ATTACK;
         if hit == miss_status::MISS as i64 {
             *num36 = 0;
@@ -1225,13 +1327,7 @@ impl Battle {
         } else {
             if target.id_skill == 17001 {
                 adl = attack_status::DEF;
-                *num36 = element_reduce(data, *num36, skill, attacker.thuoctinh, target.thuoctinh);
             }
-            *num36 = if *num36 < 1 {
-                1
-            } else {
-                *num36 + i64::from(self.rng.random_1.next_range(0, 2))
-            };
             if matches!(target.type4_id, 10010 | 10015 | 10031 | 13021) {
                 ts.reflect = *num36;
                 *num36 = 0;
@@ -1264,7 +1360,14 @@ impl Battle {
             1,
         ));
 
-        // Status-debuff skills 13007/13029 cast Type3 on a clean target.
+        // Mobile Skill_C status metadata applies on a clean target.
+        if mobile.inflicted_status > 0 && target.type3_id == 0 {
+            target.type3_id = mobile.inflicted_status;
+            target.type3_lv = skill_lv;
+            target.type3_turn = mobile.status_rounds;
+        }
+
+        // Legacy PC status-debuff skills 13007/13029 retain their packet-specific path.
         if matches!(skill, 13007 | 13029) && target.type3_id == 0 {
             let roll = damage::get_random_miss_troi(
                 &mut self.rng.random_0,
@@ -1358,12 +1461,12 @@ impl Battle {
         num37: &mut f64,
         num34: i64,
         skill: i64,
-        skill_lv: i64,
+        _skill_lv: i64,
         skill_type: i64,
         combo_field: i64,
         do_manh: i64,
         skill_tt: i64,
-        lv: i64,
+        _lv: i64,
         atk: i64,
         int_stat: i64,
         avg1: i64,
@@ -1372,52 +1475,26 @@ impl Battle {
     ) {
         let mut rear = rear.clone();
         if skill_type == 1 {
-            let base_stat = if combo_field == 87 { int_stat } else { atk };
-            *num36 = damage::calc_physical_damage_stat(
-                base_stat,
-                rear.def,
-                attacker.thuoctinh,
-                rear.thuoctinh,
-                lv,
-                rear.lv,
-                skill_tt,
-                do_manh,
-                skill_lv,
-                *num37,
+            let _ = (combo_field, num37, do_manh, skill_tt, atk);
+            let mobile = mobile_damage::calculate_attack(
+                &mut self.rng.random_damage,
+                attacker,
+                &rear,
+                mobile_skill_input(data, skill),
             );
+            *num36 = mobile.damage;
         } else {
-            *num36 = damage::calc_magic_damage(
-                int_stat,
-                rear.def,
-                attacker.thuoctinh,
-                rear.thuoctinh,
-                lv,
-                rear.lv,
-                skill_tt,
-                do_manh,
-                skill_lv,
-                skill,
-                num34,
+            let _ = (num37, num34, do_manh, skill_tt, int_stat);
+            let mobile = mobile_damage::calculate_attack(
+                &mut self.rng.random_damage,
+                attacker,
+                &rear,
+                mobile_skill_input(data, skill),
             );
+            *num36 = mobile.damage;
         }
-        damage::apply_buff_modifiers(
-            num36,
-            rear.type3_id,
-            rear.type3_lv,
-            rear.type4_id,
-            rear.type4_lv,
-            rear.type15_id,
-            rear.type15_lv,
-            attacker.type4_id,
-            attacker.type4_lv,
-            attacker.type15_id,
-            attacker.type15_lv,
-            attacker.type19_id,
-            attacker.type19_lv,
-            num34,
-        );
-        let mut hit =
-            damage::get_random_miss_attack(&mut self.rng.random_0, lv, rear.lv, avg1, avg2);
+        let _ = (avg1, avg2);
+        let mut hit = if *num36 > 0 { 1 } else { 0 };
         let mut adl = attack_status::ATTACK;
         if hit == miss_status::MISS as i64 {
             *num36 = 0;
@@ -1430,13 +1507,7 @@ impl Battle {
         } else {
             if rear.id_skill == 17001 {
                 adl = attack_status::DEF;
-                *num36 = element_reduce(data, *num36, skill, attacker.thuoctinh, rear.thuoctinh);
             }
-            *num36 = if *num36 < 1 {
-                1
-            } else {
-                *num36 + i64::from(self.rng.random_1.next_range(0, 2))
-            };
             if matches!(rear.type4_id, 10010 | 10015 | 10031 | 13021) {
                 *num36 = 0;
                 adl = attack_status::DEF;
@@ -1475,49 +1546,23 @@ impl Battle {
         num34: i64,
         do_manh: i64,
         skill: i64,
-        skill_lv: i64,
+        _skill_lv: i64,
         skill_tt: i64,
-        lv: i64,
+        _lv: i64,
         int_stat: i64,
         avg1: i64,
         avg2: i64,
         out: &mut Vec<Out>,
     ) {
-        ts.delay = data.skills.get(&skill).map(|s| s.delay).unwrap_or(0);
-        *num36 = damage::calc_magic_damage(
-            int_stat,
-            target.def,
-            attacker.thuoctinh,
-            target.thuoctinh,
-            lv,
-            target.lv,
-            skill_tt,
-            do_manh,
-            skill_lv,
-            skill,
-            num34,
+        ts.delay = skill_delay(data, skill);
+        let _ = (num34, do_manh, skill_tt, int_stat);
+        let mobile = mobile_damage::calculate_attack(
+            &mut self.rng.random_damage,
+            attacker,
+            target,
+            mobile_skill_input(data, skill),
         );
-        damage::apply_buff_modifiers(
-            num36,
-            target.type3_id,
-            target.type3_lv,
-            target.type4_id,
-            target.type4_lv,
-            target.type15_id,
-            target.type15_lv,
-            attacker.type4_id,
-            attacker.type4_lv,
-            attacker.type15_id,
-            attacker.type15_lv,
-            attacker.type19_id,
-            attacker.type19_lv,
-            num34,
-        );
-        *num36 = if *num36 < 1 {
-            1
-        } else {
-            *num36 + i64::from(self.rng.random_1.next_range(0, 2))
-        };
+        *num36 = mobile.damage;
         if matches!(attacker.type15_id, 10016..=10019) {
             let mut fresh = DotNetRandom::time_seeded();
             if fresh.next_range(1, 3) == 1 {
@@ -1526,8 +1571,16 @@ impl Battle {
                 *num36 = (*num36 / 10).max(1);
             }
         }
-        let mut hit =
-            damage::get_random_miss_attack(&mut self.rng.random_0, lv, target.lv, avg1, avg2);
+        let _ = (avg1, avg2);
+        let mut hit = if mobile.hit {
+            if mobile.thunder {
+                2
+            } else {
+                1
+            }
+        } else {
+            0
+        };
         let mut adl = attack_status::ATTACK;
         if hit == miss_status::MISS as i64 {
             *num36 = 0;
@@ -1540,7 +1593,6 @@ impl Battle {
         } else {
             if target.id_skill == 17001 {
                 adl = attack_status::DEF;
-                *num36 = element_reduce(data, *num36, skill, attacker.thuoctinh, target.thuoctinh);
             }
             if matches!(target.type4_id, 10010 | 10015 | 10031 | 13021) {
                 ts.reflect = *num36;
@@ -1564,6 +1616,11 @@ impl Battle {
             *num36 as u16,
             1,
         ));
+        if mobile.inflicted_status > 0 && target.type3_id == 0 {
+            target.type3_id = mobile.inflicted_status;
+            target.type3_lv = 1;
+            target.type3_turn = mobile.status_rounds;
+        }
         if matches!(target.type4_id, 10015 | 10031 | 13021) && ts.reflect > 0 {
             self.apply_reflect(attacker, ts, out);
         }
@@ -1585,8 +1642,12 @@ impl Battle {
         avg2: i64,
         out: &mut Vec<Out>,
     ) {
-        ts.delay = data.skills.get(&skill).map(|s| s.delay).unwrap_or(0);
-        let turn = damage::get_turn(skill, skill_lv);
+        ts.delay = skill_delay(data, skill);
+        let turn = skill_round(data, skill, skill_lv);
+        let status_id = mobile_skill_def(data, skill)
+            .map(|s| i64::from(s.hit_status))
+            .filter(|id| *id > 0)
+            .unwrap_or(skill);
         let mut byte_val;
         if target.type3_id > 0 {
             let (r, c) = (target.row, target.col);
@@ -1671,7 +1732,7 @@ impl Battle {
                         }
                         attacker.hp += ts.heal;
                     }
-                    target.type3_id = skill;
+                    target.type3_id = status_id;
                     target.type3_lv = skill_lv;
                     target.type3_turn = turn;
                 } else if target.type4_id == 10026 {
@@ -1684,7 +1745,7 @@ impl Battle {
                         ts.text_troi = packets::troi_start(row, col, skill as u16);
                     }
                 } else {
-                    target.type3_id = skill;
+                    target.type3_id = status_id;
                     target.type3_lv = skill_lv;
                     target.type3_turn = turn;
                 }
@@ -1715,8 +1776,8 @@ impl Battle {
         out: &mut Vec<Out>,
     ) {
         let _ = out;
-        ts.delay = data.skills.get(&skill).map(|s| s.delay).unwrap_or(0);
-        let turn = damage::get_turn(skill, skill_lv);
+        ts.delay = skill_delay(data, skill);
+        let turn = skill_round(data, skill, skill_lv);
         let (hit, adl) = if target.type4_id == 0 {
             (miss_status::ATTACK, attack_status::ATTACK)
         } else {
@@ -1744,7 +1805,7 @@ impl Battle {
         out: &mut Vec<Out>,
     ) {
         let _ = out;
-        ts.delay = data.skills.get(&skill).map(|s| s.delay).unwrap_or(0);
+        ts.delay = skill_delay(data, skill);
         let (r, c) = (target.row, target.col);
         match skill {
             11014 => {
@@ -1867,7 +1928,7 @@ impl Battle {
         skill_lv: i64,
         out: &mut Vec<Out>,
     ) {
-        ts.delay = data.skills.get(&skill).map(|s| s.delay).unwrap_or(0);
+        ts.delay = skill_delay(data, skill);
         let mut amount = damage::banker_round(attacker.int1 as f64 * 0.25) as i64;
         if skill == 11009 {
             amount = damage::banker_round(attacker.int1 as f64 * 0.05 * skill_lv as f64) as i64;
@@ -1912,16 +1973,15 @@ impl Battle {
         attacker: &mut WarInfo,
         target: &mut WarInfo,
         skill: i64,
-        skill_lv: i64,
+        _skill_lv: i64,
         out: &mut Vec<Out>,
     ) {
-        ts.delay = data.skills.get(&skill).map(|s| s.delay).unwrap_or(0);
-        let mut amount = damage::banker_round(attacker.int1 as f64 * 0.5) as i64;
-        if skill == 11010 {
-            amount = damage::banker_round(attacker.int1 as f64 * 0.1 * skill_lv as f64) as i64;
-        } else if skill == 11007 {
-            amount = damage::banker_round(attacker.int1 as f64 * 0.2 * skill_lv as f64) as i64;
-        }
+        ts.delay = skill_delay(data, skill);
+        let numerical = mobile_skill_def(data, skill)
+            .map(|s| i64::from(s.numerical))
+            .unwrap_or(100);
+        let heal_base = (attacker.int1 as f64 * 0.5 + attacker.lv as f64) as i64;
+        let mut amount = (heal_base * numerical / 100).max(1);
         if target.hp + amount <= target.hp_max {
             target.hp += amount;
             self.write_hp(target, target.hp, out);
@@ -1955,7 +2015,7 @@ impl Battle {
         skill_lv: i64,
         out: &mut Vec<Out>,
     ) {
-        ts.delay = data.skills.get(&skill).map(|s| s.delay).unwrap_or(0);
+        ts.delay = skill_delay(data, skill);
         let (hit, adl, amount);
         if target.hp <= 0 {
             amount = damage::banker_round(target.hp_max as f64 / (10.0 / skill_lv as f64)) as i64;
@@ -1991,7 +2051,7 @@ impl Battle {
         skill: i64,
         out: &mut Vec<Out>,
     ) -> Outcome {
-        ts.delay = data.skills.get(&skill).map(|s| s.delay).unwrap_or(0);
+        ts.delay = skill_delay(data, skill);
         let caster = if attacker.id_char != 0 {
             attacker.id_char
         } else {
@@ -2053,7 +2113,7 @@ impl Battle {
         skill: i64,
         out: &mut Vec<Out>,
     ) -> Outcome {
-        ts.delay = data.skills.get(&skill).map(|s| s.delay).unwrap_or(0);
+        ts.delay = skill_delay(data, skill);
         let is_leader = attacker.id == attacker.leader_id || attacker.id_char == attacker.leader_id;
         let hit = damage::get_random_miss_flee(
             &mut self.rng.random_0,
@@ -2131,7 +2191,7 @@ impl Battle {
         skill_lv: i64,
         out: &mut Vec<Out>,
     ) {
-        ts.delay = data.skills.get(&skill).map(|s| s.delay).unwrap_or(0);
+        ts.delay = skill_delay(data, skill);
         let (mut hp, mut sp) = (
             damage::banker_round(attacker.int1 as f64 * 0.5) as i64,
             damage::banker_round(attacker.int1 as f64 * 0.5) as i64,
@@ -2206,8 +2266,8 @@ impl Battle {
         out: &mut Vec<Out>,
     ) {
         let _ = out;
-        ts.delay = data.skills.get(&skill).map(|s| s.delay).unwrap_or(0);
-        let turn = damage::get_turn(skill, skill_lv);
+        ts.delay = skill_delay(data, skill);
+        let turn = skill_round(data, skill, skill_lv);
         let mut byte_val;
         if target.type15_id > 0 {
             let (r, c) = (target.row, target.col);
@@ -2295,7 +2355,7 @@ impl Battle {
         out: &mut Vec<Out>,
     ) {
         let _ = out;
-        ts.delay = data.skills.get(&skill).map(|s| s.delay).unwrap_or(0);
+        ts.delay = skill_delay(data, skill);
         let clears = match skill {
             10014 => target.type4_id == 10015,
             10009 => target.type4_id == 10010,
@@ -2334,7 +2394,7 @@ impl Battle {
         skill_lv: i64,
         out: &mut Vec<Out>,
     ) {
-        ts.delay = data.skills.get(&skill).map(|s| s.delay).unwrap_or(0);
+        ts.delay = skill_delay(data, skill);
         let (mut hp, mut sp) = (
             damage::banker_round(attacker.int1 as f64 * 0.5) as i64,
             damage::banker_round(attacker.int1 as f64 * 0.5) as i64,
@@ -2434,8 +2494,8 @@ impl Battle {
         out: &mut Vec<Out>,
     ) {
         let _ = out;
-        ts.delay = data.skills.get(&skill).map(|s| s.delay).unwrap_or(0);
-        let turn = damage::get_turn(skill, skill_lv);
+        ts.delay = skill_delay(data, skill);
+        let turn = skill_round(data, skill, skill_lv);
         let (hit, adl) = if target.type19_id == 0 {
             (miss_status::ATTACK, attack_status::ATTACK)
         } else {
@@ -2547,6 +2607,9 @@ impl Battle {
     fn apply_target_hp(&self, target: &mut WarInfo, dmg: i64, out: &mut Vec<Out>) {
         self.write_hp(target, (target.hp - dmg).max(0), out);
         target.hp -= dmg;
+        if target.hp <= 0 && dmg >= target.hp_max {
+            target.fly_out = true;
+        }
     }
 
     /// Register a hit type-7 npc for drop/exp processing.
@@ -2579,6 +2642,7 @@ impl Battle {
         for entry in &kills {
             let (npc_row, npc_col, npc_lv) = parse_cell_entry(entry);
             let mut item_id = 0i64;
+            let mut gold_reward = 0i64;
             let npc_dead = self
                 .cell(npc_row, npc_col)
                 .map(|c| c.hp <= 0)
@@ -2589,16 +2653,23 @@ impl Battle {
                     .and_then(|c| data.npcs.get(&c.id))
                 {
                     item_id = damage::get_random_drop(&mut self.rng.random_0, npc, &DROP_PERCENTS);
+                    gold_reward = npc_lv * i64::from(self.rng.random_damage.next_range(2, 6));
                 }
             }
 
             if ts.combo_cells.is_empty() {
+                let owner = if attacker.id_char != 0 {
+                    attacker.id_char
+                } else {
+                    attacker.id
+                };
+                if gold_reward > 0 && owner > 0 {
+                    out.push(Out::Gold {
+                        owner,
+                        amount: gold_reward,
+                    });
+                }
                 if item_id > 0 {
-                    let owner = if attacker.id_char != 0 {
-                        attacker.id_char
-                    } else {
-                        attacker.id
-                    };
                     out.push(Out::Drop {
                         item_id,
                         npc_row,
@@ -2615,27 +2686,18 @@ impl Battle {
                         attacker.col,
                     )));
                 }
-                if attacker.lv - npc_lv <= 20 {
-                    let exp = damage::calc_kill_exp(attacker.lv, npc_lv);
-                    if npc_dead {
-                        attacker.exp += exp;
-                    } else {
-                        attacker.exp += damage::banker_round(exp as f64 / 10.0) as i64;
-                    }
+                if attacker.lv - npc_lv <= 20 && npc_dead {
+                    attacker.exp += mobile_reward_exp(attacker.lv, npc_lv);
                 }
             }
 
             let combo_cells = std::mem::take(&mut ts.combo_cells);
             for entry in &combo_cells {
                 let (pr, pc, plv) = parse_cell_entry(entry);
-                if plv - npc_lv <= 20 {
-                    let exp = damage::calc_combo_exp(damage::calc_kill_exp(plv, npc_lv));
+                if plv - npc_lv <= 20 && npc_dead {
+                    let exp = mobile_reward_exp(plv, npc_lv);
                     if let Some(cell) = self.cell_mut(pr, pc) {
-                        if npc_dead {
-                            cell.exp += exp;
-                        } else {
-                            cell.exp += damage::banker_round(exp as f64 / 10.0) as i64;
-                        }
+                        cell.exp += exp;
                     }
                 }
                 if item_id > 0 {
@@ -2860,23 +2922,6 @@ fn add_combo_cell(ts: &mut TurnState, row: u8, col: u8, lv: i64) {
     }
 }
 
-/// `num36` element reduction when the defender guards (17001).
-fn element_reduce(data: &BattleData, dmg: i64, skill: i64, att_tt: i64, def_tt: i64) -> i64 {
-    let stt = if skill == 10000 {
-        att_tt
-    } else {
-        data.skills
-            .get(&skill)
-            .map(|s| s.thuoctinh)
-            .unwrap_or(att_tt)
-    };
-    match damage::get_thuoctinh_khac(stt, def_tt) {
-        2 => 1,
-        1 => dmg / 3,
-        _ => dmg / 5,
-    }
-}
-
 fn is_agi_buff(skill: i64) -> bool {
     matches!(skill, 10016 | 10017 | 10018 | 10019 | 10025 | 20022)
 }
@@ -2898,11 +2943,25 @@ fn avg_of(ts: &TurnState, team: i64) -> i64 {
 }
 
 /// Parse a `"row.col/lv"` cell entry.
-fn parse_cell_entry(entry: &str) -> (u8, u8, i64) {
-    let dot = entry.find('.').unwrap_or(0);
-    let slash = entry.rfind('/').unwrap_or(entry.len());
-    let row = entry[..dot].parse::<u8>().unwrap_or(0);
-    let col = entry[dot + 1..slash].parse::<u8>().unwrap_or(0);
-    let lv = entry[slash + 1..].parse::<i64>().unwrap_or(0);
+fn mobile_reward_exp(player_level: i64, npc_level: i64) -> i64 {
+    let level_diff = npc_level - player_level;
+    let level_modifier = if level_diff >= 5 {
+        1.2
+    } else if level_diff >= -5 {
+        1.0
+    } else if level_diff >= -10 {
+        0.7
+    } else {
+        0.3
+    };
+    ((npc_level as f64 * 10.0 * level_modifier).floor() as i64).max(1)
+}
+
+fn parse_cell_entry(s: &str) -> (u8, u8, i64) {
+    let dot = s.find('.').unwrap_or(0);
+    let slash = s.rfind('/').unwrap_or(s.len());
+    let row = s[..dot].parse::<u8>().unwrap_or(0);
+    let col = s[dot + 1..slash].parse::<u8>().unwrap_or(0);
+    let lv = s[slash + 1..].parse::<i64>().unwrap_or(0);
     (row, col, lv)
 }

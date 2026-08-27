@@ -104,8 +104,12 @@ fn swap_pet_slots(conn: &mut Conn, a: u8, b: u8) {
 /// needs both `pet` and `trangbi` to reflect a slot move atomically).
 async fn persist_pet_state(pool: Option<&MySqlPool>, conn: &Conn) {
     if let Some(pool) = pool {
-        db::persist::persist_sessions_transaction(Some(pool), &[&conn.session], &["pet", "trangbi"])
-            .await;
+        db::persist::persist_sessions_transaction(
+            Some(pool),
+            &[&conn.session],
+            &["pet", "trangbi"],
+        )
+        .await;
     }
 }
 
@@ -149,8 +153,7 @@ pub async fn handle_pet_actions(ctx: &mut OpcodeCtx<'_>) {
                 return;
             };
             move_pet_slot(ctx.conn, source_stt, free);
-            ctx.out
-                .send(format!("F44405001F06{:02X}0000", src_stable));
+            ctx.out.send(format!("F44405001F06{:02X}0000", src_stable));
             let pet_id = ctx
                 .conn
                 .session
@@ -283,13 +286,7 @@ pub async fn handle_pet_actions(ctx: &mut OpcodeCtx<'_>) {
             if name.is_empty() {
                 return;
             }
-            let Some(pos) = ctx
-                .conn
-                .session
-                .pets
-                .iter()
-                .position(|p| p.stt == stt)
-            else {
+            let Some(pos) = ctx.conn.session.pets.iter().position(|p| p.stt == stt) else {
                 return;
             };
             ctx.conn.session.pets[pos].name = name.to_vec();

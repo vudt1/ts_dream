@@ -1,9 +1,4 @@
-//! Targeting pickers for the battle engine (Chapter 6 §6.4).
-//!
-//! Each picker selects an anchor via its own qualification
-//! rule, then expands it by the skill's `SLDanh` into the target list. The
-//! expansions are byte-identical across variants; only the anchor rule differs.
-//! Terrain (`_Diahinh`) never influences targeting or damage.
+//! Targeting primitives for the 4x5 battle grid.
 
 /// A grid position.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -29,29 +24,120 @@ pub struct CellInfo {
     pub type4_id: i64,
 }
 
-/// Anchor qualification rules (one per `GetPosRandom*` variant).
+/// Mobile `BattleGrid.resolveTargets` using fightArea values 1–8.
+///
+/// For single/column/row/jump/cross/six/row-five, the positions are expanded
+/// exactly as the Kotlin grid helper. Area 8 is the living opposing side, and
+/// invalid or empty positions are omitted. `is_heal` makes area 8 select the
+/// attacker's own side, matching mobile heal targeting.
+pub fn get_pos_attack_mobile(
+    cells: &[CellInfo],
+    myteam: i64,
+    row: u8,
+    col: u8,
+    fight_area: u8,
+    is_heal: bool,
+) -> Vec<GridPos> {
+    let alive_at = |r: i16, c: i16| {
+        cells
+            .iter()
+            .any(|cell| cell.row == r as u8 && cell.col == c as u8 && cell.id > 0 && cell.hp > 0)
+    };
+    let push_if_alive = |targets: &mut Vec<GridPos>, r: i16, c: i16| {
+        if (0..4).contains(&r) && (0..5).contains(&c) && alive_at(r, c) {
+            targets.push(GridPos::new(r as u8, c as u8));
+        }
+    };
+
+    match fight_area {
+        1 => {
+            let mut targets = Vec::new();
+            push_if_alive(&mut targets, row as i16, col as i16);
+            targets
+        }
+        2 => {
+            let mut targets = Vec::new();
+            push_if_alive(&mut targets, row as i16, col as i16);
+            push_if_alive(&mut targets, row as i16 - 1, col as i16);
+            if targets.len() < 2 {
+                push_if_alive(&mut targets, row as i16 + 1, col as i16);
+            }
+            targets
+        }
+        3 => {
+            let mut targets = Vec::new();
+            for cell in cells
+                .iter()
+                .filter(|cell| cell.row == row && cell.id > 0 && cell.hp > 0 && cell.team != myteam)
+            {
+                targets.push(GridPos::new(cell.row, cell.col));
+            }
+            targets.into_iter().take(3).collect()
+        }
+        4 => {
+            let mut targets = Vec::new();
+            push_if_alive(&mut targets, row as i16, col as i16);
+            push_if_alive(&mut targets, row as i16 - 2, col as i16);
+            push_if_alive(&mut targets, row as i16 + 2, col as i16);
+            targets
+        }
+        5 => {
+            let mut targets = Vec::new();
+            push_if_alive(&mut targets, row as i16, col as i16);
+            push_if_alive(&mut targets, row as i16 - 1, col as i16);
+            push_if_alive(&mut targets, row as i16 + 1, col as i16);
+            push_if_alive(&mut targets, row as i16, col as i16 - 1);
+            push_if_alive(&mut targets, row as i16, col as i16 + 1);
+            targets
+        }
+        6 => {
+            let mut targets = Vec::new();
+            for r in 0..4 {
+                push_if_alive(&mut targets, r, col as i16);
+            }
+            targets
+        }
+        7 => {
+            let mut targets = Vec::new();
+            for c in 0..5 {
+                push_if_alive(&mut targets, row as i16, c);
+            }
+            targets
+        }
+        8 => {
+            let wanted_team = if is_heal { myteam } else { -myteam };
+            cells
+                .iter()
+                .filter(|cell| {
+                    cell.id > 0
+                        && cell.hp > 0
+                        && if is_heal {
+                            cell.team == wanted_team
+                        } else {
+                            cell.team != myteam && cell.team != wanted_team
+                        }
+                })
+                .map(|cell| GridPos::new(cell.row, cell.col))
+                .collect()
+        }
+        _ => Vec::new(),
+    }
+}
+
+/// Anchor qualification rules for the original PC targeting path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AnchorRule {
-    /// Default hostile anchor: enemy team, hp>0, type4 ∉ {13005,13025,13032}.
     Hostile,
-    /// Hostile variant: enemy team, hp>0, no type4 exclusion.
     HostileAnyType4,
-    /// Combo anchor: requested cell qualifies with `id>0 && enemy` only
-    /// (may be dead); the fallback scan uses the full Hostile rule.
     Combo,
-    /// Friendly anchor: same team, hp>0.
     Friendly,
-    /// Any-entity anchor: any entity with id>0 (no team/hp requirement).
     Any,
 }
 
-/// `_Type4_Id` exclusion set for the default hostile rules.
 pub fn excluded_type4(id: i64) -> bool {
     matches!(id, 13005 | 13025 | 13032)
 }
 
-/// Whether `c` qualifies under `rule`. `for_requested` selects the Combo rule's
-/// relaxed requested-cell check vs its strict fallback scan.
 fn qualifies(c: &CellInfo, myteam: i64, rule: AnchorRule, for_requested: bool) -> bool {
     if c.id <= 0 {
         return false;
@@ -71,8 +157,6 @@ fn qualifies(c: &CellInfo, myteam: i64, rule: AnchorRule, for_requested: bool) -
     }
 }
 
-/// Pick the anchor point: the requested cell if it qualifies, else the first
-/// qualifying cell in grid (`cells`) order. Returns `NO_TARGET` (99,99) if none.
 pub fn pick_anchor(cells: &[CellInfo], myteam: i64, row: u8, col: u8, rule: AnchorRule) -> GridPos {
     if let Some(c) = cells
         .iter()
@@ -88,13 +172,6 @@ pub fn pick_anchor(cells: &[CellInfo], myteam: i64, row: u8, col: u8, rule: Anch
     NO_TARGET
 }
 
-/// Expand an anchor position into a target list based on `sl_danh` (§4 in research).
-///
-/// The `alive_at` closure checks whether the cell at (row, col) has hp > 0 and id > 0.
-/// Expansion rules:
-///   1 = anchor; 2 = +opposite-row; 3 = +left/right; 4 = +left/right (dead→anchor);
-///   5 = +left/right+opposite; 6 = +left/right+opposite+opposite-diagonals;
-///   7 = all alive cells of the anchor ROW (all columns); 8 = anchor row + opposite row.
 pub fn expand_sl_danh<F>(anchor: GridPos, sl_danh: i64, alive_at: F) -> Vec<GridPos>
 where
     F: Fn(u8, u8) -> bool,
@@ -102,11 +179,8 @@ where
     let mut targets = Vec::new();
     let r = anchor.row;
     let c = anchor.col;
-
     match sl_danh {
-        1 => {
-            targets.push(anchor);
-        }
+        1 => targets.push(anchor),
         2 => {
             targets.push(anchor);
             let opp = r ^ 1;
@@ -126,18 +200,18 @@ where
         4 => {
             targets.push(anchor);
             if c > 0 {
-                if alive_at(r, c - 1) {
-                    targets.push(GridPos::new(r, c - 1));
+                targets.push(if alive_at(r, c - 1) {
+                    GridPos::new(r, c - 1)
                 } else {
-                    targets.push(anchor);
-                }
+                    anchor
+                });
             }
             if c < 4 {
-                if alive_at(r, c + 1) {
-                    targets.push(GridPos::new(r, c + 1));
+                targets.push(if alive_at(r, c + 1) {
+                    GridPos::new(r, c + 1)
                 } else {
-                    targets.push(anchor);
-                }
+                    anchor
+                });
             }
         }
         5 => {
@@ -173,7 +247,6 @@ where
             }
         }
         7 => {
-            // Area 7 iterates columns 0..4 keeping the anchor row.
             for col in 0..5u8 {
                 if alive_at(r, col) {
                     targets.push(GridPos::new(r, col));
@@ -196,22 +269,17 @@ where
         }
         _ => targets.push(anchor),
     }
-
     targets
 }
 
-/// Sentinel "no target" position.
 pub const NO_TARGET: GridPos = GridPos { row: 99, col: 99 };
 
-/// Check if a target is valid (not the sentinel).
 pub fn is_valid_target(pos: GridPos) -> bool {
     pos.row < 4
 }
 
-/// Column iteration order for anchor selection: 2, 1, 3, 0, 4.
 pub const COL_ORDER: [u8; 5] = [2, 1, 3, 0, 4];
 
-/// Run one full picker: anchor selection + SLDanh expansion.
 pub fn get_pos_attack(
     cells: &[CellInfo],
     myteam: i64,
@@ -232,7 +300,6 @@ pub fn get_pos_attack(
     expand_sl_danh(anchor, sl_danh, alive_at)
 }
 
-/// Default hostile targeting.
 pub fn get_pos_attack_default(
     cells: &[CellInfo],
     myteam: i64,
@@ -243,7 +310,6 @@ pub fn get_pos_attack_default(
     get_pos_attack(cells, myteam, row, col, sl_danh, AnchorRule::Hostile)
 }
 
-/// Same expansion, combo anchor rule.
 pub fn get_pos_attack_combo(
     cells: &[CellInfo],
     myteam: i64,
@@ -254,7 +320,6 @@ pub fn get_pos_attack_combo(
     get_pos_attack(cells, myteam, row, col, sl_danh, AnchorRule::Combo)
 }
 
-/// Hostile with no type4 exclusion.
 pub fn get_pos_attack_tg(
     cells: &[CellInfo],
     myteam: i64,
@@ -272,7 +337,6 @@ pub fn get_pos_attack_tg(
     )
 }
 
-/// Default hostile rule (same as `get_pos_attack_default`).
 pub fn get_pos_attack_3_15(
     cells: &[CellInfo],
     myteam: i64,
@@ -280,21 +344,9 @@ pub fn get_pos_attack_3_15(
     col: u8,
     sl_danh: i64,
 ) -> Vec<GridPos> {
-    get_pos_attack(cells, myteam, row, col, sl_danh, AnchorRule::Hostile)
+    get_pos_attack_default(cells, myteam, row, col, sl_danh)
 }
 
-/// Any-entity targeting (dispel/cleanse).
-pub fn get_pos_attack_giai_tru(
-    cells: &[CellInfo],
-    myteam: i64,
-    row: u8,
-    col: u8,
-    sl_danh: i64,
-) -> Vec<GridPos> {
-    get_pos_attack(cells, myteam, row, col, sl_danh, AnchorRule::Any)
-}
-
-/// Own-team buffs/heals.
 pub fn get_pos_attack_type4(
     cells: &[CellInfo],
     myteam: i64,
@@ -305,7 +357,6 @@ pub fn get_pos_attack_type4(
     get_pos_attack(cells, myteam, row, col, sl_danh, AnchorRule::Friendly)
 }
 
-/// Own-team splash (berserk).
 pub fn get_pos_attack_hon_loan(
     cells: &[CellInfo],
     myteam: i64,
@@ -313,5 +364,49 @@ pub fn get_pos_attack_hon_loan(
     col: u8,
     sl_danh: i64,
 ) -> Vec<GridPos> {
-    get_pos_attack(cells, myteam, row, col, sl_danh, AnchorRule::Friendly)
+    get_pos_attack_default(cells, myteam, row, col, sl_danh)
+}
+
+pub fn get_pos_attack_giai_tru(
+    cells: &[CellInfo],
+    myteam: i64,
+    row: u8,
+    col: u8,
+    sl_danh: i64,
+) -> Vec<GridPos> {
+    get_pos_attack(cells, myteam, row, col, sl_danh, AnchorRule::Any)
+}
+
+#[cfg(test)]
+mod mobile_tests {
+    use super::*;
+
+    fn cell(row: u8, col: u8, team: i64) -> CellInfo {
+        CellInfo {
+            row,
+            col,
+            id: 1,
+            hp: 100,
+            team,
+            type4_id: 0,
+        }
+    }
+
+    #[test]
+    fn mobile_area_two_prefers_the_adjacent_front_row() {
+        let cells = vec![cell(0, 2, 2), cell(1, 2, 2)];
+        assert_eq!(
+            get_pos_attack_mobile(&cells, 1, 0, 2, 2, false),
+            vec![GridPos::new(0, 2), GridPos::new(1, 2)]
+        );
+    }
+
+    #[test]
+    fn mobile_heal_area_eight_selects_only_own_side() {
+        let cells = vec![cell(0, 2, 2), cell(3, 2, 1), cell(3, 1, 1)];
+        assert_eq!(
+            get_pos_attack_mobile(&cells, 1, 3, 2, 8, true),
+            vec![GridPos::new(3, 2), GridPos::new(3, 1)]
+        );
+    }
 }

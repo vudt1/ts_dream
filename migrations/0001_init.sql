@@ -1,8 +1,3 @@
--- TS Dream — MySQL 8 schema (Chapter 5). Shared database `ts_dream`.
--- Every game-text column is explicitly CHARACTER SET latin1 (COLLATE latin1_bin)
--- so VISCII byte names (0x80–0xFF) round-trip without utf8mb4 transcoding.
--- No FOREIGN KEY / NOT NULL beyond the legacy Access schema (parity).
-
 -- ============================================================================
 -- accounts — created exclusively through the web dashboard (Chapter 5 §5.8).
 -- Passwords kept plaintext (parity with the C# server).
@@ -10,225 +5,266 @@
 CREATE TABLE IF NOT EXISTS accounts (
     player_id    BIGINT AUTO_INCREMENT PRIMARY KEY,
     pass1 VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_bin NOT NULL,
-    pass2 VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_bin NOT NULL
+    pass2 VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_bin NOT NULL,
+	password_hash VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_bin NULL,
+	is_suspended TINYINT(1) NOT NULL DEFAULT 0,
+	suspension_reason VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_bin NULL,
+	suspended_until BIGINT NULL,
+	last_login_at BIGINT NULL,
+	created_at BIGINT NOT NULL,
+	updated_at BIGINT NULL,
+	last_login_ip VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_bin NULL,
+	gm_level INT NOT NULL DEFAULT 0
 ) ENGINE = InnoDB AUTO_INCREMENT = 300000 
   DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
 
--- ============================================================================
--- players — one row per created character; its id doubles as the account id.
--- Numeric Access DOUBLE -> BIGINT; defaults kept verbatim.
--- ============================================================================
-CREATE TABLE IF NOT EXISTS players (
-    player_id         BIGINT PRIMARY KEY,
-    Name              VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_bin,
-    Lv                BIGINT DEFAULT 1,
-    Hp                BIGINT DEFAULT 0,
-    HpMax             BIGINT DEFAULT 0,
-    Sp                BIGINT DEFAULT 0,
-    SpMax             BIGINT DEFAULT 0,
-    Point             BIGINT DEFAULT 0,
-    SkillPoint        BIGINT DEFAULT 0,
-    `Int`             BIGINT DEFAULT 0,
-    Atk               BIGINT DEFAULT 0,
-    Def               BIGINT DEFAULT 0,
-    Hpx               BIGINT DEFAULT 0,
-    Spx               BIGINT DEFAULT 0,
-    Agi               BIGINT DEFAULT 0,
-    Int2              BIGINT DEFAULT 0,
-    Atk2              BIGINT DEFAULT 0,
-    Def2              BIGINT DEFAULT 0,
-    Hpx2              BIGINT DEFAULT 0,
-    Spx2              BIGINT DEFAULT 0,
-    Agi2              BIGINT DEFAULT 0,
-    Texp              BIGINT DEFAULT 0,
-    MapId             BIGINT DEFAULT 0,
-    MapX              BIGINT DEFAULT 0,
-    MapY              BIGINT DEFAULT 0,
-    Reborn            BIGINT DEFAULT 0,
-    Job               BIGINT DEFAULT 0,
-    Sex               BIGINT DEFAULT 0,
-    Hair              BIGINT DEFAULT 0,
-    Thuoctinh         BIGINT DEFAULT 0,
-    Ghost             BIGINT DEFAULT 0,
-    God               BIGINT DEFAULT 0,
-    Color             VARCHAR(16) CHARACTER SET latin1 COLLATE latin1_bin,
-    Gold              BIGINT DEFAULT 0,
-    BankGold          BIGINT DEFAULT 0,
-    Tiengtam          BIGINT DEFAULT 0,
-    Gocnhin           BIGINT DEFAULT 0,
-    SttPetXuatchien   BIGINT DEFAULT 0,
-    Pk                BIGINT DEFAULT 0,
-    ThamChien         BIGINT DEFAULT 0,
-    ShopPoint         BIGINT DEFAULT 0,
-    SP_Store          BIGINT DEFAULT 10000,
-    HP_Store          BIGINT DEFAULT 10000,
-    DTT               BIGINT DEFAULT 0,
-    TLP               BIGINT DEFAULT 0,
-    TCP               BIGINT DEFAULT 0,
-    TTP               BIGINT DEFAULT 0,
-    savemap           BIGINT DEFAULT 0,
-    tanthu            BIGINT DEFAULT 0,
-    phien             BIGINT DEFAULT 0,
-    PTS               BIGINT DEFAULT 0,
-    KEY players_mapid (MapId)
+ALTER TABLE accounts
+    ADD KEY accounts_suspended_idx (is_suspended, suspended_until),
+    ADD KEY accounts_gm_level_idx (gm_level);
+ALTER TABLE accounts
+    ADD CONSTRAINT accounts_gm_level_nonnegative CHECK (gm_level >= 0);
+
+
+CREATE TABLE IF NOT EXISTS gm_audit_log (
+    id            BIGINT AUTO_INCREMENT PRIMARY KEY,
+    actor_account_id BIGINT NULL,
+    actor_gm_level INT NOT NULL DEFAULT 0,
+    target_account_id BIGINT NULL,
+    action        VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_bin NOT NULL,
+    details       TEXT CHARACTER SET latin1 COLLATE latin1_bin NULL,
+    created_at    BIGINT NOT NULL,
+    KEY gm_audit_actor_idx (actor_account_id, created_at),
+    KEY gm_audit_target_idx (target_account_id, created_at),
+    KEY gm_audit_action_idx (action, created_at)
 ) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
+
+-- TS Dream — modern 3NF schema.
+--
+-- Normalized target relations for the runtime cutover from 0001:
+-- STATUS: modern repository implementations exist, but the current live Rust
+-- login/autosave path still targets selected 0001 tables. Do not remove 0001
+-- until dual-read/dual-write or a verified data migration has completed.
+--   accounts (0001) 1:1 characters 1:1 character_money
+--     (the PC server supports exactly ONE character per account; the UNIQUE
+--      key on characters.account_id enforces it at the schema level)
+--   characters 1:N inventories (unifies the legacy pouches homdo / trangbi
+--     into one table keyed by
+--     (character_id, storage_type, slot) with the full 35-byte ThingData
+--     attribute set)
+--   characters 1:N character_pets across four pet storages
+--     (1=Carried, 2=Cart, 3=Hotel, 4=Warehouse)
+--   missions / bit flags / completed events / friends / mails round out the
+--     persistence surface ticket 07's handlers will bind to.
+--
+-- Conventions kept from 0001:
+--   - Every game-text column is CHARACTER SET latin1 COLLATE latin1_bin so
+--     raw VISCII bytes (0x80-0xFF) round-trip without utf8mb4 transcoding.
+--   - No FOREIGN KEY constraints and no NOT NULL beyond what a row needs to
+--     be addressable (legacy Access parity; referential integrity is owned
+--     by the repository layer).
+
 
 -- ============================================================================
--- 6 gameplay tables (shared schema, per-player composite PK incl. player_id).
--- The three never-wired legacy pouches (`tientrang` / `tuideo` / `luulang`)
--- were removed after a usage audit: no handler or persist path ever targets
--- them; their runtime state stays in-memory only.
+-- characters — the single playable character of one account (1:1; the PC
+-- server never supports multiple avatars per account).
 -- ============================================================================
+CREATE TABLE IF NOT EXISTS characters (
+    character_id  BIGINT NOT NULL PRIMARY KEY,
+    name        VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_bin NOT NULL,
+    level       BIGINT DEFAULT 1,
+    job         BIGINT DEFAULT 0,
+    sex         BIGINT DEFAULT 0,
+    hair        BIGINT DEFAULT 0,
+    element     BIGINT DEFAULT 0,
+    reborn      BIGINT DEFAULT 0,
+    hp          BIGINT DEFAULT 0,
+    hp_max      BIGINT DEFAULT 0,
+    sp          BIGINT DEFAULT 0,
+    sp_max      BIGINT DEFAULT 0,
+    stat_point  BIGINT DEFAULT 0,
+    skill_point BIGINT DEFAULT 0,
+    int_attr    BIGINT DEFAULT 0,
+    atk         BIGINT DEFAULT 0,
+    def         BIGINT DEFAULT 0,
+    hpx         BIGINT DEFAULT 0,
+    spx         BIGINT DEFAULT 0,
+    agi         BIGINT DEFAULT 0,
+    map_id      BIGINT DEFAULT 0,
+    map_x       BIGINT DEFAULT 0,
+    map_y       BIGINT DEFAULT 0,
+    created_at  BIGINT DEFAULT 0,
+    KEY characters_name (name)
+) ENGINE=InnoDB AUTO_INCREMENT = 300000
+  DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
 
--- Homdo — inventory slots.
-CREATE TABLE IF NOT EXISTS homdo (
-    player_id BIGINT NOT NULL,
-    Slot      BIGINT NOT NULL,
-    Id        BIGINT DEFAULT 0,
-    `Count`   BIGINT DEFAULT 0,
-    Lv        BIGINT DEFAULT 0,
-    DoBen     BIGINT DEFAULT 0,
-    Int1      BIGINT DEFAULT 0,
-    Atk1      BIGINT DEFAULT 0,
-    Def1      BIGINT DEFAULT 0,
-    Hpx1      BIGINT DEFAULT 0,
-    Spx1      BIGINT DEFAULT 0,
-    Agi1      BIGINT DEFAULT 0,
-    Fai1      BIGINT DEFAULT 0,
-    Int2      BIGINT DEFAULT 0,
-    Atk2      BIGINT DEFAULT 0,
-    Def2      BIGINT DEFAULT 0,
-    Hpx2      BIGINT DEFAULT 0,
-    Spx2      BIGINT DEFAULT 0,
-    Agi2      BIGINT DEFAULT 0,
-    Fai2      BIGINT DEFAULT 0,
-    Hp        BIGINT DEFAULT 0,
-    Sp        BIGINT DEFAULT 0,
-    `Long`    BIGINT DEFAULT 0,
-    GiatriLong BIGINT DEFAULT 0,
-    Khang     BIGINT DEFAULT 0,
-    Thuoctinh BIGINT DEFAULT 0,
-    GiatriThuoctinh BIGINT DEFAULT 0,
-    Loai      BIGINT DEFAULT 0,
-    Texp      BIGINT DEFAULT 0,
-    PRIMARY KEY (player_id, Slot)
+-- ============================================================================
+-- character_money — currency ledger split out of the character row so gold
+-- mutations (shop buy, bank transfer, trade) stay narrow and lockable.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS character_money (
+    character_id BIGINT PRIMARY KEY,
+    gold         BIGINT DEFAULT 0,
+    bank_gold    BIGINT DEFAULT 0,
+    shop_point   BIGINT DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
 
--- LuuLang (storage) — REMOVED: no runtime caller ever read or wrote it;
--- the storage pouch lives in Session memory only (wire op 0x1766).
-
--- Pet.
-CREATE TABLE IF NOT EXISTS pet (
-    player_id BIGINT NOT NULL,
-    Stt       BIGINT NOT NULL,
-    Id        BIGINT DEFAULT 0,
-    Name      VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_bin,
-    Lv        BIGINT DEFAULT 0,
-    Thuoctinh BIGINT DEFAULT 0,
-    Reborn    BIGINT DEFAULT 0,
-    Hp        BIGINT DEFAULT 0,
-    HpMax     BIGINT DEFAULT 0,
-    Sp        BIGINT DEFAULT 0,
-    SpMax     BIGINT DEFAULT 0,
-    `Int`     BIGINT DEFAULT 0,
-    Atk       BIGINT DEFAULT 0,
-    Def       BIGINT DEFAULT 0,
-    Hpx       BIGINT DEFAULT 0,
-    Spx       BIGINT DEFAULT 0,
-    Agi       BIGINT DEFAULT 0,
-    Fai       BIGINT DEFAULT 0,
-    Texp      BIGINT DEFAULT 0,
-    Int2      BIGINT DEFAULT 0,
-    Atk2      BIGINT DEFAULT 0,
-    Def2      BIGINT DEFAULT 0,
-    Hpx2      BIGINT DEFAULT 0,
-    Spx2      BIGINT DEFAULT 0,
-    Thd       BIGINT DEFAULT 0,
-    SkillPoint BIGINT DEFAULT 0,
-    Quest     BIGINT DEFAULT 0,
-    Idskill1  BIGINT DEFAULT 0,
-	LvSkill1 BIGINT DEFAULT 0,
-    IdSkill2  BIGINT DEFAULT 0,
-	LvSkill2 BIGINT DEFAULT 0,
-    IdSkill3  BIGINT DEFAULT 0,
-	LvSkill3 BIGINT DEFAULT 0,
-    IdSkill4  BIGINT DEFAULT 0,
-	LvSkill4 BIGINT DEFAULT 0,
-    Agi2      BIGINT DEFAULT 0,
-    KEY pet_idskill1 (Idskill1),
-    KEY pet_idskill2 (Idskill2),
-    KEY pet_idskill3 (Idskill3),
-    KEY pet_idskill4 (Idskill4),
-    PRIMARY KEY (player_id, Stt)
+-- ============================================================================
+-- inventories — single item storage for every container type.
+-- storage_type: 1=Bag, 2=Secondary bag, 4=Bank, 8=Equip, 16=Warehouse.
+-- Item columns mirror the 20 fields of the 35-byte ThingData wire struct
+-- exactly (see src/protocol/codecs/thing_data.rs), Little-Endian on the wire,
+-- one column per field here.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS inventories (
+    character_id    BIGINT NOT NULL,
+    storage_type    TINYINT UNSIGNED NOT NULL,
+    slot            SMALLINT UNSIGNED NOT NULL,
+    item_id         SMALLINT UNSIGNED DEFAULT 0,
+    quantity        INT DEFAULT 0,
+    damage          TINYINT UNSIGNED DEFAULT 0,
+    element         TINYINT UNSIGNED DEFAULT 0,
+    element_value   TINYINT UNSIGNED DEFAULT 0,
+    proof_kind      TINYINT UNSIGNED DEFAULT 0,
+    grow_level      TINYINT UNSIGNED DEFAULT 0,
+    grow_exp        INT DEFAULT 0,
+    special_kind    TINYINT UNSIGNED DEFAULT 0,
+    stone_attr      TINYINT UNSIGNED DEFAULT 0,
+    stone_level     TINYINT UNSIGNED DEFAULT 0,
+    enhance_level   TINYINT UNSIGNED DEFAULT 0,
+    delete_time     DOUBLE DEFAULT 0,
+    damaged_item_id SMALLINT UNSIGNED DEFAULT 0,
+    is_locked       TINYINT(1) DEFAULT 0,
+    reinforced      TINYINT UNSIGNED DEFAULT 0,
+    affix1          TINYINT UNSIGNED DEFAULT 0,
+    affix2          TINYINT UNSIGNED DEFAULT 0,
+    affix3          TINYINT UNSIGNED DEFAULT 0,
+    style_level     TINYINT UNSIGNED DEFAULT 0,
+    PRIMARY KEY (character_id, storage_type, slot),
+    KEY inventories_item (character_id, item_id)
 ) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
 
--- Quest — no PK (Access has none); keep a KEY on QuestId. Do NOT invent
--- NOT NULL / UNIQUE.
-CREATE TABLE IF NOT EXISTS quest (
-    player_id BIGINT NOT NULL,
-    QuestId   BIGINT DEFAULT 0,
-    MapId     BIGINT DEFAULT 0,
-    NpcId     BIGINT DEFAULT 0,
-    WarpId    BIGINT DEFAULT 0,
-    Step      BIGINT DEFAULT 0,
-    KEY quest_questid (QuestId)
+-- ============================================================================
+-- character_pets — general (general) storage across four warehouses:
+-- storage_type: 1=Carried, 2=Cart, 3=Hotel, 4=Warehouse.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS character_pets (
+    character_id  BIGINT NOT NULL,
+    storage_type  TINYINT UNSIGNED NOT NULL,
+    slot          SMALLINT UNSIGNED NOT NULL,
+    pet_id        SMALLINT UNSIGNED DEFAULT 0,
+    name          VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_bin,
+    level         BIGINT DEFAULT 1,
+    element       BIGINT DEFAULT 0,
+    reborn        BIGINT DEFAULT 0,
+    hp            BIGINT DEFAULT 0,
+    hp_max        BIGINT DEFAULT 0,
+    sp            BIGINT DEFAULT 0,
+    sp_max        BIGINT DEFAULT 0,
+    int_attr      BIGINT DEFAULT 0,
+    atk           BIGINT DEFAULT 0,
+    def           BIGINT DEFAULT 0,
+    hpx           BIGINT DEFAULT 0,
+    spx           BIGINT DEFAULT 0,
+    agi           BIGINT DEFAULT 0,
+    fai           BIGINT DEFAULT 0,
+    texp          BIGINT DEFAULT 0,
+    skill_point   BIGINT DEFAULT 0,
+    thd           BIGINT DEFAULT 0,
+    skill1_id     BIGINT DEFAULT 0,
+    skill1_level  BIGINT DEFAULT 0,
+    skill2_id     BIGINT DEFAULT 0,
+    skill2_level  BIGINT DEFAULT 0,
+    skill3_id     BIGINT DEFAULT 0,
+    skill3_level  BIGINT DEFAULT 0,
+    skill4_id     BIGINT DEFAULT 0,
+    skill4_level  BIGINT DEFAULT 0,
+    quest         BIGINT DEFAULT 0,
+    PRIMARY KEY (character_id, storage_type, slot)
 ) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
 
--- Skill.
-CREATE TABLE IF NOT EXISTS skill (
-    player_id BIGINT NOT NULL,
-    Id        BIGINT NOT NULL,
-    Lv        BIGINT DEFAULT 1,
-    Sp        BIGINT DEFAULT 0,
-    Save      BIGINT DEFAULT 0,
-    PRIMARY KEY (player_id, Id)
+-- ============================================================================
+-- character_skills / character_hotkeys — learned skills and the 10-slot
+-- hotbar (parity with legacy `skill` / `skillsave`).
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS character_skills (
+    character_id BIGINT NOT NULL,
+    skill_id     BIGINT NOT NULL,
+    level        BIGINT DEFAULT 1,
+    sp           BIGINT DEFAULT 0,
+    save_flag    BIGINT DEFAULT 0,
+    PRIMARY KEY (character_id, skill_id)
 ) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
 
--- SkillSave (hotbar). Saed rows 1..10 / IdSkill 0 at character creation (C#
--- never INSERTs; it only UPDATEs).
-CREATE TABLE IF NOT EXISTS skillsave (
-    player_id BIGINT NOT NULL,
-    ID        BIGINT NOT NULL,
-    IdSkill   BIGINT DEFAULT 0,
-    KEY skillsave_idskill (IdSkill),
-    PRIMARY KEY (player_id, ID)
+CREATE TABLE IF NOT EXISTS character_hotkeys (
+    character_id BIGINT NOT NULL,
+    slot         TINYINT UNSIGNED NOT NULL,
+    skill_id     BIGINT DEFAULT 0,
+    PRIMARY KEY (character_id, slot)
 ) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
 
--- Trangbi (equip). TienTrang / Tuideo — REMOVED: no runtime caller ever
--- read or wrote them; the pouches live in Session memory only
--- (wire ops 0x1E01 / 0x172F).
-CREATE TABLE IF NOT EXISTS trangbi (
-    player_id BIGINT NOT NULL,
-    Slot      BIGINT NOT NULL,
-    Id BIGINT DEFAULT 0, 
-	`Count` BIGINT DEFAULT 0,
-	Lv BIGINT DEFAULT 0 ,
-	DoBen BIGINT DEFAULT 0,
-    Int1 BIGINT DEFAULT 0,
-	Atk1 BIGINT DEFAULT 0, 
-	Def1 BIGINT DEFAULT 0,
-	Hpx1 BIGINT DEFAULT 0,
-	Spx1 BIGINT DEFAULT 0,
-	Agi1 BIGINT DEFAULT 0,
-	Fai1 BIGINT DEFAULT 0,
-    Int2 BIGINT DEFAULT 0,
-	Atk2 BIGINT DEFAULT 0,
-	Def2 BIGINT DEFAULT 0,
-	Hpx2 BIGINT DEFAULT 0,
-	Spx2 BIGINT DEFAULT 0,
-	Agi2 BIGINT DEFAULT 0,
-	Fai2 BIGINT DEFAULT 0,
-    Hp BIGINT DEFAULT 0,
-	Sp BIGINT DEFAULT 0,
-	`Long` BIGINT DEFAULT 0,
-	GiatriLong BIGINT DEFAULT 0,
-	Khang BIGINT DEFAULT 0,
-    Thuoctinh BIGINT DEFAULT 0,
-	GiatriThuoctinh BIGINT DEFAULT 0,
-	Loai BIGINT DEFAULT 0,
-	Texp BIGINT DEFAULT 0,
-    PRIMARY KEY (player_id, Slot)
+-- ============================================================================
+-- Missions, permanent flags and completed events.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS character_missions (
+    character_id BIGINT NOT NULL,
+    mission_id   BIGINT NOT NULL,
+    step         BIGINT DEFAULT 0,
+    state        BIGINT DEFAULT 0,
+    updated_at   BIGINT DEFAULT 0,
+    PRIMARY KEY (character_id, mission_id)
 ) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
+
+CREATE TABLE IF NOT EXISTS character_mission_flags (
+    character_id BIGINT NOT NULL,
+    mission_id   BIGINT NOT NULL,
+    flag_key     VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_bin NOT NULL,
+    flag_value   BIGINT DEFAULT 0,
+    PRIMARY KEY (character_id, mission_id, flag_key)
+) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
+
+-- Forever flags: one row per permanently-latched bit index.
+CREATE TABLE IF NOT EXISTS character_bit_flags (
+    character_id BIGINT NOT NULL,
+    flag_index   INT UNSIGNED NOT NULL,
+    set_at       BIGINT DEFAULT 0,
+    PRIMARY KEY (character_id, flag_index)
+) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
+
+CREATE TABLE IF NOT EXISTS character_completed_events (
+    character_id BIGINT NOT NULL,
+    event_id     BIGINT NOT NULL,
+    completed_at BIGINT DEFAULT 0,
+    PRIMARY KEY (character_id, event_id)
+) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
+
+-- ============================================================================
+-- friends — symmetric pair rows owned by the repository layer (no FK).
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS friends (
+    character_id BIGINT NOT NULL,
+    friend_id    BIGINT NOT NULL,
+    remark       VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_bin,
+    PRIMARY KEY (character_id, friend_id)
+) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
+
+-- ============================================================================
+-- mails — mailbox rows; attachments are carried as item + count until
+-- claimed (mail_attachments stays out until the mail system ships).
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS mails (
+    mail_id             BIGINT AUTO_INCREMENT PRIMARY KEY,
+    sender_id           BIGINT DEFAULT 0,
+    receiver_id         BIGINT NOT NULL,
+    title               VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_bin,
+    body                TEXT CHARACTER SET latin1 COLLATE latin1_bin,
+    gold                BIGINT DEFAULT 0,
+    attachment_item_id  SMALLINT UNSIGNED DEFAULT 0,
+    attachment_count    INT DEFAULT 0,
+    sent_at             BIGINT DEFAULT 0,
+    claimed             TINYINT(1) DEFAULT 0,
+    KEY mails_receiver (receiver_id)
+) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
+
 
 -- ============================================================================
 -- item_code — redeemable gift codes (op 0x23 sub 3). Fully functional.

@@ -1,6 +1,9 @@
 -- TS Dream — modern 3NF schema (ticket 06).
 --
--- Normalized relations on top of the legacy tables from 0001:
+-- Normalized target relations for the runtime cutover from 0001:
+-- STATUS: modern repository implementations exist, but the current live Rust
+-- login/autosave path still targets selected 0001 tables. Do not remove 0001
+-- until dual-read/dual-write or a verified data migration has completed.
 --   accounts (0001) 1:1 characters 1:1 character_money
 --     (the PC server supports exactly ONE character per account; the UNIQUE
 --      key on characters.account_id enforces it at the schema level)

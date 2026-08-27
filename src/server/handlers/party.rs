@@ -23,11 +23,7 @@ pub fn handle_party(ctx: &mut OpcodeCtx) {
                 return; // only the party leader designates.
             }
             let member = encoder::u32_le_slice(&payload[0..4]);
-            let eligible = conn
-                .session
-                .id_mem
-                .iter()
-                .any(|m| *m == member && *m > 0);
+            let eligible = conn.session.id_mem.iter().any(|m| *m == member && *m > 0);
             if !eligible {
                 return;
             }

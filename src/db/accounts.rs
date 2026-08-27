@@ -1,10 +1,8 @@
-//! `accounts` repository (Chapter 5 §5.8).
+//! Dashboard-facing account repository.
 //!
-//! Accounts are created exclusively through the web dashboard; there is no
-//! bootstrap import of external account files. Passwords stay plaintext
-//! (parity with the original server). The PK column is `player_id` (also the
-//! character/login id). Every access is scoped by `player_id` — never an
-//! unscoped query.
+//! The PC wire continues to use numeric `player_id`, `pass1`, and `pass2`.
+//! Migration 0007 adds mobile-aligned identity and role metadata without
+//! deleting the legacy credential columns.
 
 use sqlx::MySqlPool;
 
@@ -12,28 +10,52 @@ use sqlx::MySqlPool;
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, sqlx::FromRow)]
 pub struct AccountRow {
     pub player_id: i64,
+    pub account: String,
+    #[serde(skip_serializing)]
     pub pass1: String,
+    #[serde(skip_serializing)]
     pub pass2: String,
+    pub is_suspended: bool,
+    pub gm_level: i32,
+    pub created_at: i64,
+    pub last_login_at: Option<i64>,
 }
 
 /// List every account, newest first (the dashboard table order).
 pub async fn list(pool: &MySqlPool) -> Result<Vec<AccountRow>, sqlx::Error> {
     sqlx::query_as::<_, AccountRow>(
-        "SELECT player_id, pass1, pass2 FROM accounts ORDER BY player_id DESC",
+        "SELECT player_id, account, pass1, pass2, is_suspended, gm_level,
+                created_at, last_login_at
+         FROM accounts ORDER BY player_id DESC",
     )
     .fetch_all(pool)
     .await
 }
 
-/// Insert a new account and return its auto-incremented `player_id` via
-/// `last_insert_id()` (not `max+1`, which races under concurrent creation).
+/// Create a legacy-compatible PC account plus the new mobile-aligned metadata.
+/// A UUID-derived temporary name is replaced with `legacy_<player_id>` in one
+/// transaction, keeping the new NOT NULL unique account column satisfied.
 pub async fn create(pool: &MySqlPool, pass1: &str, pass2: &str) -> Result<i64, sqlx::Error> {
-    let row = sqlx::query("INSERT INTO accounts (pass1, pass2) VALUES (?, ?)")
-        .bind(pass1)
-        .bind(pass2)
-        .execute(pool)
+    let now = chrono::Utc::now().timestamp_millis();
+    let mut tx = pool.begin().await?;
+    let row = sqlx::query(
+        "INSERT INTO accounts (pass1, pass2, account, created_at, updated_at)
+         VALUES (?, ?, CONCAT('pending_', UUID()), ?, ?)",
+    )
+    .bind(pass1)
+    .bind(pass2)
+    .bind(now)
+    .bind(now)
+    .execute(&mut *tx)
+    .await?;
+    let player_id = row.last_insert_id() as i64;
+    sqlx::query("UPDATE accounts SET account = ? WHERE player_id = ?")
+        .bind(format!("legacy_{player_id}"))
+        .bind(player_id)
+        .execute(&mut *tx)
         .await?;
-    Ok(row.last_insert_id() as i64)
+    tx.commit().await?;
+    Ok(player_id)
 }
 
 /// Resolve `pass1` for a `player_id` (login gate). Returns `None` when the
@@ -52,12 +74,10 @@ pub async fn passwords(
     pool: &MySqlPool,
     player_id: i64,
 ) -> Result<Option<(String, String)>, sqlx::Error> {
-    sqlx::query_as::<_, (String, String)>(
-        "SELECT pass1, pass2 FROM accounts WHERE player_id = ?",
-    )
-    .bind(player_id)
-    .fetch_optional(pool)
-    .await
+    sqlx::query_as::<_, (String, String)>("SELECT pass1, pass2 FROM accounts WHERE player_id = ?")
+        .bind(player_id)
+        .fetch_optional(pool)
+        .await
 }
 
 /// Update both passwords for a `player_id` in one transaction
@@ -70,12 +90,15 @@ pub async fn change_pass(
     pass2: &str,
 ) -> Result<bool, sqlx::Error> {
     let mut tx = pool.begin().await?;
-    let res = sqlx::query("UPDATE accounts SET pass1 = ?, pass2 = ? WHERE player_id = ?")
-        .bind(pass1)
-        .bind(pass2)
-        .bind(player_id)
-        .execute(&mut *tx)
-        .await?;
+    let now = chrono::Utc::now().timestamp_millis();
+    let res =
+        sqlx::query("UPDATE accounts SET pass1 = ?, pass2 = ?, updated_at = ? WHERE player_id = ?")
+            .bind(pass1)
+            .bind(pass2)
+            .bind(now)
+            .bind(player_id)
+            .execute(&mut *tx)
+            .await?;
     if res.rows_affected() != 1 {
         return Ok(false);
     }

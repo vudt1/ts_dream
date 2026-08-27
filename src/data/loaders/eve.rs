@@ -882,6 +882,3 @@ impl EveDataLoader {
         Ok(result)
     }
 }
-
-
-

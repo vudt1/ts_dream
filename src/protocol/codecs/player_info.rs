@@ -23,10 +23,10 @@
 //! - addTime (8B f64 LE OADate)
 //! - offlineTime (8B f64 LE OADate)
 
-use serde::{Deserialize, Serialize};
 use crate::error::Result;
 use crate::protocol::reader::PacketReader;
 use crate::protocol::writer::PacketWriter;
+use serde::{Deserialize, Serialize};
 
 /// Total wire size of friend extra data in bytes.
 pub const FRIEND_EXTRA_SIZE: usize = 20;

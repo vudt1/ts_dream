@@ -16,9 +16,9 @@ use ts_dream::battle::engine::{get_hp_max, get_sp_max, WarInfo};
 use ts_dream::battle::manager::{BattleManager, BattleSink, PlayerInput};
 use ts_dream::battle::npc_world::{teamdef_for_so_luong, NpcWorld, WorldPlayer, WorldSink};
 use ts_dream::battle::packets::{
-    acting, battle_exit_move, battle_exit_talk, battle_open_leader, combo_footer_20007,
-    entity_npc, entity_player, hide_from_map, show_player_on_map, skilling_full, skilling_int,
-    stat_byte, status_update, troi_byte, your_turn,
+    acting, battle_exit_move, battle_exit_talk, battle_open_leader, combo_footer_20007, entity_npc,
+    entity_player, hide_from_map, show_player_on_map, skilling_full, skilling_int, stat_byte,
+    status_update, troi_byte, your_turn,
 };
 use ts_dream::battle::rng::{BattleRng, DotNetRandom};
 use ts_dream::battle::runner::{
@@ -421,7 +421,7 @@ fn chase_triggers_teamdef_when_player_in_range() {
     assert_eq!(teamdefs.len(), 1);
     assert_eq!(teamdefs[0].0, 300001); // engaged player
     assert_eq!(teamdefs[0].1, 7); // npc on-map id = talking battle
-    // SoLuong 3 → _id2.._id4 = 9001.
+                                  // SoLuong 3 → _id2.._id4 = 9001.
     assert_eq!(teamdefs[0].2, [4712, 0, 9001, 9001, 9001, 0, 0, 0, 0, 0, 0]);
     // The instance is now in battle (id_battle = 1).
     assert_eq!(w.get(12001, 7).unwrap().id_battle, 1);
@@ -1013,6 +1013,7 @@ async fn manager_runs_battle_to_win() {
         build_manager_battle(),
         Arc::new(npcs),
         Arc::new(skills),
+        Arc::new(HashMap::new()),
         Arc::new(items),
         Arc::new(pets),
         Arc::new(players),
@@ -1131,10 +1132,10 @@ fn add_scenario_npc(battle: &mut Battle, data: &BattleData) {
     battle.add_npc(npc, 1, 0, 2, 3);
 }
 
-fn basic_command() -> HashMap<i64, BattleCommand> {
+fn basic_command() -> HashMap<(u8, u8), BattleCommand> {
     let mut cmds = HashMap::new();
     cmds.insert(
-        300001,
+        (3, 2),
         BattleCommand {
             row: 3,
             col: 2,
@@ -1239,7 +1240,7 @@ fn heal_skill_restores_hp() {
     battle.cell_mut(3, 2).unwrap().hp = 500;
     let mut cmds = basic_command();
     cmds.insert(
-        300001,
+        (3, 2),
         BattleCommand {
             row: 3,
             col: 2,
@@ -1283,7 +1284,7 @@ fn flee_by_leader_ends_battle() {
 
     let mut cmds = HashMap::new();
     cmds.insert(
-        300001,
+        (3, 2),
         BattleCommand {
             row: 3,
             col: 2,
@@ -1356,7 +1357,7 @@ fn use_item_heals_cell_and_pet() {
     battle.cell_mut(3, 2).unwrap().sp = 40;
     let mut cmds = HashMap::new();
     cmds.insert(
-        300001,
+        (3, 2),
         BattleCommand {
             row: 3,
             col: 2,

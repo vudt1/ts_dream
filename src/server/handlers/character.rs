@@ -4,11 +4,11 @@
 //! INSERT the `players` row (stats computed via the TEXP/HP formula), seed
 //! `SkillSave` 1..10 / IdSkill=0, rebuild the `Skill` table and update
 //! `accounts.pass1/pass2` (Ch5 §5.6 — the transaction lives in the
-//! `db::players` repository). Any failure → `shutdown()`. Sub 2 checks the
-//! candidate name against `players.Name`. Without a pool (golden replay) it
+//! modern repository). Any failure → `shutdown()`. Sub 2 checks the
+//! candidate name against `characters.name`. Without a pool (golden replay) it
 //! degrades to the in-memory stub.
 
-use crate::db;
+use crate::db::modern::traits::CharacterSeed;
 use crate::protocol::encoder;
 use crate::server::dispatcher::OpcodeCtx;
 use crate::server::session::{InventoryItem, Session};
@@ -70,14 +70,18 @@ pub async fn handle_character(ctx: &mut OpcodeCtx<'_>) {
         2 => {
             let candidate = payload;
             match ctx.env.pool {
-                Some(pool) => {
-                    match db::players::name_exists(pool, candidate).await {
-                        Ok(true) => out.send("F4440300090301"), // Name used
-                        Ok(false) => {
-                            conn.session.pending_new_char_name = candidate.to_vec();
-                            out.send("F4440300090300"); // Name available
+                Some(_) => {
+                    if let Some(repos) = ctx.env.repos {
+                        match repos.characters().find_id_by_name(candidate).await {
+                            Ok(Some(_)) => out.send("F4440300090301"),
+                            Ok(None) => {
+                                conn.session.pending_new_char_name = candidate.to_vec();
+                                out.send("F4440300090300");
+                            }
+                            Err(_) => out.shutdown = true,
                         }
-                        Err(_) => out.shutdown = true, // DB error -> disconnect
+                    } else {
+                        out.shutdown = true;
                     }
                 }
                 None => {
@@ -97,14 +101,18 @@ pub async fn handle_character(ctx: &mut OpcodeCtx<'_>) {
                 return;
             };
             match ctx.env.pool {
-                Some(pool) => {
-                    if create_char_db(pool, &mut conn.session, &data)
-                        .await
-                        .is_err()
-                    {
-                        out.shutdown = true; // Exception -> shutdown (Ch5 §5.6)
+                Some(_) => {
+                    if let Some(repos) = ctx.env.repos {
+                        if create_char_db(repos, &mut conn.session, &data)
+                            .await
+                            .is_err()
+                        {
+                            out.shutdown = true; // Exception -> shutdown (modern cutover)
+                        } else {
+                            out.send("F44402000901"); // Character created success
+                        }
                     } else {
-                        out.send("F44402000901"); // Character created success
+                        out.shutdown = true;
                     }
                 }
                 None => {
@@ -118,11 +126,11 @@ pub async fn handle_character(ctx: &mut OpcodeCtx<'_>) {
     }
 }
 
-/// Build the `db::players::CreateCharacter` parameters for the pending name,
-/// then run the one atomic transaction (repository). On success the session is
+/// Build the modern character seed for the pending name, then run the one
+/// atomic transaction through the modern repository. On success the session is
 /// updated in-memory to match what the DB now holds.
 async fn create_char_db(
-    pool: &sqlx::MySqlPool,
+    repos: &crate::db::modern::mysql::MySqlRepositories,
     session: &mut Session,
     data: &CreateCharData,
 ) -> Result<(), sqlx::Error> {
@@ -132,43 +140,37 @@ async fn create_char_db(
         session.pending_new_char_name.clone()
     };
 
-    // New-character stats: reborn 0, job 0, lv 1 (formula-computed HP/SP).
-    let (hp, sp) = db::players::starting_hp_sp(data.hpx, data.spx);
-
-    let params = db::players::CreateCharacter {
-        player_id: i64::from(session.id),
-        name,
-        hp,
-        sp,
-        sex: data.sex,
-        hair: data.hair,
-        thuoctinh: data.thuoctinh,
-        color_hex: data.color_hex.clone(),
-        int1: data.int1,
-        atk: data.atk,
-        def: data.def,
-        hpx: data.hpx,
-        spx: data.spx,
-        agi: data.agi,
-        pass1: data.pass1.clone(),
-        pass2: data.pass2.clone(),
-    };
-    db::players::create(pool, &params).await?;
-
-    // Reflect the new character into the live session for the upcoming login.
-    session.name = params.name;
+    // Reflect the new character into the live session before persisting the
+    // complete modern row set.
+    session.name = name;
     apply_to_session(session, data);
+    let seed = CharacterSeed {
+        level: 1,
+        sex: i64::from(data.sex),
+        hair: i64::from(data.hair),
+        element: i64::from(data.thuoctinh),
+        map_id: 10817,
+        map_x: 442,
+        map_y: 758,
+    };
+    let account_id = i64::from(session.id);
+    let character_name = session.name.clone();
+    repos
+        .sessions()
+        .create_and_seed(account_id, &character_name, &seed, session)
+        .await?;
     Ok(())
 }
 
 pub fn apply_to_session(session: &mut Session, data: &CreateCharData) {
-    // Mirror every column the `db::players::create` INSERT writes (reborn 0 /
+    // Mirror every column the modern character creation transaction writes (reborn 0 /
     // job 0 / lv 1, computed HP/SP via `starting_hp_sp`, map 10817/442/758,
     // Tiengtam/ThamChien = 1) plus the seeded starter Homdo/Trangbi rows, so a
     // create → login in the golden stub yields the same Logined1 sequence as
     // the live path. On the live path the next login also reloads everything
     // from MySQL.
-    let (hp, sp) = db::players::starting_hp_sp(data.hpx, data.spx);
+    let hp = crate::battle::engine::get_hp_max(0, 0, 1, i64::from(data.hpx));
+    let sp = crate::battle::engine::get_sp_max(0, 0, 1, i64::from(data.spx));
     session.level = 1;
     session.job = 0;
     session.reborn = 0;
@@ -198,19 +200,18 @@ pub fn apply_to_session(session: &mut Session, data: &CreateCharData) {
     session.gocnhin = 0;
     session.pk = 0;
     session.tham_chien = 1;
-    for row in db::players::starter_rows() {
-        let item = InventoryItem {
-            slot: row.slot as u8,
-            id: row.id as u16,
-            count: row.count as u8,
-            agi1: row.agi1 as i16,
-            loai: row.loai as u8,
-            ..Default::default()
-        };
-        match row.table {
-            "homdo" => session.homdo.push(item),
-            "trangbi" => session.trangbi.push(item),
-            _ => {}
-        }
-    }
+    session.homdo.push(InventoryItem {
+        slot: 1,
+        id: 32012,
+        count: 4,
+        ..Default::default()
+    });
+    session.trangbi.push(InventoryItem {
+        slot: 2,
+        id: 19737,
+        count: 1,
+        agi1: 1,
+        loai: 2,
+        ..Default::default()
+    });
 }

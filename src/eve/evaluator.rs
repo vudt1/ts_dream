@@ -46,8 +46,13 @@ pub fn evaluate(cond: &EveCondition, state: &PlayerEventState) -> bool {
             let qty = state.bag_items.get(&param).copied().unwrap_or(0);
             let result = compare_step(cond.condition_value, cond.condition_ops, qty);
             debug!(
-                class = 1, item_id = param, qty, ops = cond.condition_ops,
-                val = cond.condition_value, "bag item condition -> {}", result
+                class = 1,
+                item_id = param,
+                qty,
+                ops = cond.condition_ops,
+                val = cond.condition_value,
+                "bag item condition -> {}",
+                result
             );
             result
         }
@@ -64,8 +69,13 @@ pub fn evaluate(cond: &EveCondition, state: &PlayerEventState) -> bool {
             };
             let result = compare_step(actual, cond.condition_ops, cond.condition_value);
             debug!(
-                class = 2, mission_id = param, actual, ops = cond.condition_ops,
-                val = cond.condition_value, "quest step condition -> {}", result
+                class = 2,
+                mission_id = param,
+                actual,
+                ops = cond.condition_ops,
+                val = cond.condition_value,
+                "quest step condition -> {}",
+                result
             );
             result
         }
@@ -113,9 +123,13 @@ pub fn evaluate(cond: &EveCondition, state: &PlayerEventState) -> bool {
                 compare_step(actual, cond.condition_ops, cond.condition_value)
             };
             debug!(
-                class = 7, param = cond.condition_parameter, actual,
-                ops = cond.condition_ops, val = cond.condition_value,
-                "attribute condition -> {}", result
+                class = 7,
+                param = cond.condition_parameter,
+                actual,
+                ops = cond.condition_ops,
+                val = cond.condition_value,
+                "attribute condition -> {}",
+                result
             );
             result
         }
@@ -124,8 +138,11 @@ pub fn evaluate(cond: &EveCondition, state: &PlayerEventState) -> bool {
         8 => {
             let result = i32::from(p_style) == state.battle_result;
             debug!(
-                class = 8, p_style, battle_result = state.battle_result,
-                "battle result condition -> {}", result
+                class = 8,
+                p_style,
+                battle_result = state.battle_result,
+                "battle result condition -> {}",
+                result
             );
             result
         }
@@ -137,8 +154,12 @@ pub fn evaluate(cond: &EveCondition, state: &PlayerEventState) -> bool {
             let actual = if owned { npc_id } else { 0 };
             let result = compare_step(actual, cond.condition_ops, npc_id);
             debug!(
-                class = 9, npc_id, owned, ops = cond.condition_ops,
-                "general condition -> {}", result
+                class = 9,
+                npc_id,
+                owned,
+                ops = cond.condition_ops,
+                "general condition -> {}",
+                result
             );
             result
         }
@@ -148,10 +169,13 @@ pub fn evaluate(cond: &EveCondition, state: &PlayerEventState) -> bool {
             let result =
                 state.last_surface_id == param && state.last_choice_code == i32::from(p_style);
             debug!(
-                class = 10, surface_id = param, code = p_style,
+                class = 10,
+                surface_id = param,
+                code = p_style,
                 last_surface = state.last_surface_id,
                 last_code = state.last_choice_code,
-                "dialog choice condition -> {}", result
+                "dialog choice condition -> {}",
+                result
             );
             result
         }
@@ -159,15 +183,23 @@ pub fn evaluate(cond: &EveCondition, state: &PlayerEventState) -> bool {
         // Scene event completion count; param=0 reads the current eveNo.
         12 => {
             let value = match cond.condition_parameter {
-                0 => state.completed_eve_counts.get(&state.current_eve_no).copied().unwrap_or(0),
+                0 => state
+                    .completed_eve_counts
+                    .get(&state.current_eve_no)
+                    .copied()
+                    .unwrap_or(0),
                 _ => 0,
             };
             let result = compare_step(value, cond.condition_ops, cond.condition_value);
             debug!(
-                class = 12, param = cond.condition_parameter,
-                eve_no = state.current_eve_no, count = value,
-                ops = cond.condition_ops, val = cond.condition_value,
-                "event count condition -> {}", result
+                class = 12,
+                param = cond.condition_parameter,
+                eve_no = state.current_eve_no,
+                count = value,
+                ops = cond.condition_ops,
+                val = cond.condition_value,
+                "event count condition -> {}",
+                result
             );
             result
         }
@@ -177,17 +209,24 @@ pub fn evaluate(cond: &EveCondition, state: &PlayerEventState) -> bool {
             let actual = state.role_count_values.get(&param).copied().unwrap_or(0);
             let result = compare_step(actual, cond.condition_ops, cond.condition_value);
             debug!(
-                class = 14, count_index = param, actual,
-                ops = cond.condition_ops, val = cond.condition_value,
-                "role count condition -> {}", result
+                class = 14,
+                count_index = param,
+                actual,
+                ops = cond.condition_ops,
+                val = cond.condition_value,
+                "role count condition -> {}",
+                result
             );
             result
         }
 
         other => {
             tracing::warn!(
-                class = other, param, p_style,
-                ops = cond.condition_ops, val = cond.condition_value,
+                class = other,
+                param,
+                p_style,
+                ops = cond.condition_ops,
+                val = cond.condition_value,
                 "unimplemented conditionClass -> false"
             );
             false

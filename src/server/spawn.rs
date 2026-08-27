@@ -308,7 +308,10 @@ fn pet_stat_entry(s: &Session, p: &crate::server::session::PetState) -> String {
     stats.push_str(&encoder::le16(p.skill_point));
     stats.push_str(&format!("{:02X}", p.name.len()));
     stats.push_str(&encoder::strhex(&p.name));
-    stats.push_str(&format!("{:02X}{:02X}{:02X}", lv_skill[0], lv_skill[1], lv_skill[2]));
+    stats.push_str(&format!(
+        "{:02X}{:02X}{:02X}",
+        lv_skill[0], lv_skill[1], lv_skill[2]
+    ));
     for sub in 1..=6u16 {
         let slot = (stt as u16) * 10 + sub;
         let eq_id = s
