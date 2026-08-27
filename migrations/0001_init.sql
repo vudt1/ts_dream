@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS characters (
     map_id      BIGINT DEFAULT 0,
     map_x       BIGINT DEFAULT 0,
     map_y       BIGINT DEFAULT 0,
+    newbie      BIGINT NOT NULL DEFAULT 0,
     created_at  BIGINT DEFAULT 0,
     KEY characters_name (name)
 ) ENGINE=InnoDB AUTO_INCREMENT = 300000

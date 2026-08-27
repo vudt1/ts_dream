@@ -194,8 +194,8 @@ pub struct Session {
     pub god: u32,
     pub hp_store: u32,
     pub sp_store: u32,
-    /// Counter field (`tanthu`), incremented by item 46238.
-    pub tanthu: u32,
+    /// Counter field (`newbie`), incremented by item 46238.
+    pub newbie: u32,
     /// Respawn-map flag (`savemap`), set by inn-keepers (H6 SM33).
     pub savemap: u16,
     /// Equipped-colour hex string (`_My_Color`), e.g. `"0000000000000000"`.
@@ -314,7 +314,7 @@ impl Default for Session {
             god: 0,
             hp_store: 10000,
             sp_store: 10000,
-            tanthu: 0,
+            newbie: 0,
             savemap: 0,
             color: "0000000000000000".to_string(),
 

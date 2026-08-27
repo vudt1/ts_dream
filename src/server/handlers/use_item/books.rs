@@ -151,14 +151,14 @@ pub async fn handle(ctx: &mut UseCtx<'_>) -> bool {
         return true;
     }
 
-    // --- Spx2/SpMax/tanthu book 46238 (Spx2+50, SpMax+50, tanthu+1). ---
+    // --- Spx2/SpMax/newbie book 46238 (Spx2+50, SpMax+50, newbie+1). ---
     if id == 46238 {
         ctx.conn.session.spx2 = ctx.conn.session.spx2.saturating_add(50);
         ctx.conn.session.sp_max = ctx.conn.session.sp_max.saturating_add(50);
-        ctx.conn.session.tanthu += 1;
+        ctx.conn.session.newbie += 1;
         persist::update_player(ctx.pool, pid, "Spx2", i64::from(ctx.conn.session.spx2)).await;
         persist::update_player(ctx.pool, pid, "SpMax", i64::from(ctx.conn.session.sp_max)).await;
-        persist::update_player(ctx.pool, pid, "tanthu", i64::from(ctx.conn.session.tanthu)).await;
+        persist::update_player(ctx.pool, pid, "newbie", i64::from(ctx.conn.session.newbie)).await;
         ctx.stat(0xD0, ctx.conn.session.spx2 as i32);
         ctx.consume().await;
         return true;

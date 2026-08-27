@@ -46,7 +46,7 @@ fn character_column(column: &str) -> Option<&'static str> {
         "ThamChien" => "tham_chien",
         "HP_Store" => "hp_store",
         "SP_Store" => "sp_store",
-        "tanthu" => "tanthu",
+        "newbie" => "newbie",
         "savemap" => "savemap",
         "MapId" => "map_id",
         "MapX" => "map_x",

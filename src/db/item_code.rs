@@ -27,7 +27,7 @@ pub enum RedeemOutcome {
     Granted {
         item_id: i64,
         count: i64,
-        tanthu: bool,
+        newbie: bool,
     },
     /// Code did not exist, or was already redeemed by someone (`player_id != 0`).
     InvalidOrUsed,
@@ -95,17 +95,17 @@ pub async fn redeem_and_grant(
     Ok(RedeemOutcome::Granted {
         item_id: row.item_id,
         count: row.count,
-        tanthu: false,
+        newbie: false,
     })
 }
 
 /// The once-only `TSVN123/TSVN456` special gift (Chapter 5 §5.5).
 ///
 /// Grants the five hard-coded items (46197 + 20711 + 19711 + 23549 + 11001)
-/// and sets the player's `tanthu` flag in the same transaction as the `homdo`
+/// and sets the player's `newbie` flag in the same transaction as the `homdo`
 /// inserts, guarded against a concurrent double-claim. The `item_code`
 /// reservation is not consulted; the once-only
-/// guard is the `tanthu` flag.
+/// guard is the `newbie` flag.
 pub async fn redeem_special_gift(
     pool: &MySqlPool,
     player_id: i64,
@@ -113,14 +113,14 @@ pub async fn redeem_special_gift(
 ) -> Result<RedeemOutcome, sqlx::Error> {
     let mut tx = pool.begin().await?;
 
-    let tanthu = sqlx::query_scalar::<_, i64>(
-        "SELECT tanthu FROM characters WHERE character_id = ? FOR UPDATE",
+    let newbie = sqlx::query_scalar::<_, i64>(
+        "SELECT newbie FROM characters WHERE character_id = ? FOR UPDATE",
     )
     .bind(player_id)
     .fetch_optional(&mut *tx)
     .await?;
 
-    match tanthu {
+    match newbie {
         None | Some(1) => return Ok(RedeemOutcome::AlreadyGifted),
         _ => {}
     }
@@ -139,7 +139,7 @@ pub async fn redeem_special_gift(
         return Ok(RedeemOutcome::AlreadyGifted);
     }
 
-    sqlx::query("UPDATE characters SET tanthu = 1 WHERE character_id = ?")
+    sqlx::query("UPDATE characters SET newbie = 1 WHERE character_id = ?")
         .bind(player_id)
         .execute(&mut *tx)
         .await?;
@@ -151,7 +151,7 @@ pub async fn redeem_special_gift(
     Ok(RedeemOutcome::Granted {
         item_id: items.first().map(|i| i64::from(i.id)).unwrap_or(0),
         count: items.first().map(|i| i64::from(i.count)).unwrap_or(0),
-        tanthu: true,
+        newbie: true,
     })
 }
 

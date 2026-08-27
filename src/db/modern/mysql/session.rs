@@ -22,7 +22,7 @@ impl MySqlSessionRepository<'_> {
                     map_y, int2, atk2, def2, hpx2, spx2, agi2, texp,
                     COALESCE(m.gold, 0) AS gold, COALESCE(m.bank_gold, 0) AS bank_gold,
                     COALESCE(m.shop_point, 0) AS shop_point,
-                    god, tiengtam, gocnhin, pk, tham_chien, hp_store, sp_store, tanthu, savemap,
+                    god, tiengtam, gocnhin, pk, tham_chien, hp_store, sp_store, newbie, savemap,
                     color, fight_npc_id, title_id
              FROM characters c
              LEFT JOIN character_money m ON m.character_id = c.character_id
@@ -76,7 +76,7 @@ impl MySqlSessionRepository<'_> {
         session.tham_chien = clamp_u8(row.get("tham_chien"));
         session.hp_store = row.get::<i64, _>("hp_store") as u32;
         session.sp_store = row.get::<i64, _>("sp_store") as u32;
-        session.tanthu = row.get::<i64, _>("tanthu") as u32;
+        session.newbie = row.get::<i64, _>("newbie") as u32;
         session.savemap = clamp_u16(row.get("savemap"));
         session.color = row.get::<Option<String>, _>("color").unwrap_or_default();
 
@@ -258,7 +258,7 @@ impl MySqlSessionRepository<'_> {
             "UPDATE characters SET level=?, job=?, sex=?, hair=?, element=?, reborn=?, hp=?, hp_max=?, sp=?, sp_max=?,
              stat_point=?, skill_point=?, int_attr=?, atk=?, def=?, hpx=?, spx=?, agi=?, map_id=?, map_x=?, map_y=?,
              int2=?, atk2=?, def2=?, hpx2=?, spx2=?, agi2=?, texp=?, god=?, tiengtam=?, gocnhin=?, pk=?, tham_chien=?,
-             hp_store=?, sp_store=?, tanthu=?, savemap=?, color=? WHERE character_id=?",
+             hp_store=?, sp_store=?, newbie=?, savemap=?, color=? WHERE character_id=?",
         )
         .bind(i64::from(session.level)).bind(i64::from(session.job)).bind(i64::from(session.sex)).bind(i64::from(session.hair))
         .bind(i64::from(session.thuoctinh)).bind(i64::from(session.reborn)).bind(i64::from(session.hp)).bind(i64::from(session.hp_max))
@@ -268,7 +268,7 @@ impl MySqlSessionRepository<'_> {
         .bind(i64::from(session.map_y)).bind(i64::from(session.int2)).bind(i64::from(session.atk2)).bind(i64::from(session.def2))
         .bind(i64::from(session.hpx2)).bind(i64::from(session.spx2)).bind(i64::from(session.agi2)).bind(i64::from(session.texp))
         .bind(i64::from(session.god)).bind(i64::from(session.tiengtam)).bind(i64::from(session.gocnhin)).bind(i64::from(session.pk))
-        .bind(i64::from(session.tham_chien)).bind(i64::from(session.hp_store)).bind(i64::from(session.sp_store)).bind(i64::from(session.tanthu))
+        .bind(i64::from(session.tham_chien)).bind(i64::from(session.hp_store)).bind(i64::from(session.sp_store)).bind(i64::from(session.newbie))
         .bind(i64::from(session.savemap)).bind(&session.color).bind(character_id).execute(&mut *tx).await?;
         sqlx::query("INSERT INTO character_money (character_id, gold, bank_gold, shop_point) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE gold=VALUES(gold), bank_gold=VALUES(bank_gold), shop_point=VALUES(shop_point)")
             .bind(character_id).bind(i64::from(session.gold)).bind(i64::from(session.bank_gold)).bind(i64::from(session.shop_point)).execute(&mut *tx).await?;

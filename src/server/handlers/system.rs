@@ -282,7 +282,7 @@ pub async fn handle_account_mgmt(ctx: &mut OpcodeCtx<'_>) {
 
             // The once-only TSVN123/TSVN456 gift (§5.5).
             if code_str == "TSVN123" && pass_str == "TSVN456" {
-                if conn.session.tanthu == 1 {
+                if conn.session.newbie == 1 {
                     out.send(sys_msg_frame(
                         "Ban da nhan qua nay truoc do roi. Khong the nhan lai!",
                     ));
@@ -306,7 +306,7 @@ pub async fn handle_account_mgmt(ctx: &mut OpcodeCtx<'_>) {
                         for it in items.into_iter() {
                             conn.session.add_homdo_item(it);
                         }
-                        conn.session.tanthu = 1;
+                        conn.session.newbie = 1;
                         out.send(sys_msg_frame("Ban da nhan qua tang thanh cong!"));
                         out.send(conn.session.dump_homdo());
                     }
