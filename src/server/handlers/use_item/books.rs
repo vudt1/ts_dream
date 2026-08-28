@@ -122,7 +122,6 @@ pub async fn handle(ctx: &mut UseCtx<'_>) -> bool {
     if id == 46169 {
         if ctx.conn.session.god <= 240 {
             ctx.conn.session.god += 10;
-            persist::update_player(ctx.pool, pid, "God", i64::from(ctx.conn.session.god)).await;
             // The god column update does NOT emit a stat packet.
         }
         ctx.consume().await;
@@ -133,7 +132,6 @@ pub async fn handle(ctx: &mut UseCtx<'_>) -> bool {
     if let Some(amt) = texp_book_value(id) {
         if u16::from(ctx.conn.session.level) <= 200 {
             ctx.conn.session.texp = ctx.conn.session.texp.saturating_add(amt);
-            persist::update_player(ctx.pool, pid, "Texp", i64::from(ctx.conn.session.texp)).await;
             ctx.stat(0x24, ctx.conn.session.texp as i32);
         }
         ctx.consume().await;
@@ -151,15 +149,10 @@ pub async fn handle(ctx: &mut UseCtx<'_>) -> bool {
         return true;
     }
 
-    // --- Spx2/SpMax/newbie book 46238 (Spx2+50, SpMax+50, newbie+1). ---
+    // --- newbie book 46238 (newbie+1, in-memory only — Spx2/SpMax are deferred). ---
     if id == 46238 {
-        ctx.conn.session.spx2 = ctx.conn.session.spx2.saturating_add(50);
-        ctx.conn.session.sp_max = ctx.conn.session.sp_max.saturating_add(50);
         ctx.conn.session.newbie += 1;
-        persist::update_player(ctx.pool, pid, "Spx2", i64::from(ctx.conn.session.spx2)).await;
-        persist::update_player(ctx.pool, pid, "SpMax", i64::from(ctx.conn.session.sp_max)).await;
         persist::update_player(ctx.pool, pid, "newbie", i64::from(ctx.conn.session.newbie)).await;
-        ctx.stat(0xD0, ctx.conn.session.spx2 as i32);
         ctx.consume().await;
         return true;
     }
@@ -190,31 +183,18 @@ pub async fn handle(ctx: &mut UseCtx<'_>) -> bool {
     }
 
     // --- HP/SP store items (26456/26457/46145/46146): +10000 + red msg. ---
+    // hp_store / sp_store are deferred drift — in-memory only, no DB persist.
     let store = match id {
-        26456 | 46145 => Some((true, ctx.conn.session.hp_store)),
-        26457 | 46146 => Some((false, ctx.conn.session.sp_store)),
+        26456 | 46145 => Some(true),
+        26457 | 46146 => Some(false),
         _ => None,
     };
-    if let Some((is_hp, _)) = store {
+    if let Some(is_hp) = store {
         if is_hp {
             ctx.conn.session.hp_store += 10000;
-            persist::update_player(
-                ctx.pool,
-                pid,
-                "HP_Store",
-                i64::from(ctx.conn.session.hp_store),
-            )
-            .await;
             ctx.red("Hp Luu Thanh Cong: 10000");
         } else {
             ctx.conn.session.sp_store += 10000;
-            persist::update_player(
-                ctx.pool,
-                pid,
-                "SP_Store",
-                i64::from(ctx.conn.session.sp_store),
-            )
-            .await;
             ctx.red("Sp Luu Thanh Cong: 10000");
         }
         ctx.consume().await;

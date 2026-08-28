@@ -38,7 +38,6 @@ async fn reborn1(ctx: &mut UseCtx<'_>) -> bool {
     persist::update_player(ctx.pool, pid, "HpMax", 181).await;
     persist::update_player(ctx.pool, pid, "Sp", 111).await;
     persist::update_player(ctx.pool, pid, "SpMax", 111).await;
-    persist::update_player(ctx.pool, pid, "Texp", 13).await;
     persist::update_player(ctx.pool, pid, "Reborn", 1).await;
     persist::update_player(ctx.pool, pid, "Hair", 10).await;
     ctx.out.shutdown = true;
@@ -77,7 +76,6 @@ async fn reborn2(ctx: &mut UseCtx<'_>) -> bool {
     persist::update_player(ctx.pool, pid, "HpMax", i64::from(hpmax)).await;
     persist::update_player(ctx.pool, pid, "Sp", i64::from(spmax)).await;
     persist::update_player(ctx.pool, pid, "SpMax", i64::from(spmax)).await;
-    persist::update_player(ctx.pool, pid, "Texp", 13).await;
     persist::update_player(ctx.pool, pid, "Reborn", 2).await;
     persist::update_player(ctx.pool, pid, "Job", i64::from(job)).await;
     ctx.out.shutdown = true;

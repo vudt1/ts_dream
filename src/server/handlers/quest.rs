@@ -78,10 +78,9 @@ pub fn trigger_teamdef(conn: &mut Conn, teamdef: &[i64], out: &mut HandleOutcome
     });
 }
 
-/// `savemap` canonical seam: persist the current map as the respawn point
-/// (`PlayerUpdateDataId(_savemap)`) and refresh the session value. The actual
-/// MySQL write-through happens at the inn-keeper (H6 SM33) call site via
-/// [`save_map`] + `update_player("savemap", …)`.
+/// `savemap` canonical seam: refresh the session's respawn point from the
+/// current map. Deferred drift: the `savemap` column is not persisted (in-memory
+/// only), so a server restart loses the saved respawn point.
 pub fn save_map(conn: &mut Conn) {
     conn.session.savemap = conn.session.map_id;
 }

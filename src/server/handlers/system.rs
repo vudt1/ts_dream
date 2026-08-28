@@ -36,7 +36,6 @@ pub async fn handle_pk_war(ctx: &mut OpcodeCtx<'_>) {
     match sub {
         1 => {
             conn.session.pk = flag;
-            db::persist::update_player(ctx.env.pool, conn.session.id, "Pk", i64::from(flag)).await;
             out.send(format!(
                 "F44404002102{:02X}{:02X}",
                 flag, conn.session.tham_chien
@@ -44,8 +43,6 @@ pub async fn handle_pk_war(ctx: &mut OpcodeCtx<'_>) {
         }
         2 => {
             conn.session.tham_chien = flag;
-            db::persist::update_player(ctx.env.pool, conn.session.id, "ThamChien", i64::from(flag))
-                .await;
             out.send(format!("F44404002102{:02X}{:02X}", conn.session.pk, flag));
         }
         _ => {}

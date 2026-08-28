@@ -32,22 +32,7 @@ fn character_column(column: &str) -> Option<&'static str> {
         "Hpx" => "hpx",
         "Spx" => "spx",
         "Agi" => "agi",
-        "Int2" => "int2",
-        "Atk2" => "atk2",
-        "Def2" => "def2",
-        "Hpx2" => "hpx2",
-        "Spx2" => "spx2",
-        "Agi2" => "agi2",
-        "Texp" => "texp",
-        "God" => "god",
-        "tiengtam" => "tiengtam",
-        "gocnhin" => "gocnhin",
-        "Pk" => "pk",
-        "ThamChien" => "tham_chien",
-        "HP_Store" => "hp_store",
-        "SP_Store" => "sp_store",
         "newbie" => "newbie",
-        "savemap" => "savemap",
         "MapId" => "map_id",
         "MapX" => "map_x",
         "MapY" => "map_y",
@@ -200,11 +185,9 @@ async fn upsert_inventory_tx(
     let Some(id) = character_id_tx(tx, account_id).await? else {
         return Ok(());
     };
-    sqlx::query("INSERT INTO inventories (character_id, storage_type, slot, item_id, quantity, damage, item_level, int1, atk1, def1, hpx1, spx1, agi1, fai1, int2, atk2, def2, hpx2, spx2, agi2, fai2, item_hp, item_sp, item_type, item_element, item_element_value, grow_exp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE item_id=VALUES(item_id), quantity=VALUES(quantity), damage=VALUES(damage), item_level=VALUES(item_level), int1=VALUES(int1), atk1=VALUES(atk1), def1=VALUES(def1), hpx1=VALUES(hpx1), spx1=VALUES(spx1), agi1=VALUES(agi1), fai1=VALUES(fai1), int2=VALUES(int2), atk2=VALUES(atk2), def2=VALUES(def2), hpx2=VALUES(hpx2), spx2=VALUES(spx2), agi2=VALUES(agi2), fai2=VALUES(fai2), item_hp=VALUES(item_hp), item_sp=VALUES(item_sp), item_type=VALUES(item_type), item_element=VALUES(item_element), item_element_value=VALUES(item_element_value), grow_exp=VALUES(grow_exp)")
-        .bind(id).bind(storage).bind(i64::from(item.slot)).bind(i64::from(item.id)).bind(i64::from(item.count)).bind(i64::from(item.doben)).bind(i64::from(item.lv))
-        .bind(i64::from(item.int1)).bind(i64::from(item.atk1)).bind(i64::from(item.def1)).bind(i64::from(item.hpx1)).bind(i64::from(item.spx1)).bind(i64::from(item.agi1)).bind(i64::from(item.fai1))
-        .bind(i64::from(item.int2)).bind(i64::from(item.atk2)).bind(i64::from(item.def2)).bind(i64::from(item.hpx2)).bind(i64::from(item.spx2)).bind(i64::from(item.agi2)).bind(i64::from(item.fai2))
-        .bind(i64::from(item.item_hp)).bind(i64::from(item.item_sp)).bind(i64::from(item.loai)).bind(i64::from(item.thuoctinh)).bind(i64::from(item.giatri_thuoctinh)).bind(i64::from(item.texp))
+    let _ = item;
+    sqlx::query("INSERT INTO inventories (character_id, storage_type, slot, item_id, quantity, damage) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE item_id=VALUES(item_id), quantity=VALUES(quantity), damage=VALUES(damage)")
+        .bind(id).bind(storage).bind(i64::from(item.slot)).bind(i64::from(item.id)).bind(i64::from(item.count)).bind(i64::from(item.doben))
         .execute(&mut **tx).await?;
     Ok(())
 }
@@ -387,8 +370,8 @@ pub async fn upsert_pet(pool: Option<&MySqlPool>, player_id: u32, pet: &PetState
         pet.stt.saturating_sub(4)
     };
     let [s1, s2, s3, s4] = pet.skills;
-    let result = sqlx::query("INSERT INTO character_pets (character_id, storage_type, slot, pet_id, name, level, element, reborn, hp, hp_max, sp, sp_max, int_attr, atk, def, hpx, spx, agi, fai, int2, atk2, def2, hpx2, spx2, agi2, thd, texp, skill_point, quest, skill1_id, skill1_level, skill2_id, skill2_level, skill3_id, skill3_level, skill4_id, skill4_level) SELECT character_id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM characters WHERE character_id = ? ON DUPLICATE KEY UPDATE pet_id=VALUES(pet_id), name=VALUES(name), level=VALUES(level), element=VALUES(element), reborn=VALUES(reborn), hp=VALUES(hp), hp_max=VALUES(hp_max), sp=VALUES(sp), sp_max=VALUES(sp_max), int_attr=VALUES(int_attr), atk=VALUES(atk), def=VALUES(def), hpx=VALUES(hpx), spx=VALUES(spx), agi=VALUES(agi), fai=VALUES(fai), int2=VALUES(int2), atk2=VALUES(atk2), def2=VALUES(def2), hpx2=VALUES(hpx2), spx2=VALUES(spx2), agi2=VALUES(agi2), thd=VALUES(thd), texp=VALUES(texp), skill_point=VALUES(skill_point), quest=VALUES(quest), skill1_id=VALUES(skill1_id), skill1_level=VALUES(skill1_level), skill2_id=VALUES(skill2_id), skill2_level=VALUES(skill2_level), skill3_id=VALUES(skill3_id), skill3_level=VALUES(skill3_level), skill4_id=VALUES(skill4_id), skill4_level=VALUES(skill4_level)")
-        .bind(storage).bind(i64::from(slot)).bind(i64::from(pet.id)).bind(&pet.name).bind(i64::from(pet.level)).bind(i64::from(pet.thuoctinh)).bind(i64::from(pet.reborn)).bind(i64::from(pet.hp)).bind(i64::from(pet.hp_max)).bind(i64::from(pet.sp)).bind(i64::from(pet.sp_max)).bind(i64::from(pet.int1)).bind(i64::from(pet.atk)).bind(i64::from(pet.def)).bind(i64::from(pet.hpx)).bind(i64::from(pet.spx)).bind(i64::from(pet.agi)).bind(i64::from(pet.fai)).bind(i64::from(pet.int2)).bind(i64::from(pet.atk2)).bind(i64::from(pet.def2)).bind(i64::from(pet.hpx2)).bind(i64::from(pet.spx2)).bind(i64::from(pet.agi2)).bind(i64::from(pet.thd)).bind(i64::from(pet.texp)).bind(i64::from(pet.skill_point)).bind(i64::from(pet.quest)).bind(i64::from(s1.0)).bind(i64::from(s1.1)).bind(i64::from(s2.0)).bind(i64::from(s2.1)).bind(i64::from(s3.0)).bind(i64::from(s3.1)).bind(i64::from(s4.0)).bind(i64::from(s4.1)).bind(i64::from(player_id)).execute(pool).await;
+    let result = sqlx::query("INSERT INTO character_pets (character_id, storage_type, slot, pet_id, name, level, element, reborn, hp, hp_max, sp, sp_max, int_attr, atk, def, hpx, spx, agi, fai, thd, texp, skill_point, quest, skill1_id, skill1_level, skill2_id, skill2_level, skill3_id, skill3_level, skill4_id, skill4_level) SELECT character_id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM characters WHERE character_id = ? ON DUPLICATE KEY UPDATE pet_id=VALUES(pet_id), name=VALUES(name), level=VALUES(level), element=VALUES(element), reborn=VALUES(reborn), hp=VALUES(hp), hp_max=VALUES(hp_max), sp=VALUES(sp), sp_max=VALUES(sp_max), int_attr=VALUES(int_attr), atk=VALUES(atk), def=VALUES(def), hpx=VALUES(hpx), spx=VALUES(spx), agi=VALUES(agi), fai=VALUES(fai), thd=VALUES(thd), texp=VALUES(texp), skill_point=VALUES(skill_point), quest=VALUES(quest), skill1_id=VALUES(skill1_id), skill1_level=VALUES(skill1_level), skill2_id=VALUES(skill2_id), skill2_level=VALUES(skill2_level), skill3_id=VALUES(skill3_id), skill3_level=VALUES(skill3_level), skill4_id=VALUES(skill4_id), skill4_level=VALUES(skill4_level)")
+        .bind(storage).bind(i64::from(slot)).bind(i64::from(pet.id)).bind(&pet.name).bind(i64::from(pet.level)).bind(i64::from(pet.thuoctinh)).bind(i64::from(pet.reborn)).bind(i64::from(pet.hp)).bind(i64::from(pet.hp_max)).bind(i64::from(pet.sp)).bind(i64::from(pet.sp_max)).bind(i64::from(pet.int1)).bind(i64::from(pet.atk)).bind(i64::from(pet.def)).bind(i64::from(pet.hpx)).bind(i64::from(pet.spx)).bind(i64::from(pet.agi)).bind(i64::from(pet.fai)).bind(i64::from(pet.thd)).bind(i64::from(pet.texp)).bind(i64::from(pet.skill_point)).bind(i64::from(pet.quest)).bind(i64::from(s1.0)).bind(i64::from(s1.1)).bind(i64::from(s2.0)).bind(i64::from(s2.1)).bind(i64::from(s3.0)).bind(i64::from(s3.1)).bind(i64::from(s4.0)).bind(i64::from(s4.1)).bind(i64::from(player_id)).execute(pool).await;
     if let Err(e) = result {
         tracing::warn!("modern upsert_pet(stt {}) failed: {e}", pet.stt);
     }

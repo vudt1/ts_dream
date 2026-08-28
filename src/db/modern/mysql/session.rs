@@ -18,12 +18,10 @@ impl MySqlSessionRepository<'_> {
     pub async fn load(&self, account_id: i64, session: &mut Session) -> Result<bool, sqlx::Error> {
         let Some(row) = sqlx::query(
             "SELECT character_id AS id, name, level, job, sex, hair, element, reborn, hp, hp_max, sp, sp_max,
-                    stat_point, skill_point, int_attr, atk, def, hpx, spx, agi, map_id, map_x,
-                    map_y, int2, atk2, def2, hpx2, spx2, agi2, texp,
+                    stat_point, skill_point, int_attr, atk, def, hpx, spx, agi, map_id, map_x, map_y,
                     COALESCE(m.gold, 0) AS gold, COALESCE(m.bank_gold, 0) AS bank_gold,
                     COALESCE(m.shop_point, 0) AS shop_point,
-                    god, tiengtam, gocnhin, pk, tham_chien, hp_store, sp_store, newbie, savemap,
-                    color, fight_npc_id, title_id
+                    newbie
              FROM characters c
              LEFT JOIN character_money m ON m.character_id = c.character_id
              WHERE c.character_id = ?
@@ -59,26 +57,10 @@ impl MySqlSessionRepository<'_> {
         session.map_id = clamp_u16(row.get("map_id"));
         session.map_x = clamp_u16(row.get("map_x"));
         session.map_y = clamp_u16(row.get("map_y"));
-        session.int2 = row.get::<i64, _>("int2") as u32;
-        session.atk2 = row.get::<i64, _>("atk2") as u32;
-        session.def2 = row.get::<i64, _>("def2") as u32;
-        session.hpx2 = row.get::<i64, _>("hpx2") as u32;
-        session.spx2 = row.get::<i64, _>("spx2") as u32;
-        session.agi2 = row.get::<i64, _>("agi2") as u32;
-        session.texp = row.get::<i64, _>("texp") as u32;
         session.gold = row.get::<i64, _>("gold") as u32;
         session.bank_gold = row.get::<i64, _>("bank_gold") as u32;
         session.shop_point = row.get::<i64, _>("shop_point") as u32;
-        session.god = row.get::<i64, _>("god") as u32;
-        session.tiengtam = clamp_u16(row.get("tiengtam"));
-        session.gocnhin = clamp_u8(row.get("gocnhin"));
-        session.pk = clamp_u8(row.get("pk"));
-        session.tham_chien = clamp_u8(row.get("tham_chien"));
-        session.hp_store = row.get::<i64, _>("hp_store") as u32;
-        session.sp_store = row.get::<i64, _>("sp_store") as u32;
         session.newbie = row.get::<i64, _>("newbie") as u32;
-        session.savemap = clamp_u16(row.get("savemap"));
-        session.color = row.get::<Option<String>, _>("color").unwrap_or_default();
 
         session.homdo = self.load_items(session.db_character_id, 1).await?;
         session.tientrang = self.load_items(session.db_character_id, 2).await?;
@@ -107,24 +89,6 @@ impl MySqlSessionRepository<'_> {
                 session.hotkeys[slot as usize] = clamp_u16(row.get("skill_id"));
             }
         }
-        session.quest_steps = sqlx::query(
-            "SELECT npc_id, step FROM character_missions WHERE character_id = ? AND npc_id > 0",
-        )
-        .bind(session.db_character_id)
-        .fetch_all(self.pool)
-        .await?
-        .into_iter()
-        .map(|r| (r.get("npc_id"), r.get("step")))
-        .collect();
-        session.warp_steps = sqlx::query(
-            "SELECT npc_id, warp_id FROM character_missions WHERE character_id = ? AND warp_id > 0",
-        )
-        .bind(session.db_character_id)
-        .fetch_all(self.pool)
-        .await?
-        .into_iter()
-        .map(|r| (r.get("npc_id"), r.get("warp_id")))
-        .collect();
         Ok(true)
     }
 
@@ -134,9 +98,7 @@ impl MySqlSessionRepository<'_> {
         storage_type: u8,
     ) -> Result<Vec<InventoryItem>, sqlx::Error> {
         let rows = sqlx::query(
-            "SELECT slot, item_id, quantity, damage, item_level, int1, atk1, def1, hpx1, spx1,
-                    agi1, fai1, int2, atk2, def2, hpx2, spx2, agi2, fai2, item_hp, item_sp,
-                    item_type, item_element, item_element_value, grow_exp
+            "SELECT slot, item_id, quantity, damage
              FROM inventories WHERE character_id = ? AND storage_type = ? AND item_id > 0 ORDER BY slot",
         )
         .bind(character_id)
@@ -150,27 +112,6 @@ impl MySqlSessionRepository<'_> {
                 id: clamp_u16(r.get("item_id")),
                 count: clamp_u8(r.get("quantity")),
                 doben: clamp_u8(r.get("damage")),
-                lv: clamp_u8(r.get("item_level")),
-                int1: r.get::<i64, _>("int1") as i16,
-                atk1: r.get::<i64, _>("atk1") as i16,
-                def1: r.get::<i64, _>("def1") as i16,
-                hpx1: r.get::<i64, _>("hpx1") as i16,
-                spx1: r.get::<i64, _>("spx1") as i16,
-                agi1: r.get::<i64, _>("agi1") as i16,
-                fai1: r.get::<i64, _>("fai1") as i16,
-                int2: r.get::<i64, _>("int2") as i16,
-                atk2: r.get::<i64, _>("atk2") as i16,
-                def2: r.get::<i64, _>("def2") as i16,
-                hpx2: r.get::<i64, _>("hpx2") as i16,
-                spx2: r.get::<i64, _>("spx2") as i16,
-                agi2: r.get::<i64, _>("agi2") as i16,
-                fai2: r.get::<i64, _>("fai2") as i16,
-                item_hp: r.get::<i64, _>("item_hp") as i16,
-                item_sp: r.get::<i64, _>("item_sp") as i16,
-                loai: clamp_u8(r.get("item_type")),
-                thuoctinh: clamp_u8(r.get("item_element")),
-                giatri_thuoctinh: clamp_u8(r.get("item_element_value")),
-                texp: r.get::<i64, _>("grow_exp") as u32,
                 ..Default::default()
             })
             .collect())
@@ -179,7 +120,7 @@ impl MySqlSessionRepository<'_> {
     async fn load_pets(&self, character_id: i64) -> Result<Vec<PetState>, sqlx::Error> {
         let rows = sqlx::query(
             "SELECT storage_type, slot, pet_id, name, level, element, reborn, hp, hp_max, sp, sp_max,
-                    int_attr, atk, def, hpx, spx, agi, fai, int2, atk2, def2, hpx2, spx2, agi2,
+                    int_attr, atk, def, hpx, spx, agi, fai,
                     thd, texp, skill_point, quest, skill1_id, skill1_level, skill2_id, skill2_level,
                     skill3_id, skill3_level, skill4_id, skill4_level
              FROM character_pets WHERE character_id = ? AND pet_id > 0 ORDER BY storage_type, slot",
@@ -214,12 +155,6 @@ impl MySqlSessionRepository<'_> {
                     spx: clamp_u16(r.get("spx")),
                     agi: clamp_u16(r.get("agi")),
                     fai: clamp_u16(r.get("fai")),
-                    int2: clamp_u16(r.get("int2")),
-                    atk2: clamp_u16(r.get("atk2")),
-                    def2: clamp_u16(r.get("def2")),
-                    hpx2: clamp_u16(r.get("hpx2")),
-                    spx2: clamp_u16(r.get("spx2")),
-                    agi2: clamp_u16(r.get("agi2")),
                     thd: clamp_u16(r.get("thd")),
                     texp: r.get::<i64, _>("texp") as u32,
                     skill_point: clamp_u16(r.get("skill_point")),
@@ -242,6 +177,7 @@ impl MySqlSessionRepository<'_> {
                             clamp_u8(r.get("skill4_level")),
                         ),
                     ],
+                    ..Default::default()
                 }
             })
             .collect())
@@ -257,19 +193,15 @@ impl MySqlSessionRepository<'_> {
         sqlx::query(
             "UPDATE characters SET level=?, job=?, sex=?, hair=?, element=?, reborn=?, hp=?, hp_max=?, sp=?, sp_max=?,
              stat_point=?, skill_point=?, int_attr=?, atk=?, def=?, hpx=?, spx=?, agi=?, map_id=?, map_x=?, map_y=?,
-             int2=?, atk2=?, def2=?, hpx2=?, spx2=?, agi2=?, texp=?, god=?, tiengtam=?, gocnhin=?, pk=?, tham_chien=?,
-             hp_store=?, sp_store=?, newbie=?, savemap=?, color=? WHERE character_id=?",
+             newbie=? WHERE character_id=?",
         )
         .bind(i64::from(session.level)).bind(i64::from(session.job)).bind(i64::from(session.sex)).bind(i64::from(session.hair))
         .bind(i64::from(session.thuoctinh)).bind(i64::from(session.reborn)).bind(i64::from(session.hp)).bind(i64::from(session.hp_max))
         .bind(i64::from(session.sp)).bind(i64::from(session.sp_max)).bind(i64::from(session.point)).bind(i64::from(session.skill_point))
         .bind(i64::from(session.int1)).bind(i64::from(session.atk)).bind(i64::from(session.def)).bind(i64::from(session.hpx))
         .bind(i64::from(session.spx)).bind(i64::from(session.agi)).bind(i64::from(session.map_id)).bind(i64::from(session.map_x))
-        .bind(i64::from(session.map_y)).bind(i64::from(session.int2)).bind(i64::from(session.atk2)).bind(i64::from(session.def2))
-        .bind(i64::from(session.hpx2)).bind(i64::from(session.spx2)).bind(i64::from(session.agi2)).bind(i64::from(session.texp))
-        .bind(i64::from(session.god)).bind(i64::from(session.tiengtam)).bind(i64::from(session.gocnhin)).bind(i64::from(session.pk))
-        .bind(i64::from(session.tham_chien)).bind(i64::from(session.hp_store)).bind(i64::from(session.sp_store)).bind(i64::from(session.newbie))
-        .bind(i64::from(session.savemap)).bind(&session.color).bind(character_id).execute(&mut *tx).await?;
+        .bind(i64::from(session.map_y)).bind(i64::from(session.newbie))
+        .bind(character_id).execute(&mut *tx).await?;
         sqlx::query("INSERT INTO character_money (character_id, gold, bank_gold, shop_point) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE gold=VALUES(gold), bank_gold=VALUES(bank_gold), shop_point=VALUES(shop_point)")
             .bind(character_id).bind(i64::from(session.gold)).bind(i64::from(session.bank_gold)).bind(i64::from(session.shop_point)).execute(&mut *tx).await?;
 
@@ -285,11 +217,8 @@ impl MySqlSessionRepository<'_> {
             (16, &session.luulang),
         ] {
             for item in items.iter().filter(|i| i.id > 0) {
-                sqlx::query("INSERT INTO inventories (character_id, storage_type, slot, item_id, quantity, damage, item_level, int1, atk1, def1, hpx1, spx1, agi1, fai1, int2, atk2, def2, hpx2, spx2, agi2, fai2, item_hp, item_sp, item_type, item_element, item_element_value, grow_exp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-                    .bind(character_id).bind(storage).bind(i64::from(item.slot)).bind(i64::from(item.id)).bind(i64::from(item.count)).bind(i64::from(item.doben)).bind(i64::from(item.lv))
-                    .bind(i64::from(item.int1)).bind(i64::from(item.atk1)).bind(i64::from(item.def1)).bind(i64::from(item.hpx1)).bind(i64::from(item.spx1)).bind(i64::from(item.agi1)).bind(i64::from(item.fai1))
-                    .bind(i64::from(item.int2)).bind(i64::from(item.atk2)).bind(i64::from(item.def2)).bind(i64::from(item.hpx2)).bind(i64::from(item.spx2)).bind(i64::from(item.agi2)).bind(i64::from(item.fai2))
-                    .bind(i64::from(item.item_hp)).bind(i64::from(item.item_sp)).bind(i64::from(item.loai)).bind(i64::from(item.thuoctinh)).bind(i64::from(item.giatri_thuoctinh)).bind(i64::from(item.texp)).execute(&mut *tx).await?;
+                sqlx::query("INSERT INTO inventories (character_id, storage_type, slot, item_id, quantity, damage) VALUES (?, ?, ?, ?, ?, ?)")
+                    .bind(character_id).bind(storage).bind(i64::from(item.slot)).bind(i64::from(item.id)).bind(i64::from(item.count)).bind(i64::from(item.doben)).execute(&mut *tx).await?;
             }
         }
         sqlx::query("DELETE FROM character_pets WHERE character_id = ?")
@@ -303,8 +232,8 @@ impl MySqlSessionRepository<'_> {
                 (3u8, pet.stt.saturating_sub(4))
             };
             let [s1, s2, s3, s4] = pet.skills;
-            sqlx::query("INSERT INTO character_pets (character_id, storage_type, slot, pet_id, name, level, element, reborn, hp, hp_max, sp, sp_max, int_attr, atk, def, hpx, spx, agi, fai, int2, atk2, def2, hpx2, spx2, agi2, thd, texp, skill_point, quest, skill1_id, skill1_level, skill2_id, skill2_level, skill3_id, skill3_level, skill4_id, skill4_level) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-                .bind(character_id).bind(storage).bind(i64::from(slot)).bind(i64::from(pet.id)).bind(&pet.name).bind(i64::from(pet.level)).bind(i64::from(pet.thuoctinh)).bind(i64::from(pet.reborn)).bind(i64::from(pet.hp)).bind(i64::from(pet.hp_max)).bind(i64::from(pet.sp)).bind(i64::from(pet.sp_max)).bind(i64::from(pet.int1)).bind(i64::from(pet.atk)).bind(i64::from(pet.def)).bind(i64::from(pet.hpx)).bind(i64::from(pet.spx)).bind(i64::from(pet.agi)).bind(i64::from(pet.fai)).bind(i64::from(pet.int2)).bind(i64::from(pet.atk2)).bind(i64::from(pet.def2)).bind(i64::from(pet.hpx2)).bind(i64::from(pet.spx2)).bind(i64::from(pet.agi2)).bind(i64::from(pet.thd)).bind(i64::from(pet.texp)).bind(i64::from(pet.skill_point)).bind(i64::from(pet.quest)).bind(i64::from(s1.0)).bind(i64::from(s1.1)).bind(i64::from(s2.0)).bind(i64::from(s2.1)).bind(i64::from(s3.0)).bind(i64::from(s3.1)).bind(i64::from(s4.0)).bind(i64::from(s4.1)).execute(&mut *tx).await?;
+            sqlx::query("INSERT INTO character_pets (character_id, storage_type, slot, pet_id, name, level, element, reborn, hp, hp_max, sp, sp_max, int_attr, atk, def, hpx, spx, agi, fai, thd, texp, skill_point, quest, skill1_id, skill1_level, skill2_id, skill2_level, skill3_id, skill3_level, skill4_id, skill4_level) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                .bind(character_id).bind(storage).bind(i64::from(slot)).bind(i64::from(pet.id)).bind(&pet.name).bind(i64::from(pet.level)).bind(i64::from(pet.thuoctinh)).bind(i64::from(pet.reborn)).bind(i64::from(pet.hp)).bind(i64::from(pet.hp_max)).bind(i64::from(pet.sp)).bind(i64::from(pet.sp_max)).bind(i64::from(pet.int1)).bind(i64::from(pet.atk)).bind(i64::from(pet.def)).bind(i64::from(pet.hpx)).bind(i64::from(pet.spx)).bind(i64::from(pet.agi)).bind(i64::from(pet.fai)).bind(i64::from(pet.thd)).bind(i64::from(pet.texp)).bind(i64::from(pet.skill_point)).bind(i64::from(pet.quest)).bind(i64::from(s1.0)).bind(i64::from(s1.1)).bind(i64::from(s2.0)).bind(i64::from(s2.1)).bind(i64::from(s3.0)).bind(i64::from(s3.1)).bind(i64::from(s4.0)).bind(i64::from(s4.1)).execute(&mut *tx).await?;
         }
         sqlx::query("DELETE FROM character_skills WHERE character_id = ?")
             .bind(character_id)
@@ -327,18 +256,6 @@ impl MySqlSessionRepository<'_> {
             .bind(i64::from(*skill))
             .execute(&mut *tx)
             .await?;
-        }
-        sqlx::query("DELETE FROM character_missions WHERE character_id = ?")
-            .bind(character_id)
-            .execute(&mut *tx)
-            .await?;
-        for (npc, step) in &session.quest_steps {
-            sqlx::query("INSERT INTO character_missions (character_id, mission_id, step, state, updated_at, npc_id) VALUES (?, ?, ?, 0, ?, ?)")
-                .bind(character_id).bind(*npc).bind(*step).bind(chrono::Utc::now().timestamp()).bind(*npc).execute(&mut *tx).await?;
-        }
-        for (npc, warp) in &session.warp_steps {
-            sqlx::query("INSERT INTO character_missions (character_id, mission_id, step, state, updated_at, npc_id, warp_id) VALUES (?, ?, 0, 0, ?, ?, ?)")
-                .bind(character_id).bind(*npc).bind(chrono::Utc::now().timestamp()).bind(*npc).bind(*warp).execute(&mut *tx).await?;
         }
         tx.commit().await
     }

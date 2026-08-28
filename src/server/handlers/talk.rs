@@ -151,7 +151,7 @@ async fn handle_talk_continue(
     conn: &mut Conn,
     _payload: &[u8],
     data: &GameData,
-    pool: Option<&MySqlPool>,
+    _pool: Option<&MySqlPool>,
     out: &mut HandleOutcome,
 ) {
     // H6 pre-dispatch guards.
@@ -209,13 +209,6 @@ async fn handle_talk_continue(
             32 => out.send("F44411001401000000010603010000000000000100"),
             33 => {
                 crate::server::handlers::quest::save_map(conn);
-                crate::db::persist::update_player(
-                    pool,
-                    conn.session.id,
-                    "savemap",
-                    i64::from(conn.session.savemap),
-                )
-                .await;
                 let item = crate::server::inventory::from_template(data, 46016, 2);
                 let _ = conn.session.add_homdo_item(item);
                 out.send(conn.session.dump_homdo());
@@ -241,13 +234,6 @@ async fn handle_talk_continue(
             32 => out.send("F44411001401000000010603010000000000000200"),
             33 => {
                 crate::server::handlers::quest::save_map(conn);
-                crate::db::persist::update_player(
-                    pool,
-                    conn.session.id,
-                    "savemap",
-                    i64::from(conn.session.savemap),
-                )
-                .await;
                 let item = crate::server::inventory::from_template(data, 46016, 2);
                 let _ = conn.session.add_homdo_item(item);
                 out.send(conn.session.dump_homdo());

@@ -133,11 +133,6 @@ pub async fn handle(ctx: &mut UseCtx<'_>) -> bool {
         ctx.stat(0xD4, ctx.conn.session.int2 as i32);
         ctx.stat(0xCF, ctx.conn.session.hpx2 as i32);
         ctx.stat(0xD0, ctx.conn.session.spx2 as i32);
-        persist::update_player(ctx.pool, pid, "Int2", i64::from(ctx.conn.session.int2)).await;
-        persist::update_player(ctx.pool, pid, "Hpx2", i64::from(ctx.conn.session.hpx2)).await;
-        persist::update_player(ctx.pool, pid, "Spx2", i64::from(ctx.conn.session.spx2)).await;
-        persist::update_player(ctx.pool, pid, "HpMax", i64::from(ctx.conn.session.hp_max)).await;
-        persist::update_player(ctx.pool, pid, "SpMax", i64::from(ctx.conn.session.sp_max)).await;
         return true;
     }
 

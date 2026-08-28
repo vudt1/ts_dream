@@ -94,7 +94,7 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 - **Định nghĩa**: Nhân vật đạt ngưỡng (≥120) đổi nghề, đặt lại level/stats, giữ các kỹ năng đặc thù và pack nghề. Là quá trình "chết" (server đóng socket để ép đăng nhập lại).
 - **Ràng buộc (Invariants)**:
   - Không được mặc trang bị ở slot ≤ 6.
-  - Nhân vật mới: `Lv=1`, `Point/SkillPoint = base + (Lv-120)/5`, `Hp/Sp=181`, stats=0, `Texp=13`; `Reborn` tăng, `Job` đổi theo menu (reborn 2).
+  - Nhân vật mới: `Lv=1`, `Point/SkillPoint = base + (Lv-120)/5`, `Hp/Sp=181`, stats=0, `Texp` reset in-memory; `Reborn` tăng, `Job` đổi theo menu (reborn 2).
   - Chỉ giữ kỹ năng đặc biệt (10016-19, 11016-19, 12016-19, 13015-18); `DELETE FROM Skill` scope theo `player_id`.
   - Tail: replay `OnWin` quest hiện tại, cập nhật quest step NPC 59411, gửi `F444…F476`, rồi đóng socket.
 
@@ -106,8 +106,9 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
   - Phát broadcast map `0F02`/`0F01` + `SendStatusPet` + `06001301` + `2C01`; guards fail → silent.
 
 ### ThingData (Dữ liệu Vật phẩm Chuẩn hóa 35 Bytes)
-- **Định nghĩa**: Cấu trúc nhị phân 35-byte đại diện toàn diện cho một vật phẩm (Item) trong game TS Online theo chuẩn Mobile & PC. Bao gồm 20 trường thuộc tính: mã vật phẩm (`id`), số lượng (`count`), chỉ số sát thương (`damage`), kháng cự (`defend`), hệ thuộc tính (`element`), ngọc khảm (`gem`), cấp cường hóa (`enhance`), cấp linh vũ khí (`grow`), thời gian hết hạn (`delete_time` theo chuẩn OADate), trạng thái khóa (`is_lock`), thuộc tính phụ (`attribute`), cấp tinh luyện (`refine`), độ bền (`durability`), cùng các đặc tính dòng ngọc và tẩy luyện.
+- **Định nghĩa**: Cấu trúc nhị phân 35-byte đại diện toàn hiện cho một vật phẩm (Item) trong game TS Online theo chuẩn Mobile & PC. Bao gồm 20 trường thuộc tính: mã vật phẩm (`id`), số lượng (`count`), chỉ số sát thương (`damage`), kháng cự (`defend`), hệ thuộc tính (`element`), ngọc khảm (`gem`), cấp cường hóa (`enhance`), cấp linh vũ khí (`grow`), thời gian hết hạn (`delete_time` theo chuẩn OADate), trạng thái khóa (`is_lock`), thuộc tính phụ (`attribute`), cấp tinh luyện (`refine`), độ bền (`durability`), cùng các đặc tính dòng ngọc và tẩy luyện.
 - **Ràng buộc (Invariants)**: Kích thước mã hóa nhị phân luôn cố định đúng 35 bytes (`THING_DATA_SIZE = 35`).
+- **Phạm vi persist (ADR 0001 defer)**: Chỉ 3/20 trường (`item_id`, `quantity`, `damage`) hiện được lưu xuống `inventories` (migration 0001_init.sql:119-145). 17 trường còn lại (`item_level, int1..fai2, item_hp, item_sp, item_type, item_element, item_element_value, grow_exp`) sống **in-memory only** trong `Session` và không qua restart. Khi cần persist trở lại → tạo migration mới.
 
 ### 4 Kho Võ Tướng (Four Pet Storage Tiers)
 - **Định nghĩa**: 4 phân vùng lưu trữ Sủng vật / Võ tướng của một Nhân vật trong hệ thống `character_pets` với `storage_type`:
@@ -163,12 +164,22 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 - **Định nghĩa**: Không gian tọa độ thế giới game nơi các Nhân vật di chuyển, tương tác với NPC và kích hoạt các sự kiện/trận đấu.
 
 ### Tân thủ / Newbie (Trạng thái tân thủ)
-- **Định nghĩa**: Cờ đếm `characters.newbie` (`BIGINT NOT NULL DEFAULT 0`, ánh xạ `Session.newbie: u32`) đánh dấu người chơi đã nhận gói quà tân thủ hay chưa và số lần tích lũy qua vật phẩm 46238. Giá trị `1` chặn nhận lại gói `TSVN123/TSVN456` (guard `AlreadyGifted` trong `src/db/item_code.rs:116`).
-- **Ràng buộc (Invariants)**: `0` = chưa nhận, `1` = đã nhận quà tân thủ, `>1` = đã dùng thêm sách 46238 (mỗi lần `+1 newbie, +50 spx2, +50 sp_max` tại `src/server/handlers/use_item/books.rs:154`). Persist qua `src/db/persist.rs:49` (`"newbie" => "newbie"`) và `src/db/modern/mysql/session.rs:261`.
+- **Định nghĩa**: Cờ đếm `characters.newbie` (`BIGINT NOT NULL DEFAULT 0`, ánh xạ `Session.newbie: u32`) đánh dấu người chơi đã nhận gói quà tân thủ hay chưa. Giá trị `1` chặn nhận lại gói `TSVN123/TSVN456` (guard `AlreadyGifted` trong `src/db/item_code.rs:116`).
+- **Ràng buộc (Invariants)**: `0` = chưa nhận, `1` = đã nhận quà tân thủ. Persist qua `src/db/persist.rs:49` (`"newbie" => "newbie"`) và `src/db/modern/mysql/session.rs:79,261`.
+- **Phạm vi hiện tại (sau ADR 0001 cleanup)**: Sách 46238 chỉ tăng `newbie` (đã xóa `Spx2+50` / `SpMax+50` và stat frame `0xD0`).
 - **Tránh dùng các từ mơ hồ**: *tanthu* (tên legacy tiếng Việt không dấu, đã đổi thành `newbie` thống nhất).
 
 ### Web Admin Dashboard (Hệ thống Quản trị Web)
 - **Định nghĩa**: Bounded Context vận hành & giám sát (Operations) cho phép Quản trị viên theo dõi số lượng người chơi online, xem log gói tin realtime (SSE) và điều khiển trạng thái server (Start/Stop).
+
+### Deferred Drift (Đã Cleanup Sau ADR 0001)
+- **Định nghĩa**: Tập hợp các trường/cột schema thuộc `characters`/`inventories`/`character_pets`/`character_missions` mà **migration 0001_init.sql chưa định nghĩa** nhưng source Rust vẫn tham chiếu. Sau cleanup, các tham chiếu này đã bị xóa khỏi Rust (giữ in-memory hoặc xóa hoàn toàn); migration **không** được sửa.
+- **Ràng buộc (Invariants)**:
+  - `Session` struct vẫn giữ các field deferred (`int2, atk2, def2, hpx2, spx2, agi2, texp, god, hp_store, sp_store, tiengtam, gocnhin, pk, tham_chien, savemap, color, fight_npc_id, title_id`) cho wire packet + in-memory state, **nhưng persist về DB không còn thực hiện** — restart = mất state.
+  - `quest_steps`/`warp_steps` đã bị xóa khỏi `Session` — toàn bộ quest state mất khi restart. Persist lại cần `character_missions.npc_id/warp_id` (migration mới).
+  - `PetState.int2/atk2/def2/hpx2/spx2/agi2` (in-memory, set = 0 tại load).
+  - `Session.newbie` là **DUY NHẤT** field còn persist từ deferred list (vì cần cho TSVN gift guard).
+- **Trường đã xóa hoàn toàn khỏi Rust**: `db::players` (file orphan), `db::quest` (file orphan), `src/server/handlers/quest::save_map` (chỉ còn in-memory, comment ghi rõ).
 
 
 

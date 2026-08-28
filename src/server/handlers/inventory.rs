@@ -486,7 +486,6 @@ async fn handle_reborn(
     persist::update_player(pool, conn.session.id, "Hpx", 0).await;
     persist::update_player(pool, conn.session.id, "Spx", 0).await;
     persist::update_player(pool, conn.session.id, "Agi", 0).await;
-    persist::update_player(pool, conn.session.id, "Texp", 13).await;
     persist::delete_reborn_skills(pool, conn.session.id).await;
 
     out.send("F44402002C01");
