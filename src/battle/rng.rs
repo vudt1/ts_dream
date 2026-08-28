@@ -124,8 +124,9 @@ pub struct BattleRng {
     pub random_1: DotNetRandom,
     /// Stream 2: npc respawn coordinates.
     pub random_2: DotNetRandom,
-    /// Dedicated stream for mobile damage hit/critical/status/random factors.
-    /// Keeping it separate preserves existing drop and NPC-AI draw ordering.
+    /// Dedicated stream for combat-formula hit/critical/status/random factors
+    /// (see `battle/combat_formula.rs`). Keeping it separate preserves existing
+    /// drop and NPC-AI draw ordering.
     pub random_damage: DotNetRandom,
 }
 

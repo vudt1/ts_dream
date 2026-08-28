@@ -1,8 +1,12 @@
-//! Kotlin/mobile battle damage rules.
+//! Combat damage formula (renamed from `mobile_damage` per ADR 0002).
 //!
-//! This module deliberately contains only combat arithmetic and outcome rolls.
-//! Packet projection remains in `runner.rs`, so replacing the damage pipeline
-//! does not change the PC frame format.
+//! This module contains the authoritative combat arithmetic and outcome rolls
+//! for the PC server. Packet projection remains in `runner.rs`, so replacing
+//! the damage pipeline does not change the PC frame format.
+//!
+//! Renamed from `mobile_damage` because the formula applies to both PC and
+//! mobile clients; the original name suggested a mobile-only path that no
+//! longer reflects the actual dialect handling. See ADR 0002 for context.
 
 use crate::battle::engine::WarInfo;
 use crate::battle::rng::DotNetRandom;
@@ -11,9 +15,9 @@ const MAX_BASE_DAMAGE: i64 = 50_000;
 const ATTRIBUTE_INT: u8 = 27;
 const ICE_BOUND_STATUS_ID: i64 = 6;
 
-/// Mobile skill fields consumed by damage and status resolution.
+/// Combat skill fields consumed by damage and status resolution.
 #[derive(Debug, Clone, Copy, Default)]
-pub struct MobileSkillInput {
+pub struct SkillFormulaInput {
     pub element: u8,
     pub numerical: i64,
     pub attribute: u8,
@@ -21,9 +25,9 @@ pub struct MobileSkillInput {
     pub hit_status: i64,
 }
 
-/// Result of one mobile-formula attack roll.
+/// Result of one combat-formula attack roll.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct MobileAttackResult {
+pub struct AttackResult {
     pub hit: bool,
     pub thunder: bool,
     pub damage: i64,
@@ -31,7 +35,7 @@ pub struct MobileAttackResult {
     pub status_rounds: i64,
 }
 
-/// Calculate one attack using the mobile formula.
+/// Calculate one attack using the combat formula.
 ///
 /// `skill=None` means basic attack. The random stream is injected so tests can
 /// reproduce the same result for a fixed battle seed.
@@ -39,11 +43,11 @@ pub fn calculate_attack(
     rng: &mut DotNetRandom,
     attacker: &WarInfo,
     target: &WarInfo,
-    skill: Option<MobileSkillInput>,
-) -> MobileAttackResult {
+    skill: Option<SkillFormulaInput>,
+) -> AttackResult {
     let hit_rate = (90 + (attacker.agi - target.agi) / 2).clamp(5, 99);
     if rng.next_range(0, 100) >= hit_rate as i32 {
-        return MobileAttackResult {
+        return AttackResult {
             hit: false,
             thunder: false,
             damage: 0,
@@ -52,7 +56,7 @@ pub fn calculate_attack(
         };
     }
 
-    let skill = skill.unwrap_or(MobileSkillInput {
+    let skill = skill.unwrap_or(SkillFormulaInput {
         element: attacker.thuoctinh.clamp(0, u8::MAX as i64) as u8,
         numerical: 100,
         attribute: 0,
@@ -102,7 +106,7 @@ pub fn calculate_attack(
         (0, 0)
     };
 
-    MobileAttackResult {
+    AttackResult {
         hit: true,
         thunder,
         damage,
@@ -111,7 +115,7 @@ pub fn calculate_attack(
     }
 }
 
-fn calculate_base_damage(attacker: &WarInfo, skill: MobileSkillInput) -> i64 {
+fn calculate_base_damage(attacker: &WarInfo, skill: SkillFormulaInput) -> i64 {
     let level_damage = attacker.lv * 2;
     let base = if skill.attribute == ATTRIBUTE_INT {
         let base_damage = (attacker.int1 as f64 * 0.5 + attacker.lv as f64) as i64;
@@ -127,7 +131,7 @@ fn calculate_base_damage(attacker: &WarInfo, skill: MobileSkillInput) -> i64 {
     base.clamp(i64::MIN / 2, MAX_BASE_DAMAGE)
 }
 
-/// Mobile element table: earth→water→fire→wind→earth; light↔dark.
+/// Combat element table: earth→water→fire→wind→earth; light↔dark.
 pub fn element_multiplier(attacker: u8, defender: i64) -> f64 {
     if attacker == defender.clamp(0, u8::MAX as i64) as u8
         || matches!(attacker, 5 | 6)

@@ -1,10 +1,11 @@
-//! Compatibility boundary for documented but not-yet-semantic opcode families.
+//! Boundary for documented opcodes that have not yet been ported to a real
+//! handler (renamed from `compat` per ADR 0002).
 //!
 //! This handler is deliberately conservative: it validates the dispatcher
 //! contract, emits structured diagnostics, and never mutates player state or
 //! fabricates a success response. It prevents valid documented packets from
-//! disappearing in an unobservable wildcard branch while deeper Kotlin/client
-//! parity is implemented.
+//! disappearing in an unobservable wildcard branch while deeper porting work
+//! continues.
 
 use crate::protocol::is_documented_client_opcode;
 use crate::server::dispatcher::OpcodeCtx;

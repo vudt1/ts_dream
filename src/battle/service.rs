@@ -908,7 +908,7 @@ impl BattleService {
 
         let npcs = Arc::new(self.data.npcs.clone());
         let skills = Arc::new(self.data.skills.clone());
-        let mobile_skills = Arc::new(self.data.binary_skill_defs.clone());
+        let binary_skills = Arc::new(self.data.binary_skill_defs.clone());
         let items = Arc::new(self.data.items.clone());
         let pet_slots = Arc::new(pet_slots);
         let players = Arc::new(players);
@@ -931,7 +931,7 @@ impl BattleService {
             battle,
             npcs,
             skills,
-            mobile_skills,
+            binary_skills,
             items,
             pet_slots,
             players,

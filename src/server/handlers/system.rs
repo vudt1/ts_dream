@@ -84,10 +84,9 @@ pub fn handle_rank(ctx: &mut OpcodeCtx) {
 pub async fn handle_gm_shop(ctx: &mut OpcodeCtx<'_>) {
     let conn = &mut ctx.conn;
     let out = &mut ctx.out;
-    if ctx.env.profile == crate::protocol::profile::ProtocolProfile::PcALogin
-        && (!conn.session.authed
-            || !conn.session.logined
-            || conn.session.gm_level <= crate::server::gm::PLAYER_GM_LEVEL)
+    if !conn.session.authed
+        || !conn.session.logined
+        || conn.session.gm_level <= crate::server::gm::PLAYER_GM_LEVEL
     {
         out.send(sys_msg_frame("Ban khong co quyen GM."));
         if let Some(pool) = ctx.env.pool {

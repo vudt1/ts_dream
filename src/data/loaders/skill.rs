@@ -1,4 +1,4 @@
-//! Mobile-compatible `Skill_C.dat`/`Skill.Dat` loader.
+//! Mobile `Skill_C.dat` loader (PC `Skill.Dat` parser lives in `skill_pc.rs`).
 //!
 //! The field order follows the Kotlin `SkillDatLoader`: count(Int32), then
 //! Unicode name, primitive skill metadata, two prerequisite ids, and Unicode

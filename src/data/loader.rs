@@ -18,7 +18,8 @@ pub struct GameData {
     pub npcs: HashMap<i64, Npc>,
     pub items: HashMap<i64, Item>,
     pub skills: HashMap<i64, Skill>,
-    /// Rich mobile-compatible binary skill definitions from Skill.Dat.
+    /// Rich binary skill definitions from Skill.Dat (PC `Skill.Dat` once the
+    /// dedicated parser in `skill_pc.rs` lands; mobile `Skill_C.dat` until then).
     pub binary_skill_defs: HashMap<u16, BinarySkillDef>,
     /// Mission-mark definitions and the mobile reverse bit index.
     pub mark_defs: HashMap<u16, MarkDef>,
@@ -296,7 +297,7 @@ impl GameData {
             self.npcs.insert(def.id as i64, def.to_npc());
         }
 
-        let optional_binary: [(&str, &str); 18] = [
+        let optional_binary: [(&str, &str); 19] = [
             ("Formula.Dat", "formula"),
             ("BlissBag.Dat", "bliss_bag"),
             ("Compound.Dat", "compound"),
@@ -304,8 +305,10 @@ impl GameData {
             ("CityEx.Dat", "city_ex"),
             ("EVOStatus.Dat", "evo_status"),
             ("Warp.Dat", "warp"),
-            // The supplied PC Skill.Dat has a different, unverified layout. Only
-            // an explicitly supplied mobile-compatible Skill_C.dat may be parsed.
+            // PC `Skill.Dat` is the authoritative source (preferred per ADR
+            // 0002). `Skill_C.dat` is the mobile variant; if PC is absent
+            // and mobile is present, fall back to the mobile parser.
+            ("Skill.dat", "skill_pc"),
             ("Skill_C.dat", "skill"),
             ("Mark.Dat", "mark"),
             ("Mounts.Dat", "mount"),
@@ -332,6 +335,7 @@ impl GameData {
                 "cityex.dat" => self.city_ex = CityExDatLoader::load(&bytes)?,
                 "evostatus.dat" => self.evo_statuses = EVOStatusDatLoader::load(&bytes)?,
                 "warp.dat" => self.warp_defs = WarpDatLoader::load(&bytes)?,
+                "skill.dat" => self.binary_skill_defs = SkillDatLoaderPc::load(&bytes)?,
                 "skill_c.dat" => self.binary_skill_defs = SkillDatLoader::load(&bytes)?,
                 "mark.dat" => {
                     let (defs, reverse) = MarkDatLoader::load(&bytes)?;

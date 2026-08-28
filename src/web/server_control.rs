@@ -8,7 +8,6 @@ use crate::data::loader::GameData;
 use crate::db::modern::mysql::MySqlRepositories;
 use crate::protocol::encoder;
 use crate::protocol::frame;
-use crate::protocol::profile::ProtocolProfile;
 use crate::server::dispatcher::{self, ServerEnv};
 use crate::server::session::{online_sessions, Conn};
 use crate::server::spawn::announce_frame;
@@ -367,7 +366,6 @@ async fn handle_client_connection(
                                 repos: repos.as_ref(),
                                 hub: Some(&control),
                                 sender: Some(&tx),
-                                profile: ProtocolProfile::PcALogin,
                             };
                             // Pull the authoritative snapshot (a buyer may have
                             // mutated us through the player shop registry).

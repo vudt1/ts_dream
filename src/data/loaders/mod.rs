@@ -17,6 +17,7 @@ pub mod mount_grow;
 pub mod npc;
 pub mod scene_set;
 pub mod skill;
+pub mod skill_pc;
 pub mod teach_info;
 pub mod warp;
 
@@ -41,5 +42,6 @@ pub use mount_grow::MountGrowDatLoader;
 pub use npc::{NpcDatLoader, NpcDef};
 pub use scene_set::SceneSetDatLoader;
 pub use skill::SkillDatLoader;
+pub use skill_pc::{PcSkillDef, SkillDatLoaderPc, pc_to_binary};
 pub use teach_info::{TeachInfoDatLoader, TeachInfoResult};
 pub use warp::{WarpDatLoader, WarpDef};

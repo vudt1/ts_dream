@@ -8,7 +8,7 @@
 use crate::battle::construction::Battle;
 use crate::battle::damage;
 use crate::battle::engine::WarInfo;
-use crate::battle::mobile_damage::{self, MobileSkillInput};
+use crate::battle::combat_formula::{self, SkillFormulaInput};
 use crate::battle::npc_world::NpcWorld;
 use crate::battle::packets;
 use crate::battle::packets::{attack_status, miss_status, troi_byte, troi_end_byte};
@@ -44,8 +44,8 @@ pub type BattleCommands = HashMap<(u8, u8), BattleCommand>;
 pub struct BattleData<'a> {
     pub npcs: &'a HashMap<i64, Npc>,
     pub skills: &'a HashMap<i64, Skill>,
-    /// Optional mobile `Skill_C.dat` metadata used by the mobile formula.
-    pub mobile_skills: Option<&'a HashMap<u16, BinarySkillDef>>,
+    /// Optional binary skill catalog (PC `Skill.Dat` or mobile `Skill_C.dat`).
+    pub binary_skills: Option<&'a HashMap<u16, BinarySkillDef>>,
     /// Item records — used by in-battle use-item (op 0x32 sub 2) heals.
     pub items: &'a HashMap<i64, Item>,
     /// Per-player pet slot ids `[stt1..stt4]` (0 = empty), used by catch.
@@ -74,41 +74,41 @@ pub struct PlayerSnapshot {
     pub spx2: i64,
 }
 
-fn mobile_skill_def<'a>(data: &'a BattleData<'_>, skill_id: i64) -> Option<&'a BinarySkillDef> {
-    data.mobile_skills
+fn binary_skill_def<'a>(data: &'a BattleData<'_>, skill_id: i64) -> Option<&'a BinarySkillDef> {
+    data.binary_skills
         .and_then(|skills| skills.get(&(skill_id as u16)))
 }
 
 fn skill_exists(data: &BattleData<'_>, skill_id: i64) -> bool {
-    data.skills.contains_key(&skill_id) || mobile_skill_def(data, skill_id).is_some()
+    data.skills.contains_key(&skill_id) || binary_skill_def(data, skill_id).is_some()
 }
 
 fn skill_sp(data: &BattleData<'_>, skill_id: i64) -> i64 {
-    mobile_skill_def(data, skill_id)
+    binary_skill_def(data, skill_id)
         .map(|skill| i64::from(skill.require_sp))
         .or_else(|| data.skills.get(&skill_id).map(|skill| skill.sp))
         .unwrap_or(0)
 }
 
 fn skill_round(data: &BattleData<'_>, skill_id: i64, skill_lv: i64) -> i64 {
-    mobile_skill_def(data, skill_id)
+    binary_skill_def(data, skill_id)
         .map(|skill| i64::from(skill.round))
         .unwrap_or_else(|| damage::get_turn(skill_id, skill_lv))
 }
 
 fn skill_delay(data: &BattleData<'_>, skill_id: i64) -> i64 {
-    mobile_skill_def(data, skill_id)
+    binary_skill_def(data, skill_id)
         .map(|skill| i64::from(skill.spend_second))
         .or_else(|| data.skills.get(&skill_id).map(|skill| skill.delay))
         .unwrap_or(0)
 }
 
-fn mobile_skill_input(data: &BattleData<'_>, skill_id: i64) -> Option<MobileSkillInput> {
+fn binary_skill_input(data: &BattleData<'_>, skill_id: i64) -> Option<SkillFormulaInput> {
     if skill_id == 10_000 {
         return None;
     }
-    if let Some(def) = mobile_skill_def(data, skill_id) {
-        return Some(MobileSkillInput {
+    if let Some(def) = binary_skill_def(data, skill_id) {
+        return Some(SkillFormulaInput {
             element: def.element,
             numerical: i64::from(def.numerical),
             attribute: def.attribute,
@@ -116,7 +116,7 @@ fn mobile_skill_input(data: &BattleData<'_>, skill_id: i64) -> Option<MobileSkil
             hit_status: i64::from(def.hit_status),
         });
     }
-    data.skills.get(&skill_id).map(|skill| MobileSkillInput {
+    data.skills.get(&skill_id).map(|skill| SkillFormulaInput {
         element: skill.thuoctinh.clamp(0, u8::MAX as i64) as u8,
         numerical: 100,
         attribute: if skill.skill_type == 2 { 27 } else { 28 },
@@ -142,7 +142,7 @@ impl<'a> BattleData<'a> {
         BattleData {
             npcs,
             skills,
-            mobile_skills: None,
+            binary_skills: None,
             items,
             pet_slots,
             world,
@@ -153,13 +153,13 @@ impl<'a> BattleData<'a> {
         }
     }
 
-    /// Attach the mobile binary skill catalog without changing existing test
+    /// Attach the binary skill catalog without changing existing test
     /// constructors or the PC wire-facing BattleData API.
-    pub fn with_mobile_skills(
+    pub fn with_binary_skills(
         mut self,
-        mobile_skills: &'a HashMap<u16, BinarySkillDef>,
+        binary_skills: &'a HashMap<u16, BinarySkillDef>,
     ) -> BattleData<'a> {
-        self.mobile_skills = Some(mobile_skills);
+        self.binary_skills = Some(binary_skills);
         self
     }
 }
@@ -227,7 +227,7 @@ pub enum Out {
     },
     /// Pet exp grant at battle end.
     PetExp { owner: i64, stt: i64, exp: i64 },
-    /// Mobile PvE gold reward for a defeated NPC.
+    /// PvE gold reward for a defeated NPC.
     Gold { owner: i64, amount: i64 },
 }
 
@@ -627,7 +627,7 @@ impl Battle {
         let npc = data.npcs.get(&c.id).cloned().unwrap_or_default();
         c.id_skill =
             damage::get_random_skill_npc(&mut self.rng.random_0, npc.lv, npc.reborn, npc.skill);
-        c.lv_skill = mobile_skill_def(data, c.id_skill)
+        c.lv_skill = binary_skill_def(data, c.id_skill)
             .map(|s| i64::from(s.max_lv))
             .or_else(|| data.skills.get(&c.id_skill).map(|s| s.lv_max))
             .unwrap_or(1);
@@ -774,20 +774,20 @@ impl Battle {
         }
 
         let skill_row = data.skills.get(&skill);
-        let mobile_skill = mobile_skill_def(data, skill);
-        let skill_type = mobile_skill
+        let skill_def = binary_skill_def(data, skill);
+        let skill_type = skill_def
             .map(|s| i64::from(s.kind))
             .or_else(|| skill_row.map(|s| s.skill_type))
             .unwrap_or(0);
         let do_manh = skill_row.map(|s| s.do_manh).unwrap_or(0);
-        let num34 = mobile_skill
+        let num34 = skill_def
             .map(|s| i64::from(s.fight_area))
             .or_else(|| skill_row.map(|s| s.sl_danh))
             .unwrap_or(1);
         let combo_field = skill_row.map(|s| s.combo).unwrap_or(0);
         let mut num36 = 0i64;
         let mut num37 = 2.0f64;
-        let skill_tt = mobile_skill
+        let skill_tt = skill_def
             .map(|s| i64::from(s.element))
             .or_else(|| skill_row.map(|s| s.thuoctinh))
             .unwrap_or(0);
@@ -813,7 +813,7 @@ impl Battle {
         }
 
         let count = targets.len() as u8;
-        let hit_times = mobile_skill
+        let hit_times = skill_def
             .map(|s| usize::from(s.how_much_times.max(1)))
             .unwrap_or(1);
 
@@ -1183,9 +1183,9 @@ impl Battle {
         attacker: &WarInfo,
     ) -> Vec<GridPos> {
         let cells = self.cell_infos();
-        if let Some(def) = mobile_skill_def(data, skill) {
+        if let Some(def) = binary_skill_def(data, skill) {
             let is_heal = def.element == 2 && def.attribute == 25;
-            return targeting::get_pos_attack_mobile(
+            return targeting::get_pos_attack_by_fight_area(
                 &cells,
                 team,
                 row_attack,
@@ -1299,15 +1299,15 @@ impl Battle {
             ts.delay = sd;
         }
         let _ = (combo_field, num37, num34, do_manh, skill_tt, atk, int_stat);
-        let mobile = mobile_damage::calculate_attack(
+        let attack = combat_formula::calculate_attack(
             &mut self.rng.random_damage,
             attacker,
             target,
-            mobile_skill_input(data, skill),
+            binary_skill_input(data, skill),
         );
-        *num36 = mobile.damage;
-        let mut hit = if mobile.hit {
-            if mobile.thunder {
+        *num36 = attack.damage;
+        let mut hit = if attack.hit {
+            if attack.thunder {
                 2
             } else {
                 1
@@ -1360,11 +1360,11 @@ impl Battle {
             1,
         ));
 
-        // Mobile Skill_C status metadata applies on a clean target.
-        if mobile.inflicted_status > 0 && target.type3_id == 0 {
-            target.type3_id = mobile.inflicted_status;
+        // Binary skill status metadata applies on a clean target.
+        if attack.inflicted_status > 0 && target.type3_id == 0 {
+            target.type3_id = attack.inflicted_status;
             target.type3_lv = skill_lv;
-            target.type3_turn = mobile.status_rounds;
+            target.type3_turn = attack.status_rounds;
         }
 
         // Legacy PC status-debuff skills 13007/13029 retain their packet-specific path.
@@ -1476,22 +1476,22 @@ impl Battle {
         let mut rear = rear.clone();
         if skill_type == 1 {
             let _ = (combo_field, num37, do_manh, skill_tt, atk);
-            let mobile = mobile_damage::calculate_attack(
+            let attack = combat_formula::calculate_attack(
                 &mut self.rng.random_damage,
                 attacker,
                 &rear,
-                mobile_skill_input(data, skill),
+                binary_skill_input(data, skill),
             );
-            *num36 = mobile.damage;
+            *num36 = attack.damage;
         } else {
             let _ = (num37, num34, do_manh, skill_tt, int_stat);
-            let mobile = mobile_damage::calculate_attack(
+            let attack = combat_formula::calculate_attack(
                 &mut self.rng.random_damage,
                 attacker,
                 &rear,
-                mobile_skill_input(data, skill),
+                binary_skill_input(data, skill),
             );
-            *num36 = mobile.damage;
+            *num36 = attack.damage;
         }
         let _ = (avg1, avg2);
         let mut hit = if *num36 > 0 { 1 } else { 0 };
@@ -1556,13 +1556,13 @@ impl Battle {
     ) {
         ts.delay = skill_delay(data, skill);
         let _ = (num34, do_manh, skill_tt, int_stat);
-        let mobile = mobile_damage::calculate_attack(
+        let attack = combat_formula::calculate_attack(
             &mut self.rng.random_damage,
             attacker,
             target,
-            mobile_skill_input(data, skill),
+            binary_skill_input(data, skill),
         );
-        *num36 = mobile.damage;
+        *num36 = attack.damage;
         if matches!(attacker.type15_id, 10016..=10019) {
             let mut fresh = DotNetRandom::time_seeded();
             if fresh.next_range(1, 3) == 1 {
@@ -1572,8 +1572,8 @@ impl Battle {
             }
         }
         let _ = (avg1, avg2);
-        let mut hit = if mobile.hit {
-            if mobile.thunder {
+        let mut hit = if attack.hit {
+            if attack.thunder {
                 2
             } else {
                 1
@@ -1616,10 +1616,10 @@ impl Battle {
             *num36 as u16,
             1,
         ));
-        if mobile.inflicted_status > 0 && target.type3_id == 0 {
-            target.type3_id = mobile.inflicted_status;
+        if attack.inflicted_status > 0 && target.type3_id == 0 {
+            target.type3_id = attack.inflicted_status;
             target.type3_lv = 1;
-            target.type3_turn = mobile.status_rounds;
+            target.type3_turn = attack.status_rounds;
         }
         if matches!(target.type4_id, 10015 | 10031 | 13021) && ts.reflect > 0 {
             self.apply_reflect(attacker, ts, out);
@@ -1644,7 +1644,7 @@ impl Battle {
     ) {
         ts.delay = skill_delay(data, skill);
         let turn = skill_round(data, skill, skill_lv);
-        let status_id = mobile_skill_def(data, skill)
+        let status_id = binary_skill_def(data, skill)
             .map(|s| i64::from(s.hit_status))
             .filter(|id| *id > 0)
             .unwrap_or(skill);
@@ -1977,7 +1977,7 @@ impl Battle {
         out: &mut Vec<Out>,
     ) {
         ts.delay = skill_delay(data, skill);
-        let numerical = mobile_skill_def(data, skill)
+        let numerical = binary_skill_def(data, skill)
             .map(|s| i64::from(s.numerical))
             .unwrap_or(100);
         let heal_base = (attacker.int1 as f64 * 0.5 + attacker.lv as f64) as i64;
@@ -2687,7 +2687,7 @@ impl Battle {
                     )));
                 }
                 if attacker.lv - npc_lv <= 20 && npc_dead {
-                    attacker.exp += mobile_reward_exp(attacker.lv, npc_lv);
+                    attacker.exp += reward_exp(attacker.lv, npc_lv);
                 }
             }
 
@@ -2695,7 +2695,7 @@ impl Battle {
             for entry in &combo_cells {
                 let (pr, pc, plv) = parse_cell_entry(entry);
                 if plv - npc_lv <= 20 && npc_dead {
-                    let exp = mobile_reward_exp(plv, npc_lv);
+                    let exp = reward_exp(plv, npc_lv);
                     if let Some(cell) = self.cell_mut(pr, pc) {
                         cell.exp += exp;
                     }
@@ -2943,7 +2943,7 @@ fn avg_of(ts: &TurnState, team: i64) -> i64 {
 }
 
 /// Parse a `"row.col/lv"` cell entry.
-fn mobile_reward_exp(player_level: i64, npc_level: i64) -> i64 {
+fn reward_exp(player_level: i64, npc_level: i64) -> i64 {
     let level_diff = npc_level - player_level;
     let level_modifier = if level_diff >= 5 {
         1.2

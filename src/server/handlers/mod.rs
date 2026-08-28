@@ -3,7 +3,6 @@
 pub mod battle;
 pub mod character;
 pub mod chat;
-pub mod compat;
 pub mod expressions;
 pub mod inventory;
 pub mod login;
@@ -18,4 +17,5 @@ pub mod stats;
 pub mod system;
 pub mod talk;
 pub mod trade_storage;
+pub mod unimplemented;
 pub mod use_item;

@@ -56,7 +56,7 @@ pub mod battle {
     pub mod damage;
     pub mod engine;
     pub mod manager;
-    pub mod mobile_damage;
+    pub mod combat_formula;
     pub mod npc_world;
     pub mod packets;
     pub mod rng;

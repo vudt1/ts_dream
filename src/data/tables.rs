@@ -202,7 +202,8 @@ pub struct MarkDef {
     pub description: String,
 }
 
-/// Rich binary skill definition loaded from mobile-compatible Skill.Dat.
+/// Rich binary skill definition loaded from PC `Skill.Dat` (preferred) or
+/// mobile `Skill_C.dat` (fallback until the PC parser lands).
 #[derive(Debug, Clone, Default)]
 pub struct BinarySkillDef {
     pub id: u16,

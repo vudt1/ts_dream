@@ -24,13 +24,13 @@ pub struct CellInfo {
     pub type4_id: i64,
 }
 
-/// Mobile `BattleGrid.resolveTargets` using fightArea values 1–8.
+/// Resolve attack targets by `fight_area` values 1–8.
 ///
 /// For single/column/row/jump/cross/six/row-five, the positions are expanded
-/// exactly as the Kotlin grid helper. Area 8 is the living opposing side, and
-/// invalid or empty positions are omitted. `is_heal` makes area 8 select the
-/// attacker's own side, matching mobile heal targeting.
-pub fn get_pos_attack_mobile(
+/// exactly as the Kotlin grid helper (ported from `ts_mobile_server`). Area 8
+/// is the living opposing side, and invalid or empty positions are omitted.
+/// `is_heal` makes area 8 select the attacker's own side (heal targeting).
+pub fn get_pos_attack_by_fight_area(
     cells: &[CellInfo],
     myteam: i64,
     row: u8,

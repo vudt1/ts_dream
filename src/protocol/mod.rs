@@ -59,7 +59,6 @@ pub mod codec;
 pub mod codecs;
 pub mod encoder;
 pub mod frame;
-pub mod profile;
 pub mod reader;
 pub mod writer;
 

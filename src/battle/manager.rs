@@ -2,9 +2,10 @@
 //!
 //! One battle runs on its own `tokio::spawn` task. Player commands (op 0x32)
 //! arrive through a per-battle `mpsc` channel; the task collects them each turn
-//! (with a per-turn timeout, default 20 s), runs the mobile-compatible
-//! `Battle::run_turn`, and dispatches every `runner::Out` through a `BattleSink`.
-//! The grid + RNG live only inside the task, so battle state is race-free.
+//! (with a per-turn timeout, default 20 s, ported from the Kotlin/mobile
+//! `BattleConstants.COUNTDOWN_NORMAL`), runs `Battle::run_turn`, and dispatches
+//! every `runner::Out` through a `BattleSink`. The grid + RNG live only inside
+//! the task, so battle state is race-free.
 
 use crate::battle::construction::Battle;
 use crate::battle::npc_world::NpcWorld;
@@ -35,7 +36,7 @@ pub trait BattleSink: Send + Sync + 'static {
     fn apply_fled(&self, player: i64);
     fn apply_respawn(&self, npc_id: i64, map_id: i64, x: i64, y: i64);
     fn apply_pet_exp(&self, owner: i64, stt: i64, exp: i64);
-    /// Apply a mobile PvE gold reward. The default is a no-op for test sinks.
+    /// Apply a PvE gold reward. The default is a no-op for test sinks.
     fn apply_gold(&self, _owner: i64, _amount: i64) {}
     /// The battle task finished (`PlayerWin`/`PlayerLose`/`PlayerFled`).
     fn battle_ended(&self, id: i32, outcome: Outcome);
@@ -73,9 +74,10 @@ impl BattleManager {
         BattleManager {
             battles: RwLock::new(HashMap::new()),
             next_id: AtomicI32::new(1),
-            // Mobile BattleConstants.COUNTDOWN_NORMAL = 20 seconds.
-            // Keep this as a business-rule timeout; custom timeouts remain
-            // available for deterministic tests and special battle modes.
+            // Per-turn input timeout ported from the Kotlin/mobile
+            // `BattleConstants.COUNTDOWN_NORMAL`. Keep this as a business-rule
+            // timeout; custom timeouts remain available for deterministic
+            // tests and special battle modes.
             default_timeout: std::time::Duration::from_secs(20),
         }
     }
@@ -106,7 +108,7 @@ impl BattleManager {
         battle: Battle,
         npcs: Arc<HashMap<i64, Npc>>,
         skills: Arc<HashMap<i64, Skill>>,
-        mobile_skills: Arc<HashMap<u16, BinarySkillDef>>,
+        binary_skills: Arc<HashMap<u16, BinarySkillDef>>,
         items: Arc<HashMap<i64, Item>>,
         pet_slots: Arc<HashMap<i64, [i64; 4]>>,
         players: Arc<HashMap<i64, PlayerSnapshot>>,
@@ -121,7 +123,7 @@ impl BattleManager {
             battle,
             npcs,
             skills,
-            mobile_skills,
+            binary_skills,
             items,
             pet_slots,
             players,
@@ -142,7 +144,7 @@ impl BattleManager {
         battle: Battle,
         npcs: Arc<HashMap<i64, Npc>>,
         skills: Arc<HashMap<i64, Skill>>,
-        mobile_skills: Arc<HashMap<u16, BinarySkillDef>>,
+        binary_skills: Arc<HashMap<u16, BinarySkillDef>>,
         items: Arc<HashMap<i64, Item>>,
         pet_slots: Arc<HashMap<i64, [i64; 4]>>,
         players: Arc<HashMap<i64, PlayerSnapshot>>,
@@ -174,7 +176,7 @@ impl BattleManager {
                 talking_battle,
                 map_id,
             )
-            .with_mobile_skills(&mobile_skills);
+            .with_binary_skills(&binary_skills);
             let mut out: Vec<Out> = Vec::new();
             loop {
                 out.clear();
