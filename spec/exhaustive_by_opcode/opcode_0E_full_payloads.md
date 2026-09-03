@@ -1,0 +1,20 @@
+# Outer opcode 0x0E — exhaustive full payloads
+
+> Số payload unique: **14**. Đây là các vector tổng hợp từ phân tích tĩnh, không phải traffic capture. `H[0]` ở offset frame `5`; full wire được XOR `0xAD`.
+
+| # | H[0] | Payload length | H | Full decoded frame | Full wire XOR `0xAD` | Category | Route/target | Evidence | Confidence | Provenance |
+|---:|---:|---:|---|---|---|---|---|---|---|---|
+| 1 | `0x00` | 2 | `00` | `F4 44 02 00 0E 00` | `59 E9 AF AD A3 AD` | `exhaustive-selector-routing` | `H[0]=0x00 0x00796347` | PE-decoded local table plus cmp/jmp guard; no callee-tail grammar asserted. | routing-high | `fable_deep_vectors_08_09_0C_0D_0E.json` |
+| 2 | `0x01` | 2 | `01` | `F4 44 02 00 0E 01` | `59 E9 AF AD A3 AC` | `exhaustive-selector-routing` | `H[0]=0x01 0x0078E06B` | PE-decoded local table plus cmp/jmp guard; no callee-tail grammar asserted. | routing-high | `fable_deep_vectors_08_09_0C_0D_0E.json` |
+| 3 | `0x02` | 2 | `02` | `F4 44 02 00 0E 02` | `59 E9 AF AD A3 AF` | `exhaustive-selector-routing` | `H[0]=0x02 0x0078E155` | PE-decoded local table plus cmp/jmp guard; no callee-tail grammar asserted. | routing-high | `fable_deep_vectors_08_09_0C_0D_0E.json` |
+| 4 | `0x03` | 2 | `03` | `F4 44 02 00 0E 03` | `59 E9 AF AD A3 AE` | `exhaustive-selector-routing` | `H[0]=0x03 0x0078E193` | PE-decoded local table plus cmp/jmp guard; no callee-tail grammar asserted. | routing-high | `fable_deep_vectors_08_09_0C_0D_0E.json` |
+| 5 | `0x04` | 2 | `04` | `F4 44 02 00 0E 04` | `59 E9 AF AD A3 A9` | `exhaustive-selector-routing` | `H[0]=0x04 0x0078E2DF` | PE-decoded local table plus cmp/jmp guard; no callee-tail grammar asserted. | routing-high | `fable_deep_vectors_08_09_0C_0D_0E.json` |
+| 6 | `0x05` | 2 | `05` | `F4 44 02 00 0E 05` | `59 E9 AF AD A3 A8` | `exhaustive-selector-routing` | `H[0]=0x05 0x0078E31D` | PE-decoded local table plus cmp/jmp guard; no callee-tail grammar asserted. | routing-high | `fable_deep_vectors_08_09_0C_0D_0E.json` |
+| 7 | `0x06` | 2 | `06` | `F4 44 02 00 0E 06` | `59 E9 AF AD A3 AB` | `exhaustive-selector-routing` | `H[0]=0x06 0x0078E331` | PE-decoded local table plus cmp/jmp guard; no callee-tail grammar asserted. | routing-high | `fable_deep_vectors_08_09_0C_0D_0E.json` |
+| 8 | `0x07` | 2 | `07` | `F4 44 02 00 0E 07` | `59 E9 AF AD A3 AA` | `exhaustive-selector-routing` | `H[0]=0x07 0x0078E353` | PE-decoded local table plus cmp/jmp guard; no callee-tail grammar asserted. | routing-high | `fable_deep_vectors_08_09_0C_0D_0E.json` |
+| 9 | `0x02` | 6 | `02 40 30 20 10` | `F4 44 06 00 0E 02 40 30 20 10` | `59 E9 AB AD A3 AF ED 9D 8D BD` | `direct-schema` | `H[0]=0x02 0x0078E155` | 0x0078E155..0x0078E18E | schema-high | `fable_deep_vectors_08_09_0C_0D_0E.json` |
+| 10 | `0x04` | 6 | `04 40 30 20 10` | `F4 44 06 00 0E 04 40 30 20 10` | `59 E9 AB AD A3 A9 ED 9D 8D BD` | `direct-schema` | `H[0]=0x04 0x0078E2DF` | 0x0078E2DF..0x0078E318 | schema-high | `fable_deep_vectors_08_09_0C_0D_0E.json` |
+| 11 | `0x03` | 7 | `03 40 30 20 10 01` | `F4 44 07 00 0E 03 40 30 20 10 01` | `59 E9 AA AD A3 AE ED 9D 8D BD AC` | `direct-schema` | `H[0]=0x03,H[5]=1 0x0078E193` | 0x0078E193..0x0078E2DA | schema-high | `fable_deep_vectors_08_09_0C_0D_0E.json` |
+| 12 | `0x03` | 7 | `03 40 30 20 10 02` | `F4 44 07 00 0E 03 40 30 20 10 02` | `59 E9 AA AD A3 AE ED 9D 8D BD AF` | `direct-schema` | `H[0]=0x03,H[5]=2 0x0078E193` | 0x0078E193..0x0078E2DA | schema-high | `fable_deep_vectors_08_09_0C_0D_0E.json` |
+| 13 | `0x03` | 7 | `03 40 30 20 10 03` | `F4 44 07 00 0E 03 40 30 20 10 03` | `59 E9 AA AD A3 AE ED 9D 8D BD AE` | `direct-schema` | `H[0]=0x03,H[5]=3 0x0078E193` | 0x0078E193..0x0078E2DA | schema-high | `fable_deep_vectors_08_09_0C_0D_0E.json` |
+| 14 | `0x01` | 16 | `01 40 30 20 10 00 00 00 00 00 00 29 40 03 00` | `F4 44 10 00 0E 01 40 30 20 10 00 00 00 00 00 00 29 40 03 00` | `59 E9 BD AD A3 AC ED 9D 8D BD AD AD AD AD AD AD 84 ED AE AD` | `direct-schema` | `H[0]=0x01 0x0078E06B` | 0x0078E06B..0x0078E150 and callee 0x007605EC | schema-high-for-fields | `fable_deep_vectors_08_09_0C_0D_0E.json` |

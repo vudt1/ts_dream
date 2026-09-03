@@ -1,0 +1,31 @@
+# Outer opcode 0x29 — exhaustive full payloads
+
+> Số payload unique: **25**. Đây là các vector tổng hợp từ phân tích tĩnh, không phải traffic capture. `H[0]` ở offset frame `5`; full wire được XOR `0xAD`.
+
+| # | H[0] | Payload length | H | Full decoded frame | Full wire XOR `0xAD` | Category | Route/target | Evidence | Confidence | Provenance |
+|---:|---:|---:|---|---|---|---|---|---|---|---|
+| 1 | `0x01` | 2 | `01` | `F4 44 02 00 29 01` | `59 E9 AF AD 84 AC` | `premap-routing` | `H[0]=0x01 -> premap index 0x01 0x007944BF` | premap 0x0079442E + jump table 0x00794463 | routing-high | `fable_deep_vectors_28_29_2A_2B_2C.json` |
+| 2 | `0x02` | 2 | `02` | `F4 44 02 00 29 02` | `59 E9 AF AD 84 AF` | `premap-routing` | `H[0]=0x02 -> premap index 0x02 0x007944D3` | premap 0x0079442E + jump table 0x00794463 | routing-high | `fable_deep_vectors_28_29_2A_2B_2C.json` |
+| 3 | `0x03` | 2 | `03` | `F4 44 02 00 29 03` | `59 E9 AF AD 84 AE` | `premap-routing` | `H[0]=0x03 -> premap index 0x03 0x007944E7` | premap 0x0079442E + jump table 0x00794463 | routing-high | `fable_deep_vectors_28_29_2A_2B_2C.json` |
+| 4 | `0x04` | 2 | `04` | `F4 44 02 00 29 04` | `59 E9 AF AD 84 A9` | `premap-routing` | `H[0]=0x04 -> premap index 0x04 0x007944FB` | premap 0x0079442E + jump table 0x00794463 | routing-high | `fable_deep_vectors_28_29_2A_2B_2C.json` |
+| 5 | `0x05` | 2 | `05` | `F4 44 02 00 29 05` | `59 E9 AF AD 84 A8` | `premap-routing` | `H[0]=0x05 -> premap index 0x05 0x0079450F` | premap 0x0079442E + jump table 0x00794463 | routing-high | `fable_deep_vectors_28_29_2A_2B_2C.json` |
+| 6 | `0x06` | 2 | `06` | `F4 44 02 00 29 06` | `59 E9 AF AD 84 AB` | `premap-routing` | `H[0]=0x06 -> premap index 0x06 0x00794523` | premap 0x0079442E + jump table 0x00794463 | routing-high | `fable_deep_vectors_28_29_2A_2B_2C.json` |
+| 7 | `0x07` | 2 | `07` | `F4 44 02 00 29 07` | `59 E9 AF AD 84 AA` | `premap-routing` | `H[0]=0x07 -> premap index 0x07 0x00794537` | premap 0x0079442E + jump table 0x00794463 | routing-high | `fable_deep_vectors_28_29_2A_2B_2C.json` |
+| 8 | `0x08` | 2 | `08` | `F4 44 02 00 29 08` | `59 E9 AF AD 84 A5` | `premap-routing` | `H[0]=0x08 -> premap index 0x08 0x0079454B` | premap 0x0079442E + jump table 0x00794463 | routing-high | `fable_deep_vectors_28_29_2A_2B_2C.json` |
+| 9 | `0x09` | 2 | `09` | `F4 44 02 00 29 09` | `59 E9 AF AD 84 A4` | `premap-routing` | `H[0]=0x09 -> premap index 0x09 0x0079455C` | premap 0x0079442E + jump table 0x00794463 | routing-high | `fable_deep_vectors_28_29_2A_2B_2C.json` |
+| 10 | `0x0A` | 2 | `0A` | `F4 44 02 00 29 0A` | `59 E9 AF AD 84 A7` | `premap-routing` | `H[0]=0x0A -> premap index 0x0A 0x00794570` | premap 0x0079442E + jump table 0x00794463 | routing-high | `fable_deep_vectors_28_29_2A_2B_2C.json` |
+| 11 | `0x0B` | 2 | `0B` | `F4 44 02 00 29 0B` | `59 E9 AF AD 84 A6` | `premap-routing` | `H[0]=0x0B -> premap index 0x0B 0x007945EC` | premap 0x0079442E + jump table 0x00794463 | routing-high | `fable_deep_vectors_28_29_2A_2B_2C.json` |
+| 12 | `0x0C` | 2 | `0C` | `F4 44 02 00 29 0C` | `59 E9 AF AD 84 A1` | `premap-routing` | `H[0]=0x0C -> premap index 0x0C 0x00794600` | premap 0x0079442E + jump table 0x00794463 | routing-high | `fable_deep_vectors_28_29_2A_2B_2C.json` |
+| 13 | `0x0D` | 2 | `0D` | `F4 44 02 00 29 0D` | `59 E9 AF AD 84 A0` | `premap-routing` | `H[0]=0x0D -> premap index 0x0D 0x0079462B` | premap 0x0079442E + jump table 0x00794463 | routing-high | `fable_deep_vectors_28_29_2A_2B_2C.json` |
+| 14 | `0x0E` | 2 | `0E` | `F4 44 02 00 29 0E` | `59 E9 AF AD 84 A3` | `premap-routing || direct-schema` | `H[0]=0x0E -> premap index 0x0E 0x0079463F` | premap 0x0079442E + jump table 0x00794463 // 0x0079463F..0x0079464D | routing-high | `fable_deep_vectors_28_29_2A_2B_2C.json` |
+| 15 | `0x0F` | 2 | `0F` | `F4 44 02 00 29 0F` | `59 E9 AF AD 84 A2` | `premap-routing` | `H[0]=0x0F -> premap index 0x0F 0x00794652` | premap 0x0079442E + jump table 0x00794463 | routing-high | `fable_deep_vectors_28_29_2A_2B_2C.json` |
+| 16 | `0x14` | 2 | `14` | `F4 44 02 00 29 14` | `59 E9 AF AD 84 B9` | `premap-routing` | `H[0]=0x14 -> premap index 0x10 0x00794663` | premap 0x0079442E + jump table 0x00794463 | routing-high | `fable_deep_vectors_28_29_2A_2B_2C.json` |
+| 17 | `0x15` | 2 | `15` | `F4 44 02 00 29 15` | `59 E9 AF AD 84 B8` | `premap-routing` | `H[0]=0x15 -> premap index 0x11 0x00794677` | premap 0x0079442E + jump table 0x00794463 | routing-high | `fable_deep_vectors_28_29_2A_2B_2C.json` |
+| 18 | `0x16` | 2 | `16` | `F4 44 02 00 29 16` | `59 E9 AF AD 84 BB` | `premap-routing` | `H[0]=0x16 -> premap index 0x12 0x0079468B` | premap 0x0079442E + jump table 0x00794463 | routing-high | `fable_deep_vectors_28_29_2A_2B_2C.json` |
+| 19 | `0x17` | 2 | `17` | `F4 44 02 00 29 17` | `59 E9 AF AD 84 BA` | `premap-routing` | `H[0]=0x17 -> premap index 0x13 0x0079469F` | premap 0x0079442E + jump table 0x00794463 | routing-high | `fable_deep_vectors_28_29_2A_2B_2C.json` |
+| 20 | `0x32` | 2 | `32` | `F4 44 02 00 29 32` | `59 E9 AF AD 84 9F` | `premap-routing` | `H[0]=0x32 -> premap index 0x14 0x007946B3` | premap 0x0079442E + jump table 0x00794463 | routing-high | `fable_deep_vectors_28_29_2A_2B_2C.json` |
+| 21 | `0x33` | 2 | `33` | `F4 44 02 00 29 33` | `59 E9 AF AD 84 9E` | `premap-routing` | `H[0]=0x33 -> premap index 0x15 0x007946F1` | premap 0x0079442E + jump table 0x00794463 | routing-high | `fable_deep_vectors_28_29_2A_2B_2C.json` |
+| 22 | `0x34` | 2 | `34` | `F4 44 02 00 29 34` | `59 E9 AF AD 84 99` | `premap-routing` | `H[0]=0x34 -> premap index 0x16 0x00794705` | premap 0x0079442E + jump table 0x00794463 | routing-high | `fable_deep_vectors_28_29_2A_2B_2C.json` |
+| 23 | `0x0C` | 3 | `0C 7F` | `F4 44 03 00 29 0C 7F` | `59 E9 AE AD 84 A1 D2` | `direct-schema` | `H[0]=0x0C,H[1]=byte 0x00794600` | 0x00794600..0x00794626 | schema-high | `fable_deep_vectors_28_29_2A_2B_2C.json` |
+| 24 | `0x32` | 3 | `32 02` | `F4 44 03 00 29 32 02` | `59 E9 AE AD 84 9F AF` | `direct-schema` | `H[0]=0x32,H[1]=byte 0x007946B3` | 0x007946B3..0x007946EC | schema-high | `fable_deep_vectors_28_29_2A_2B_2C.json` |
+| 25 | `0x0A` | 4 | `0A 34 12` | `F4 44 04 00 29 0A 34 12` | `59 E9 A9 AD 84 A7 99 BF` | `direct-schema` | `H[0]=0x0A,H[1..2]=UInt16LE 0x00794570` | 0x00794570..0x007945E7 | schema-high | `fable_deep_vectors_28_29_2A_2B_2C.json` |

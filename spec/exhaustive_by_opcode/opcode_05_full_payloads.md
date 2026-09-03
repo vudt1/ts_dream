@@ -1,0 +1,17 @@
+# Outer opcode 0x05 — exhaustive full payloads
+
+> Số payload unique: **11**. Đây là các vector tổng hợp từ phân tích tĩnh, không phải traffic capture. `H[0]` ở offset frame `5`; full wire được XOR `0xAD`.
+
+| # | H[0] | Payload length | H | Full decoded frame | Full wire XOR `0xAD` | Category | Route/target | Evidence | Confidence | Provenance |
+|---:|---:|---:|---|---|---|---|---|---|---|---|
+| 1 | `0x00` | 2 | `00` | `F4 44 02 00 05 00` | `59 E9 AF AD A8 AD` | `exhaustive-selector-routing` | `H[0]=0x00 0x0078CAB1` | PE-decoded local jump table + guard; skeleton has no asserted callee-tail schema. | routing-high | `fable_deep_vectors_01_02_03_04_05_07.json` |
+| 2 | `0x01` | 2 | `01` | `F4 44 02 00 05 01` | `59 E9 AF AD A8 AC` | `exhaustive-selector-routing` | `H[0]=0x01 0x0078CAC5` | PE-decoded local jump table + guard; skeleton has no asserted callee-tail schema. | routing-high | `fable_deep_vectors_01_02_03_04_05_07.json` |
+| 3 | `0x02` | 2 | `02` | `F4 44 02 00 05 02` | `59 E9 AF AD A8 AF` | `exhaustive-selector-routing` | `H[0]=0x02 0x0078CAD9` | PE-decoded local jump table + guard; skeleton has no asserted callee-tail schema. | routing-high | `fable_deep_vectors_01_02_03_04_05_07.json` |
+| 4 | `0x03` | 2 | `03` | `F4 44 02 00 05 03` | `59 E9 AF AD A8 AE` | `exhaustive-selector-routing` | `H[0]=0x03 0x0078CAED` | PE-decoded local jump table + guard; skeleton has no asserted callee-tail schema. | routing-high | `fable_deep_vectors_01_02_03_04_05_07.json` |
+| 5 | `0x04` | 2 | `04` | `F4 44 02 00 05 04` | `59 E9 AF AD A8 A9` | `exhaustive-selector-routing || direct-state-route` | `H[0]=0x04 0x0078CB01` | PE-decoded local jump table + guard; skeleton has no asserted callee-tail schema. // 0x0078CB01..0x0078CB2B direct global/object state mutation. | routing-high | `fable_deep_vectors_01_02_03_04_05_07.json` |
+| 6 | `0x05` | 2 | `05` | `F4 44 02 00 05 05` | `59 E9 AF AD A8 A8` | `exhaustive-selector-routing` | `H[0]=0x05 0x0078CB35` | PE-decoded local jump table + guard; skeleton has no asserted callee-tail schema. | routing-high | `fable_deep_vectors_01_02_03_04_05_07.json` |
+| 7 | `0x06` | 2 | `06` | `F4 44 02 00 05 06` | `59 E9 AF AD A8 AB` | `exhaustive-selector-routing` | `H[0]=0x06 0x0078CB49` | PE-decoded local jump table + guard; skeleton has no asserted callee-tail schema. | routing-high | `fable_deep_vectors_01_02_03_04_05_07.json` |
+| 8 | `0x07` | 2 | `07` | `F4 44 02 00 05 07` | `59 E9 AF AD A8 AA` | `exhaustive-selector-routing` | `H[0]=0x07 0x00796347` | PE-decoded local jump table + guard; skeleton has no asserted callee-tail schema. | routing-high | `fable_deep_vectors_01_02_03_04_05_07.json` |
+| 9 | `0x08` | 2 | `08` | `F4 44 02 00 05 08` | `59 E9 AF AD A8 A5` | `exhaustive-selector-routing` | `H[0]=0x08 0x0078CB5D` | PE-decoded local jump table + guard; skeleton has no asserted callee-tail schema. | routing-high | `fable_deep_vectors_01_02_03_04_05_07.json` |
+| 10 | `0x09` | 2 | `09` | `F4 44 02 00 05 09` | `59 E9 AF AD A8 A4` | `exhaustive-selector-routing` | `H[0]=0x09 0x0078CB71` | PE-decoded local jump table + guard; skeleton has no asserted callee-tail schema. | routing-high | `fable_deep_vectors_01_02_03_04_05_07.json` |
+| 11 | `0x0A` | 2 | `0A` | `F4 44 02 00 05 0A` | `59 E9 AF AD A8 A7` | `exhaustive-selector-routing` | `H[0]=0x0A 0x0078CB85` | PE-decoded local jump table + guard; skeleton has no asserted callee-tail schema. | routing-high | `fable_deep_vectors_01_02_03_04_05_07.json` |

@@ -181,5 +181,32 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
   - `Session.newbie` là **DUY NHẤT** field còn persist từ deferred list (vì cần cho TSVN gift guard).
 - **Trường đã xóa hoàn toàn khỏi Rust**: `db::players` (file orphan), `db::quest` (file orphan), `src/server/handlers/quest::save_map` (chỉ còn in-memory, comment ghi rõ).
 
+### Combat Damage Formula
+- **Định nghĩa**: Công thức tính sát thương trong `src/battle/combat_formula.rs::calculate_attack` (đổi tên từ `mobile_damage.rs` theo ADR 0002). Áp dụng cho cả PC client lẫn mobile client: hit roll `(90 + (agi_atk - agi_def) / 2).clamp(5,99)`, base damage từ `int1` (skill thuộc tính `attribute=27`) hoặc `atk` (basic) với multiplier `0.5`/`0.6` × `lv`, sau đó nhân với element multiplier (1.5× khắc, 0.75× bị khắc, 1.0× đồng/hỗn), reborn multiplier `1+0.1×(reborn_atk-reborn_def)`, random factor `0.9..1.1`, thunder roll `5+agi/10` với multiplier 1.5×, PvP multiplier 0.5× nếu target là player, status multiplier 1.5× nếu bị đóng băng, defend multiplier 0.5× nếu có skill 17001.
+- **Ràng buộc (Invariants)**:
+  - Công thức này là **damage formula chính thức cho PC server** theo ADR 0002, bất kể client là PC hay mobile. Không dùng `damage::calc_physical_damage` / `damage::calc_magic_damage` (đã xóa sau cleanup).
+  - Status infliction: nếu skill có `hit_status > 0 && round > 0`, land roll `(50 + (int1_atk - int1_def)/2).clamp(10,90)`, target sạch (`type3_id == 0`) mới nhận status.
+- **Phạm vi áp dụng**: physical attack, magic attack, shield (20006) rear damage — gọi từ `runner.rs::apply_physical`/`apply_damage_to_rear`/`apply_magic`.
+- **Tránh dùng các từ mơ hồ**: *mobile damage formula*, *PC damage formula* (đã gộp thành một), *Formula.Dat formula* (chỉ áp dụng cho PC classic, không dùng).
+
+### Skill Catalog (Danh mục kỹ năng)
+- **Định nghĩa**: Bảng tra cứu metadata kỹ năng (`BinarySkillDef` trong `data/tables.rs:206`) load từ `Data/Skill.Dat` (PC binary, ưu tiên theo ADR 0002) hoặc `Data/Skill_C.dat` (mobile binary, fallback). Dùng cho: damage calculation (element, numerical, attribute, round, hit_status), targeting (fight_area), status infliction.
+- **Ràng buộc (Invariants)**:
+  - Hai file **khác format hoàn toàn**:
+    - **PC `Skill.Dat`** (Pack=1, 86 bytes/record, 86-byte zero header): reverse-decoded name/des, `DecodeItem8/16/32` XOR obfuscation. Spec từ `SkillData.cs`/`SkillInfo.cs`. Parser ở `src/data/loaders/skill_pc.rs::SkillDatLoaderPc`.
+    - **Mobile `Skill_C.dat`** (count-prefix, variable-length UTF-16LE names): parser ở `src/data/loaders/skill.rs::SkillDatLoader` (tham khảo từ Kotlin `ts_mobile_server`).
+  - Field `binary_skills: Option<&HashMap<u16, BinarySkillDef>>` trong `BattleData` được fill bởi `BattleService` từ `GameData::binary_skill_defs` (cùng một HashMap, không phân biệt PC/mobile sau load qua bridge `pc_to_binary`).
+  - PC bridge (`skill_pc::pc_to_binary`): map PC fields sang `BinarySkillDef` theo best-effort (vd: `sp_cost` → `require_sp`, `elem` → `element`, `state` → `round`, `delay` → `spend_second`, `require_sk` → pre_skill_id1, `unk21` → pre_skill_id2). Unknown fields zero-fill.
+  - VISCII decode: `decode_viscii` route qua `encoding::viscii_to_unicode` (bảng 102-entry VISCII 1.1 với extension `Đ` ở 0xD0/0xDD) — render đầy đủ ký tự tiếng Việt có dấu (ế, ộ, ặ, ẫ, ẩ, ằ, ắ, ọ, ợ, ử, ữ, ị, ể, ễ, ẽ...).
+  - **PC `Skill.Dat` đã parse được** (từ ADR 0002 follow-up #1): 352 records, id range 9984..=23019, tất cả đều có name (VISCII) + description (VISCII) + require_sk. Skill 10000 (basic attack) tồn tại với name "Nham quái".
+- **Tránh dùng các từ mơ hồ**: *mobile skills* (gây hiểu nhầm là chỉ dùng cho mobile), *Skill.dat* (chưa rõ PC hay mobile — phải ghi rõ).
+
+### Opcode Dialect (Đã đơn giản hóa sau ADR 0002)
+- **Định nghĩa**: PC server chỉ phục vụ một dialect duy nhất — PC `aLogin.exe` port 6414. Không còn enum `ProtocolProfile` (`PcALogin` / `KotlinMobile`) — đã xóa theo ADR 0002. Mọi opcode đều dùng PC table semantic; opcode nào chưa implement thì rơi vào `unimplemented::handle` (chỉ log, không phản hồi).
+- **Ràng buộc (Invariants)**:
+  - `FROZEN_PC_COLLISIONS` const đã xóa — khái niệm "collision" chỉ có nghĩa khi có 2 dialect, không áp dụng cho PC-only.
+  - 4 opcode (`0x19/0x1B/0x1F/0x23`) hiện rơi vào `unimplemented::handle` vì chưa port PC handler — không phải "compat", mà là "chưa viết".
+- **Tránh dùng các từ mơ hồ**: *Protocol Profile*, *Kotlin dialect*, *PC dialect* (sau refactor không còn khái niệm này).
+- **Phạm vi hiện tại**: Kotlin `ts_mobile_server/` chỉ là source tham chiếu để port logic, không bao giờ được dịch ra wire từ Rust server.
 
 

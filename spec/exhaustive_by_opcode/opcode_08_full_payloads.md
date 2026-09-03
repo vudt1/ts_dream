@@ -1,0 +1,18 @@
+# Outer opcode 0x08 — exhaustive full payloads
+
+> Số payload unique: **12**. Đây là các vector tổng hợp từ phân tích tĩnh, không phải traffic capture. `H[0]` ở offset frame `5`; full wire được XOR `0xAD`.
+
+| # | H[0] | Payload length | H | Full decoded frame | Full wire XOR `0xAD` | Category | Route/target | Evidence | Confidence | Provenance |
+|---:|---:|---:|---|---|---|---|---|---|---|---|
+| 1 | `0x00` | 2 | `00` | `F4 44 02 00 08 00` | `59 E9 AF AD A5 AD` | `exhaustive-selector-routing` | `H[0]=0x00 0x00796347` | PE-decoded local table plus cmp/jmp guard; no callee-tail grammar asserted. | routing-high | `fable_deep_vectors_08_09_0C_0D_0E.json` |
+| 2 | `0x01` | 2 | `01` | `F4 44 02 00 08 01` | `59 E9 AF AD A5 AC` | `exhaustive-selector-routing` | `H[0]=0x01 0x0078D178` | PE-decoded local table plus cmp/jmp guard; no callee-tail grammar asserted. | routing-high | `fable_deep_vectors_08_09_0C_0D_0E.json` |
+| 3 | `0x02` | 2 | `02` | `F4 44 02 00 08 02` | `59 E9 AF AD A5 AF` | `exhaustive-selector-routing` | `H[0]=0x02 0x0078D244` | PE-decoded local table plus cmp/jmp guard; no callee-tail grammar asserted. | routing-high | `fable_deep_vectors_08_09_0C_0D_0E.json` |
+| 4 | `0x03` | 2 | `03` | `F4 44 02 00 08 03` | `59 E9 AF AD A5 AE` | `exhaustive-selector-routing` | `H[0]=0x03 0x0078D34A` | PE-decoded local table plus cmp/jmp guard; no callee-tail grammar asserted. | routing-high | `fable_deep_vectors_08_09_0C_0D_0E.json` |
+| 5 | `0x04` | 2 | `04` | `F4 44 02 00 08 04` | `59 E9 AF AD A5 A9` | `exhaustive-selector-routing` | `H[0]=0x04 0x0078D44B` | PE-decoded local table plus cmp/jmp guard; no callee-tail grammar asserted. | routing-high | `fable_deep_vectors_08_09_0C_0D_0E.json` |
+| 6 | `0x05` | 2 | `05` | `F4 44 02 00 08 05` | `59 E9 AF AD A5 A8` | `exhaustive-selector-routing` | `H[0]=0x05 0x0078D45F` | PE-decoded local table plus cmp/jmp guard; no callee-tail grammar asserted. | routing-high | `fable_deep_vectors_08_09_0C_0D_0E.json` |
+| 7 | `0x06` | 2 | `06` | `F4 44 02 00 08 06` | `59 E9 AF AD A5 AB` | `exhaustive-selector-routing` | `H[0]=0x06 0x0078D473` | PE-decoded local table plus cmp/jmp guard; no callee-tail grammar asserted. | routing-high | `fable_deep_vectors_08_09_0C_0D_0E.json` |
+| 8 | `0x07` | 2 | `07` | `F4 44 02 00 08 07` | `59 E9 AF AD A5 AA` | `exhaustive-selector-routing` | `H[0]=0x07 0x0078D487` | PE-decoded local table plus cmp/jmp guard; no callee-tail grammar asserted. | routing-high | `fable_deep_vectors_08_09_0C_0D_0E.json` |
+| 9 | `0x08` | 2 | `08` | `F4 44 02 00 08 08` | `59 E9 AF AD A5 A5` | `exhaustive-selector-routing` | `H[0]=0x08 0x0078D49B` | PE-decoded local table plus cmp/jmp guard; no callee-tail grammar asserted. | routing-high | `fable_deep_vectors_08_09_0C_0D_0E.json` |
+| 10 | `0x01` | 12 | `01 01 02 40 30 20 10 88 77 66 55` | `F4 44 0C 00 08 01 01 02 40 30 20 10 88 77 66 55` | `59 E9 A1 AD A5 AC AC AF ED 9D 8D BD 25 DA CB F8` | `direct-schema` | `H[0]=0x01 0x0078D178` | 0x0078D178..0x0078D23F | schema-high | `fable_deep_vectors_08_09_0C_0D_0E.json` |
+| 11 | `0x02` | 15 | `02 04 03 00 01 02 40 30 20 10 88 77 66 55` | `F4 44 0F 00 08 02 04 03 00 01 02 40 30 20 10 88 77 66 55` | `59 E9 A2 AD A5 AF A9 AE AD AC AF ED 9D 8D BD 25 DA CB F8` | `direct-schema` | `H[0]=0x02 0x0078D244` | 0x0078D244..0x0078D345 | schema-high | `fable_deep_vectors_08_09_0C_0D_0E.json` |
+| 12 | `0x03` | 16 | `03 40 30 20 10 01 02 44 33 22 11 88 77 66 55` | `F4 44 10 00 08 03 40 30 20 10 01 02 44 33 22 11 88 77 66 55` | `59 E9 BD AD A5 AE ED 9D 8D BD AC AF E9 9E 8F BC 25 DA CB F8` | `direct-schema` | `H[0]=0x03 0x0078D34A` | 0x0078D34A..0x0078D446 | schema-high | `fable_deep_vectors_08_09_0C_0D_0E.json` |
