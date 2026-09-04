@@ -31,6 +31,9 @@ pub struct GameData {
     pub dispatch_bonus_defs: HashMap<u8, DispatchBonusDef>,
     pub leaderboard_defs: HashMap<u8, LeaderboardDef>,
     pub scene_set_defs: HashMap<u16, SceneSetDef>,
+    /// Military-rank definitions from PC `Rank.Dat`, keyed by 1-based
+    /// record index (mirrors the Lua `rankDatas` loop counter).
+    pub rank_defs: HashMap<u16, RankDef>,
     pub guide_last_bit_flag_id: HashMap<u8, u16>,
     pub guide_mark_flag_ids: HashMap<u8, u16>,
     pub mark_flag_to_guide_id: HashMap<u16, u8>,
@@ -297,7 +300,7 @@ impl GameData {
             self.npcs.insert(def.id as i64, def.to_npc());
         }
 
-        let optional_binary: [(&str, &str); 19] = [
+        let optional_binary: [(&str, &str); 20] = [
             ("Formula.Dat", "formula"),
             ("BlissBag.Dat", "bliss_bag"),
             ("Compound.Dat", "compound"),
@@ -318,6 +321,7 @@ impl GameData {
             ("DispatchBonus.Dat", "dispatch_bonus"),
             ("LeaderboardInfo.Dat", "leaderboard"),
             ("SceneSet.Dat", "scene_set"),
+            ("Rank.Dat", "rank"),
             ("TeachInfo.Dat", "teach_info"),
             ("eve.emg", "eve"),
         ];
@@ -355,6 +359,7 @@ impl GameData {
                     self.leaderboard_defs = LeaderboardDatLoader::load(&bytes)?;
                 }
                 "sceneset.dat" => self.scene_set_defs = SceneSetDatLoader::load(&bytes)?,
+                "rank.dat" => self.rank_defs = RankDatLoader::load(&bytes)?,
                 "teachinfo.dat" => {
                     let result = TeachInfoDatLoader::load(&bytes)?;
                     self.guide_last_bit_flag_id = result.guide_last_bit_flag_id;

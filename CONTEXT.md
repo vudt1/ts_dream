@@ -209,4 +209,16 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 - **Tránh dùng các từ mơ hồ**: *Protocol Profile*, *Kotlin dialect*, *PC dialect* (sau refactor không còn khái niệm này).
 - **Phạm vi hiện tại**: Kotlin `ts_mobile_server/` chỉ là source tham chiếu để port logic, không bao giờ được dịch ra wire từ Rust server.
 
+### Quân hàm (Rank)
+- **Định nghĩa**: Cấp bậc quân sự của Nhân vật (Giáp binh → … → Đại tướng quân, 42 bậc), xác định bởi điểm chiến công (honor) tích lũy. Mỗi bậc cho bộ 4 bonus thuộc tính `(kind, value)` tra cứu theo kiểu `RankData.GetAttribute(honor, kind)` (ví dụ cộng EquipMaxHp/EquipMaxSp).
+- **Ràng buộc (Invariants)**:
+  - Nguồn catalog: PC `Rank.Dat` (43 records cố định 43B, record 0 dummy), key là index 1-based.
+  - Ngưỡng honor tăng dần từ 15 (bậc 1) đến 2000 (bậc cao nhất).
+- **Tránh dùng các từ mơ hồ**: *Level*, *Reborn* (cấp độ/đổi nghề khác với quân hàm).
+
+### Địa chất bản đồ (geolBaseAtt)
+- **Định nghĩa**: Mã địa chất của một bản đồ, trích từ file `ground.mmg` (mapId → 1 byte), dùng cho chất liệu nền chiến đấu (battle background).
+- **Ràng buộc (Invariants)**: Parser tham khảo độc lập (`GroundMmgLoader`), **chưa** đấu vào `GameData::load` vì chưa chắc server cần — **không** nhầm với `DiaHinh` (mã địa hình trận đấu echo trên wire).
+- **Tránh dùng các từ mơ hồ**: *DiaHinh*, *Terrain* (khi nói wire packet phải dùng `DiaHinh`).
+
 
