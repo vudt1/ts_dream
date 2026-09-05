@@ -48,7 +48,13 @@ pub struct GameData {
     /// `(map_id, slot)`. Pre-filled empty slots 1..255 per map, then each
     /// ItemOnMap.txt row spawns a `_Delay=999999` static drop.
     pub item_drop_on_map: HashMap<(i64, i64), ItemDropOnMap>,
-    // Binary .Dat tables
+    // Binary .Dat tables.
+    //
+    // Deferred catalogs (`formula_params` … `city_ex`, `warp_defs`,
+    // `mark_defs` … `mark_flag_to_guide_id`): `load_binary` intentionally
+    // leaves these at their empty defaults (ground.rs policy — wire only
+    // when a consumer lands). `load_legacy_text` below still fills a subset
+    // for migration fixtures; that path is not production boot.
     pub formula_params: Option<FormulaParams>,
     pub bliss_bags: HashMap<u16, BlissBagDef>,
     pub compounds: Vec<CompoundDef>,
@@ -300,29 +306,26 @@ impl GameData {
             self.npcs.insert(def.id as i64, def.to_npc());
         }
 
-        let optional_binary: [(&str, &str); 20] = [
-            ("Formula.Dat", "formula"),
-            ("BlissBag.Dat", "bliss_bag"),
-            ("Compound.Dat", "compound"),
-            ("Astrolabe.Dat", "astrolabe"),
-            ("CityEx.Dat", "city_ex"),
-            ("EVOStatus.Dat", "evo_status"),
-            ("Warp.Dat", "warp"),
+        // Deferred-catalog policy (ground.rs pattern, ADR 0003): only catalogs
+        // with a live consumer are wired here (`Skill.Dat`/`Skill_C.dat` →
+        // battle engine, `eve.emg` → npc_event). Every other typed parser in
+        // `data::loaders` (formula, bliss_bag, compound, astrolabe, city_ex,
+        // evo_status, warp, mark, mount, mount_grow, achievement, dispatch,
+        // leaderboard, scene_set, rank, teach_info) stays unit-tested by
+        // calling its loader directly — do NOT re-add it here until its
+        // consumer lands. Re-wiring is a 3-line change (one entry below, one
+        // match arm, field already exists on `GameData`).
+        // NOTE: `Warp.Dat` (`warp_defs`) is NOT a replacement for the legacy
+        // `warps` table: it feeds the crystal-teleport opcode (mobile
+        // mainKind 68 / 0x44, unimplemented in `dispatcher.rs`), keyed by
+        // client-sent index — not the `(map_id, warpid)` talk-warp lookup in
+        // `quest.rs` which reads `data.warps` (from `Warps.txt`, absent).
+        let optional_binary: [(&str, &str); 3] = [
             // PC `Skill.Dat` is the authoritative source (preferred per ADR
             // 0002). `Skill_C.dat` is the mobile variant; if PC is absent
             // and mobile is present, fall back to the mobile parser.
             ("Skill.dat", "skill_pc"),
             ("Skill_C.dat", "skill"),
-            ("Mark.Dat", "mark"),
-            ("Mounts.Dat", "mount"),
-            ("MountsGrow.Dat", "mount_grow"),
-            ("AchievementData.Dat", "achievement"),
-            ("Dispatch.Dat", "dispatch"),
-            ("DispatchBonus.Dat", "dispatch_bonus"),
-            ("LeaderboardInfo.Dat", "leaderboard"),
-            ("SceneSet.Dat", "scene_set"),
-            ("Rank.Dat", "rank"),
-            ("TeachInfo.Dat", "teach_info"),
             ("eve.emg", "eve"),
         ];
         for (file_name, _) in optional_binary {
@@ -332,47 +335,25 @@ impl GameData {
             let bytes = std::fs::read(&path)
                 .map_err(|e| TsError::Data(format!("read {}: {}", path.display(), e)))?;
             match file_name.to_ascii_lowercase().as_str() {
-                "formula.dat" => self.formula_params = Some(FormulaDatLoader::load(&bytes)?),
-                "blissbag.dat" => self.bliss_bags = BlissBagDatLoader::load(&bytes)?,
-                "compound.dat" => self.compounds = CompoundDatLoader::load(&bytes)?,
-                "astrolabe.dat" => self.astrolabes = AstrolabeDatLoader::load(&bytes)?,
-                "cityex.dat" => self.city_ex = CityExDatLoader::load(&bytes)?,
-                "evostatus.dat" => self.evo_statuses = EVOStatusDatLoader::load(&bytes)?,
-                "warp.dat" => self.warp_defs = WarpDatLoader::load(&bytes)?,
                 "skill.dat" => self.binary_skill_defs = SkillDatLoaderPc::load(&bytes)?,
                 "skill_c.dat" => self.binary_skill_defs = SkillDatLoader::load(&bytes)?,
-                "mark.dat" => {
-                    let (defs, reverse) = MarkDatLoader::load(&bytes)?;
-                    self.mark_defs = defs;
-                    self.bit_to_mission_id = reverse;
-                }
-                "mounts.dat" => self.mount_defs = MountDatLoader::load(&bytes)?,
-                "mountsgrow.dat" => self.mount_grow_defs = MountGrowDatLoader::load(&bytes)?,
-                "achievementdata.dat" => {
-                    self.achievement_defs = AchievementDatLoader::load(&bytes)?;
-                }
-                "dispatch.dat" => self.dispatch_defs = DispatchDatLoader::load_dispatch(&bytes)?,
-                "dispatchbonus.dat" => {
-                    self.dispatch_bonus_defs = DispatchDatLoader::load_bonus(&bytes)?;
-                }
-                "leaderboardinfo.dat" => {
-                    self.leaderboard_defs = LeaderboardDatLoader::load(&bytes)?;
-                }
-                "sceneset.dat" => self.scene_set_defs = SceneSetDatLoader::load(&bytes)?,
-                "rank.dat" => self.rank_defs = RankDatLoader::load(&bytes)?,
-                "teachinfo.dat" => {
-                    let result = TeachInfoDatLoader::load(&bytes)?;
-                    self.guide_last_bit_flag_id = result.guide_last_bit_flag_id;
-                    self.guide_mark_flag_ids = result.guide_mark_flag_ids;
-                    self.mark_flag_to_guide_id = self
-                        .guide_mark_flag_ids
-                        .iter()
-                        .map(|(&guide_id, &mark_flag_id)| (mark_flag_id, guide_id))
-                        .collect();
-                }
                 "eve.emg" => self.scene_eve_data = EveDataLoader::load(&bytes)?,
                 _ => unreachable!("optional binary list contains unknown file"),
             }
+        }
+
+        // Talk-warp exception: `Warps.txt` is the only text asset in
+        // production boot. `quest.rs` talk-warp lookup reads `data.warps`
+        // keyed `(map_id, warpid)` and there is no binary equivalent
+        // (`Warp.Dat` feeds the unimplemented crystal-teleport opcode).
+        if let Some(path) = resolve_data_file(data_dir, "Warps.txt") {
+            self.load_warps(&path)?;
+        }
+        // Same exception for `BattleGate.txt`: `quest.rs` checks
+        // `data.battle_gates` on the same `(map_id, warpid)` key before
+        // falling through to the normal warp.
+        if let Some(path) = resolve_data_file(data_dir, "BattleGate.txt") {
+            self.load_battle_gates(&path)?;
         }
         Ok(())
     }

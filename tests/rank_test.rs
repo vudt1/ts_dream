@@ -46,8 +46,13 @@ fn rank_first_and_last_records_match_lua_spec() {
 }
 
 #[test]
-fn rank_game_data_wires_catalog() {
+fn rank_deferred_from_game_data_boot() {
+    // Deferred-catalog policy (ground.rs pattern): `RankDatLoader` is tested
+    // directly above; production `GameData::load` must NOT wire it until a
+    // consumer lands. Delete this test when re-wiring `rank_defs`.
     let data = ts_dream::data::loader::GameData::load(&data_dir()).expect("GameData::load");
-    assert_eq!(data.rank_defs.len(), 42);
-    assert_eq!(data.rank_defs[&2].honor, 15);
+    assert!(
+        data.rank_defs.is_empty(),
+        "rank_defs must stay empty until a consumer lands"
+    );
 }
