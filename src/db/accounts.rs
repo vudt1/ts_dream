@@ -1,8 +1,9 @@
 //! Dashboard-facing account repository.
 //!
-//! The PC wire continues to use numeric `player_id`, `pass1`, and `pass2`.
-//! Migration 0007 adds mobile-aligned identity and role metadata without
-//! deleting the legacy credential columns.
+//! The PC wire authenticates with numeric `player_id` + plaintext `pass1`
+//! (login gate) and `pass2` (op 0x23 change/delete gate), compared byte-exact
+//! via `HEX(pass1) = HEX(?)`. The `accounts` table (migration 0001) carries no
+//! hashed-password column — plaintext parity with the C# server is intentional.
 
 use sqlx::MySqlPool;
 

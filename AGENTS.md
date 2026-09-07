@@ -63,8 +63,7 @@ ts_dream/
 ├── spec/
 │   └── codebase_design.md      # Thiết kế kiến trúc ban đầu
 ├── migrations/
-│   ├── 0001_init.sql           # SQLx migration schema legacy MySQL 8 (accounts PK = player_id)
-│   ├── 0002_modern_schema.sql  # SQLx migration schema 3NF MySQL 8 (characters 1:1, inventories 20-col, character_pets 4 kho, missions, flags)
+│   ├── 0001_init.sql           # SQLx migration: accounts (PK=player_id, plaintext pass1/pass2) + modern 3NF (characters 1:1, inventories 20-col, character_pets 4 kho, missions, flags)
 │   └── 0003_production_domain.sql # Mở rộng production (guilds, world_boss, trade_sessions, static_assets, admin)
 ├── golden/                     # 18 golden packets (01-hello → 18-player-trade) để diffing khi test (giữ lại, không phải test source)
 ├── tests/                      # Thư mục test tập trung — **hiện trống** (tạm thời không cần test)

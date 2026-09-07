@@ -6,7 +6,6 @@ CREATE TABLE IF NOT EXISTS accounts (
     player_id    BIGINT AUTO_INCREMENT PRIMARY KEY,
     pass1 VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_bin NOT NULL,
     pass2 VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_bin NOT NULL,
-	password_hash VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_bin NULL,
 	is_suspended TINYINT(1) NOT NULL DEFAULT 0,
 	suspension_reason VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_bin NULL,
 	suspended_until BIGINT NULL,
