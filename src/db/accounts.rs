@@ -51,6 +51,14 @@ pub async fn create(pool: &MySqlPool, pass1: &str, pass2: &str) -> Result<i64, s
     Ok(row.last_insert_id() as i64)
 }
 
+/// Password policy shared by the dashboard create path and op 0x23 change:
+/// 8..=10 bytes, every byte printable ASCII (`0x21..=0x7E`) — no space, no
+/// control chars, and never UTF-8/VISCII, so the byte-exact `HEX(pass)=HEX(?)`
+/// login compare always round-trips.
+pub fn is_valid_password(pass: &[u8]) -> bool {
+    (8..=10).contains(&pass.len()) && pass.iter().all(|&b| (0x21..=0x7E).contains(&b))
+}
+
 /// Resolve `pass1` for a `player_id` (login gate). Returns `None` when the
 /// account does not exist.
 pub async fn pass1(pool: &MySqlPool, player_id: i64) -> Result<Option<String>, sqlx::Error> {

@@ -1,12 +1,13 @@
 //! Character creation & name check handler (Opcode 0x09).
 //!
 //! Sub 1 (create): parse the client layout, then in **one atomic transaction**
-//! INSERT the `players` row (stats computed via the TEXP/HP formula), seed
-//! `SkillSave` 1..10 / IdSkill=0, rebuild the `Skill` table and update
-//! `accounts.pass1/pass2` (Ch5 §5.6 — the transaction lives in the
-//! modern repository). Any failure → `shutdown()`. Sub 2 checks the
-//! candidate name against `characters.name`. Without a pool (golden replay) it
-//! degrades to the in-memory stub.
+//! INSERT the `characters` row (stats computed via the TEXP/HP formula) and
+//! seed the starter Homdo/Trangbi through the modern repository. It does **not**
+//! write `accounts.pass1/pass2` — the PC create-char packet carries an empty
+//! `pass1` (`golden/06`), and the password is set only via the web dashboard
+//! (create) or op `0x23` sub 1 (change). Any failure → `shutdown()`. Sub 2
+//! checks the candidate name against `characters.name`. Without a pool (golden
+//! replay) it degrades to the in-memory stub.
 
 use crate::db::modern::traits::CharacterSeed;
 use crate::protocol::encoder;

@@ -283,9 +283,11 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         // Op 0x22 — Game points / God panel
         0x22 => system::handle_game_points(ctx),
 
-        // Op 0x23 — Account management in the Kotlin/mobile table; Guild in
-        // the PC table (handler not yet ported — see ADR 0002 follow-up).
-        0x23 => unimplemented::handle(ctx),
+        // Op 0x23 — Account management (change pass / delete char / gift code).
+        // The "Guild" label in the PC opcode table is a misnomer; the C# server
+        // uses 0x23 subs 1/2/3 for account management (see the VISCII string
+        // report). handle_account_mgmt is the ported handler.
+        0x23 => system::handle_account_mgmt(ctx).await,
 
         // Op 0x28 — Hotkey / skill bar
         0x28 => stats::handle_hotkey(ctx).await,

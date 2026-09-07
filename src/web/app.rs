@@ -371,6 +371,23 @@ async fn create_account(
         None => return StatusCode::SERVICE_UNAVAILABLE.into_response(),
     };
 
+    if !db::accounts::is_valid_password(payload.pass1.as_bytes())
+        || !db::accounts::is_valid_password(payload.pass2.as_bytes())
+    {
+        let msg = "Mat ma phai 8-10 ky tu ASCII (khong dau cach / ky tu dieu khien).";
+        return if headers.get("HX-Request").is_some() {
+            (
+                StatusCode::BAD_REQUEST,
+                Html(format!(
+                    "<tr><td colspan=\"3\" style=\"color: var(--accent-red)\">{msg}</td></tr>"
+                )),
+            )
+                .into_response()
+        } else {
+            (StatusCode::BAD_REQUEST, Json(json!({ "error": msg }))).into_response()
+        };
+    }
+
     let player_id = match db::accounts::create(pool, &payload.pass1, &payload.pass2).await {
         Ok(id) => id,
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),

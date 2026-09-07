@@ -215,11 +215,16 @@ pub async fn handle_account_mgmt(ctx: &mut OpcodeCtx<'_>) {
             let id = i64::from(conn.session.id);
             match db::accounts::passwords(pool, id).await {
                 Ok(Some((db1, db2))) => {
-                    let old1_str = String::from_utf8_lossy(old1).into_owned();
-                    let old2_str = String::from_utf8_lossy(old2).into_owned();
-                    if old1_str != db1 {
+                    // Byte-exact old-credential check (ASCII policy keeps this
+                    // equivalent to the login HEX compare; no lossy decode).
+                    if old1 != db1.as_bytes() {
                         out.send("F4440300230102");
-                    } else if old2_str != db2 {
+                    } else if old2 != db2.as_bytes() {
+                        out.send("F4440300230103");
+                    } else if !db::accounts::is_valid_password(new1)
+                        || !db::accounts::is_valid_password(new2)
+                    {
+                        // New password violates the [8,10] printable-ASCII policy.
                         out.send("F4440300230103");
                     } else {
                         let new1_str = String::from_utf8_lossy(new1).into_owned();

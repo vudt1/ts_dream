@@ -12,7 +12,7 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 
 ### Account (Tài khoản)
 - **Định nghĩa**: Thực thể gốc định danh người dùng, PK là `player_id` (BIGINT AUTO_INCREMENT, `accounts.player_id`, wire dùng làm `player_id`). Chứa `pass1`/`pass2` (latin1_bin, so sánh byte-exact qua HEX), `gm_level`, trạng thái treo. Không có cột `account` riêng — identity duy nhất là `player_id`.
-- **Ràng buộc (Invariants)**: PK duy nhất là `player_id`; mọi FK nhân vật là shared PK `characters.character_id = accounts.player_id` (1:1, PK đồng thời là FK).
+- **Ràng buộc (Invariants)**: PK duy nhất là `player_id`; mọi FK nhân vật là shared PK `characters.character_id = accounts.player_id` (1:1, PK đồng thời là FK). **Chính sách mật khẩu**: `pass1`/`pass2` dài **8–10 byte**, mỗi byte trong `0x21..=0x7E` (ASCII in được, không khoảng trắng/control), **không** UTF-8/VISCII để `HEX(pass)=HEX(?)` luôn round-trip; mặc định lúc tạo là `1111111111` (đặt qua web dashboard), người chơi đổi qua op `0x23` sub 1.
 - **Tránh dùng các từ mơ hồ**: *User*, *Login Info*, *Client Account*, *id* (thay bằng `player_id`), *account* (không tồn tại cột riêng).
 
 ### Character / Player (Nhân vật / Người chơi)
@@ -205,7 +205,7 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 - **Định nghĩa**: PC server chỉ phục vụ một dialect duy nhất — PC `aLogin.exe` port 6414. Không còn enum `ProtocolProfile` (`PcALogin` / `KotlinMobile`) — đã xóa theo ADR 0002. Mọi opcode đều dùng PC table semantic; opcode nào chưa implement thì rơi vào `unimplemented::handle` (chỉ log, không phản hồi).
 - **Ràng buộc (Invariants)**:
   - `FROZEN_PC_COLLISIONS` const đã xóa — khái niệm "collision" chỉ có nghĩa khi có 2 dialect, không áp dụng cho PC-only.
-  - 4 opcode (`0x19/0x1B/0x1F/0x23`) hiện rơi vào `unimplemented::handle` vì chưa port PC handler — không phải "compat", mà là "chưa viết".
+  - 3 opcode (`0x19/0x1B/0x1F`) hiện rơi vào `unimplemented::handle` vì chưa port PC handler — không phải "compat", mà là "chưa viết". `0x23` **không** còn ở đây: nó là account-management (đổi mật khẩu / xóa nhân vật / gift code), "Guild" trong bảng opcode PC chỉ là nhãn đặt sai.
 - **Tránh dùng các từ mơ hồ**: *Protocol Profile*, *Kotlin dialect*, *PC dialect* (sau refactor không còn khái niệm này).
 - **Phạm vi hiện tại**: Kotlin `ts_mobile_server/` chỉ là source tham chiếu để port logic, không bao giờ được dịch ra wire từ Rust server.
 
