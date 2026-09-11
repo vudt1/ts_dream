@@ -137,7 +137,7 @@ fn split_slash(msg: &str) -> (String, Vec<String>) {
 async fn handle_slash(
     conn: &mut Conn,
     out: &mut HandleOutcome,
-    pool: Option<&sqlx::MySqlPool>,
+    pool: Option<&crate::db::pool::DbPool>,
     hub: Option<&ServerControl>,
     msg: &str,
 ) {

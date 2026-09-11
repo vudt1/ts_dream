@@ -4,26 +4,27 @@
 
 use crate::db::modern::model::{MissionRow, SkillRow};
 use crate::db::modern::traits::{QuestRepository, RepoResult};
-use sqlx::{MySqlPool, Row};
+use crate::db::pool::DbPool;
+use sqlx::Row;
 
-pub struct MySqlQuestRepository<'a> {
-    pub pool: &'a MySqlPool,
+pub struct SqliteQuestRepository<'a> {
+    pub pool: &'a DbPool,
 }
 
-impl QuestRepository for MySqlQuestRepository<'_> {
+impl QuestRepository for SqliteQuestRepository<'_> {
     async fn upsert_mission(&self, character_id: i64, mission: &MissionRow) -> RepoResult<()> {
         sqlx::query(
             "INSERT INTO character_missions (character_id, mission_id, step, state, updated_at) \
              VALUES (?, ?, ?, ?, ?) \
-             ON DUPLICATE KEY UPDATE step = VALUES(step), state = VALUES(state), \
-             updated_at = VALUES(updated_at)",
+             ON CONFLICT(character_id, mission_id) DO UPDATE SET \
+             step = excluded.step, state = excluded.state, updated_at = excluded.updated_at",
         )
         .bind(character_id)
         .bind(mission.mission_id)
         .bind(mission.step)
         .bind(mission.state)
         .bind(mission.updated_at)
-        .execute(self.pool)
+        .execute(&self.pool.write)
         .await?;
         Ok(())
     }
@@ -34,7 +35,7 @@ impl QuestRepository for MySqlQuestRepository<'_> {
              WHERE character_id = ?",
         )
         .bind(character_id)
-        .fetch_all(self.pool)
+        .fetch_all(&self.pool.read)
         .await?;
         Ok(rows
             .iter()
@@ -48,15 +49,15 @@ impl QuestRepository for MySqlQuestRepository<'_> {
     }
 
     async fn set_bit_flag(&self, character_id: i64, flag_index: u32, now: i64) -> RepoResult<()> {
-        // INSERT IGNORE semantics: once latched, a forever flag never rewrites.
+        // INSERT OR IGNORE semantics in SQLite: once latched, a forever flag never rewrites.
         sqlx::query(
-            "INSERT IGNORE INTO character_bit_flags (character_id, flag_index, set_at) \
+            "INSERT OR IGNORE INTO character_bit_flags (character_id, flag_index, set_at) \
              VALUES (?, ?, ?)",
         )
         .bind(character_id)
         .bind(flag_index)
         .bind(now)
-        .execute(self.pool)
+        .execute(&self.pool.write)
         .await?;
         Ok(())
     }
@@ -67,7 +68,7 @@ impl QuestRepository for MySqlQuestRepository<'_> {
         )
         .bind(character_id)
         .bind(flag_index)
-        .fetch_one(self.pool)
+        .fetch_one(&self.pool.read)
         .await?;
         Ok(hits > 0)
     }
@@ -79,13 +80,13 @@ impl QuestRepository for MySqlQuestRepository<'_> {
         completed_at: i64,
     ) -> RepoResult<()> {
         sqlx::query(
-            "INSERT IGNORE INTO character_completed_events (character_id, event_id, completed_at) \
+            "INSERT OR IGNORE INTO character_completed_events (character_id, event_id, completed_at) \
              VALUES (?, ?, ?)",
         )
         .bind(character_id)
         .bind(event_id)
         .bind(completed_at)
-        .execute(self.pool)
+        .execute(&self.pool.write)
         .await?;
         Ok(())
     }
@@ -97,7 +98,7 @@ impl QuestRepository for MySqlQuestRepository<'_> {
         )
         .bind(character_id)
         .bind(event_id)
-        .fetch_one(self.pool)
+        .fetch_one(&self.pool.read)
         .await?;
         Ok(hits > 0)
     }
@@ -106,7 +107,7 @@ impl QuestRepository for MySqlQuestRepository<'_> {
         &self,
         character_id: i64,
         skills: &[SkillRow],
-        tx: &mut sqlx::MySqlConnection,
+        tx: &mut sqlx::SqliteConnection,
     ) -> RepoResult<()> {
         sqlx::query("DELETE FROM character_skills WHERE character_id = ?")
             .bind(character_id)

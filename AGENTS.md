@@ -21,7 +21,7 @@ Single-context layout — one [`CONTEXT.md`](CONTEXT.md) + `docs/adr/` at the re
 - **Ngôn ngữ & Runtime**: Rust (2021 edition) + Tokio 1 (`full` async runtime).
 - **Web Framework**: Axum 0.8 (Web admin dashboard phục vụ tại port 8090, chia sẻ cùng Tokio runtime với TCP Server).
 - **Template Engine**: Askama 0.12 (Biên dịch HTML thẳng vào binary, kết hợp HTMX).
-- **Database & Migration**: MySQL 8 (InnoDB, kết nối qua SQLx 0.8 với `mysql`, `runtime-tokio-rustls`, `migrate`).
+- **Database**: SQLite (kết nối qua SQLx 0.8 với `sqlite`, `runtime-tokio-rustls`, `migrate`), kiến trúc Dual-Pool: `read` (tối đa 16 sessions song song) và `write` (độc quyền 1 session chống `SQLITE_BUSY`), chế độ WAL (`PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;`). File cơ sở dữ liệu `DB/ts_dream.db`. Tự động flush WAL về file chính định kỳ và khi dừng TCP server/thoát tiến trình.
 - **Mã hóa & Định dạng Wire**: Giao thức TS Online (Header `F4 44`, XOR key `0xAD`, VISCII 1.1 text encoding).
 - **Thư viện bổ sung**: Serde, Serde JSON, TOML 0.8, Tracing + tracing-subscriber (env-filter), Anyhow, Thiserror 2, Hex, Chrono, Futures. Dev: Tempfile, Tower.
 
@@ -32,12 +32,13 @@ Single-context layout — one [`CONTEXT.md`](CONTEXT.md) + `docs/adr/` at the re
 > **Trạng thái hiện tại: TẠM THỜI KHÔNG CẦN TEST.** Toàn bộ test source đã được xóa (`tests/` trống). Quy định dưới đây áp dụng khi agent cần tạo lại test trong tương lai.
 
 - **Vị trí duy nhất cho test**: Mọi unit test / integration test mới **phải** đặt trong thư mục `tests/` ở repo root. **Cấm** `#[cfg(test)]` inline trong `src/` (kể cả `mod tests` nhỏ). Nếu cần test pure-logic, tạo file `tests/<feature>_test.rs` và import qua `ts_dream::...` public API.
-- **Test liên quan DB — dùng fake/dump, không khởi MySQL thật**: Để tránh treo lâu chờ DB khởi động, test chạm DB phải dùng dump, fixture file, hoặc fake object / mock repository (implement `AccountRepository`/`CharacterRepository` trait với in-memory struct). Không `cargo test` với `MySqlPool` thật trong harness tự động.
-- **MySQL thật do người dùng test thủ công**: Khi cần kiểm chứng MySQL, người dùng tự chạy thủ công:
-  ```bash
-  TS_TEST_DB_URL=mysql://root:password@localhost:3306/ts_dream_test cargo test --test db_repositories
-  ```
-  Agent **không** tự khởi MySQL hay chạy test nhóm `db_*` khi chưa được user cho phép.
+- **Tách biệt DB Test và DB Production**: Tuyệt đối **không** chạy test ghi đè lên file production `DB/ts_dream.db`. Test chạm cơ sở dữ liệu có thể thực hiện theo 2 cách:
+  1. **In-memory SQLite (`sqlite::memory:?cache=shared`)**: Tối ưu cho unit test / repository test vì tốc độ thực thi tức thì, 0 disk I/O, độc lập giữa các test runner và tự hủy sau khi xong.
+  2. **File DB riêng cho test (`DB/ts_dream_test.db` hoặc tempfile)**: Phù hợp cho integration test kiểm thử WAL checkpoint hoặc persist. Biến môi trường chỉ định:
+     ```bash
+     TS_TEST_DB_URL=sqlite://DB/ts_dream_test.db cargo test --test <test_name>
+     ```
+     File `*test.db` luôn được `.gitignore` loại trừ, không commit vào kho mã nguồn.
 - **Khi chạy lại test suite** (sau khi scaffold lại):
   ```bash
   cargo test --all-targets --no-fail-fast
@@ -50,12 +51,12 @@ Single-context layout — one [`CONTEXT.md`](CONTEXT.md) + `docs/adr/` at the re
 ```text
 ts_dream/
 ├── Cargo.toml                  # Khai báo crate & phụ thuộc
-├── build.rs                    # Đóng gói Data/ vào cạnh binary khi cargo build
+├── build.rs                    # Đóng gói Data/ và DB/ vào cạnh binary khi cargo build
 ├── CONTEXT.md                  # Từ vựng miền (Domain Glossary & Ubiquitous Language)
 ├── AGENTS.md                   # Hướng dẫn Agent, Tech Stack & Cấu trúc Codebase
 ├── LICENSE & README.md         # Giấy phép & hướng dẫn dựng dự án
-├── Huong_Dan_Cai_Dat_MySQL_ZIP.md  # Hướng dẫn cài đặt MySQL
 ├── TS_Server_OP_Code_basic.md  # Đặc tả opcode giao thức TS Online tham khảo
+├── DB/                         # Thư mục chứa cơ sở dữ liệu SQLite (ts_dream.db, ts_dream.db-wal, ts_dream.db-shm)
 ├── Data/                       # Dữ liệu tĩnh game (Item.dat, Npc.dat, Warp.Dat, eve.emg 9.8MB, Formula.Dat, BlissBag.Dat, Compound.Dat, Astrolabe.Dat, CityEx.Dat, EVOStatus.Dat, v.v.)
 ├── templates/
 │   └── dashboard.html          # Template HTML duy nhất cho Web Dashboard (Askama + HTMX)
@@ -63,28 +64,26 @@ ts_dream/
 ├── spec/
 │   └── codebase_design.md      # Thiết kế kiến trúc ban đầu
 ├── migrations/
-│   ├── 0001_init.sql           # SQLx migration: accounts (PK=player_id, plaintext pass1/pass2) + modern 3NF (characters 1:1, inventories 20-col, character_pets 4 kho, missions, flags)
-│   └── 0003_production_domain.sql # Mở rộng production (guilds, world_boss, trade_sessions, static_assets, admin)
+│   ├── 0001_init.sql           # SQLx migration legacy
+│   └── 0003_production_domain.sql # Mở rộng production legacy
 ├── golden/                     # 18 golden packets (01-hello → 18-player-trade) để diffing khi test (giữ lại, không phải test source)
 ├── tests/                      # Thư mục test tập trung — **hiện trống** (tạm thời không cần test)
 │   └── .gitkeep                # Scaffold sẵn cho test tương lai; mọi test mới phải đặt ở đây, cấm #[cfg(test)] trong src/
 └── src/
-    ├── main.rs                 # Entry point: Config → MySQL bootstrap → seed map drops → Web Admin (8090) + Game TCP (6414) + AutoSave
+    ├── main.rs                 # Entry point: Config → SQLite bootstrap → seed map drops → Web Admin (8090) + Game TCP (6414) + AutoSave + WAL Flush
     ├── lib.rs                  # Module root cho thư viện ts_dream
-    ├── config.rs               # Xử lý file cấu hình + env TS_* (port, db URL, data_dir, db_auto_create)
+    ├── config.rs               # Xử lý file cấu hình + env TS_* (port, database_url, wal_checkpoint_interval_secs, data_dir)
     ├── state.rs                # AppState chia sẻ dữ liệu qua Arc<RwLock<AppState>>
     ├── error.rs                # Định nghĩa lỗi
     ├── encoding.rs             # Xử lý mã hóa VISCII 1.1 / Big5 / UTF-8
     ├── harness.rs              # Test harness hỗ trợ kiểm thử packet capture diffing
     ├── db/                     # Repository layer — mọi SQL tập trung, unit-testable
     │   ├── mod.rs              # Tổ chức module db
-    │   ├── pool.rs             # MySQL Pool, auto-create database & chạy SQLx migration khi boot
+    │   ├── pool.rs             # SQLite Dual-Pool (DbPool: read + write), WAL pragmas, periodic checkpoint & shutdown flush
     │   ├── accounts.rs         # Truy vấn accounts (login)
-    │   ├── players.rs          # Truy vấn/transaction players + bảng gameplay + item_code
-    │   ├── persist.rs          # Ghi-through players/skills/items/pets (no-op khi Option<&Pool> là None)
-    │   ├── quest.rs            # Truy vấn quest legacy
+    │   ├── persist.rs          # Ghi-through players/skills/items/pets (no-op khi Option<&DbPool> là None)
     │   ├── item_code.rs        # Nhận mã quà (item_code), degrade khi không có DB
-    │   └── modern/             # Schema 3NF: models + repository traits + MySQL impls + transactions nguyên tử (trade/shop/bank)
+    │   └── modern/             # Schema 3NF: models + repository traits + SQLite impls (src/db/modern/sqlite/) + transactions nguyên tử
     ├── protocol/               # Bộ mã hóa/giải mã XOR 0xAD, PacketReader, PacketWriter, Codecs
     │   ├── mod.rs              # Hằng số giao thức (HEADER_TS_MAGIC, XOR_KEY, MIN_VERSION, MAX_LEVEL)
     │   ├── frame.rs            # Phân tách khung tin (Frame F4 44)

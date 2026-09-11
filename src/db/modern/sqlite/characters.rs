@@ -2,13 +2,14 @@
 
 use crate::db::modern::model::Money;
 use crate::db::modern::traits::{CharacterRepository, CharacterSeed, CharacterSummary, RepoResult};
-use sqlx::{MySqlPool, Row};
+use crate::db::pool::DbPool;
+use sqlx::Row;
 
-pub struct MySqlCharacterRepository<'a> {
-    pub pool: &'a MySqlPool,
+pub struct SqliteCharacterRepository<'a> {
+    pub pool: &'a DbPool,
 }
 
-impl MySqlCharacterRepository<'_> {
+impl SqliteCharacterRepository<'_> {
     pub async fn create(
         &self,
         account_id: i64,
@@ -16,7 +17,7 @@ impl MySqlCharacterRepository<'_> {
         seed: &CharacterSeed,
     ) -> RepoResult<i64> {
         // Shared PK: characters.character_id = accounts.player_id (1:1, no account_id column)
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pool.write.begin().await?;
         sqlx::query(
             "INSERT INTO characters (character_id, name, level, sex, hair, element, map_id, map_x, map_y) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
@@ -34,12 +35,12 @@ impl MySqlCharacterRepository<'_> {
     pub async fn find_id_by_name(&self, name: &[u8]) -> RepoResult<Option<i64>> {
         sqlx::query_scalar::<_, i64>("SELECT character_id FROM characters WHERE HEX(name) = HEX(?) LIMIT 1")
             .bind(name)
-            .fetch_optional(self.pool)
+            .fetch_optional(&self.pool.read)
             .await
     }
 
     pub async fn delete(&self, character_id: i64) -> RepoResult<()> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pool.write.begin().await?;
         for table in [
             "character_money",
             "inventories",
@@ -78,7 +79,7 @@ impl MySqlCharacterRepository<'_> {
 /// query shape lives in exactly one place.
 pub(crate) async fn money_row<'e, E>(executor: E, character_id: i64) -> RepoResult<Money>
 where
-    E: sqlx::Executor<'e, Database = sqlx::MySql>,
+    E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
 {
     let row = sqlx::query(
         "SELECT gold, bank_gold, shop_point FROM character_money WHERE character_id = ?",
@@ -93,9 +94,9 @@ where
     })
 }
 
-impl CharacterRepository for MySqlCharacterRepository<'_> {
+impl CharacterRepository for SqliteCharacterRepository<'_> {
     async fn create(&self, account_id: i64, name: &[u8], seed: &CharacterSeed) -> RepoResult<i64> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pool.write.begin().await?;
 
         sqlx::query(
             "INSERT INTO characters \
@@ -129,7 +130,7 @@ impl CharacterRepository for MySqlCharacterRepository<'_> {
              WHERE character_id = ? ORDER BY character_id",
         )
         .bind(account_id)
-        .fetch_all(self.pool)
+        .fetch_all(&self.pool.read)
         .await?;
 
         Ok(rows
@@ -150,17 +151,17 @@ impl CharacterRepository for MySqlCharacterRepository<'_> {
             "SELECT character_id FROM characters WHERE HEX(name) = HEX(?) LIMIT 1",
         )
         .bind(name)
-        .fetch_optional(self.pool)
+        .fetch_optional(&self.pool.read)
         .await?;
         Ok(found)
     }
 
     async fn load_money(&self, character_id: i64) -> RepoResult<Money> {
-        money_row(self.pool, character_id).await
+        money_row(&self.pool.read, character_id).await
     }
 
     async fn delete(&self, character_id: i64) -> RepoResult<()> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pool.write.begin().await?;
 
         // Order does not matter without FKs, but every dependent table must be
         // covered — this list is the authoritative "what belongs to a

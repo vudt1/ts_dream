@@ -6,14 +6,14 @@
 //! There is intentionally no self-promotion, packet-spam command, or implicit
 //! dashboard bootstrap.
 
-use crate::db::modern::mysql::MySqlRepositories;
+use crate::db::modern::sqlite::SqliteRepositories;
 use crate::db::persist;
+use crate::db::pool::DbPool;
 use crate::protocol::encoder;
 use crate::server::dispatcher::HandleOutcome;
 use crate::server::session::{online_sessions, Conn, InventoryItem, Session};
 use crate::server::spawn;
 use crate::web::server_control::ServerControl;
-use sqlx::MySqlPool;
 
 pub const PLAYER_GM_LEVEL: i32 = 0;
 pub const HELPER_GM_LEVEL: i32 = 1;
@@ -94,7 +94,7 @@ fn emit_item_add(out: &mut HandleOutcome, item: &InventoryItem) {
 }
 
 async fn audit(
-    pool: Option<&MySqlPool>,
+    pool: Option<&DbPool>,
     actor: u32,
     actor_level: i32,
     target: Option<u32>,
@@ -102,10 +102,10 @@ async fn audit(
     details: &str,
 ) {
     let Some(pool) = pool else {
-        tracing::warn!("GM audit skipped without MySQL: action={action} actor={actor}");
+        tracing::warn!("GM audit skipped without DB: action={action} actor={actor}");
         return;
     };
-    let repo = crate::db::modern::mysql::accounts::MySqlAccountRepository { pool };
+    let repo = crate::db::modern::sqlite::accounts::SqliteAccountRepository { pool };
     if let Err(error) = repo
         .write_gm_audit(
             i64::from(actor),
@@ -156,8 +156,8 @@ where
 pub async fn handle(
     conn: &mut Conn,
     out: &mut HandleOutcome,
-    pool: Option<&MySqlPool>,
-    repos: Option<&MySqlRepositories>,
+    pool: Option<&DbPool>,
+    repos: Option<&SqliteRepositories>,
     hub: Option<&ServerControl>,
     data: &crate::data::loader::GameData,
     msg: &str,

@@ -5,11 +5,12 @@
 
 use crate::db::modern::model::{InventorySlot, StorageType};
 use crate::db::modern::traits::{InventoryRepository, RepoResult};
+use crate::db::pool::DbPool;
 use crate::protocol::codecs::thing_data::ThingData;
-use sqlx::{MySqlPool, Row};
+use sqlx::Row;
 
-pub struct MySqlInventoryRepository<'a> {
-    pub pool: &'a MySqlPool,
+pub struct SqliteInventoryRepository<'a> {
+    pub pool: &'a DbPool,
 }
 
 const SELECT_COLUMNS: &str = "storage_type, slot, item_id, quantity, damage, element, \
@@ -17,7 +18,7 @@ const SELECT_COLUMNS: &str = "storage_type, slot, item_id, quantity, damage, ele
      enhance_level, delete_time, damaged_item_id, is_locked, reinforced, affix1, affix2, \
      affix3, style_level";
 
-impl InventoryRepository for MySqlInventoryRepository<'_> {
+impl InventoryRepository for SqliteInventoryRepository<'_> {
     async fn load_storage(
         &self,
         character_id: i64,
@@ -30,7 +31,7 @@ impl InventoryRepository for MySqlInventoryRepository<'_> {
         let rows = sqlx::query(&sql)
             .bind(character_id)
             .bind(storage_type.value())
-            .fetch_all(self.pool)
+            .fetch_all(&self.pool.read)
             .await?;
         Ok(rows.iter().filter_map(row_to_slot).collect())
     }
@@ -42,7 +43,7 @@ impl InventoryRepository for MySqlInventoryRepository<'_> {
         executor: E,
     ) -> RepoResult<()>
     where
-        E: sqlx::Executor<'e, Database = sqlx::MySql>,
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
     {
         sqlx::query(
             "INSERT INTO inventories \
@@ -51,16 +52,16 @@ impl InventoryRepository for MySqlInventoryRepository<'_> {
               stone_level, enhance_level, delete_time, damaged_item_id, is_locked, reinforced, \
               affix1, affix2, affix3, style_level) \
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
-             ON DUPLICATE KEY UPDATE \
-             item_id = VALUES(item_id), quantity = VALUES(quantity), damage = VALUES(damage), \
-             element = VALUES(element), element_value = VALUES(element_value), \
-             proof_kind = VALUES(proof_kind), grow_level = VALUES(grow_level), \
-             grow_exp = VALUES(grow_exp), special_kind = VALUES(special_kind), \
-             stone_attr = VALUES(stone_attr), stone_level = VALUES(stone_level), \
-             enhance_level = VALUES(enhance_level), delete_time = VALUES(delete_time), \
-             damaged_item_id = VALUES(damaged_item_id), is_locked = VALUES(is_locked), \
-             reinforced = VALUES(reinforced), affix1 = VALUES(affix1), affix2 = VALUES(affix2), \
-             affix3 = VALUES(affix3), style_level = VALUES(style_level)",
+             ON CONFLICT(character_id, storage_type, slot) DO UPDATE SET \
+             item_id = excluded.item_id, quantity = excluded.quantity, damage = excluded.damage, \
+             element = excluded.element, element_value = excluded.element_value, \
+             proof_kind = excluded.proof_kind, grow_level = excluded.grow_level, \
+             grow_exp = excluded.grow_exp, special_kind = excluded.special_kind, \
+             stone_attr = excluded.stone_attr, stone_level = excluded.stone_level, \
+             enhance_level = excluded.enhance_level, delete_time = excluded.delete_time, \
+             damaged_item_id = excluded.damaged_item_id, is_locked = excluded.is_locked, \
+             reinforced = excluded.reinforced, affix1 = excluded.affix1, affix2 = excluded.affix2, \
+             affix3 = excluded.affix3, style_level = excluded.style_level",
         )
         .bind(character_id)
         .bind(slot.storage_type.value())
@@ -98,7 +99,7 @@ impl InventoryRepository for MySqlInventoryRepository<'_> {
         executor: E,
     ) -> RepoResult<()>
     where
-        E: sqlx::Executor<'e, Database = sqlx::MySql>,
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
     {
         // Keep the row (vacancy marker) but zero every item column so a later
         // upsert never resurrects stale attributes.
@@ -132,7 +133,7 @@ impl InventoryRepository for MySqlInventoryRepository<'_> {
             .bind(character_id)
             .bind(storage_type.value())
             .bind(slot)
-            .fetch_optional(self.pool)
+            .fetch_optional(&self.pool.read)
             .await?;
         Ok(row.as_ref().and_then(row_to_slot))
     }
@@ -140,7 +141,7 @@ impl InventoryRepository for MySqlInventoryRepository<'_> {
 
 /// Maps one `inventories` row to an [`InventorySlot`]. Rows with an unknown
 /// `storage_type` are skipped on load (defensive against manual edits).
-fn row_to_slot(r: &sqlx::mysql::MySqlRow) -> Option<InventorySlot> {
+fn row_to_slot(r: &sqlx::sqlite::SqliteRow) -> Option<InventorySlot> {
     let storage_raw: u8 = r.try_get("storage_type").ok()?;
     let storage_type = StorageType::from_value(storage_raw)?;
     let item = ThingData {
@@ -158,7 +159,7 @@ fn row_to_slot(r: &sqlx::mysql::MySqlRow) -> Option<InventorySlot> {
         enhance_level: r.try_get("enhance_level").ok()?,
         delete_time: r.try_get("delete_time").ok()?,
         damaged_item_id: r.try_get("damaged_item_id").ok()?,
-        is_locked: r.try_get::<i8, _>("is_locked").ok()? != 0,
+        is_locked: r.try_get::<bool, _>("is_locked").unwrap_or(false),
         reinforced: r.try_get("reinforced").ok()?,
         affix1: r.try_get("affix1").ok()?,
         affix2: r.try_get("affix2").ok()?,

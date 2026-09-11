@@ -76,26 +76,26 @@ async fn main() -> anyhow::Result<()> {
         cfg.data_dir.display()
     );
 
-    // 2. Connect MySQL pool (fail-fast), auto-creating the `ts_dream` database
-    //    when missing and `db_auto_create` is enabled (default true).
-    let pool = ts_dream::db::pool::bootstrap(&cfg.database_url, cfg.db_auto_create).await?;
-    tracing::info!("connected to MySQL; running migrations");
-    ts_dream::db::pool::migrate(&pool).await?;
+    // 2. Connect SQLite dual-pool (fail-fast)
+    let db_url = cfg.resolve_database_url();
+    let pool = ts_dream::db::pool::bootstrap(&db_url, Some(cfg.sqlite_cache_size_kb)).await?;
+    tracing::info!("connected to SQLite ({db_url})");
 
     // 3. Shared AppState
-    let app_state = Arc::new(RwLock::new(AppState::new(cfg.perexp_default)));
+    let mut app_state_inner = AppState::new(cfg.perexp_default);
+    app_state_inner.db_status = ts_dream::state::DbStatus::Connected;
+    let app_state = Arc::new(RwLock::new(app_state_inner));
 
-    // 3b. Background MySQL liveness probe (Ch7 ticket #22): detect *runtime*
-    //     DB loss. Boot stays fail-fast (spec §1.1); the probe only flips the
-    //     dashboard's DB badge to dark if the connection drops after boot.
-    ts_dream::db::pool::spawn_liveness_probe(
-        pool.clone(),
-        app_state.clone(),
-        tokio::time::Duration::from_secs(5),
+    // 3b. Periodic WAL checkpoint background task (flushes WAL to main db every N secs, default 300s)
+    let wal_interval = std::time::Duration::from_secs(cfg.wal_checkpoint_interval_secs);
+    ts_dream::db::pool::spawn_wal_checkpoint_task(pool.write.clone(), wal_interval);
+    tracing::info!(
+        "scheduled periodic WAL checkpoint task every {}s",
+        cfg.wal_checkpoint_interval_secs
     );
 
     // 3c. AutoSaveService (ticket 07): every 3 minutes, fingerprint the online
-    //     sessions and batch-write dirty ones in one InnoDB transaction each.
+    //     sessions and batch-write dirty ones in one transaction each.
     ts_dream::server::auto_save::spawn(pool.clone());
 
     // 3d. Eve-event activation gate (ticket 07): off by default so wire parity
@@ -175,8 +175,27 @@ async fn main() -> anyhow::Result<()> {
         tracing::error!("initial game server start failed: {e}");
     }
 
-    // Keep process alive
-    loop {
-        tokio::time::sleep(tokio::time::Duration::from_secs(3600)).await;
+    // 8. Graceful shutdown: listen for Ctrl+C / SIGINT signal
+    tokio::signal::ctrl_c().await?;
+    tracing::info!("received shutdown signal (Ctrl+C); initiating graceful exit...");
+
+    // Stop TCP server (broadcasts 020C, kicks clients, auto-saves & WAL checkpoints)
+    if let Err((code, msg)) = server_control.stop().await {
+        tracing::warn!("server control stop returned {code}: {msg}");
     }
+
+    // Extra safety: final auto-save pass and WAL flush
+    let saved = ts_dream::server::auto_save::save_all_dirty(&pool).await;
+    if saved > 0 {
+        tracing::info!("graceful shutdown: saved {saved} dirty session(s)");
+    }
+    if let Err(e) = pool.checkpoint().await {
+        tracing::error!("graceful shutdown: final WAL checkpoint error: {e}");
+    } else {
+        tracing::info!("graceful shutdown: final WAL checkpoint (TRUNCATE) completed successfully");
+    }
+
+    tracing::info!("TS Dream server shutdown complete.");
+    Ok(())
 }
+

@@ -16,11 +16,11 @@
 //! scoped by `player_id`.
 
 use crate::db;
+use crate::db::pool::DbPool;
 use crate::protocol::encoder;
 use crate::server::dispatcher::OpcodeCtx;
 use crate::server::pet_box::{ACTIVE_SLOTS, STABLE_SLOTS};
 use crate::server::session::{Conn, PetState};
-use sqlx::MySqlPool;
 
 /// True when `stt` lies in the player's fight roster (`1..=4`).
 pub fn is_roster(stt: u8) -> bool {
@@ -102,7 +102,7 @@ fn swap_pet_slots(conn: &mut Conn, a: u8, b: u8) {
 
 /// Persist the pet + equipment mutation in one transaction (the shared schema
 /// needs both `pet` and `trangbi` to reflect a slot move atomically).
-async fn persist_pet_state(pool: Option<&MySqlPool>, conn: &Conn) {
+async fn persist_pet_state(pool: Option<&DbPool>, conn: &Conn) {
     if let Some(pool) = pool {
         db::persist::persist_sessions_transaction(
             Some(pool),

@@ -158,14 +158,14 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
   - Hoán đổi tài sản (vật phẩm, võ tướng, tiền vàng) nguyên tử; tự động hoàn trả (rollback) trọn vẹn nếu có sự cố ngắt kết nối hoặc hủy giao dịch.
 
 ### AutoSave (Dịch vụ Tự Động Lưu Trữ Nền)
-- **Định nghĩa**: Tiến trình nền (Background Task) chạy định kỳ mỗi 3 phút trong Tokio runtime, sử dụng thuật toán băm FNV-1a để phát hiện những phiên người chơi có trạng thái biến động (dirty state: vàng, HP/SP, chỉ số, túi đồ, võ tướng, nhiệm vụ) và thực hiện ghi vào MySQL theo từng Transaction nguyên tử.
+- **Định nghĩa**: Tiến trình nền (Background Task) chạy định kỳ mỗi 3 phút trong Tokio runtime, sử dụng thuật toán băm FNV-1a để phát hiện những phiên người chơi có trạng thái biến động (dirty state: vàng, HP/SP, chỉ số, túi đồ, võ tướng, nhiệm vụ) và thực hiện ghi vào cơ sở dữ liệu SQLite theo từng Transaction nguyên tử.
 
 ### Map & Spatial Position (Bản đồ & Tọa độ)
 - **Định nghĩa**: Không gian tọa độ thế giới game nơi các Nhân vật di chuyển, tương tác với NPC và kích hoạt các sự kiện/trận đấu.
 
 ### Tân thủ / Newbie (Trạng thái tân thủ)
 - **Định nghĩa**: Cờ đếm `characters.newbie` (`BIGINT NOT NULL DEFAULT 0`, ánh xạ `Session.newbie: u32`) đánh dấu người chơi đã nhận gói quà tân thủ hay chưa. Giá trị `1` chặn nhận lại gói `TSVN123/TSVN456` (guard `AlreadyGifted` trong `src/db/item_code.rs:116`).
-- **Ràng buộc (Invariants)**: `0` = chưa nhận, `1` = đã nhận quà tân thủ. Persist qua `src/db/persist.rs:49` (`"newbie" => "newbie"`) và `src/db/modern/mysql/session.rs:79,261`.
+- **Ràng buộc (Invariants)**: `0` = chưa nhận, `1` = đã nhận quà tân thủ. Persist qua `src/db/persist.rs:49` (`"newbie" => "newbie"`) và `src/db/modern/sqlite/session.rs:79,261`.
 - **Phạm vi hiện tại (sau ADR 0001 cleanup)**: Sách 46238 chỉ tăng `newbie` (đã xóa `Spx2+50` / `SpMax+50` và stat frame `0xD0`).
 - **Tránh dùng các từ mơ hồ**: *tanthu* (tên legacy tiếng Việt không dấu, đã đổi thành `newbie` thống nhất).
 

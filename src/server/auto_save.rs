@@ -12,9 +12,8 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::Duration;
 
-use sqlx::MySqlPool;
-
 use crate::db::persist;
+use crate::db::pool::DbPool;
 use crate::server::session::{online_sessions, Session};
 
 /// Save cadence: 3 minutes (spec §3 AutoSaveService).
@@ -89,7 +88,7 @@ pub type SaveLedger = Mutex<HashMap<u32, u64>>;
 
 /// One save pass over the registry. Returns how many sessions were written.
 /// `pool == None` (protocol replay / DB-less boot) is a no-op success.
-pub async fn run_cycle(pool: Option<&MySqlPool>, ledger: &SaveLedger) -> usize {
+pub async fn run_cycle(pool: Option<&DbPool>, ledger: &SaveLedger) -> usize {
     let Some(pool) = pool else {
         return 0;
     };
@@ -128,6 +127,32 @@ pub async fn run_cycle(pool: Option<&MySqlPool>, ledger: &SaveLedger) -> usize {
     }
 }
 
+/// Persist all active authed sessions to the database immediately.
+/// Typically called right before shutting down the server or during graceful exit.
+pub async fn save_all_dirty(pool: &DbPool) -> usize {
+    let mut candidates: Vec<Session> = Vec::new();
+    {
+        let sessions = online_sessions().lock().unwrap();
+        for s in sessions.values() {
+            if !s.authed || s.id == 0 {
+                continue;
+            }
+            candidates.push(s.clone());
+        }
+    }
+    if candidates.is_empty() {
+        return 0;
+    }
+    let refs: Vec<&Session> = candidates.iter().collect();
+    if persist::persist_sessions_transaction(Some(pool), &refs, &SAVE_TABLES).await {
+        tracing::info!("save_all_dirty saved {} session(s)", candidates.len());
+        candidates.len()
+    } else {
+        tracing::warn!("save_all_dirty transaction failed");
+        0
+    }
+}
+
 /// Forget a player's ledger entry (disconnect path keeps the map bounded).
 pub fn forget(ledger: &SaveLedger, player_id: u32) {
     ledger.lock().unwrap().remove(&player_id);
@@ -135,7 +160,7 @@ pub fn forget(ledger: &SaveLedger, player_id: u32) {
 
 /// Spawn the recurring background task. Called once at server boot with the
 /// live pool; the task lives for the process lifetime.
-pub fn spawn(pool: MySqlPool) {
+pub fn spawn(pool: DbPool) {
     let ledger: std::sync::Arc<SaveLedger> = std::sync::Arc::default();
     tokio::spawn(async move {
         let mut ticker = tokio::time::interval(AUTO_SAVE_INTERVAL);
@@ -147,3 +172,4 @@ pub fn spawn(pool: MySqlPool) {
         }
     });
 }
+

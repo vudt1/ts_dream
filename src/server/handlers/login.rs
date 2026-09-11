@@ -136,7 +136,7 @@ pub async fn handle_enter_game(ctx: &mut OpcodeCtx<'_>) {
 async fn login_db(
     conn: &mut Conn,
     out: &mut HandleOutcome,
-    repos: &crate::db::modern::mysql::MySqlRepositories,
+    repos: &crate::db::modern::sqlite::SqliteRepositories,
     hub: Option<&ServerControl>,
     sender: Option<&ClientSender>,
     password: &[u8],
@@ -153,7 +153,7 @@ async fn login_db(
         return Ok(());
     };
     let now_ms = chrono::Utc::now().timestamp_millis();
-    if crate::db::modern::mysql::accounts::MySqlAccountRepository::is_suspended(&access, now_ms) {
+    if crate::db::modern::sqlite::accounts::SqliteAccountRepository::is_suspended(&access, now_ms) {
         // No verified PC/aLogin suspended-account opcode exists in the supplied
         // corpus, so do not emit a mobile numeric response on the PC dialect.
         out.send(spawn::sys_msg_frame("Tai khoan dang bi tam khoa."));

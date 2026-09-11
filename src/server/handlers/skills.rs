@@ -103,7 +103,7 @@ async fn handle_player_skill_learn(
     payload: &[u8],
     out: &mut HandleOutcome,
     data: &crate::data::loader::GameData,
-    pool: Option<&sqlx::MySqlPool>,
+    pool: Option<&crate::db::pool::DbPool>,
 ) {
     if payload.is_empty() {
         return;
@@ -231,7 +231,7 @@ async fn handle_pet_skill_upgrade(
     payload: &[u8],
     out: &mut HandleOutcome,
     data: &crate::data::loader::GameData,
-    pool: Option<&sqlx::MySqlPool>,
+    pool: Option<&crate::db::pool::DbPool>,
 ) {
     if payload.len() < 4 {
         return;

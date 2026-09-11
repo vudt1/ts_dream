@@ -60,7 +60,7 @@ fn warp_target(id: u16, current_map: u16) -> Option<(u16, u16, u16)> {
 pub(crate) struct UseCtx<'a> {
     pub conn: &'a mut Conn,
     pub out: &'a mut HandleOutcome,
-    pub pool: Option<&'a sqlx::MySqlPool>,
+    pub pool: Option<&'a crate::db::pool::DbPool>,
     pub data: &'a GameData,
     /// Homdo slot (packet byte 6).
     pub slot: u8,
@@ -221,7 +221,7 @@ pub async fn use_item(
     conn: &mut Conn,
     payload: &[u8],
     out: &mut HandleOutcome,
-    pool: Option<&sqlx::MySqlPool>,
+    pool: Option<&crate::db::pool::DbPool>,
     data: &GameData,
 ) {
     let mut rng = DotNetRandom::time_seeded();
@@ -233,7 +233,7 @@ pub async fn use_item_rng(
     conn: &mut Conn,
     payload: &[u8],
     out: &mut HandleOutcome,
-    pool: Option<&sqlx::MySqlPool>,
+    pool: Option<&crate::db::pool::DbPool>,
     data: &GameData,
     rng: &mut DotNetRandom,
 ) {

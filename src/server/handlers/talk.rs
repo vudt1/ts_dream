@@ -13,8 +13,8 @@ use crate::data::loader::GameData;
 use crate::protocol::encoder;
 use crate::server::dispatcher::{HandleOutcome, OpcodeCtx};
 use crate::server::handlers::stats::build_stat_update;
+use crate::db::pool::DbPool;
 use crate::server::session::Conn;
-use sqlx::MySqlPool;
 
 /// EndTalk packet + reset the whole talk context.
 pub fn end_talk(conn: &mut Conn, out: &mut HandleOutcome) {
@@ -151,7 +151,7 @@ async fn handle_talk_continue(
     conn: &mut Conn,
     _payload: &[u8],
     data: &GameData,
-    _pool: Option<&MySqlPool>,
+    _pool: Option<&DbPool>,
     out: &mut HandleOutcome,
 ) {
     // H6 pre-dispatch guards.

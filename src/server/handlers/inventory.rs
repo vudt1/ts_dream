@@ -74,7 +74,7 @@ async fn handle_pickup(
     conn: &mut Conn,
     payload: &[u8],
     out: &mut HandleOutcome,
-    pool: Option<&sqlx::MySqlPool>,
+    pool: Option<&crate::db::pool::DbPool>,
     hub: Option<&crate::web::server_control::ServerControl>,
 ) {
     if conn.session.battle_id > 0 || payload.is_empty() {
@@ -129,7 +129,7 @@ async fn handle_drop(
     conn: &mut Conn,
     payload: &[u8],
     out: &mut HandleOutcome,
-    pool: Option<&sqlx::MySqlPool>,
+    pool: Option<&crate::db::pool::DbPool>,
     hub: Option<&crate::web::server_control::ServerControl>,
 ) {
     if conn.session.battle_id > 0 || payload.len() < 2 {
@@ -257,7 +257,7 @@ async fn handle_equip(
     conn: &mut Conn,
     payload: &[u8],
     out: &mut HandleOutcome,
-    pool: Option<&sqlx::MySqlPool>,
+    pool: Option<&crate::db::pool::DbPool>,
     hub: Option<&crate::web::server_control::ServerControl>,
 ) {
     if conn.session.battle_id > 0 || payload.is_empty() {
@@ -319,7 +319,7 @@ async fn handle_unequip(
     conn: &mut Conn,
     payload: &[u8],
     out: &mut HandleOutcome,
-    pool: Option<&sqlx::MySqlPool>,
+    pool: Option<&crate::db::pool::DbPool>,
     hub: Option<&crate::web::server_control::ServerControl>,
 ) {
     if conn.session.battle_id > 0 || payload.len() < 2 {
@@ -388,7 +388,7 @@ async fn handle_use_item(
     conn: &mut Conn,
     payload: &[u8],
     out: &mut HandleOutcome,
-    pool: Option<&sqlx::MySqlPool>,
+    pool: Option<&crate::db::pool::DbPool>,
     data: &crate::data::loader::GameData,
 ) {
     super::use_item::use_item(conn, payload, out, pool, data).await;
@@ -403,7 +403,7 @@ async fn handle_reborn(
     payload: &[u8],
     out: &mut HandleOutcome,
     data: &crate::data::loader::GameData,
-    pool: Option<&sqlx::MySqlPool>,
+    pool: Option<&crate::db::pool::DbPool>,
 ) {
     // Requires no equipment in trangbi slots 1..6
     if conn

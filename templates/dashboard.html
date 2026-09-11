@@ -165,23 +165,12 @@
                     <div class="brand-sub">Rust Port Server Controller (Port 8090)</div>
                 </div>
             </div>
-            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+            <div>
                 <div id="status-badge-container">
                     {% if running %}
                     <span class="status-badge status-online"><span class="dot dot-green"></span> SERVER ONLINE</span>
                     {% else %}
                     <span class="status-badge status-offline"><span class="dot dot-red"></span> SERVER OFFLINE</span>
-                    {% endif %}
-                </div>
-                <div id="db-status-container">
-                    {% if db_state == "green" %}
-                    <span class="status-badge status-connected"><span class="dot dot-green"></span> DATABASE ONLINE</span>
-                    {% else %}
-                    {% if db_state == "light" %}
-                    <span class="status-badge status-connecting"><span class="dot dot-light"></span> DATABASE CONNECTING</span>
-                    {% else %}
-                    <span class="status-badge status-disconnected"><span class="dot dot-dark"></span> DATABASE OFFLINE</span>
-                    {% endif %}
                     {% endif %}
                 </div>
             </div>
@@ -216,7 +205,7 @@
             <div class="card">
                 <div class="card-header">Accounts Created</div>
                 <div class="card-value">{{ accounts.len() }}</div>
-                <div style="font-size: 13px; color: var(--text-secondary); margin-top: 8px;">MySQL accounts table</div>
+                <div style="font-size: 13px; color: var(--text-secondary); margin-top: 8px;">Database accounts</div>
             </div>
 
             <!-- PerEXP Settings -->
@@ -449,29 +438,6 @@
                 consoleEl.scrollTop = consoleEl.scrollHeight;
             } catch (err) {
                 console.error("SSE parse error", err);
-            }
-        });
-
-        // Live Database connection status (Ch7 ticket #22) via SSE.
-        const dbEl = document.getElementById('db-status-container');
-        function renderDbStatus(state) {
-            let html;
-            if (state === 'green') {
-                html = '<span class="status-badge status-connected"><span class="dot dot-green"></span> DATABASE ONLINE</span>';
-            } else if (state === 'light') {
-                html = '<span class="status-badge status-connecting"><span class="dot dot-light"></span> DATABASE CONNECTING</span>';
-            } else {
-                html = '<span class="status-badge status-disconnected"><span class="dot dot-dark"></span> DATABASE OFFLINE</span>';
-            }
-            dbEl.innerHTML = html;
-        }
-        const dbSource = new EventSource('/api/db/status/stream');
-        dbSource.addEventListener('dbstatus', function(e) {
-            try {
-                const data = JSON.parse(e.data);
-                renderDbStatus(data.state);
-            } catch (err) {
-                console.error("dbstatus parse error", err);
             }
         });
     </script>

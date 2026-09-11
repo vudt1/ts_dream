@@ -5,7 +5,8 @@
 
 use crate::battle::service::BattleService;
 use crate::data::loader::GameData;
-use crate::db::modern::mysql::MySqlRepositories;
+use crate::db::modern::sqlite::SqliteRepositories;
+use crate::db::pool::DbPool;
 use crate::protocol::encoder;
 use crate::protocol::frame;
 use crate::server::dispatcher::{self, ServerEnv};
@@ -13,7 +14,6 @@ use crate::server::session::{online_sessions, Conn};
 use crate::server::spawn::announce_frame;
 use crate::state::AppState;
 use axum::http::StatusCode;
-use sqlx::MySqlPool;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -29,7 +29,7 @@ pub struct ServerControl {
     pub game_port: u16,
     pub app: Arc<RwLock<AppState>>,
     pub data: Option<Arc<GameData>>,
-    pub pool: Option<MySqlPool>,
+    pub pool: Option<DbPool>,
     pub clients: Arc<Mutex<HashMap<u32, ClientSender>>>,
     /// Shutdown signal for the accept loop (`Some` while listening). Exposed
     /// so lifecycle owners (and tests) can halt the listener without the 5s
@@ -42,7 +42,7 @@ impl ServerControl {
         game_port: u16,
         app: Arc<RwLock<AppState>>,
         data: Option<Arc<GameData>>,
-        pool: Option<MySqlPool>,
+        pool: Option<DbPool>,
     ) -> Self {
         Self {
             game_port,
@@ -169,6 +169,18 @@ impl ServerControl {
         let mut clients = self.clients.lock().await;
         clients.clear();
         drop(clients);
+
+        if let Some(pool) = self.pool.as_ref() {
+            let saved = crate::server::auto_save::save_all_dirty(pool).await;
+            if saved > 0 {
+                tracing::info!("Server stop: auto-saved {saved} dirty session(s)");
+            }
+            if let Err(e) = pool.checkpoint().await {
+                tracing::warn!("Server stop: WAL checkpoint failed: {e}");
+            } else {
+                tracing::info!("Server stop: WAL checkpoint (TRUNCATE) completed");
+            }
+        }
 
         let mut app = self.app.write().await;
         app.running = false;
@@ -300,7 +312,7 @@ async fn handle_client_connection(
     peer: std::net::SocketAddr,
     app: Arc<RwLock<AppState>>,
     data: Option<Arc<GameData>>,
-    pool: Option<MySqlPool>,
+    pool: Option<DbPool>,
     control: ServerControl,
 ) {
     let peer_ip = peer.to_string();
@@ -311,7 +323,7 @@ async fn handle_client_connection(
     let data = data.unwrap_or_else(|| Arc::new(GameData::default()));
     let repos = pool
         .as_ref()
-        .map(|pool| MySqlRepositories::new(pool.clone()));
+        .map(|pool| SqliteRepositories::new(pool.clone()));
     let service = {
         let mut svc = BattleService::new(Arc::clone(&data));
         if let Some(pool) = pool.as_ref() {

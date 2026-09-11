@@ -11,13 +11,13 @@ use axum::{
     Form, Json,
 };
 use serde_json::json;
-use sqlx::MySqlPool;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::data::loader::GameData;
 use crate::db;
 use crate::db::accounts::AccountRow;
+use crate::db::pool::DbPool;
 use crate::state::{AppState, LogEvent, OnlineEntry};
 use crate::web::server_control::ServerControl;
 
@@ -29,7 +29,7 @@ pub const HTMX_JS: &str = include_str!("static/htmx.min.js");
 #[derive(Clone)]
 pub struct WebState {
     pub app: SharedState,
-    pub pool: Option<MySqlPool>,
+    pub pool: Option<DbPool>,
     pub data: Option<Arc<GameData>>,
     pub server_control: Option<Arc<ServerControl>>,
 }
@@ -101,8 +101,6 @@ pub struct DashboardTemplate {
     pub guilds: Vec<db::domain::GuildRow>,
     pub world_bosses: Vec<db::domain::WorldBossRow>,
     pub initial_logs: Vec<LogEvent>,
-    /// Live MySQL connectivity color token: `green` / `light` / `dark` (Ch7 #22).
-    pub db_state: String,
 }
 
 impl IntoResponse for DashboardTemplate {
@@ -213,8 +211,6 @@ async fn index(State(s): State<WebState>) -> Response {
         None => Vec::new(),
     };
 
-    let db_state = s.app.read().await.db_status.as_str().to_string();
-
     let template = DashboardTemplate {
         running,
         perexp,
@@ -227,7 +223,6 @@ async fn index(State(s): State<WebState>) -> Response {
         guilds,
         world_bosses,
         initial_logs,
-        db_state,
     };
 
     template.into_response()

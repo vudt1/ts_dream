@@ -5,10 +5,10 @@
 //! duplicate or destroy an item.
 
 use crate::db::modern::model::{InventorySlot, Money, StorageType};
-use crate::db::modern::mysql::characters::money_row;
-use crate::db::modern::mysql::inventories::MySqlInventoryRepository;
+use crate::db::modern::sqlite::characters::money_row;
+use crate::db::modern::sqlite::inventories::SqliteInventoryRepository;
 use crate::db::modern::traits::InventoryRepository;
-use sqlx::MySqlPool;
+use crate::db::pool::DbPool;
 
 /// Failure modes surfaced to handlers so they can send the matching client
 /// error frame instead of a bare 500-style rejection.
@@ -31,11 +31,11 @@ impl From<sqlx::Error> for TxError {
 /// `bank_gold >= cost` predicate inside the UPDATE makes overdrafts
 /// impossible even under concurrent transfers.
 pub async fn bank_transfer(
-    pool: &MySqlPool,
+    pool: &DbPool,
     character_id: i64,
     amount: i64,
 ) -> Result<Money, TxError> {
-    let mut tx = pool.begin().await?;
+    let mut tx = pool.write.begin().await?;
 
     let (debit, credit, guard_col) = if amount >= 0 {
         (-amount, amount, "gold")
@@ -65,16 +65,14 @@ pub async fn bank_transfer(
 }
 
 /// Deducts `price` gold and grants the purchased item in one transaction:
-/// either both the ledger and the bag row land, or neither does. The target
-/// slot must be vacant (locked `FOR UPDATE` so a concurrent write cannot
-/// sneak an item into the same cell between check and insert).
+/// either both the ledger and the bag row land, or neither does.
 pub async fn shop_buy(
-    pool: &MySqlPool,
+    pool: &DbPool,
     character_id: i64,
     price: i64,
     purchase: &InventorySlot,
 ) -> Result<(), TxError> {
-    let mut tx = pool.begin().await?;
+    let mut tx = pool.write.begin().await?;
 
     let updated = sqlx::query(
         "UPDATE character_money SET gold = gold - ? WHERE character_id = ? AND gold >= ?",
@@ -90,7 +88,7 @@ pub async fn shop_buy(
 
     ensure_slot_vacant(&mut tx, character_id, purchase.storage_type, purchase.slot).await?;
 
-    MySqlInventoryRepository { pool }
+    SqliteInventoryRepository { pool }
         .save_slot(character_id, purchase, &mut *tx)
         .await?;
 
@@ -99,18 +97,16 @@ pub async fn shop_buy(
 }
 
 /// Peer-to-peer trade: moves the item in `(from_character, offer)` to
-/// `(to_character, destination)` atomically. Both cells are locked
-/// `FOR UPDATE` before anything moves, so two concurrent trades can neither
-/// double-spend the source item nor race into the same destination.
+/// `(to_character, destination)` atomically.
 pub async fn p2p_trade(
-    pool: &MySqlPool,
+    pool: &DbPool,
     from_character_id: i64,
     offer: (StorageType, u16),
     to_character_id: i64,
     destination: (StorageType, u16),
 ) -> Result<(), TxError> {
-    let mut tx = pool.begin().await?;
-    let repo = MySqlInventoryRepository { pool };
+    let mut tx = pool.write.begin().await?;
+    let repo = SqliteInventoryRepository { pool };
 
     lock_occupied_slot(&mut tx, from_character_id, offer.0, offer.1).await?;
     let Some(item) = repo
@@ -136,11 +132,11 @@ pub async fn p2p_trade(
     Ok(())
 }
 
-/// Locks the inventory row (or its gap) for the given cell and fails when it
+/// Locks the inventory row for the given cell and fails when it
 /// is occupied. Running inside the caller's transaction makes the vacancy
 /// check race-free until commit.
 async fn ensure_slot_vacant(
-    tx: &mut sqlx::MySqlConnection,
+    tx: &mut sqlx::SqliteConnection,
     character_id: i64,
     storage_type: StorageType,
     slot: u16,
@@ -156,7 +152,7 @@ async fn ensure_slot_vacant(
 
 /// Locks the cell and fails when there is no live (non-zero) item in it.
 async fn lock_occupied_slot(
-    tx: &mut sqlx::MySqlConnection,
+    tx: &mut sqlx::SqliteConnection,
     character_id: i64,
     storage_type: StorageType,
     slot: u16,
@@ -167,17 +163,17 @@ async fn lock_occupied_slot(
     }
 }
 
-/// `SELECT ... FOR UPDATE` on one inventory cell; `None` when the row does
-/// not exist yet (InnoDB still takes the gap lock under REPEATABLE READ).
+/// `SELECT` on one inventory cell; `None` when the row does
+/// not exist yet. Serialized by the exclusive single-writer connection.
 async fn lock_inventory_cell(
-    tx: &mut sqlx::MySqlConnection,
+    tx: &mut sqlx::SqliteConnection,
     character_id: i64,
     storage_type: StorageType,
     slot: u16,
 ) -> Result<Option<i64>, TxError> {
     let found = sqlx::query_scalar::<_, i64>(
         "SELECT item_id FROM inventories \
-         WHERE character_id = ? AND storage_type = ? AND slot = ? FOR UPDATE",
+         WHERE character_id = ? AND storage_type = ? AND slot = ?",
     )
     .bind(character_id)
     .bind(storage_type.value())

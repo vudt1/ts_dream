@@ -131,7 +131,7 @@ pub async fn handle_character(ctx: &mut OpcodeCtx<'_>) {
 /// atomic transaction through the modern repository. On success the session is
 /// updated in-memory to match what the DB now holds.
 async fn create_char_db(
-    repos: &crate::db::modern::mysql::MySqlRepositories,
+    repos: &crate::db::modern::sqlite::SqliteRepositories,
     session: &mut Session,
     data: &CreateCharData,
 ) -> Result<(), sqlx::Error> {

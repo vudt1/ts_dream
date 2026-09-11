@@ -1,17 +1,15 @@
-//! Static catalog provenance persistence.
-
 use crate::data::loader::BinaryAssetMeta;
-use sqlx::MySqlPool;
+use crate::db::pool::DbPool;
 
 /// Replace the current asset provenance rows atomically for one boot.
 ///
 /// This makes the dashboard/audit layer able to answer exactly which binary
 /// inputs were loaded, their byte sizes, and their content hashes.
 pub async fn replace_asset_catalog(
-    pool: &MySqlPool,
+    pool: &DbPool,
     assets: &[BinaryAssetMeta],
 ) -> Result<(), sqlx::Error> {
-    let mut tx = pool.begin().await?;
+    let mut tx = pool.write.begin().await?;
     sqlx::query("DELETE FROM data_asset_catalog")
         .execute(&mut *tx)
         .await?;

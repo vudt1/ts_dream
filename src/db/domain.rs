@@ -1,6 +1,4 @@
-//! Read models and narrow administration queries for production domain tables.
-
-use sqlx::MySqlPool;
+use crate::db::pool::DbPool;
 
 #[derive(Debug, Clone, serde::Serialize, sqlx::FromRow)]
 pub struct GuildRow {
@@ -27,28 +25,28 @@ pub struct WorldBossRow {
     pub participant_count: i64,
 }
 
-pub async fn list_guilds(pool: &MySqlPool) -> Result<Vec<GuildRow>, sqlx::Error> {
+pub async fn list_guilds(pool: &DbPool) -> Result<Vec<GuildRow>, sqlx::Error> {
     sqlx::query_as::<_, GuildRow>(
         "SELECT g.guild_id, g.name, g.leader_id, g.level, g.experience, g.treasury, g.status,
                 (SELECT COUNT(*) FROM guild_members gm WHERE gm.guild_id = g.guild_id) AS member_count
          FROM guilds g ORDER BY g.guild_id DESC",
     )
-    .fetch_all(pool)
+    .fetch_all(&pool.read)
     .await
 }
 
-pub async fn list_world_bosses(pool: &MySqlPool) -> Result<Vec<WorldBossRow>, sqlx::Error> {
+pub async fn list_world_bosses(pool: &DbPool) -> Result<Vec<WorldBossRow>, sqlx::Error> {
     sqlx::query_as::<_, WorldBossRow>(
         "SELECT b.boss_id, b.npc_id, b.scene_id, b.state, b.hp, b.hp_max, b.starts_at, b.ends_at,
                 (SELECT COUNT(*) FROM world_boss_participants p WHERE p.boss_id = b.boss_id) AS participant_count
          FROM world_bosses b ORDER BY b.boss_id DESC",
     )
-    .fetch_all(pool)
+    .fetch_all(&pool.read)
     .await
 }
 
 pub async fn write_audit(
-    pool: &MySqlPool,
+    pool: &DbPool,
     admin_id: Option<i64>,
     action: &str,
     target_type: Option<&str>,
@@ -66,7 +64,7 @@ pub async fn write_audit(
     .bind(target_id)
     .bind(details)
     .bind(now)
-    .execute(pool)
+    .execute(&pool.write)
     .await
     .map(|_| ())
 }

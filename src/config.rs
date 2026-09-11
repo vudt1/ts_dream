@@ -16,10 +16,11 @@ pub struct Config {
     pub data_dir: PathBuf,
     pub database_url: String,
     pub perexp_default: u32,
-    /// Auto-create the `ts_dream` database (and a latin1 charset) at boot if
-    /// it does not exist yet. Off when an operator provisions the DB themselves
-    /// (spec §8.3). Override with `TS_DB_AUTO_CREATE`.
     pub db_auto_create: bool,
+    /// Periodic SQLite WAL checkpoint interval in seconds (default: 300s / 5 mins).
+    pub wal_checkpoint_interval_secs: u64,
+    /// SQLite cache size in KiB per connection (default: 64000 KiB / 64 MB).
+    pub sqlite_cache_size_kb: i64,
 }
 
 impl Default for Config {
@@ -28,9 +29,11 @@ impl Default for Config {
             game_port: 6414,
             web_port: 8090,
             data_dir: PathBuf::from("./Data"),
-            database_url: "mysql://user:pass@localhost:3306/ts_dream".to_string(),
+            database_url: "sqlite://DB/ts_dream.db".to_string(),
             perexp_default: 0,
             db_auto_create: true,
+            wal_checkpoint_interval_secs: 300,
+            sqlite_cache_size_kb: 64000,
         }
     }
 }
@@ -44,6 +47,16 @@ fn parse_u32(s: &str) -> std::result::Result<u32, String> {
     s.trim()
         .parse::<u32>()
         .map_err(|e| format!("invalid u32: {e}"))
+}
+fn parse_u64(s: &str) -> std::result::Result<u64, String> {
+    s.trim()
+        .parse::<u64>()
+        .map_err(|e| format!("invalid u64: {e}"))
+}
+pub fn parse_i64(s: &str) -> std::result::Result<i64, String> {
+    s.trim()
+        .parse::<i64>()
+        .map_err(|e| format!("invalid i64: {e}"))
 }
 pub fn parse_bool(s: &str) -> std::result::Result<bool, String> {
     match s.trim().to_ascii_lowercase().as_str() {
@@ -83,6 +96,18 @@ impl Config {
             .map_err(|e| TsError::Config(format!("TS_PEREXP_DEFAULT: {e}")))?;
         cfg.db_auto_create = env_override("TS_DB_AUTO_CREATE", cfg.db_auto_create, parse_bool)
             .map_err(|e| TsError::Config(format!("TS_DB_AUTO_CREATE: {e}")))?;
+        cfg.wal_checkpoint_interval_secs = env_override(
+            "TS_WAL_CHECKPOINT_INTERVAL_SECS",
+            cfg.wal_checkpoint_interval_secs,
+            parse_u64,
+        )
+        .map_err(|e| TsError::Config(format!("TS_WAL_CHECKPOINT_INTERVAL_SECS: {e}")))?;
+        cfg.sqlite_cache_size_kb = env_override(
+            "TS_SQLITE_CACHE_SIZE_KB",
+            cfg.sqlite_cache_size_kb,
+            parse_i64,
+        )
+        .map_err(|e| TsError::Config(format!("TS_SQLITE_CACHE_SIZE_KB: {e}")))?;
         if let Ok(raw) = std::env::var("TS_DATA_DIR") {
             cfg.data_dir = PathBuf::from(raw);
         }
@@ -120,6 +145,33 @@ impl Config {
             }
         }
         data_dir.to_path_buf()
+    }
+
+    /// Resolve the SQLite database URL candidate (similar to data_dir resolution).
+    pub fn resolve_database_url(&self) -> String {
+        let exe_dir = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|d| d.to_path_buf()));
+        Self::resolve_database_url_with(&self.database_url, exe_dir)
+    }
+
+    pub fn resolve_database_url_with(database_url: &str, exe_dir: Option<PathBuf>) -> String {
+        if let Some(path_str) = database_url
+            .strip_prefix("sqlite://")
+            .or_else(|| database_url.strip_prefix("sqlite:"))
+        {
+            let path = Path::new(path_str);
+            if path.exists() {
+                return database_url.to_string();
+            }
+            if let Some(exe) = exe_dir {
+                let candidate = exe.join(path);
+                if candidate.exists() {
+                    return format!("sqlite://{}", candidate.display());
+                }
+            }
+        }
+        database_url.to_string()
     }
 }
 

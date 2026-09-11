@@ -1,16 +1,7 @@
 //! `item_code` redeem repository (Chapter 5 §5.5, op 0x23 sub 3).
-//!
-//! MySQL is mandatory here — there is no no-DB degrade branch. `code` /
-//! `password` are always bind parameters (never SQL-concatenated). The redeem
-//! runs in a transaction guarded by `rows_affected() == 1` so a concurrent
-//! double-redeem of the same code cannot grant the reward twice.
-//!
-//! The reservation **and** the `homdo` grant live in
-//! the same InnoDB transaction: if the inventory insert fails the redeem
-//! rolls back, so a used code never "disappears" while the reward was lost.
 
+use crate::db::pool::DbPool;
 use crate::server::session::InventoryItem;
-use sqlx::MySqlPool;
 
 /// One unused `item_code` row (the reward a code grants).
 #[derive(sqlx::FromRow)]
@@ -36,29 +27,19 @@ pub enum RedeemOutcome {
 }
 
 /// Redeem `code`/`password` and grant the reward atomically.
-///
-/// - No matching unused row -> `Ok(RedeemOutcome::InvalidOrUsed)`
-///   (invalid or already-redeemed code).
-/// - Matching row -> the code is marked used AND the item is inserted into
-///   `homdo` (at `slot`) inside the same transaction; only then it commits.
-///
-/// `item` carries the exact in-memory `InventoryItem` the handler has already
-/// added to the session (id/count/stat copy). The DB write and the session
-/// mutation agree on slot and item.
 pub async fn redeem_and_grant(
-    pool: &MySqlPool,
+    pool: &DbPool,
     player_id: i64,
     code: &str,
     password: &str,
     slot: i64,
     item: &InventoryItem,
 ) -> Result<RedeemOutcome, sqlx::Error> {
-    let mut tx = pool.begin().await?;
+    let mut tx = pool.write.begin().await?;
 
     let row = sqlx::query_as::<_, CodeRow>(
-        "SELECT item_id, `count` FROM item_code \
-         WHERE code = ? AND password = ? AND player_id = 0 \
-         FOR UPDATE",
+        "SELECT item_id, count FROM item_code \
+         WHERE code = ? AND password = ? AND player_id = 0",
     )
     .bind(code)
     .bind(password)
@@ -100,21 +81,15 @@ pub async fn redeem_and_grant(
 }
 
 /// The once-only `TSVN123/TSVN456` special gift (Chapter 5 §5.5).
-///
-/// Grants the five hard-coded items (46197 + 20711 + 19711 + 23549 + 11001)
-/// and sets the player's `newbie` flag in the same transaction as the `homdo`
-/// inserts, guarded against a concurrent double-claim. The `item_code`
-/// reservation is not consulted; the once-only
-/// guard is the `newbie` flag.
 pub async fn redeem_special_gift(
-    pool: &MySqlPool,
+    pool: &DbPool,
     player_id: i64,
     items: &[InventoryItem],
 ) -> Result<RedeemOutcome, sqlx::Error> {
-    let mut tx = pool.begin().await?;
+    let mut tx = pool.write.begin().await?;
 
     let newbie = sqlx::query_scalar::<_, i64>(
-        "SELECT newbie FROM characters WHERE character_id = ? FOR UPDATE",
+        "SELECT newbie FROM characters WHERE character_id = ?",
     )
     .bind(player_id)
     .fetch_optional(&mut *tx)
@@ -155,22 +130,19 @@ pub async fn redeem_special_gift(
     })
 }
 
-/// Preview the reward a code would grant, **without reserving or consuming it**
-/// (op 0x23 sub 3 pre-validation: the handler checks the item template and the
-/// bag capacity before committing to the atomic redeem). Returns the reusable
-/// `(item_id, count)` when an unused row matches.
+/// Preview the reward a code would grant, **without reserving or consuming it**.
 pub async fn reward_for(
-    pool: &MySqlPool,
+    pool: &DbPool,
     code: &str,
     password: &str,
 ) -> Result<Option<(i64, i64)>, sqlx::Error> {
     let row = sqlx::query_as::<_, (i64, i64)>(
-        "SELECT item_id, `count` FROM item_code \
+        "SELECT item_id, count FROM item_code \
          WHERE code = ? AND password = ? AND player_id = 0",
     )
     .bind(code)
     .bind(password)
-    .fetch_optional(pool)
+    .fetch_optional(&pool.read)
     .await?;
     Ok(row)
 }

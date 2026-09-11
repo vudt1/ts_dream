@@ -16,21 +16,26 @@ fn main() {
     let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
     let src = manifest.join("Data");
     println!("cargo:rerun-if-changed=Data");
-    if !src.is_dir() {
-        // The bundle is committed at the repo root; if it is missing (e.g. a
-        // source-only checkout) the build still succeeds and the runtime
-        // reports a missing data dir at boot.
-        println!("cargo:warning=Data/ not present at build time; binary ships without the static data bundle");
-        return;
-    }
-
     // OUT_DIR = <target>/<profile>/build/<pkg>-<hash>/out  ->  +3 parents.
     let out = PathBuf::from(std::env::var("OUT_DIR").unwrap());
     let Some(profile_dir) = out.parent().and_then(Path::parent).and_then(Path::parent) else {
-        println!("cargo:warning=could not derive the profile output dir from OUT_DIR; skipping Data packaging");
+        println!("cargo:warning=could not derive the profile output dir from OUT_DIR; skipping Data/DB packaging");
         return;
     };
-    copy_dir(&src, &profile_dir.join("Data"));
+
+    if src.is_dir() {
+        copy_dir(&src, &profile_dir.join("Data"));
+    } else {
+        println!("cargo:warning=Data/ not present at build time; binary ships without the static data bundle");
+    }
+
+    let db_src = manifest.join("DB");
+    println!("cargo:rerun-if-changed=DB");
+    if db_src.is_dir() {
+        copy_dir(&db_src, &profile_dir.join("DB"));
+    } else {
+        let _ = fs::create_dir_all(profile_dir.join("DB"));
+    }
 }
 
 fn copy_dir(src: &Path, dst: &Path) {

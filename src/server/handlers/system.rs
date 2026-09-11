@@ -90,7 +90,7 @@ pub async fn handle_gm_shop(ctx: &mut OpcodeCtx<'_>) {
     {
         out.send(sys_msg_frame("Ban khong co quyen GM."));
         if let Some(pool) = ctx.env.pool {
-            let repo = crate::db::modern::mysql::accounts::MySqlAccountRepository { pool };
+            let repo = crate::db::modern::sqlite::accounts::SqliteAccountRepository { pool };
             let _ = repo
                 .write_gm_audit(
                     i64::from(conn.session.id),

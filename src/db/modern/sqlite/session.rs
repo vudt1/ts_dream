@@ -5,14 +5,15 @@
 //! key is carried by `Session.db_character_id`.
 
 use crate::db::modern::model::PetStorageType;
+use crate::db::pool::DbPool;
 use crate::server::session::{InventoryItem, PetState, Session};
-use sqlx::{MySqlPool, Row};
+use sqlx::Row;
 
-pub struct MySqlSessionRepository<'a> {
-    pub pool: &'a MySqlPool,
+pub struct SqliteSessionRepository<'a> {
+    pub pool: &'a DbPool,
 }
 
-impl MySqlSessionRepository<'_> {
+impl SqliteSessionRepository<'_> {
     /// Load the character selected by its account id and hydrate the complete
     /// wire-visible session from 0001 tables. `account_id` is the shared PK (`character_id`).
     pub async fn load(&self, account_id: i64, session: &mut Session) -> Result<bool, sqlx::Error> {
@@ -28,7 +29,7 @@ impl MySqlSessionRepository<'_> {
              LIMIT 1",
         )
         .bind(account_id)
-        .fetch_optional(self.pool)
+        .fetch_optional(&self.pool.read)
         .await?
         else {
             return Ok(false);
@@ -72,7 +73,7 @@ impl MySqlSessionRepository<'_> {
             "SELECT skill_id, level FROM character_skills WHERE character_id = ? ORDER BY skill_id",
         )
         .bind(session.db_character_id)
-        .fetch_all(self.pool)
+        .fetch_all(&self.pool.read)
         .await?
         .into_iter()
         .map(|r| (clamp_u16(r.get("skill_id")), clamp_u8(r.get("level"))))
@@ -81,7 +82,7 @@ impl MySqlSessionRepository<'_> {
         for row in
             sqlx::query("SELECT slot, skill_id FROM character_hotkeys WHERE character_id = ?")
                 .bind(session.db_character_id)
-                .fetch_all(self.pool)
+                .fetch_all(&self.pool.read)
                 .await?
         {
             let slot = row.get::<i64, _>("slot");
@@ -103,7 +104,7 @@ impl MySqlSessionRepository<'_> {
         )
         .bind(character_id)
         .bind(storage_type)
-        .fetch_all(self.pool)
+        .fetch_all(&self.pool.read)
         .await?;
         Ok(rows
             .into_iter()
@@ -123,10 +124,10 @@ impl MySqlSessionRepository<'_> {
                     int_attr, atk, def, hpx, spx, agi, fai,
                     thd, texp, skill_point, quest, skill1_id, skill1_level, skill2_id, skill2_level,
                     skill3_id, skill3_level, skill4_id, skill4_level
-             FROM character_pets WHERE character_id = ? AND pet_id > 0 ORDER BY storage_type, slot",
+              FROM character_pets WHERE character_id = ? AND pet_id > 0 ORDER BY storage_type, slot",
         )
         .bind(character_id)
-        .fetch_all(self.pool)
+        .fetch_all(&self.pool.read)
         .await?;
         Ok(rows
             .into_iter()
@@ -189,7 +190,7 @@ impl MySqlSessionRepository<'_> {
         if character_id <= 0 {
             return Ok(());
         }
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pool.write.begin().await?;
         sqlx::query(
             "UPDATE characters SET level=?, job=?, sex=?, hair=?, element=?, reborn=?, hp=?, hp_max=?, sp=?, sp_max=?,
              stat_point=?, skill_point=?, int_attr=?, atk=?, def=?, hpx=?, spx=?, agi=?, map_id=?, map_x=?, map_y=?,
@@ -202,7 +203,7 @@ impl MySqlSessionRepository<'_> {
         .bind(i64::from(session.spx)).bind(i64::from(session.agi)).bind(i64::from(session.map_id)).bind(i64::from(session.map_x))
         .bind(i64::from(session.map_y)).bind(i64::from(session.newbie))
         .bind(character_id).execute(&mut *tx).await?;
-        sqlx::query("INSERT INTO character_money (character_id, gold, bank_gold, shop_point) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE gold=VALUES(gold), bank_gold=VALUES(bank_gold), shop_point=VALUES(shop_point)")
+        sqlx::query("INSERT INTO character_money (character_id, gold, bank_gold, shop_point) VALUES (?, ?, ?, ?) ON CONFLICT(character_id) DO UPDATE SET gold=excluded.gold, bank_gold=excluded.bank_gold, shop_point=excluded.shop_point")
             .bind(character_id).bind(i64::from(session.gold)).bind(i64::from(session.bank_gold)).bind(i64::from(session.shop_point)).execute(&mut *tx).await?;
 
         sqlx::query("DELETE FROM inventories WHERE character_id = ?")
@@ -267,7 +268,7 @@ impl MySqlSessionRepository<'_> {
         seed: &crate::db::modern::traits::CharacterSeed,
         session: &mut Session,
     ) -> Result<(), sqlx::Error> {
-        let repos = crate::db::modern::mysql::MySqlRepositories::new(self.pool.clone());
+        let repos = crate::db::modern::sqlite::SqliteRepositories::new((*self.pool).clone());
         let id = repos.characters().create(account_id, name, seed).await?;
         session.db_character_id = id;
         self.save(session).await

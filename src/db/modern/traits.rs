@@ -106,7 +106,7 @@ pub trait InventoryRepository {
         executor: E,
     ) -> RepoResult<()>
     where
-        E: sqlx::Executor<'e, Database = sqlx::MySql>;
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>;
 
     /// Resets a slot back to vacancy (`item_id = 0` row retained).
     async fn clear_slot<'e, E>(
@@ -117,9 +117,9 @@ pub trait InventoryRepository {
         executor: E,
     ) -> RepoResult<()>
     where
-        E: sqlx::Executor<'e, Database = sqlx::MySql>;
+        E: sqlx::Executor<'e, Database = sqlx::Sqlite>;
 
-    /// Loads one slot, if occupied.
+    /// Reads one slot; `None` when the row does not exist or has `item_id == 0`.
     async fn load_slot(
         &self,
         character_id: i64,
@@ -151,7 +151,7 @@ pub trait PetRepository {
     ) -> RepoResult<()>;
 }
 
-/// Mission bookkeeping: progress rows, permanent bit flags, completed events.
+/// Mission and event progress tracking.
 pub trait QuestRepository {
     async fn upsert_mission(&self, character_id: i64, mission: &MissionRow) -> RepoResult<()>;
 
@@ -176,6 +176,6 @@ pub trait QuestRepository {
         &self,
         character_id: i64,
         skills: &[SkillRow],
-        tx: &mut sqlx::MySqlConnection,
+        tx: &mut sqlx::SqliteConnection,
     ) -> RepoResult<()>;
 }

@@ -1,7 +1,8 @@
 //! `accounts` repository — byte-exact credential checks (0001 table reused).
 
 use crate::db::modern::traits::{AccountRepository, RepoResult};
-use sqlx::MySqlPool;
+use crate::db::pool::DbPool;
+use sqlx::SqlitePool;
 
 /// Account metadata required by the live PC login and GM authorization paths.
 #[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
@@ -13,17 +14,17 @@ pub struct AccountAccess {
     pub gm_level: i32,
 }
 
-pub struct MySqlAccountRepository<'a> {
-    pub pool: &'a MySqlPool,
+pub struct SqliteAccountRepository<'a> {
+    pub pool: &'a DbPool,
 }
 
-impl MySqlAccountRepository<'_> {
+impl SqliteAccountRepository<'_> {
     pub async fn verify_pass1(&self, account_id: i64, pass: &[u8]) -> RepoResult<bool> {
-        verify(self.pool, account_id, "pass1", pass).await
+        verify(&self.pool.read, account_id, "pass1", pass).await
     }
 
     pub async fn verify_pass2(&self, account_id: i64, pass: &[u8]) -> RepoResult<bool> {
-        verify(self.pool, account_id, "pass2", pass).await
+        verify(&self.pool.read, account_id, "pass2", pass).await
     }
 
     /// Load role/suspension state after the numeric PC account id is known.
@@ -31,12 +32,12 @@ impl MySqlAccountRepository<'_> {
     /// shared PK `accounts.player_id = characters.character_id`).
     pub async fn access(&self, account_id: i64) -> RepoResult<Option<AccountAccess>> {
         sqlx::query_as::<_, AccountAccess>(
-            "SELECT player_id AS account_id, CAST(player_id AS CHAR) AS account_name,
+            "SELECT player_id AS account_id, CAST(player_id AS TEXT) AS account_name,
                     is_suspended, suspended_until, gm_level
              FROM accounts WHERE player_id = ?",
         )
         .bind(account_id)
-        .fetch_optional(self.pool)
+        .fetch_optional(&self.pool.read)
         .await
     }
 
@@ -54,7 +55,7 @@ impl MySqlAccountRepository<'_> {
             .bind(now_ms)
             .bind(now_ms)
             .bind(account_id)
-            .execute(self.pool)
+            .execute(&self.pool.write)
             .await
             .map(|_| ())
     }
@@ -78,7 +79,7 @@ impl MySqlAccountRepository<'_> {
         {
             return Ok(false);
         }
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pool.write.begin().await?;
         let result = sqlx::query(
             "UPDATE accounts SET gm_level = ?, updated_at = ?
              WHERE player_id = ? AND gm_level <= ?",
@@ -129,13 +130,13 @@ impl MySqlAccountRepository<'_> {
         .bind(action)
         .bind(details)
         .bind(chrono::Utc::now().timestamp_millis())
-        .execute(self.pool)
+        .execute(&self.pool.write)
         .await
         .map(|_| ())
     }
 }
 
-impl AccountRepository for MySqlAccountRepository<'_> {
+impl AccountRepository for SqliteAccountRepository<'_> {
     async fn verify_pass1(&self, account_id: i64, pass: &[u8]) -> RepoResult<bool> {
         self.verify_pass1(account_id, pass).await
     }
@@ -145,9 +146,9 @@ impl AccountRepository for MySqlAccountRepository<'_> {
     }
 }
 
-/// HEX comparison keeps the latin1-stored bytes and the wire bytes identical;
+/// HEX comparison keeps the stored bytes and the wire bytes identical;
 /// the column name is a compile-time constant, never user input.
-async fn verify(pool: &MySqlPool, account_id: i64, column: &str, pass: &[u8]) -> RepoResult<bool> {
+async fn verify(pool: &SqlitePool, account_id: i64, column: &str, pass: &[u8]) -> RepoResult<bool> {
     let sql = format!(
         "SELECT COUNT(*) FROM accounts \
          WHERE player_id = ? AND HEX({column}) = HEX(?)"

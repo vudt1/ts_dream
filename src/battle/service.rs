@@ -56,10 +56,10 @@ struct BattleSinkImpl {
     /// Player ids currently in a battle (receive `broadcast`/`Out::Broadcast`).
     members: Arc<Mutex<HashSet<i64>>>,
     data: Arc<GameData>,
-    /// Optional MySQL pool used for post-battle persistence (quest/homdo).
+    /// Optional DB pool used for post-battle persistence (quest/homdo).
     /// Shared (same Arc) with the owning [`BattleService`] so `with_pool` can
     /// set it after construction, before any battle starts.
-    pool: Arc<tokio::sync::RwLock<Option<sqlx::MySqlPool>>>,
+    pool: Arc<tokio::sync::RwLock<Option<crate::db::pool::DbPool>>>,
 }
 
 impl BattleSink for BattleSinkImpl {
@@ -363,9 +363,9 @@ pub struct BattleService {
     pub data: Arc<GameData>,
     sink: Arc<BattleSinkImpl>,
     online: Arc<tokio::sync::RwLock<OnlineMap>>,
-    /// Optional MySQL pool used for post-battle persistence (quest/homdo);
+    /// Optional DB pool used for post-battle persistence (quest/homdo);
     /// shared with the sink via `Arc` so `with_pool` is visible to battles.
-    pool: Option<Arc<tokio::sync::RwLock<Option<sqlx::MySqlPool>>>>,
+    pool: Option<Arc<tokio::sync::RwLock<Option<crate::db::pool::DbPool>>>>,
     /// The shared map-NPC world (ticket 20 G1/G2), built from `npcs_on_map`.
     world: Option<Arc<std::sync::RwLock<NpcWorld>>>,
     /// Synchronous handle registry for sync handler access (op 0x32, join).
@@ -419,8 +419,8 @@ impl BattleService {
         }
     }
 
-    /// Attach the MySQL pool used for post-battle persistence.
-    pub fn with_pool(self, pool: sqlx::MySqlPool) -> Self {
+    /// Attach the DB pool used for post-battle persistence.
+    pub fn with_pool(self, pool: crate::db::pool::DbPool) -> Self {
         if let Some(p) = &self.pool {
             if let Ok(mut guard) = p.try_write() {
                 *guard = Some(pool);
@@ -431,7 +431,7 @@ impl BattleService {
 
     /// The configured post-battle persistence pool (best-effort setter used by
     /// tests); `None` when no DB is attached.
-    pub fn pool(&self) -> Option<sqlx::MySqlPool> {
+    pub fn pool(&self) -> Option<crate::db::pool::DbPool> {
         self.pool
             .as_ref()
             .and_then(|p| p.try_read().ok())

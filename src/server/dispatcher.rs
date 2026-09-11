@@ -16,16 +16,16 @@ use crate::server::handlers::{
     battle, character, chat, expressions, inventory, login, movement, npc_event, party,
     pet_actions, skills, stats, system, talk, trade_storage, unimplemented,
 };
+use crate::db::pool::DbPool;
 use crate::server::session::Conn;
 use crate::web::server_control::{ClientSender, ServerControl};
-use sqlx::MySqlPool;
 
 /// Live-server environment threaded into the dispatcher: the DB pool and the
 /// shared client registry (double-login guard + broadcast). Absent (`none`)
 /// in golden replay, where handlers run purely in-memory over a seeded session.
 pub struct ServerEnv<'a> {
-    pub pool: Option<&'a MySqlPool>,
-    pub repos: Option<&'a crate::db::modern::mysql::MySqlRepositories>,
+    pub pool: Option<&'a DbPool>,
+    pub repos: Option<&'a crate::db::modern::sqlite::SqliteRepositories>,
     pub hub: Option<&'a ServerControl>,
     pub sender: Option<&'a ClientSender>,
 }

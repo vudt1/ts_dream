@@ -2,10 +2,11 @@
 
 use crate::db::modern::model::{PetRecord, PetSkill, PetStorageType};
 use crate::db::modern::traits::{PetRepository, RepoResult};
-use sqlx::{MySqlPool, Row};
+use crate::db::pool::DbPool;
+use sqlx::Row;
 
-pub struct MySqlPetRepository<'a> {
-    pub pool: &'a MySqlPool,
+pub struct SqlitePetRepository<'a> {
+    pub pool: &'a DbPool,
 }
 
 const SELECT_COLUMNS: &str = "slot, pet_id, name, level, element, reborn, hp, hp_max, sp, \
@@ -13,7 +14,7 @@ const SELECT_COLUMNS: &str = "slot, pet_id, name, level, element, reborn, hp, hp
      skill1_id, skill1_level, skill2_id, skill2_level, skill3_id, skill3_level, \
      skill4_id, skill4_level, quest";
 
-impl PetRepository for MySqlPetRepository<'_> {
+impl PetRepository for SqlitePetRepository<'_> {
     async fn load_storage(
         &self,
         character_id: i64,
@@ -26,7 +27,7 @@ impl PetRepository for MySqlPetRepository<'_> {
         let rows = sqlx::query(&sql)
             .bind(character_id)
             .bind(storage_type.value())
-            .fetch_all(self.pool)
+            .fetch_all(&self.pool.read)
             .await?;
         Ok(rows.iter().filter_map(row_to_pet).collect())
     }
@@ -46,17 +47,18 @@ impl PetRepository for MySqlPetRepository<'_> {
               skill4_id, skill4_level, quest) \
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \
                      ?, ?, ?, ?, ?, ?, ?, ?) \
-             ON DUPLICATE KEY UPDATE pet_id = VALUES(pet_id), name = VALUES(name), \
-             level = VALUES(level), element = VALUES(element), reborn = VALUES(reborn), \
-             hp = VALUES(hp), hp_max = VALUES(hp_max), sp = VALUES(sp), sp_max = VALUES(sp_max), \
-             int_attr = VALUES(int_attr), atk = VALUES(atk), def = VALUES(def), \
-             hpx = VALUES(hpx), spx = VALUES(spx), agi = VALUES(agi), fai = VALUES(fai), \
-             texp = VALUES(texp), skill_point = VALUES(skill_point), thd = VALUES(thd), \
-             skill1_id = VALUES(skill1_id), skill1_level = VALUES(skill1_level), \
-             skill2_id = VALUES(skill2_id), skill2_level = VALUES(skill2_level), \
-             skill3_id = VALUES(skill3_id), skill3_level = VALUES(skill3_level), \
-             skill4_id = VALUES(skill4_id), skill4_level = VALUES(skill4_level), \
-             quest = VALUES(quest)",
+             ON CONFLICT(character_id, storage_type, slot) DO UPDATE SET pet_id = excluded.pet_id, \
+             name = excluded.name, level = excluded.level, element = excluded.element, \
+             reborn = excluded.reborn, hp = excluded.hp, hp_max = excluded.hp_max, \
+             sp = excluded.sp, sp_max = excluded.sp_max, int_attr = excluded.int_attr, \
+             atk = excluded.atk, def = excluded.def, hpx = excluded.hpx, spx = excluded.spx, \
+             agi = excluded.agi, fai = excluded.fai, texp = excluded.texp, \
+             skill_point = excluded.skill_point, thd = excluded.thd, \
+             skill1_id = excluded.skill1_id, skill1_level = excluded.skill1_level, \
+             skill2_id = excluded.skill2_id, skill2_level = excluded.skill2_level, \
+             skill3_id = excluded.skill3_id, skill3_level = excluded.skill3_level, \
+             skill4_id = excluded.skill4_id, skill4_level = excluded.skill4_level, \
+             quest = excluded.quest",
         )
         .bind(character_id)
         .bind(storage_type.value())
@@ -89,7 +91,7 @@ impl PetRepository for MySqlPetRepository<'_> {
         .bind(s4.id)
         .bind(s4.level)
         .bind(pet.quest)
-        .execute(self.pool)
+        .execute(&self.pool.write)
         .await?;
         Ok(())
     }
@@ -106,13 +108,13 @@ impl PetRepository for MySqlPetRepository<'_> {
         .bind(character_id)
         .bind(storage_type.value())
         .bind(slot)
-        .execute(self.pool)
+        .execute(&self.pool.write)
         .await?;
         Ok(())
     }
 }
 
-fn row_to_pet(r: &sqlx::mysql::MySqlRow) -> Option<PetRecord> {
+fn row_to_pet(r: &sqlx::sqlite::SqliteRow) -> Option<PetRecord> {
     let skill = |id_col: &str, lv_col: &str| -> Option<PetSkill> {
         Some(PetSkill {
             id: r.try_get(id_col).ok()?,
