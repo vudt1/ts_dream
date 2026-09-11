@@ -5,7 +5,7 @@
 //! and standard `F4 44` framing with `0xAD` XOR wire encryption.
 
 use crate::encoding::viscii_encode;
-use crate::protocol::{MAGIC, XOR_KEY};
+use crate::protocol::{HEADER_TS_MAGIC, XOR_KEY};
 
 /// Fluent binary packet buffer builder.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -178,7 +178,7 @@ impl PacketWriter {
     pub fn build_frame(&self) -> Vec<u8> {
         let body_len = self.buf.len() as u16;
         let mut out = Vec::with_capacity(4 + self.buf.len());
-        out.extend_from_slice(&MAGIC);
+        out.extend_from_slice(&HEADER_TS_MAGIC);
         out.extend_from_slice(&body_len.to_le_bytes());
         out.extend_from_slice(&self.buf);
         out

@@ -98,5 +98,5 @@ pub fn encode_to_wire(frame_hex: &str) -> Result<Vec<u8>> {
 
 /// Validate a decoded frame carries the `F4 44` magic.
 pub fn check_magic(decoded: &[u8]) -> bool {
-    decoded.len() >= 2 && decoded[0] == 0xF4 && decoded[1] == 0x44
+    decoded.len() >= 2 && decoded[..2] == crate::protocol::HEADER_TS_MAGIC
 }

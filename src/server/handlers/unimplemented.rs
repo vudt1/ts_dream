@@ -7,7 +7,7 @@
 //! disappearing in an unobservable wildcard branch while deeper porting work
 //! continues.
 
-use crate::protocol::is_documented_client_opcode;
+use crate::protocol::{is_main_opcode, opcode_name};
 use crate::server::dispatcher::OpcodeCtx;
 
 /// Handle a documented opcode whose full business semantics are not yet safe
@@ -15,7 +15,7 @@ use crate::server::dispatcher::OpcodeCtx;
 /// intentional for unsupported subcodes; the client can retry or disconnect,
 /// while the bounded trace gives operators a reproducible audit trail.
 pub fn handle(ctx: &mut OpcodeCtx<'_>) {
-    if !is_documented_client_opcode(ctx.opcode) {
+    if !is_main_opcode(ctx.opcode) {
         tracing::warn!(
             opcode = ctx.opcode,
             sub = ctx.sub,
@@ -27,6 +27,7 @@ pub fn handle(ctx: &mut OpcodeCtx<'_>) {
 
     tracing::debug!(
         opcode = ctx.opcode,
+        op_name = opcode_name(ctx.opcode),
         sub = ctx.sub,
         payload_len = ctx.payload.len(),
         "documented opcode reached compatibility boundary"

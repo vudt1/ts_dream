@@ -86,7 +86,7 @@ ts_dream/
     │   ├── item_code.rs        # Nhận mã quà (item_code), degrade khi không có DB
     │   └── modern/             # Schema 3NF: models + repository traits + MySQL impls + transactions nguyên tử (trade/shop/bank)
     ├── protocol/               # Bộ mã hóa/giải mã XOR 0xAD, PacketReader, PacketWriter, Codecs
-    │   ├── mod.rs              # Hằng số giao thức (MAGIC, XOR_KEY, MIN_VERSION, MAX_LEVEL)
+    │   ├── mod.rs              # Hằng số giao thức (HEADER_TS_MAGIC, XOR_KEY, MIN_VERSION, MAX_LEVEL)
     │   ├── frame.rs            # Phân tách khung tin (Frame F4 44)
     │   ├── codec.rs            # Codec XOR 0xAD & opcode/subcode
     │   ├── reader.rs           # PacketReader Zero-copy Little-Endian & VISCII string
