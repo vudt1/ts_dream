@@ -3,6 +3,7 @@
 
 # SQLite database files
 *.db
+!DB/ts_dream.db
 *.db-shm
 *.db-wal
 *.sqlite
