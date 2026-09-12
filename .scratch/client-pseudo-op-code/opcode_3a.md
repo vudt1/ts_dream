@@ -16,7 +16,7 @@ Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (`ts_decompile/`). 
 - Client: ghi 3 byte vào **3 ô hiển thị** (`f78[1..3]`), tính **tổng** giữ tại `f60` (bắt buộc ≤255, ngược lại ERangeError), dựng flag `f5` = RP[5], cất **token DWORD** `f18` = RP[6..9], rồi **chuyển state machine sang 5** (`f61:=5`) để chạy nốt hoạt ảnh.
 - Ở state 6, client **vẽ banner = IntToStr(tổng f60) + nhãn, phân dải theo tổng**: `[3..10]` nối thêm chuỗi tại `DAT_00548930`, `[11..18]` nối `DAT_00548940` (`0054886c_FUN_0054886c.c:40–48`) — hai dải `[3..10]`/`[11..18]` **chính là Xỉu/Tài của tổng 3 xúc xắc** (suy luận confidence khá, khớp tên unit `BiDaXiao`; chuỗi nhãn chưa dump — §7).
 - Ở state 7 (sau chờ 1000 ms + play sound theo `f5`), client **tự-inject OP 0x1A cục bộ** với payload `[tiền-tố?][token f18:4B LE]` (`00548080.c:151–166`) — OP 0x1A đã kiểm chứng ở `opcode_1a.md` là kênh **"đồng bộ bộ đếm/tài khoản số + banner thưởng"** → `f18` nhiều khả năng là **số tiền/điểm cộng-trừ** mà server muốn áp sau phiên cược.
-- **C→S CÓ THẬT**: nhà của gói này cũng chính là state machine — tại state 4 client gửi **`[0x3A][0x01][f4:1B][f0c:4B LE]`** (kiểu bảng + **số người dùng nhập**, xem §6). Tức 0x3A là cặp **request ↔ response** một-vs-một SubOp.
+- **C→S CÓ THẬT**: nhà của gói này cũng chính là state machine — tại state 4 client gửi **`[0x3A][f4:1B][f0c:4B LE]`** (6 byte; byte 2 = byte biến thể bảng `obj+4`, KHÔNG phải hằng SubOp — xem §6). Tức 0x3A là cặp **request ↔ response** một-vs-một SubOp (chỉ chiều S→C dùng SubOp `0x01`).
 
 **Nghiêm trọng cho mock:** handler **không kiểm tra nil** `gvar_007DA42C`; nếu scene #1 chưa được tạo/đã bị free (`FUN_00553410` mode 1), `FUN_00547c84` ghi `*(byte*)(0+0x60)` → **Access Violation** (`00547c84.c:53`).
 
@@ -140,17 +140,20 @@ Lưu ý idiom `FUN_0077ef7c(*(undefined4*)gvar_007D9D30, s)`: param_1 là **rác
 
 ## 6. Chiều C→S — CÓ, khôi phục được body thật
 
-**Sender duy nhất trong SSOT:** `FUN_00547fbc` (`00547fbc.c:19–23`): `FUN_0077f414(gvar_007D9D30-rác, CONCAT31(…, 0x3a))`, gọi từ state 4 (`00548080.c:103`) **một lần/phiên** (gate `f63`).
+**Sender duy nhất trong SSOT:** `FUN_00547fbc` (asm `00547fbc.asm.txt`: `MOV CL,0x1; MOV DL,0x3a; CALL 0x0077f414` — **CL=1 bị builder case 0x3A bỏ quên**, chỉ DL=op được dùng; C của Ghidra `CONCAT31(…, 0x3a)` là artifact), gọi từ state 4 (`00548080.c:103`) **một lần/phiên** (gate `f63`).
 
 `0077f414_FUN_0077f414.c:1022–1031` (`case 0x3a:`) — asm chuẩn tại `0077f414_FUN_0077f414.asm.txt:3617–3648`:
 ```asm
-; s1 := #$01 + op byte  → buf := copy(s1)            [buf = "#$3A"]
-; s2[0] := 1 ; s2[1] := [obj+4]                      ; ← MOV DL,[EDX+0x4]
-; @PStrNCat(buf, s2, 2)  — copy 2 byte RAW từ đầu s2 → append [0x01][f4]
+; sA[0]:=1 ; sA[1]:=DL(=op 0x3A) ; t := @PStrCopy(sA)          ; t = #1'3A'
+; s2[0] := 1 ; s2[1] := [obj+4]  = f4                          ; ← MOV DL,[EDX+0x4]
+; @PStrNCat(t, s2, 2)  — nối TỐI ĐA 2 ký tự TỪ DATA của s2; s2 dài 1 ⇒ chỉ nối f4
+;                        ⇒ t = #2'3A f4'      (idiom hiệu chuẩn ở opcode_37.md §6.3,
+;                          khớp login "Khối 1 [0x01][lenPw]" — opcode_00_01.md §5,
+;                          opcode_37.md: `PStrNCat` thêm đúng 1 ký tự, KHÔNG copy length byte)
 ; CALL 0x0077ee84 : append DWORD LE [obj+0xc]
 ; CY_AddSedQueue(gvar_007DA664 = TFConnect)
 ```
-⇒ **Body C→S = `[0x3A][0x01 SubOp][f4:1B][f0c:4B LE]` (8 byte)** — đúng khuôn "byte chèn luôn = length-byte của shortstring tạm = 0x01 = SubOp" thấy ở mọi case dùng idiom này (đối chiếu `opcode_00_01.md` §5 case 1: `[0x01][0x01][lenPw][charID:4LE]…`). RTL `@PStrNCat` @ `0x402b60` **không export** (HOLE `0x00402B1C–0x00402B90` — check `index.csv`), ngữ nghĩa raw-copy suy từ nhất quán 40+ call-site + asm.
+⇒ **Body C→S = `[0x3A][f4:1B][f0c:4B LE]` (6 byte)** — byte 2 là **biến thể bảng f4** (1|2), không phải SubOp; `@LStrFromString` bỏ length byte của shortstring nên payload bắt đầu thẳng bằng `0x3A`. RTL `@PStrNCat` @ `0x402b60` **không export** (HOLE `0x00402B1C–0x00402B90` — check `index.csv`); ngữ nghĩa "nối min(count, src[0]) ký tự data" là **khuôn đã được 3 tài liệu trước hiệu chuẩn độc lập** (`opcode_37.md §6.3`, `opcode_03.md`, `opcode_06.md` — cùng builder `#1[op] + #1[arg] → [op][arg]` 2 byte; `login_flow_research.md §3.7`: khối 1 auth = `[0x01][lenPw]` đúng 2 byte).
 Gate đầu hàm: `if (*gvar_007DA3A0 = 0) → không gửi` (`0077f414.c:768`) = cờ đã kết nối. `f0c` = **số người dùng nhập (10..1000, ≤ f8)**; `f4` = byte biến thể bảng (1|2) — **nơi ghi f4 không có trong export** (HOLE).
 
 ---
@@ -180,7 +183,7 @@ Quyền ưu tiên giải mã khi redump: cp1258→NFC (tiền lệ `opcode_02.md
 2. **Chỉ gửi khi scene #1 đang sống** (object `gvar_007DA42C` ≠ nil — thường ngay sau khi client gửi request C→S bên dưới). Gửi lúc scene chưa mở ⇒ **AV crash client** (không có nil-check).
 3. **Độ dài ≥ 10 byte payload**; `c1+c2+c3 ≤ 255` (mock an toàn: mỗi byte ≤ 85). vi phạm ⇒ ERangeError giữa chừng.
 4. Muốn client **show kết quả + cộng tiền**: chọn `token` là delta numeric — client sẽ tự phát OP 0x1A nội bộ (prefix chưa dump; giá trị 4B LE = token). Server **không cần gửi thêm 0x1A** cho cùng sự kiện nếu đã muốn client tự inject.
-5. **Nhận C→S**: `[0x3A][0x01][f4][bet:4B LE]` (ví dụ `3A 01 01 F4 01 00 00` = kiểu bảng 1, cược 500) — chỉ xuất hiện 1 lần/phiên ở state 4; respond bằng đúng gói mục 1.
+5. **Nhận C→S**: `[0x3A][f4][bet:4B LE]` 6 byte (ví dụ `3A 02 F4 01 00 00` = kiểu bảng 2, cược 500; lưu ý `f4=1` sẽ trông giống SubOp nhưng là biến thể bảng) — chỉ xuất hiện 1 lần/phiên ở state 4; respond bằng đúng gói mục 1.
 6. Sau khi phiên đóng (state 0xb), client gửi **OP 0x39** — server nên chuẩn bị handle leave-scene.
 7. SubOp ≠ `0x01`: drop im lặng (không ack) — có thể dùng làm probe.
 

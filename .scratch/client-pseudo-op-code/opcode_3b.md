@@ -19,7 +19,7 @@ Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (`ts_decompile/`). 
 | khác | **silent drop** (không có `else`) | `case_052…c:28–36` |
 
 - **CẢ 3 helper nằm trong HOLE `0x00552269–0x005524A0`** (đã verify bằng `index.csv`: hàm liền trước `FUN_00552238` kết thúc tại `0x552238+49=0x552269`, hàm liền sau là `FUN_005524a0`) ⇒ **wire body sau SubOp KHÔNG khôi phục được từ SSOT** (§4).
-- **Chiều C→S KHÔI PHỤC ĐƯỢC 100% format** (hiếm, do hàm gửi `FUN_005524a0` nằm ngay mép HOLE và được export): gói gửi lên = **6 byte `3B [sub] [DWORD LE = obj+0x28]`** — gửi giá trị số điểm của manager mỗi lần "dirty" (§6).
+- **Chiều C→S KHÔI PHỤC ĐƯỢC 100% format** (hiếm, do hàm gửi `FUN_005524a0` nằm ngay mép HOLE và được export): gói gửi lên = **6 byte `3B 01 [DWORD LE = obj+0x28]`** — byte 2 là **hằng `0x01`** (asm sender: `MOV CL,0x1`), gửi giá trị điểm của manager mỗi lần "dirty" (§6).
 - Họ manager: `gvar_007DA0F4` là **thành viên tag-2** trong bảng dispatch của `TSportManage` (`FUN_00553410.c:24–52`: tag1→`gvar_007DA42C` = object OP 0x3A/`FUN_00547c84` theo `case_051…c:28`, tag2→`gvar_007DA0F4` (file này), tag3→`gvar_007DA778`, tag4→`gvar_007D9F98`, tag6→`gvar_007DA4EC`, 0xff→`gvar_007DA0A0`). **Xác nhận "cùng một họ UI manager" như giả định đầu bài** — OP 0x39/0x3A/0x3B là các opcode cập nhật từng panel theo mode (§5).
 - Bản chất panel mode-2 (suy ra từ các method cùng class đã export): **bảng số chạy / điểm** — field `+0x28` là số lớn, được phân khoảng `100..999 / 1000..3000 / 3001..5000 / 5001..9999 / ≥10000` để chọn sprite ID hiển thị, 3 dòng `TLight` đếm số với **jitter Random(±step)** ⇒ nhiều khả năng là bảng điểm/odds chạy trực tiếp (tên `TSportManage` gợi ý cá cược thể thao — **chưa chốt, UNKNOWN**).
 
@@ -114,22 +114,23 @@ Chuỗi suy luận (KHÔNG có tài liệu `.md` nào trước đây định dan
 `0077f414_FUN_0077f414.c:1032–1041` (switch `param_2 & 0xff` sau gate `*gvar_007DA3A0 ≠ 0`, `:767`):
 ```c
 case 0x3b:
-  FUN_00402b90(&b1, &tmp); _PStrNCat(&b1, &pre, 2);      // header 2 byte [DL][CL] = [0x3B][byte1 param_2]
+  FUN_00402b90(&b1, &tmp); _PStrNCat(&b1, &pre, 2);      // header 2 byte [DL][CL] = [0x3B][CL của sender]
   _LStrFromString(&pkt, &b1);                             //   (khuôn đã hiệu chuẩn opcode_37.md:331–334)
   FUN_0077ee84(param_1, *(uint*)(gvar_007DA0F4^ + 0x28), &d); // DWORD obj+0x28 → 4 byte LE (0077ee84.c:68–126; param_1 chỉ được lưu, không dùng — dead arg)
   _LStrCat(&pkt, d);
   TForm1_CY_AddSedQueue(gvar_007DA664, pkt);              // asm: 3683–3685 CALL 0x0051633c
 ```
-Gói gửi: **`[3B][sub][b0][b1][b2][b3]`** = 6 byte, trong đó 4 byte sau = little-endian DWORD `gvar_007DA0F4^+0x28`.
+Gói gửi: **`[3B][01][b0][b1][b2][b3]`** = 6 byte, trong đó byte 2 là **hằng `0x01`** và 4 byte sau = little-endian DWORD `gvar_007DA0F4^+0x28`.
 
-Sender duy nhất trong tree export: **`FUN_005524a0` (`005524a0.c:18–24`)** — method của chính class mode-2:
-```c
-void FUN_005524a0(int obj /*param_1*/, uint param_2) {
-  FUN_0077f414(gvar_007D9D30^ /*context builder*/, (param_2 & 0xFFFFFF00) | 0x3B); // byte1 param_2 = sub byte
-  *(byte*)(obj + 0xA0) = 0;   // clear dirty flag
-}
+Sender duy nhất trong tree export: **`FUN_005524a0`** — method của chính class mode-2. Ghidra C (`005524a0.c:20–24`) ghi `CONCAT31((int3)(param_2>>8), 0x3b)` — **đây là artifact của decompiler**; asm mới là quyết định (`005524a0_FUN_005524a0.asm.txt`):
+```asm
+MOV CL,0x1      ; sub byte = HẰNG 1, gán ngay trong sender
+MOV DL,0x3b     ; op
+CALL 0x0077f414
+MOV EAX,[EBP-0x4]        ; obj
+MOV byte ptr [EAX+0xa0],0x0   ; clear dirty flag
 ```
-⇒ ngữ nghĩa chắc chắn: *"gửi điểm hiện tại `+0x28` lên server rồi xóa cờ dirty `+0xA0`"*; byte `sub` của gói gửi lấy từ caller của `FUN_005524a0` tại `0x551558` — **HOLE `0x00551365–0x0055165C`** (kiểm index.csv) ⇒ giá trị sub phía C→S **không khẳng định được** (có thể khác tập {1,2,3} chiều S→C). Đối chứng họ: `FUN_00553818` (`00553818.c:20–26`) cùng khuôn nhưng gửi **0x39** + set flag `gvar_007DA5A0^+0xA096` (được tag1-manager `FUN_00548080.c:221` và `FUN_005467d0.c:23` gọi — cùng pattern per-mode report).
+⇒ ngữ nghĩa chắc chắn: *"gửi điểm hiện tại `+0x28` lên server với sub byte **cố định = 1**, rồi xóa cờ dirty `+0xA0`"*; caller của `FUN_005524a0` tại `0x551558` (HOLE `0x00551365–0x0055165C`) chỉ quyết định **khi nào** gửi (điều kiện dirty), không quyết định nội dung — byte sub C→S **đã chốt = 0x01**, tình cờ trùng tập {1,2,3} chiều S→C. Đối chứng họ: `FUN_00553818` (asm: `MOV CL,1; MOV DL,0x39`) cùng khuôn nhưng builder case 0x39 rỗng nên không frame nào được phát — và `FUN_00547fbc` của OP 0x3A (`MOV CL,1; MOV DL,0x3a`) thì builder 0x3A **bỏ quên CL**, dùng `[obj+4]` thay vào (xem `opcode_3a.md §6`).
 
 ---
 
@@ -145,7 +146,7 @@ void FUN_005524a0(int obj /*param_1*/, uint param_2) {
 ## 8. Ghi chú cho Mock Server
 
 **Chắc chắn làm được:**
-1. **Nhận C→S**: chấp nhận gói 6 byte `3B [sub] [DWORD LE]`; byte 2..5 = điểm hiện tại của panel mode-2 (`obj+0x28`). Gửi lặp lại khi client thấy dirty ⇒ server nên idempotent theo giá trị.
+1. **Nhận C→S**: chấp nhận gói 6 byte `3B 01 [DWORD LE]` (byte 2 luôn `01`); byte 3..6 = điểm hiện tại của panel mode-2 (`obj+0x28`). Gửi lặp lại khi client thấy dirty ⇒ server nên idempotent theo giá trị.
 2. **Gửi S→C**: phần TẤT YẾU đúng: `[0x3B][SubOp]` với `SubOp ∈ {1,2,3}`; SubOp khác ⇒ client bỏ qua vô hại; payload rỗng (`[0x3B]` đơn độc) ⇒ client raise `_BoundErr` nội bộ (SEH swallow — không crash nhưng mất gói).
 3. Muốn im lặng tuyệt đối với client: **không gửi 0x3B** hoặc gửi SubOp lạ — hành vi đã kiểm chứng ở dispatcher.
 4. OP này chỉ có nghĩa khi TSportManage đang ở mode 2 (`TSportManage+4 == 2`) — nếu chưa bật mode, manager có thể nil ⇒ helper HOLE có thể deref nil; **rủi ro không đo được vì body chưa export** — an toàn nhất là mock server KHÔNG emit 0x3B cho tới khi redump xong helper.
@@ -168,7 +169,7 @@ void FUN_005524a0(int obj /*param_1*/, uint param_2) {
 
 **UNKNOWN (cần redump):**
 - **Thân 3 helper** `0x0055226C / 0x005523D0 / 0x00552420` → **wire S→C sau SubOp** (HOLE `0x00552269–0x005524A0`).
-- Caller `0x551558` của `FUN_005524a0` (HOLE `0x00551365–0x0055165C`) → **giá trị sub byte thực tế khi client gửi 0x3B** + điều kiện dirty (`+0x28` đổi khi nào).
+- Caller `0x551558` của `FUN_005524a0` (HOLE `0x00551365–0x0055165C`) → **điều kiện dirty** khiến client gửi 0x3B (`+0x28` đổi khi nào) — byte sub C→S đã chốt `0x01` từ asm sender (§6), không còn là UNKNOWN.
 - **Điểm gán tạo instance `gvar_007DA0F4` và tên class** (không có trong 6302 asm export; constructor không export).
 - Nơi ghi byte mode `TSportManage+4` (HOLE `0x0055355D–0x00553840` hoặc ngoài tree).
 - Nội dung toast `DAT_00552180/DAT_005521A0` (vùng `0x55xxxx` chưa lit-dump) và tên debug opcode 0x3B (vùng `0x796Cxx`).
