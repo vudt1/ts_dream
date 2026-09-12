@@ -1,0 +1,130 @@
+# PHÂN TÍCH — Main OP 0x21 (33) / Case 29 / `FUN_007928E4` @ `0x007928E4`
+
+Ngày: 2026-09-12 · Workspace: `/mnt/d/VUDT/GIT_PCC/test` · Feature: `op-code` · Chiều: **Server → Client (S→C) một chiều**
+Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (`ts_decompile/` only). Handler nhỏ (111 dòng), không codec, 2 nhánh.
+
+---
+
+## 1. Tóm tắt nghiệp vụ
+
+- **Vai trò**: Server push 2 loại không liên quan chung một MainOp, cấu trúc **2 tầng** (không phải switch phẳng):
+  - Tầng 1: `T = RP[0] = P[1]` — chỉ `1` và `2` có nghĩa.
+  - Tầng 2 (chỉ khi `T==1`): `K = RP[1] = P[2]` — `switch(K)` `1..8` → 8 **Toast/banner tĩnh** 2000ms qua `TSe_TalkMsgFormPlus` (`gvar_007DA084`, VMT `+0x90`). Không đọc số, không ghi state, không sound/light.
+  - Nhánh `T==0x02`: **set 2 byte option** vào `TCY_OptionForm` (`gvar_007D9F74`, `+0x180/+0x181`) rồi gọi `func_0x00602f68(optionForm)` (apply/refresh — body chưa phục hồi).
+- Không DWORD/Word codec, không text trên dây, không chạm bản ghi player (`gvar_007DA7BC` không xuất hiện).
+- Chiều C→S `case 0x21: break;` rỗng → client không bao giờ gửi OP này.
+
+---
+
+## 2. Entry & cách đọc PacketBuffer (S→C)
+
+### 2.1. Đường tới handler
+
+```
+MainOp 0x21 (33) → byte_table[0x78A8EE][0x21] = 0x1D (29)
+                 → dword_table[0x78A9B6][29] = 0x007928E4
+                 → FUN_007928e4 (Case 29)
+```
+
+- File chính: `ts_decompile/case_functions/functions/case_029_007928E4_FUN_007928e4.c` (111 dòng)
+- Bản inline: `ts_decompile/functions/0078a89c_FUN_0078a89c.c:5204-5274` — khớp 1:1.
+- Manifest: `case_functions/manifest.csv:31` (`29, 0x0078AA2A, 0x007928E4`).
+- Framing/XOR/pump như `opcode_00_01.md` §2. File `.asm.txt` dispatcher chỉ còn prologue (71 dòng) nên mapping xác nhận bằng 2 file `.hex`/`.csv` + manifest + bản inline.
+
+### 2.2. Quy ước ký hiệu
+
+- `P[i]` = byte payload (`P[0]=0x21`), `RP[i]` = byte RestPayload (`RP[i]=P[i+1]`), con trỏ `*(EBP-0x0c)`, độ dài tại `*(ptr-4)`.
+
+### 2.3. Đọc tầng 1 (dòng 23-30)
+
+```c
+if (*(RP-4) == 0) _BoundErr(0);  // RP rỗng (L=1) → ném
+T = (uint)*(byte*)(RP + 0);      // T = RP[0] = P[1]
+if (T == 1) {...} else if (T == 2) {...}
+// T==0 hoặc >=3: no-op (chỉ epilogue _LStrArrayClr/_LStrClr cuối hàm)
+```
+
+Mọi phép đọc là dereference byte trực tiếp + guard `len`, không `_LStrCopy`/codec nào.
+
+---
+
+## 3. Bảng tổng hợp SubOp
+
+| T1 `T=P[1]` | T2 `K=P[2]` | Wire (payload) | Core logic |
+| :---: | :---: | :--- | :--- |
+| `0x01` | `0x01` | `[21][01][01]` (3B) | Banner `UNK_00798418` 2000ms |
+| `0x01` | `0x02` | `[21][01][02]` | Banner `UNK_00798448` |
+| `0x01` | `0x03` | `[21][01][03]` | Banner `UNK_00798478` |
+| `0x01` | `0x04` | `[21][01][04]` | Banner `UNK_007984C0` |
+| `0x01` | `0x05` | `[21][01][05]` | Banner `UNK_007984F0` |
+| `0x01` | `0x06` | `[21][01][06]` | Banner `UNK_00798530` |
+| `0x01` | `0x07` | `[21][01][07]` | Banner `UNK_00798570` |
+| `0x01` | `0x08` | `[21][01][08]` | Banner `UNK_00798594` |
+| `0x02` | — | `[21][02][A:1B][B:1B]` (4B) | `*(OptionForm+0x180)=A`, `+0x181=B`, gọi apply |
+| `0x00`,`≥0x03` | — | — | no-op |
+| `0x01` | `0x00`,`≥0x09` | `[21][01][K lạ]` | no-op (switch không default) |
+
+---
+
+## 4. Chi tiết từng nhánh (core logic, bỏ graphics/sound/animation — OP này vốn không có)
+
+### 4.1. Nhánh `T==0x01` — 8 Toast tĩnh
+
+- **Wire**: `P[0]=0x21, P[1]=0x01, P[2]=K (0x01..0x08)`.
+- **Đọc**: `T=RP[0]` (guard `len>=1`), `K=RP[1]` (guard `len(RP)>=2` nếu không `_BoundErr(1)`), `switch(K)`.
+- **Xử lý**: cả 8 case cùng khuôn `(VMT+0x90)(*gvar_007DA084, &UNK_007984xx, 2000, 0, 0)` (bản inline ghi 3-arg, bản case ghi 5-arg — cùng hàm, chênh do Ghidra mất varargs). Không đọc thêm byte, không ghi global, không gate, không `WA0014.wav`, không `TLight`. Thừa byte sau `P[2]` bị bỏ qua.
+
+### 4.2. Nhánh `T==0x02` — Set 2 byte option
+
+- **Wire**: `[21][02][A 1B][B 1B]` = 4 byte payload.
+- **Đọc**: byte trực tiếp, không codec: `A=RP[1]` (guard `len>=2`), `B=RP[2]` (guard `len>=3`).
+- **Xử lý**:
+  ```c
+  *(*(gvar_007D9F74) + 0x180) = A;
+  *(*(gvar_007D9F74) + 0x181) = B;
+  func_0x00602f68(*(gvar_007D9F74));
+  ```
+  `gvar_007D9F74 = TCY_OptionForm` (gán tại `0051189c:1588-1590` qua `VMT_5FA1CC`). Bằng chứng `+0x180` là cờ gate boolean: `00642c2c.c:100-104` (`if (*(OptionForm+0x180)==0){banner(...);return;}`). `func_0x00602f68` chưa có body (`index.csv` không entry) → phần apply ở mức unknown; tầng handler chỉ đảm bảo ghi 2 byte + gọi apply.
+
+---
+
+## 5. Chuỗi VISCII → UTF-8
+
+- Không có payload text trên dây — mọi text là chuỗi tĩnh: `UNK_00798418/44/78/C0/F0/30/70/94`.
+- `redump/` hiện không có dump cho cả 8 địa chỉ → **không decode được từ source cho phép**. Cần redump `.rodata` tại đó (Delphi `[len:4LE][chars][00]`).
+- Nhánh `T==0x02` không chạm chuỗi nào.
+
+---
+
+## 6. Chiều Client → Server
+
+- `ts_decompile/functions/0077f414_FUN_0077F414.c:962-963`: `case 0x21: break;` — rỗng hoàn toàn.
+- Kết luận: OP 0x21 S→C thuần. Không format C→S để mock (caveat suy hao decompile như `opcode_1a.md` §5, nhưng không có bằng chứng dương cho hướng gửi).
+
+---
+
+## 7. Ghi chú cho Mock Server
+
+```
+S→C [21][01][01..08]      ; 8 toast tĩnh 2000ms
+S→C [21][02][A u8][B u8]  ; set OptionForm+0x180=A,+0x181=B + apply
+C→S [21]: KHÔNG TỒN TẠI
+```
+
+1. Downlink-only. Frame `[F4 44][L:Word LE][payload]`, XOR `0xAD`.
+2. Không gửi `T` ngoài 01/02, `K` ngoài 01..08 (no-op). Không gửi `L=1` (`_BoundErr(0)`). Nhánh 01 cần `L>=3`, nhánh 02 cần `L>=4`.
+3. Muốn test yên lặng (không banner) → dùng `[21][02]`; test banner → `[21][01][K]`. Không sound/light đi kèm.
+4. Nội dung 8 banner chưa đọc được — test trên client thật chỉ kiểm tra banner có hiện hay không.
+
+---
+
+## 8. Source trail
+
+| # | Nguồn | Dùng để |
+| :-- | :-- | :-- |
+| 1 | `case_functions/functions/case_029_007928E4_FUN_007928e4.c` | Handler chính toàn bộ |
+| 2 | `functions/0078a89c_FUN_0078a89c.c:5204-5274` | Bản inline đối chiếu 1:1 |
+| 3 | `redump/jumptable_byte200_0x78A8EE.hex` + `jumptable_dword200_0x78A9B6.hex` + `manifest.csv:31` | Mapping |
+| 4 | `functions/0051189c_FUN_0051189c.c:1265-1266` + `:1588-1590` | Định danh `TSe_TalkMsgFormPlus` + `TCY_OptionForm` |
+| 5 | `functions/00642c2c_FUN_00642c2c.c:100-104` | Chứng minh `+0x180` là cờ option |
+| 6 | `functions/0077f414_FUN_0077F414.c:962-963` | C→S rỗng |

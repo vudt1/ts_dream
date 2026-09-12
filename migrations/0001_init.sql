@@ -1,281 +1,270 @@
 -- ============================================================================
--- accounts — created exclusively through the web dashboard (Chapter 5 §5.8).
--- Passwords kept plaintext (parity with the C# server).
+-- TS Dream — SQLite Database Schema (Migration 0001)
+-- Converted from 0001_init_mysql.sql with SQLite 3 standard conventions.
+-- Contains full domain column comments for future coding agents.
+-- ============================================================================
+
+-- ============================================================================
+-- accounts — Quản lý tài khoản đăng nhập người chơi.
+-- Tạo độc quyền qua Web Admin Dashboard. Mật khẩu lưu plaintext (chuẩn C# server).
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS accounts (
-    player_id    BIGINT AUTO_INCREMENT PRIMARY KEY,
-    pass1 VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_bin NOT NULL,
-    pass2 VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_bin NOT NULL,
-	is_suspended TINYINT(1) NOT NULL DEFAULT 0,
-	suspension_reason VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_bin NULL,
-	suspended_until BIGINT NULL,
-	last_login_at BIGINT NULL,
-	created_at BIGINT NOT NULL,
-	updated_at BIGINT NULL,
-	last_login_ip VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_bin NULL,
-	gm_level INT NOT NULL DEFAULT 0
-) ENGINE = InnoDB AUTO_INCREMENT = 300000 
-  DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
+    playerid         INTEGER PRIMARY KEY AUTOINCREMENT,                 -- Mã ID tài khoản định danh duy nhất (bắt đầu từ 300000)
+    pass1            TEXT NOT NULL,                                     -- Mật khẩu chính đăng nhập vào game (8..10 ký tự ASCII)
+    pass2            TEXT NOT NULL,                                     -- Mật khẩu cấp 2 dùng xác nhận đổi mật khẩu / xóa nhân vật (op 0x23)
+    issuspended      INTEGER NOT NULL DEFAULT 0,                        -- Cờ khóa tài khoản: 0 = Bình thường, 1 = Đang bị đình chỉ/khóa
+    suspensionreason TEXT NULL,                                         -- Lý do khóa tài khoản (nếu bị khóa)
+    suspendeduntil   INTEGER NULL,                                      -- Thời điểm hết hạn khóa tài khoản (timestamp unix; NULL nếu vô thời hạn)
+    lastlogin_at     INTEGER NULL,                                      -- Thời điểm đăng nhập gần nhất (timestamp unix)
+    createdat        INTEGER NOT NULL,                                  -- Thời điểm khởi tạo tài khoản (timestamp unix)
+    updatedat        INTEGER NULL,                                      -- Thời điểm cập nhật thông tin tài khoản gần nhất (timestamp unix)
+    lastloginip      TEXT NULL,                                         -- Địa chỉ IP của phiên đăng nhập gần nhất
+    gmlevel          INTEGER NOT NULL DEFAULT 0 CHECK (gmlevel >= 0)    -- Cấp bậc quyền quản trị viên: 0 = Người chơi thường, >= 1 = GM/Admin
+);
 
-ALTER TABLE accounts
-    ADD KEY accounts_suspended_idx (is_suspended, suspended_until),
-    ADD KEY accounts_gm_level_idx (gm_level);
-ALTER TABLE accounts
-    ADD CONSTRAINT accounts_gm_level_nonnegative CHECK (gm_level >= 0);
+CREATE INDEX IF NOT EXISTS accounts_suspended_idx ON accounts (issuspended, suspendeduntil);
+CREATE INDEX IF NOT EXISTS accounts_gm_level_idx ON accounts (gmlevel);
 
-
-CREATE TABLE IF NOT EXISTS gm_audit_log (
-    id            BIGINT AUTO_INCREMENT PRIMARY KEY,
-    actor_account_id BIGINT NULL,
-    actor_gm_level INT NOT NULL DEFAULT 0,
-    target_account_id BIGINT NULL,
-    action        VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_bin NOT NULL,
-    details       TEXT CHARACTER SET latin1 COLLATE latin1_bin NULL,
-    created_at    BIGINT NOT NULL,
-    KEY gm_audit_actor_idx (actor_account_id, created_at),
-    KEY gm_audit_target_idx (target_account_id, created_at),
-    KEY gm_audit_action_idx (action, created_at)
-) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
-
--- TS Dream — modern 3NF schema.
---
--- Normalized target relations for the runtime cutover from 0001:
--- STATUS: modern repository implementations exist, but the current live Rust
--- login/autosave path still targets selected 0001 tables. Do not remove 0001
--- until dual-read/dual-write or a verified data migration has completed.
---   accounts (0001) 1:1 characters 1:1 character_money
---     (the PC server supports exactly ONE character per account; the UNIQUE
---      key on characters.account_id enforces it at the schema level)
---   characters 1:N inventories (unifies the legacy pouches homdo / trangbi
---     into one table keyed by
---     (character_id, storage_type, slot) with the full 35-byte ThingData
---     attribute set)
---   characters 1:N character_pets across four pet storages
---     (1=Carried, 2=Cart, 3=Hotel, 4=Warehouse)
---   missions / bit flags / completed events / friends / mails round out the
---     persistence surface ticket 07's handlers will bind to.
---
--- Conventions kept from 0001:
---   - Every game-text column is CHARACTER SET latin1 COLLATE latin1_bin so
---     raw VISCII bytes (0x80-0xFF) round-trip without utf8mb4 transcoding.
---   - No FOREIGN KEY constraints and no NOT NULL beyond what a row needs to
---     be addressable (legacy Access parity; referential integrity is owned
---     by the repository layer).
-
+-- Khởi tạo giá trị tự tăng ban đầu để tài khoản đầu tiên tạo ra sẽ có playerid = 300000
+INSERT OR IGNORE INTO sqlite_sequence (name, seq) VALUES ('accounts', 299999);
 
 -- ============================================================================
--- characters — the single playable character of one account (1:1; the PC
--- server never supports multiple avatars per account).
+-- characters — Bảng chứa dữ liệu nhân vật người chơi (Quan hệ 1:1 với accounts).
+-- Mỗi tài khoản TS Online chỉ chứa duy nhất 1 nhân vật đại diện.
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS characters (
-    character_id  BIGINT NOT NULL PRIMARY KEY,
-    name        VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_bin NOT NULL,
-    level       BIGINT DEFAULT 1,
-    job         BIGINT DEFAULT 0,
-    sex         BIGINT DEFAULT 0,
-    hair        BIGINT DEFAULT 0,
-    element     BIGINT DEFAULT 0,
-    reborn      BIGINT DEFAULT 0,
-    hp          BIGINT DEFAULT 0,
-    hp_max      BIGINT DEFAULT 0,
-    sp          BIGINT DEFAULT 0,
-    sp_max      BIGINT DEFAULT 0,
-    stat_point  BIGINT DEFAULT 0,
-    skill_point BIGINT DEFAULT 0,
-    int_attr    BIGINT DEFAULT 0,
-    atk         BIGINT DEFAULT 0,
-    def         BIGINT DEFAULT 0,
-    hpx         BIGINT DEFAULT 0,
-    spx         BIGINT DEFAULT 0,
-    agi         BIGINT DEFAULT 0,
-    map_id      BIGINT DEFAULT 0,
-    map_x       BIGINT DEFAULT 0,
-    map_y       BIGINT DEFAULT 0,
-    newbie      BIGINT NOT NULL DEFAULT 0,
-    created_at  BIGINT DEFAULT 0,
-    KEY characters_name (name)
-) ENGINE=InnoDB AUTO_INCREMENT = 300000
-  DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
+    playerid    INTEGER NOT NULL PRIMARY KEY,   -- Mã ID định danh nhân vật (shared PK 1:1 với accounts.playerid)
+    name        BLOB NOT NULL UNIQUE,           -- Tên nhân vật (dữ liệu byte mã VISCII 1.1 nguyên bản, tối đa 16 bytes)
+    level       INTEGER DEFAULT 1,              -- Đẳng cấp nhân vật (1..200)
+    gender      INTEGER DEFAULT 0,              -- Giới tính nhân vật: 0 = Nữ, 1 = Nam
+    hair        INTEGER DEFAULT 0,              -- Kiểu và màu sắc tóc của nhân vật
+    element     INTEGER DEFAULT 0,              -- Hệ nguyên tố: 1=Địa, 2=Thủy, 3=Hỏa, 4=Phong, 5=Quang, 6=Ám, 7=Tâm
+    rebornstage INTEGER DEFAULT 0,              -- Giai đoạn chuyển sinh: 0=Chưa, 1=Chuyển sinh (CS), 2=Tái sinh (TS)
+    curhp       INTEGER DEFAULT 0,              -- Sinh lực (Máu / HP) hiện tại của nhân vật
+    maxhp       INTEGER DEFAULT 0,              -- Sinh lực (Máu / HP) tối đa của nhân vật
+    cursp       INTEGER DEFAULT 0,              -- Nội lực (Mana / SP) hiện tại của nhân vật
+    maxsp       INTEGER DEFAULT 0,              -- Nội lực (Mana / SP) tối đa của nhân vật
+    curexp      INTEGER DEFAULT 0,              -- Điểm kinh nghiệm tích lũy hiện tại trong cấp độ
+    nextexp     INTEGER DEFAULT 0,              -- Điểm kinh nghiệm cần đạt để thăng cấp độ tiếp theo
+    freepoints  INTEGER DEFAULT 0,              -- Điểm tiềm năng khả dụng chưa phân bổ (stat points)
+    skillpoint  INTEGER DEFAULT 0,              -- Điểm kỹ năng khả dụng chưa phân bổ (skill points)
+    baseatk     INTEGER DEFAULT 0,              -- Điểm tấn công vật lý cơ bản (ATK gốc)
+    baseint     INTEGER DEFAULT 0,              -- Điểm trí lực cơ bản (INT gốc)
+    basedef     INTEGER DEFAULT 0,              -- Điểm phòng thủ cơ bản (DEF gốc)
+    basehpx     INTEGER DEFAULT 0,              -- Điểm tiềm năng tăng máu gốc (HPX gốc)
+    basespx     INTEGER DEFAULT 0,              -- Điểm tiềm năng tăng mana gốc (SPX gốc)
+    baseagi     INTEGER DEFAULT 0,              -- Điểm nhanh nhẹn cơ bản (AGI gốc - quyết định thứ tự lượt đánh)
+    equipatk    INTEGER DEFAULT 0,              -- Điểm tấn công vật lý cộng thêm từ trang bị mang trên người
+    equipdef    INTEGER DEFAULT 0,              -- Điểm phòng ngự cộng thêm từ trang bị mang trên người
+    equipint    INTEGER DEFAULT 0,              -- Điểm trí lực cộng thêm từ trang bị mang trên người
+    equipagi    INTEGER DEFAULT 0,              -- Điểm nhanh nhẹn cộng thêm từ trang bị mang trên người
+    equiphpx    INTEGER DEFAULT 0,              -- Máu cộng thêm từ trang bị mang trên người
+    equipspx    INTEGER DEFAULT 0,              -- Mana cộng thêm từ trang bị mang trên người
+    fai         INTEGER DEFAULT 0,              -- Điểm trung thành / Tâm tính người chơi (0..100)
+    pk          INTEGER DEFAULT 0,              -- Điểm sát khí / Tội ác PK khi giết người chơi khác
+    mapid       INTEGER DEFAULT 0,              -- Mã bản đồ hiện tại nhân vật đang đứng (theo Warp.Dat / CityEx.Dat)
+    mapx        INTEGER DEFAULT 0,              -- Tọa độ trục X của nhân vật trên bản đồ hiện tại
+    mapy        INTEGER DEFAULT 0,              -- Tọa độ trục Y của nhân vật trên bản đồ hiện tại
+    jobtype     INTEGER DEFAULT 0               -- Nghề nghiệp: 0=Dân thường, 1=Hiệp sĩ, 2=Nho gia, 3=Hiền triết, 4=Bá vương
+);
 
 -- ============================================================================
--- character_money — currency ledger split out of the character row so gold
--- mutations (shop buy, bank transfer, trade) stay narrow and lockable.
+-- character_money — Sổ cái quản lý tiền tệ của nhân vật (Tách riêng khỏi characters
+-- để tối ưu lock khi giao dịch, mua bán shop, chuyển khoản ngân hàng).
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS character_money (
-    character_id BIGINT PRIMARY KEY,
-    gold         BIGINT DEFAULT 0,
-    bank_gold    BIGINT DEFAULT 0,
-    shop_point   BIGINT DEFAULT 0
-) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
+    playerid  INTEGER PRIMARY KEY,  -- Mã ID nhân vật người chơi (shared PK 1:1)
+    gold      INTEGER DEFAULT 0,    -- Lượng tiền vàng (Gold) mang theo trong hành trang người chơi
+    bankgold  INTEGER DEFAULT 0,    -- Lượng tiền vàng gửi trong Tiền trang / Ngân hàng
+    shoppoint INTEGER DEFAULT 0     -- Điểm tích lũy / nạp dùng giao dịch tại Kỳ Trân Các / Shop đặc biệt
+);
 
 -- ============================================================================
--- inventories — single item storage for every container type.
--- storage_type: 1=Bag, 2=Secondary bag, 4=Bank, 8=Equip, 16=Warehouse.
--- Item columns mirror the 20 fields of the 35-byte ThingData wire struct
--- exactly (see src/protocol/codecs/thing_data.rs), Little-Endian on the wire,
--- one column per field here.
+-- inventories — Quản lý toàn bộ vật phẩm trong tất cả các loại túi / rương chứa.
+-- storagetype: 1=Hành trang chính (Bag), 2=Tiền trang (Bank), 4=Túi phụ (Secondary),
+--              8=Trang bị trên người (Equip), 16=Hòm đồ lưu lãng (Warehouse).
+-- Các cột ánh xạ khớp 1:1 với struct ThingData 35-byte giao thức wire (Little-Endian).
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS inventories (
-    character_id    BIGINT NOT NULL,
-    storage_type    TINYINT UNSIGNED NOT NULL,
-    slot            SMALLINT UNSIGNED NOT NULL,
-    item_id         SMALLINT UNSIGNED DEFAULT 0,
-    quantity        INT DEFAULT 0,
-    damage          TINYINT UNSIGNED DEFAULT 0,
-    element         TINYINT UNSIGNED DEFAULT 0,
-    element_value   TINYINT UNSIGNED DEFAULT 0,
-    proof_kind      TINYINT UNSIGNED DEFAULT 0,
-    grow_level      TINYINT UNSIGNED DEFAULT 0,
-    grow_exp        INT DEFAULT 0,
-    special_kind    TINYINT UNSIGNED DEFAULT 0,
-    stone_attr      TINYINT UNSIGNED DEFAULT 0,
-    stone_level     TINYINT UNSIGNED DEFAULT 0,
-    enhance_level   TINYINT UNSIGNED DEFAULT 0,
-    delete_time     DOUBLE DEFAULT 0,
-    damaged_item_id SMALLINT UNSIGNED DEFAULT 0,
-    is_locked       TINYINT(1) DEFAULT 0,
-    reinforced      TINYINT UNSIGNED DEFAULT 0,
-    affix1          TINYINT UNSIGNED DEFAULT 0,
-    affix2          TINYINT UNSIGNED DEFAULT 0,
-    affix3          TINYINT UNSIGNED DEFAULT 0,
-    style_level     TINYINT UNSIGNED DEFAULT 0,
-    PRIMARY KEY (character_id, storage_type, slot),
-    KEY inventories_item (character_id, item_id)
-) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
+    playerid      INTEGER NOT NULL,     -- Mã ID nhân vật sở hữu vật phẩm
+    storagetype   INTEGER NOT NULL,     -- Loại kho chứa (1: HomDo, 2: TienTrang, 4: TuiDeo, 8: TrangBi, 16: LuuLang)
+    slot          INTEGER NOT NULL,     -- Vị trí ô chứa trong túi/hòm đồ (1..25 hoặc 1..50 tùy loại túi)
+    itemid        INTEGER DEFAULT 0,    -- Mã ID định danh vật phẩm theo Item.dat (0 = ô trống)
+    quantity      INTEGER DEFAULT 0,    -- Số lượng vật phẩm trong ô (chồng vật phẩm / stack count)
+    damage        INTEGER DEFAULT 0,    -- Độ hao mòn / Độ bền hiện tại của trang bị
+    element       INTEGER DEFAULT 0,    -- Thuộc tính nguyên tố của trang bị (1=Địa, 2=Thủy, 3=Hỏa, 4=Phong...)
+    elementvalue  INTEGER DEFAULT 0,    -- Giá trị thuộc tính nguyên tố cộng thêm
+    proofkind     INTEGER DEFAULT 0,    -- Loại bùa hộ mệnh / loại chứng nhận bảo hộ trang bị
+    growlevel     INTEGER DEFAULT 0,    -- Cấp độ trưởng thành / phát triển của trang bị
+    growexp       INTEGER DEFAULT 0,    -- Điểm kinh nghiệm tích lũy phát triển của trang bị
+    specialkind   INTEGER DEFAULT 0,    -- Thuộc tính / hiệu ứng đặc biệt của trang bị
+    stoneattr     INTEGER DEFAULT 0,    -- Thuộc tính loại ngọc / đá đã khảm nạm vào trang bị
+    stonelevel    INTEGER DEFAULT 0,    -- Cấp độ ngọc / đá đã khảm nạm vào trang bị
+    enhancelevel  INTEGER DEFAULT 0,    -- Cấp độ tinh luyện / cường hóa trang bị
+    deletetime    REAL DEFAULT 0,       -- Thời hạn sử dụng / thời điểm vật phẩm tự hủy (timestamp unix; 0 = vĩnh viễn)
+    damageditemid INTEGER DEFAULT 0,    -- Mã ID vật phẩm phế liệu biến đổi thành khi trang bị bị hỏng vỡ
+    islocked      INTEGER DEFAULT 0,    -- Trạng thái khóa an toàn trang bị: 0 = Mở khóa, 1 = Đã khóa bảo vệ
+    reinforced    INTEGER DEFAULT 0,    -- Cấp độ gia cố / tăng viện của trang bị
+    affix1        INTEGER DEFAULT 0,    -- Thuộc tính bổ sung / dòng phụ thứ 1
+    affix2        INTEGER DEFAULT 0,    -- Thuộc tính bổ sung / dòng phụ thứ 2
+    affix3        INTEGER DEFAULT 0,    -- Thuộc tính bổ sung / dòng phụ thứ 3
+    stylelevel    INTEGER DEFAULT 0,    -- Cấp độ thời trang / hiển thị ngoại trang
+    PRIMARY KEY (playerid, storagetype, slot)
+);
+
+CREATE INDEX IF NOT EXISTS inventories_item ON inventories (playerid, itemid);
 
 -- ============================================================================
--- character_pets — general (general) storage across four warehouses:
--- storage_type: 1=Carried, 2=Cart, 3=Hotel, 4=Warehouse.
+-- character_pets — Quản lý danh sách Võ Tướng / Thú Nuôi (Pet) của người chơi.
+-- storagetype: 1=Mang theo (Carried 1..4), 2=Xe ngựa (Cart), 
+--              3=Nhà nghỉ (Hotel), 4=Kho quân doanh (Warehouse).
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS character_pets (
-    character_id  BIGINT NOT NULL,
-    storage_type  TINYINT UNSIGNED NOT NULL,
-    slot          SMALLINT UNSIGNED NOT NULL,
-    pet_id        SMALLINT UNSIGNED DEFAULT 0,
-    name          VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_bin,
-    level         BIGINT DEFAULT 1,
-    element       BIGINT DEFAULT 0,
-    reborn        BIGINT DEFAULT 0,
-    hp            BIGINT DEFAULT 0,
-    hp_max        BIGINT DEFAULT 0,
-    sp            BIGINT DEFAULT 0,
-    sp_max        BIGINT DEFAULT 0,
-    int_attr      BIGINT DEFAULT 0,
-    atk           BIGINT DEFAULT 0,
-    def           BIGINT DEFAULT 0,
-    hpx           BIGINT DEFAULT 0,
-    spx           BIGINT DEFAULT 0,
-    agi           BIGINT DEFAULT 0,
-    fai           BIGINT DEFAULT 0,
-    texp          BIGINT DEFAULT 0,
-    skill_point   BIGINT DEFAULT 0,
-    thd           BIGINT DEFAULT 0,
-    skill1_id     BIGINT DEFAULT 0,
-    skill1_level  BIGINT DEFAULT 0,
-    skill2_id     BIGINT DEFAULT 0,
-    skill2_level  BIGINT DEFAULT 0,
-    skill3_id     BIGINT DEFAULT 0,
-    skill3_level  BIGINT DEFAULT 0,
-    skill4_id     BIGINT DEFAULT 0,
-    skill4_level  BIGINT DEFAULT 0,
-    quest         BIGINT DEFAULT 0,
-    PRIMARY KEY (character_id, storage_type, slot)
-) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
+    playerid     INTEGER NOT NULL,      -- Mã ID nhân vật sở hữu võ tướng
+    storagetype  INTEGER NOT NULL,      -- Vị trí lưu trữ võ tướng: 1=Mang theo, 2=Xe ngựa, 3=Nhà nghỉ, 4=Kho
+    slot         INTEGER NOT NULL,      -- Vị trí ô chứa võ tướng trong danh sách tương ứng (1..4 hoặc mở rộng)
+    petid        INTEGER DEFAULT 0,     -- Mã ID nguyên mẫu NPC gốc trong Npc.dat (0 = ô trống)
+    name         BLOB,                  -- Tên riêng của Võ Tướng / Pet (dữ liệu byte mã VISCII 1.1)
+    level        INTEGER DEFAULT 1,     -- Đẳng cấp hiện tại của Võ Tướng (1..200)
+    element      INTEGER DEFAULT 0,     -- Hệ nguyên tố: 1=Địa, 2=Thủy, 3=Hỏa, 4=Phong, 5=Quang, 6=Ám
+    rebornstage  INTEGER DEFAULT 0,     -- Cấp độ chuyển sinh võ tướng: 0=Thường, 1=Tái sinh 1 (RB1), 2=Tái sinh 2 (RB2)
+    curhp        INTEGER DEFAULT 0,     -- Sinh lực (Máu / HP) hiện tại của võ tướng
+    maxhp        INTEGER DEFAULT 0,     -- Sinh lực (Máu / HP) tối đa của võ tướng
+    cursp        INTEGER DEFAULT 0,     -- Nội lực (Mana / SP) hiện tại của võ tướng
+    maxsp        INTEGER DEFAULT 0,     -- Nội lực (Mana / SP) tối đa của võ tướng
+    curexp       INTEGER DEFAULT 0,     -- Điểm kinh nghiệm tích lũy hiện tại của võ tướng
+    nextexp      INTEGER DEFAULT 0,     -- Điểm kinh nghiệm cần đạt để thăng cấp võ tướng tiếp theo
+    baseatk      INTEGER DEFAULT 0,     -- Điểm tấn công vật lý cơ bản (ATK gốc) của võ tướng
+    baseint      INTEGER DEFAULT 0,     -- Điểm trí lực cơ bản (INT gốc) của võ tướng
+    basedef      INTEGER DEFAULT 0,     -- Điểm phòng thủ cơ bản (DEF gốc) của võ tướng
+    basehpx      INTEGER DEFAULT 0,     -- Điểm tiềm năng tăng máu gốc (HPX) của võ tướng
+    basespx      INTEGER DEFAULT 0,     -- Điểm tiềm năng tăng mana gốc (SPX) của võ tướng
+    baseagi      INTEGER DEFAULT 0,     -- Điểm nhanh nhẹn cơ bản (AGI gốc) của võ tướng
+    equipatk     INTEGER DEFAULT 0,     -- Tấn công cộng thêm từ trang bị võ tướng mang
+    equipdef     INTEGER DEFAULT 0,     -- Phòng thủ cộng thêm từ trang bị võ tướng mang
+    equipint     INTEGER DEFAULT 0,     -- Trí lực cộng thêm từ trang bị võ tướng mang
+    equipagi     INTEGER DEFAULT 0,     -- Nhanh nhẹn cộng thêm từ trang bị võ tướng mang
+    equiphpx     INTEGER DEFAULT 0,     -- Máu cộng thêm từ trang bị võ tướng mang
+    equipspx     INTEGER DEFAULT 0,     -- Mana cộng thêm từ trang bị võ tướng mang
+    fai          INTEGER DEFAULT 0,     -- Điểm trung thành / Thân mật của tướng (0..100; <60 có nguy cơ bỏ trốn)
+    skillpoint   INTEGER DEFAULT 0,     -- Điểm kỹ năng khả dụng chưa phân bổ của võ tướng
+    skill1_id    INTEGER DEFAULT 0,     -- Mã ID kỹ năng chiến đấu thứ 1
+    skill1_level INTEGER DEFAULT 0,     -- Cấp độ kỹ năng thứ 1
+    skill2_id    INTEGER DEFAULT 0,     -- Mã ID kỹ năng chiến đấu thứ 2
+    skill2_level INTEGER DEFAULT 0,     -- Cấp độ kỹ năng thứ 2
+    skill3_id    INTEGER DEFAULT 0,     -- Mã ID kỹ năng chiến đấu thứ 3
+    skill3_level INTEGER DEFAULT 0,     -- Cấp độ kỹ năng thứ 3
+    skill4_id    INTEGER DEFAULT 0,     -- Mã ID kỹ năng chiến đấu thứ 4
+    skill4_level INTEGER DEFAULT 0,     -- Cấp độ kỹ năng thứ 4
+    isactive     INTEGER DEFAULT 0,     -- Cờ trạng thái xuất chiến: 1=Đang chọn làm Pet chiến đấu chính, 0=Nghỉ ngơi
+    PRIMARY KEY (playerid, storagetype, slot)
+);
 
 -- ============================================================================
--- character_skills / character_hotkeys — learned skills and the 10-slot
--- hotbar (parity with legacy `skill` / `skillsave`).
+-- character_skills — Kỹ năng đã học của nhân vật người chơi.
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS character_skills (
-    character_id BIGINT NOT NULL,
-    skill_id     BIGINT NOT NULL,
-    level        BIGINT DEFAULT 1,
-    sp           BIGINT DEFAULT 0,
-    save_flag    BIGINT DEFAULT 0,
-    PRIMARY KEY (character_id, skill_id)
-) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
-
-CREATE TABLE IF NOT EXISTS character_hotkeys (
-    character_id BIGINT NOT NULL,
-    slot         TINYINT UNSIGNED NOT NULL,
-    skill_id     BIGINT DEFAULT 0,
-    PRIMARY KEY (character_id, slot)
-) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
+    playerid INTEGER NOT NULL,          -- Mã ID nhân vật người chơi
+    skillid  INTEGER NOT NULL,          -- Mã ID kỹ năng đã học (theo file dữ liệu Skill.dat)
+    level    INTEGER DEFAULT 1,         -- Đẳng cấp của kỹ năng (1..10)
+    sp       INTEGER DEFAULT 0,         -- Lượng nội lực (SP) tiêu hao khi thi triển kỹ năng
+    saveflag INTEGER DEFAULT 0,         -- Cờ đánh dấu lưu trữ thuộc tính đặc thù kỹ năng
+    PRIMARY KEY (playerid, skillid)
+);
 
 -- ============================================================================
--- Missions, permanent flags and completed events.
+-- character_hotkeys — Danh sách phím tắt gán kỹ năng nhanh (Hotbar 10 ô).
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS character_hotkeys (
+    playerid INTEGER NOT NULL,          -- Mã ID nhân vật người chơi
+    slot     INTEGER NOT NULL,          -- Vị trí ô phím tắt nhanh trên thanh hotbar (1..10)
+    skillid  INTEGER DEFAULT 0,         -- Mã ID kỹ năng hoặc biểu cảm gán vào ô phím tắt (0 = để trống)
+    PRIMARY KEY (playerid, slot)
+);
+
+-- ============================================================================
+-- character_missions — Tiến độ thực hiện nhiệm vụ (Quest) của nhân vật.
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS character_missions (
-    character_id BIGINT NOT NULL,
-    mission_id   BIGINT NOT NULL,
-    step         BIGINT DEFAULT 0,
-    state        BIGINT DEFAULT 0,
-    updated_at   BIGINT DEFAULT 0,
-    PRIMARY KEY (character_id, mission_id)
-) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
-
-CREATE TABLE IF NOT EXISTS character_mission_flags (
-    character_id BIGINT NOT NULL,
-    mission_id   BIGINT NOT NULL,
-    flag_key     VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_bin NOT NULL,
-    flag_value   BIGINT DEFAULT 0,
-    PRIMARY KEY (character_id, mission_id, flag_key)
-) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
-
--- Forever flags: one row per permanently-latched bit index.
-CREATE TABLE IF NOT EXISTS character_bit_flags (
-    character_id BIGINT NOT NULL,
-    flag_index   INT UNSIGNED NOT NULL,
-    set_at       BIGINT DEFAULT 0,
-    PRIMARY KEY (character_id, flag_index)
-) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
-
-CREATE TABLE IF NOT EXISTS character_completed_events (
-    character_id BIGINT NOT NULL,
-    event_id     BIGINT NOT NULL,
-    completed_at BIGINT DEFAULT 0,
-    PRIMARY KEY (character_id, event_id)
-) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
+    playerid  INTEGER NOT NULL,         -- Mã ID nhân vật người chơi
+    missionid INTEGER NOT NULL,         -- Mã ID nhiệm vụ (theo cấu trúc kịch bản nhiệm vụ)
+    step      INTEGER DEFAULT 0,        -- Bước / Giai đoạn hiện tại của nhiệm vụ đang thực hiện
+    state     INTEGER DEFAULT 0,        -- Trạng thái: 0=Chưa nhận, 1=Đang làm, 2=Đã hoàn thành, 3=Thất bại
+    updatedat INTEGER DEFAULT 0,        -- Thời điểm cập nhật trạng thái nhiệm vụ gần nhất (timestamp unix)
+    PRIMARY KEY (playerid, missionid)
+);
 
 -- ============================================================================
--- friends — symmetric pair rows owned by the repository layer (no FK).
+-- character_mission_flags — Cờ trạng thái chi tiết theo từng nhiệm vụ.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS character_mission_flags (
+    playerid  INTEGER NOT NULL,         -- Mã ID nhân vật người chơi
+    missionid INTEGER NOT NULL,         -- Mã ID nhiệm vụ liên quan
+    flagkey   TEXT NOT NULL,            -- Tên khóa định danh của cờ tiến trình (vd: "kill_count", "talk_step")
+    flagvalue INTEGER DEFAULT 0,        -- Giá trị số nguyên lưu trạng thái của cờ
+    PRIMARY KEY (playerid, missionid, flagkey)
+);
+
+-- ============================================================================
+-- character_bit_flags — Cờ bit vĩnh viễn (Mỗi hàng đại diện cho 1 bit đã bật).
+-- Dùng đánh dấu hoàn thành sự kiện hoặc nhận thưởng 1 lần duy nhất trong đời nhân vật.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS character_bit_flags (
+    playerid  INTEGER NOT NULL,         -- Mã ID nhân vật người chơi
+    flagindex INTEGER NOT NULL,         -- Chỉ số index của bit cờ (0..n)
+    set_at    INTEGER DEFAULT 0,        -- Thời điểm bit cờ được kích hoạt bật lên 1 (timestamp unix)
+    PRIMARY KEY (playerid, flagindex)
+);
+
+-- ============================================================================
+-- character_completed_events — Lịch sử ghi nhận các sự kiện kịch bản Eve đã hoàn thành.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS character_completed_events (
+    playerid    INTEGER NOT NULL,       -- Mã ID nhân vật người chơi
+    eventid     INTEGER NOT NULL,       -- Mã ID sự kiện kịch bản trong eve.emg đã tham gia
+    completedat INTEGER DEFAULT 0,      -- Thời điểm hoàn thành sự kiện (timestamp unix)
+    PRIMARY KEY (playerid, eventid)
+);
+
+-- ============================================================================
+-- friends — Danh sách hảo hữu / Bạn bè (Quan hệ đối xứng giữa 2 nhân vật).
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS friends (
-    character_id BIGINT NOT NULL,
-    friend_id    BIGINT NOT NULL,
-    remark       VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_bin,
-    PRIMARY KEY (character_id, friend_id)
-) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
+    playerid INTEGER NOT NULL,          -- Mã ID nhân vật người chơi sở hữu danh sách
+    friendid INTEGER NOT NULL,          -- Mã ID người chơi bạn bè kết giao
+    remark   TEXT,                      -- Biệt hiệu / Ghi chú gợi nhớ đặt cho người bạn này
+    PRIMARY KEY (playerid, friendid)
+);
 
 -- ============================================================================
--- mails — mailbox rows; attachments are carried as item + count until
--- claimed (mail_attachments stays out until the mail system ships).
+-- mails — Hòm thư tín của người chơi (Hỗ trợ gửi thư hệ thống, thư kèm tiền và vật phẩm).
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS mails (
-    mail_id             BIGINT AUTO_INCREMENT PRIMARY KEY,
-    sender_id           BIGINT DEFAULT 0,
-    receiver_id         BIGINT NOT NULL,
-    title               VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_bin,
-    body                TEXT CHARACTER SET latin1 COLLATE latin1_bin,
-    gold                BIGINT DEFAULT 0,
-    attachment_item_id  SMALLINT UNSIGNED DEFAULT 0,
-    attachment_count    INT DEFAULT 0,
-    sent_at             BIGINT DEFAULT 0,
-    claimed             TINYINT(1) DEFAULT 0,
-    KEY mails_receiver (receiver_id)
-) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
+    mailid           INTEGER PRIMARY KEY AUTOINCREMENT,     -- Mã ID định danh thư tự tăng duy nhất
+    senderid         INTEGER DEFAULT 0,                     -- Mã ID người chơi gửi thư (0 = Thư tự động từ Hệ thống/NPC)
+    receiverid       INTEGER NOT NULL,                      -- Mã ID người chơi nhận thư
+    title            TEXT,                                  -- Tiêu đề của bức thư
+    body             TEXT,                                  -- Nội dung chi tiết bức thư
+    gold             INTEGER DEFAULT 0,                     -- Lượng tiền vàng (Gold) gửi đính kèm theo thư
+    attachmentitemid INTEGER DEFAULT 0,                     -- Mã ID vật phẩm đính kèm theo thư (theo Item.dat; 0 = không có)
+    attachmentcount  INTEGER DEFAULT 0,                     -- Số lượng vật phẩm đính kèm tương ứng
+    sentat           INTEGER DEFAULT 0,                     -- Thời điểm gửi thư đi (timestamp unix)
+    claimed          INTEGER DEFAULT 0                      -- Trạng thái nhận thư: 0 = Chưa nhận/chưa đọc, 1 = Đã nhận quà
+);
 
+CREATE INDEX IF NOT EXISTS mails_receiver ON mails (receiverid);
 
 -- ============================================================================
--- item_code — redeemable gift codes (op 0x23 sub 3). Fully functional.
+-- item_code — Hệ thống mã quà tặng (Giftcode / Redeem Code) - Opcode 0x23 sub 3.
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS item_code (
-    code       VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_bin NOT NULL,
-    password   VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_bin NOT NULL,
-    player_id  BIGINT NOT NULL DEFAULT 0,
-    used_at    BIGINT NULL,
-    item_id    BIGINT DEFAULT 0,
-    `count`    BIGINT DEFAULT 0,
-    KEY item_code_code (code),
-    KEY item_code_redeem (code, password, player_id)
-) ENGINE=InnoDB DEFAULT CHARACTER SET latin1 COLLATE latin1_bin;
+    code     TEXT NOT NULL,             -- Chuỗi mã giftcode người chơi nhập (vd: TSVN123)
+    password TEXT NOT NULL,             -- Chuỗi mật khẩu bảo mật đi kèm mã quà (secret pass)
+    playerid INTEGER NOT NULL DEFAULT 0,-- Mã ID người chơi đã sử dụng giftcode này (0 = Chưa có ai dùng)
+    usedat   INTEGER NULL,              -- Thời điểm mã quà được đổi thành công (timestamp unix; NULL nếu chưa dùng)
+    itemid   INTEGER DEFAULT 0,         -- Mã ID vật phẩm nhận được khi đổi mã quà (theo Item.dat)
+    count    INTEGER DEFAULT 0          -- Số lượng vật phẩm được tặng khi đổi mã quà
+);
+
+CREATE INDEX IF NOT EXISTS item_code_code ON item_code (code);
+CREATE INDEX IF NOT EXISTS item_code_redeem ON item_code (code, password, playerid);
