@@ -3,15 +3,16 @@
 Ngày: 2026-09-12 · Workspace: `/mnt/d/VUDT/GIT_PCC/test` · Chiều: **Server → Client (S→C)**
 Trạng thái: **Đã xác minh từ mã nguồn sơ cấp trong `ts_decompile/`**. Chỗ nào không có body thì ghi rõ, không suy diễn.
 
+> Cập nhật 2026-09-14: bổ sung phân tích từ các body/hex dump mới (theo `missing_opcode_sources.md`).
+
 ---
 
 ## 0. Kết luận quan trọng nhất
 
 > **Main OP 0x0F CÓ SubOp. Handler là một `switch` 20 nhánh trên 1 byte `payload[1] = ECX[0]`.**
 
-Khác OP 0x0C (không SubOp, struct cố định), OP này giống họ OP 0x02/0x0D: 1 byte SubOp chọn đường xử lý, mỗi đường forward nguyên RestPayload cho một hàm con kèm một object form (`TFNpcManage`, `TWF_CartManage`, …). Trong 20 đường, **chỉ 5 đường đọc được body** (`0x05, 0x09, 0x0A, 0x0E, 0x0F`); 15 đường còn lại gọi hàm **không có file body** — Mock Server với các SubOp đó chỉ có thể forward mù.
-
-Nghiệp vụ (suy trực tiếp từ object form + body đọc được): **đồng bộ NPC (TFNpcManage) + xe/cart (TWF_CartManage) + trạng thái buff/effect trên actor + vài form hệ thống**. Không phải chat (chat là OP 0x02), không mang text tiếng Việt nào trên wire.
+Khác OP 0x0C (không SubOp, struct cố định), OP này giống họ OP 0x02/0x0D: 1 byte SubOp chọn đường xử lý, mỗi đường forward nguyên RestPayload cho một hàm con kèm một object form. **Cập nhật 2026-09-14: cả 20/20 đường đã có body** (15 handler vừa được decompile). Kết quả verify lớn nhất: các handler 0x01/0x02/0x04/0x06/0x07/0x08/0x11/0x12/0x14/0x15 **không hoạt động trên `TFNpcManage`** (param_1 của 0x01–0x07 chỉ được cất rồi bỏ, trừ 0x08/0x14/0x15 dùng làm arg refresh `FUN_007a5d54/7a5e1c`); chúng thao tác **mảng 5 con trỏ slot `PlayerRec(self)+0x57C + slot*4`** (guard `slot ≤ 4`, các field `+0x55F…+0x568, +0x3EA…+0x40A` của sub-object) — cùng hệ "slot" đã gặp ở SubOp 0x0A (parser cart). (đính chính: suy đoán cũ "mỗi đường → một form NPC/cart khác nhau" chỉ đúng với 0x0B/0x0C (cart), 0x0D/0x0E/0x0F (buff-actor), 0x10/0x11 (scene), 0x12 (self), 0x13 (SystemForm); nhóm 0x01/02/04/06/07/08/14/15 là **đồng bộ state 5 slot của self qua id**.)
+Nghiệp vụ (suy trực tiếp từ object + body đọc được): **đồng bộ NPC (TFNpcManage) + xe/cart (TWF_CartManage) + trạng thái buff/effect trên actor + vài form hệ thống**. Không phải chat (chat là OP 0x02), không mang text tiếng Việt nào trên wire (ngoài 2 hằng chuỗi vùng code — xem §6).
 
 ---
 
@@ -57,7 +58,7 @@ switch(SubOp) { case 1 ... case 0x15 ... }   // KHÔNG có case 0, case 3, KHÔN
 | `gvar_007D9F70` | **TSe_SystemForm** | `0051189c`: `FUN_005a64d4(VMT_589FAC_TSe_SystemForm)` → `gvar_007D9F70` |
 | `gvar_007DA7BC` | **Player record self** (`+4` = myId) | dùng `*(+4)==id`, cùng quy ước `opcode_0c.md` |
 | `gvar_007D9D34` | **Scene actor container** (tra actor trong mảng 800 slot `gvar_007DA300`) | cùng quy ước `opcode_0c.md` §4 |
-| `gvar_007DA2FC` | Manager của SubOp 0x0D–0x0F (vùng item/buff) | **chưa tìm thấy dòng khởi tạo `Create` → chưa xác định tên class chính xác, chỉ rõ vai trò** |
+| `gvar_007DA2FC` | Manager của SubOp 0x0D–0x0F (vùng item/buff) | **Vẫn chưa tìm thấy dòng `Create` → tên class chưa xác định.** Cập nhật 2026-09-14: SubOp 0x0D (`FUN_0052a898`) **bỏ qua arg1** trong body — chỉ dùng RP + scene global |
 
 ---
 
@@ -67,32 +68,32 @@ switch(SubOp) { case 1 ... case 0x15 ... }   // KHÔNG có case 0, case 3, KHÔN
 
 Quy ước `P[.]` = payload gốc (`P[0]=0x0F`), `RP[.]` = RestPayload (`RP[0]=P[1]=SubOp`).
 
-| SubOp | Payload tối thiểu | Wire field (tầng case) | Hàm con / object | Body? |
+| SubOp | Payload tối thiểu (sau body mới) | Wire field (bên trong callee) | Hàm con / object | Body? |
 |---|---|---|---|---|
-| `0x01` | ≥2 (`0F 01`) | forward nguyên RP | `func_0x007a3ed0(TFNpcManage, RP)` | KHÔNG |
-| `0x02` | ≥2 | forward nguyên RP | `func_0x007a40e8(TFNpcManage, RP)` | KHÔNG |
-| `0x04` | ≥2 | forward nguyên RP | `func_0x007a4694(TFNpcManage, RP)` | KHÔNG |
+| `0x01` | **12** | `id:RP1..4 DWORD` + `mã:RP5 1B` + `a:RP6..9 DWORD` + `b:RP10 1B` | `FUN_007a3ed0(TFNpcManage→bỏ qua, RP)` | **CÓ (mới)** |
+| `0x02` | **6** | `id:RP1..4 DWORD` + `slot:RP5 1B` | `FUN_007a40e8(TFNpcManage→bỏ qua, RP)` | **CÓ (mới)** |
+| `0x04` | **2**, sau đó chuỗi record `[id:4][n:1][n×(12+len)]` | parser lồng (bỏ `7·n` byte nếu actor absent — xem §4.8) | `FUN_007a4694(TFNpcManage→bỏ qua, RP)` | **CÓ (mới)** |
 | `0x05` | **14** (`0F 05` + 12B) | 3×DWORD LE | `FUN_007a49c0(TFNpcManage, RP)` | **CÓ** |
-| `0x06` | ≥2 | forward nguyên RP | `func_0x007a42ec(TFNpcManage, RP)` | KHÔNG |
-| `0x07` | ≥2 | forward nguyên RP | `func_0x007a43c8(TFNpcManage, RP)` | KHÔNG |
-| `0x08` | ≥2 | forward nguyên RP | `func_0x007a5010(TFNpcManage, RP)` | KHÔNG |
+| `0x06` | **6** | `id:RP1..4 DWORD` | `FUN_007a42ec(TFNpcManage→bỏ qua, RP)` | **CÓ (mới)** |
+| `0x07` | **6**, sau đó chuỗi record `12+len` byte từ `RP[5]` | id cha + vòng entry slot | `FUN_007a43c8(TFNpcManage→bỏ qua, RP)` | **CÓ (mới)** |
+| `0x08` | **31+** — chuỗi record ~`99+len` byte | blob state slot đầy đủ (header 29B + name + 60B blocks) | `FUN_007a5010(TFNpcManage, RP)` | **CÓ (mới)** |
 | `0x09` | **7** (`0F 09` + 4B + 1B) | id DWORD + flag 1B + msg tới hết | `FUN_007a4b08(TFNpcManage, RP)` | **CÓ** |
 | `0x0A` | **9** (`0F 0A` + 8B) | vòng lặp ≤4 entry `[idx:1B][w:2B][b:1B][w:2B][len:1B][str]` | `FUN_00751d28(TWF_CartManage, RP)` | **CÓ** |
-| `0x0B` | **3** (`0F 0B` + 1B) | 1 byte thường (guard `Len<2→BoundErr(1)`) | `func_0x00751c7c(TWF_CartManage, byte)` | KHÔNG |
-| `0x0C` | ≥2 | forward nguyên RP | `func_0x00746fc8(self, RP)` | KHÔNG |
-| `0x0D` | ≥2 | forward nguyên RP | `func_0x0052a898(mgr_2FC, RP)` | KHÔNG |
+| `0x0B` | **3** (`0F 0B` + 1B) | 1 byte thường (guard `Len<2→BoundErr(1)`) | `FUN_00751c7c(TWF_CartManage, byte)` | **CÓ (mới)** |
+| `0x0C` | **3** (`0F 0C` + 1B) | `mode:RP1 1B` | `FUN_00746fc8(self, RP)` | **CÓ (mới)** |
+| `0x0D` | **2**, chuỗi record `[id:4][w:2]` tới hết | per-id buff apply | `FUN_0052a898(mgr_2FC→bỏ qua, RP)` | **CÓ (mới)** |
 | `0x0E` | **8** (`0F 0E` + 4B + 2B) | id DWORD + w Word LE | `FUN_0052a7b4(mgr_2FC, RP)` | **CÓ** |
 | `0x0F` | **5** (`0F 0F` + 2B + 1B) | w Word LE + b byte thường | `FUN_0052aacc(mgr_2FC, RP)` | **CÓ** |
-| `0x10` | ≥2 | forward nguyên RP | `func_0x0074dfd4(scene, RP)` | KHÔNG |
-| `0x11` | ≥2 | forward nguyên RP | `func_0x0074e400(scene, RP)` | KHÔNG |
-| `0x12` | ≥2 | forward nguyên RP | `func_0x0074edd0(self, RP)` | KHÔNG |
-| `0x13` | ≥2 | forward nguyên RP | `func_0x005a71bc(SystemForm, RP)` | KHÔNG |
-| `0x14` | ≥2 | forward nguyên RP | `func_0x007a5b74(TFNpcManage, RP)` | KHÔNG |
-| `0x15` | ≥2 | forward nguyên RP | `func_0x007a4e94(TFNpcManage, RP)` | KHÔNG |
+| `0x10` | **11** | `id:RP1..4` + `slot:RP5` + `w1:RP6..7` + `w2:RP8..9` (LE) | `FUN_0074dfd4(scene, RP)` | **CÓ (mới)** |
+| `0x11` | **7** | `kind:RP1 (1..5)` + `id:RP2..5 DWORD` | `FUN_0074e400(scene, RP)` | **CÓ (mới)** |
+| `0x12` | **5** | `slot:RP1 (1..4)` + `b1:RP2` + `b2:RP3` | `FUN_0074edd0(self, RP)` | **CÓ (mới)** |
+| `0x13` | **3** (branch 1 cần 4) | `mã:RP1`; nếu `==1`: `char:RP2` | `FUN_005a71bc(SystemForm, RP)` | **CÓ (mới)** |
+| `0x14` | **2**, chuỗi `[slot:1][b1:1][b2:1]` × `(Len-1)/3` | batch của 0x15 | `FUN_007a5b74(TFNpcManage, RP)` | **CÓ (mới)** |
+| `0x15` | **5** | `slot:RP1 (≤4)` + `b1:RP2` + `b2:RP3` | `FUN_007a4e94(TFNpcManage, RP)` | **CÓ (mới)** |
 
 ---
 
-## 4. Chi tiết từng SubOp đọc được body
+## 4. Chi tiết từng SubOp (toàn bộ 20 đường đã có body — 4.1–4.6 cũ + 4.7 mới 2026-09-14)
 
 ### 4.1. SubOp `0x05` — set 3 DWORD lên actor + VMT
 - Wire: `[0F][05][id:P2..P5 DWORD LE][a:P6..P9 DWORD LE][b:P10..P13 DWORD LE]` — 3 lần `Copy(RP,2/6/10,4)` + `FUN_0077ef7c`.
@@ -113,9 +114,9 @@ Quy ước `P[.]` = payload gốc (`P[0]=0x0F`), `RP[.]` = RestPayload (`RP[0]=P
   - ghi vào self (`gvar_007DA7BC`): tên + word/cờ theo slot (tên tối đa 10 ký tự, chỉ khi `slen!=0`).
   - tiến `pos += 8+slen`; dừng khi đủ 4 vòng hoặc hết chuỗi. Payload ngắn hơn entry đang đọc → `_BoundErr`, không phải no-op.
 
-### 4.4. SubOp `0x0B` — 1 byte cho CartManage (không body)
+### 4.4. SubOp `0x0B` — `FUN_00751c7c` (**CÓ BODY MỚI** — clear 1 WORD slot trên self)
 - Wire: `[0F][0B][b:P2, 1B]` — guard `Len<2→BoundErr(1)` ngay tầng case, `func_0x00751c7c(cartObj, b)`.
-- **Giới hạn:** `00751c7c` không có file body — không suy diễn ý nghĩa byte này.
+- Body (`00751c7c_FUN_00751c7c.c:22–31`): guard `b ≤ 4` (`_BoundErr` nếu lớn hơn); rồi `*(Word*)(*(gvar_007DA7BC) + 0xD6F + b*16) := 0` — **xóa 2 byte tại `PlayerRec+0xD6F + slot·16`** (mảng 5 slot stride 16). Arg1 `TWF_CartManage` không dùng. Ý nghĩa field `+0xD6F` chưa kết luận được (liên quan hệ slot 5-entry như `+0x57C`).
 
 ### 4.5. SubOp `0x0E` — apply buff/effect lên actor
 - Wire: `[0F][0E][id:P2..P5 DWORD LE][w:P6..P7 Word LE]`.
@@ -128,9 +129,25 @@ Quy ước `P[.]` = payload gốc (`P[0]=0x0F`), `RP[.]` = RestPayload (`RP[0]=P
   - `w==0` → `FUN_0074bd70(self)`: duyệt 4 slot, gỡ hiển thị slot, xóa struct buff — tóm 1 dòng: **xóa buff self**.
   - `w!=0` → `FUN_0074b7c8(self,w)` (apply buff như 4.5) + ghi byte `b` + cờ + refresh.
 
-### 4.7. Các SubOp không body (`0x01,02,04,06,07,08,0x0B,0x0C,0x0D,0x10–0x15`)
-- Tầng case chỉ forward nguyên RP cho `(objectForm, RP)` như bảng §3 — không tách field nào ở tầng case.
-- **Giới hạn:** 15 hàm đều **không có file body trong `ts_decompile/functions/`**. Không suy diễn parse bên trong; Mock Server chỉ forward nguyên rest.
+### 4.7. Các SubOp trước đây "không body" — **NAY ĐÃ CÓ BODY (2026-09-14)**, phân tích từng handler
+
+Quy ước chung rút ra từ 15 body mới: các handler nhóm slot resolve actor theo `id` (self nếu `id==myId`, ngược lại `FUN_0070c20c(scene)` — actor không tồn tại thì **bỏ qua gói**), và ghi vào **sub-object slot `*(PlayerRec+0x57C + slot*4)`** (slot guard `≤4`). Lá `FUN_0071c3a0(obj, slot, dword, flag)` **vẫn không có body** — chỉ biết chữ ký.
+
+- **0x01 — `FUN_007a3ed0`** (`007a3ed0_FUN_007a3ed0.c:52–112`): `id=DWORD RP[1..4]`; guard `Len<6→BoundErr(5)` → `mã=RP[5]` (byte, guard `≤0xFF`); `a=DWORD RP[6..9]`; guard `Len<0xB→BoundErr(10)` → `b=RP[10]`. Ghi: `FUN_0071c3a0(obj, mã, a, 1)` (`:90`); global `*(gvar_007DA694+4) := mã` (`:95` — byte lưu "slot đang xử lý", guard `≤4`); `*(subobj(mã)+0x55F) := b` (`:108`); nếu obj là self → `FUN_0063afa4(gvar_007DA0CC)` + `FUN_005a3018(gvar_007D9D7C)` refresh (`:109–112`).
+- **0x02 — `FUN_007a40e8`** (`007a40e8_FUN_007a40e8.c:51–102`): `id=DWORD RP[1..4]`; guard `Len<6` → `slot=RP[5]` (guard `≤4`). `FUN_0071c8dc(obj, slot)` (`:80` — lá 189 dòng: xóa slot, có phát `sound\WA0014.wav` `0071c8dc.c:175`). Nếu obj==self: đọc tên shortstring `subobj(slot)+9` (`:88–89`); refresh `FUN_0063afa4` + `FUN_005a3018`; clear `self+0x151C` nếu trùng slot (`:93–95`); nếu tên ≠ rỗng và `self+0x376 ≠ 0` → ghi dòng chat-log `tên + DAT_007A42B0` qua `FUN_007ab870(gvar_007DA1B0, myId, msg, tag=0)` (`:96–101`). → "gỡ/dismount slot + thông báo chat".
+- **0x04 — `FUN_007a4694`** (`007a4694_FUN_007a4694.c:78–221`): parser lồng: ngoài `pos=2`: `id=DWORD` (`:82–83`), `n=RP[pos+4]` byte (`:94`), `pos+=5`; nếu actor **không** tồn tại → `pos += n*7` (`:102–109` — **mâu thuẫn với độ dài entry 12+len của nhánh có actor, chưa kết luận được**); nếu có: lặp `n` entry `[slot:1][a:4][b:4][flag:1][x:1][len:1][name:len]` (`:118–194`): `FUN_0071c3a0(obj,slot,a,0)` (`:196`); `flag==1` → `FUN_0071dae0(obj,a,b)` (`:197–199`); `subobj(slot)+0x55F := x` (`:204`); `len≠0` → `_PStrNCpy(subobj+9, name, 0x11)` (`:213`).
+- **0x06 — `FUN_007a42ec`** (`007a42ec_FUN_007a42ec.c:40–58`): `id=DWORD RP[1..4]`; resolve obj (self/scene); `FUN_0071d058(obj)` (`:57`) — lá có body (`0071d058_FUN_0071d058.c:26–40`): nếu `obj[0x360]!=0` → clear `+0x360`, clear `subobj+0x554`, 2 call VMT `+0x24` (gvar_007DA39C/007DA3BC), `TObject_Free(obj+0x37C)` + set 0, VMT `+0x18(obj,0)`. → "đóng/hủy phương tiện slot của actor".
+- **0x07 — `FUN_007a43c8`** (`007a43c8_FUN_007a43c8.c:67–192`): `id=DWORD RP[1..4]`; **chỉ chạy khi actor đã tồn tại** (`FUN_0070c20c != 0`, `:69–70`); vòng entry từ `pos=6` (RP[5]): `[slot:1][a:4][b:4][flag:1][x:1][len:1][name]` (12+len byte, `:81–141`); ghi y hệt 0x04 (`FUN_0071c3a0` flag 0 `:156`, `FUN_0071dae0` khi flag==1 `:162`, `subobj+0x55F := x` `:174`, name → `subobj+9` `:190`).
+- **0x08 — `FUN_007a5010`** (835 dòng, blob state slot): vòng record từ `pos=2` (`007a5010_FUN_007a5010.c:142–145`), mỗi record dài `99+len` byte (`:817`): header 29B: `slot=RP[0]`, `w=Word` → `FUN_0071c3a0(self, slot, w, 0)` + `FUN_005752a8(gvar_007DA688, w)` + `FUN_007a5e1c(mgr, slot)` (`:160–165`); `DWORD→subobj+0x3FC` (`:181`); byte→`+0x3FA` (`:198`); 8×Word→`+0x3EA..+0x3F8` (`:214–326`); 3 byte→`+0x55D/55E/55F` (`:343–377`); Word→`+0x400` (`:393`); byte `len` + name→`subobj+9` (`:415–423`); 4 byte→`+0x560..0x563` (`:463`); 6 block 10 byte → `FUN_0072fa98(subobj, w, ...)` mỗi block (`:470–690`); byte→`+0x565` (`:715`); char→byte `+0x566` qua `FUN_0077eaa4` (`:752`); Word→`+0x568` (`:791`); cuối record `FUN_007a5d54(mgr, slot)` (`:821`). **Toàn bộ field này là bản "full state" của cùng sub-object slot mà 0x01/0x02/0x04/0x07 ghi từng phần** — tên field nghiệp vụ chưa kết luận được.
+- **0x0C — `FUN_00746fc8`** (`00746fc8_FUN_00746fc8.c:26–133`): `mode=RP[1]` byte → `self+0x1358`; đảm bảo 2 object `THuman` (`VMT_70B1C4_TPlayers→THuman_Create`) tại `self+0x1350/+0x1354` (`:31–38`); chọn animation id theo `self+0x4B0/0x4B1` (0x7536/0x753D..0x7540, và 0x4655) qua VMT `+0x1c` (`:39–57`); ghi 2 float `+0x340/+0x344` (`:59–63`). `mode==1` → `self+0x134D=1` + `FUN_0053b3cc`; `mode==2` → copy tọa độ `self+0x1C/0x20/0x54/0x58 ±400/-50` vào 2 THuman + `FUN_0070dc78` (`:69–122`); `mode==3` → `TObject_Free` cả 2 + clear (`:124–132`). → **dựng/hủy "người đẩy xe" hiển thị khi mount/dismount cart** (suy từ offset cart `+0x4B0/+0x4B1` đã biết ở OP 0x0C §4).
+- **0x0D — `FUN_0052a898`** (`0052a898_FUN_0052a898.c:45–79`): chuỗi record `[id:4 DWORD][w:2 Word]` từ `RP[1]`; actor không tồn tại → skip 2 byte; có → `FUN_0074b7c8(actor, w)` — **nhiều bản buff của SubOp 0x0E** (lá buff đã biết ở §4.5).
+- **0x10 — `FUN_0074dfd4`** (`0074dfd4_FUN_0074dfd4.c:55–117`): `id=DWORD RP[1..4]`; guard `Len<6→BoundErr(5)` → `slot=RP[5]` (guard `≤4`); `w1=Word RP[6..7]`; `w2=Word RP[8..9]`; resolve obj (self/scene); nếu `subobj(slot)+4 ≠ 0` (slot đang dùng): đọc tên `subobj+9`, ghi `subobj+0x568 := w2` (`:99`), VMT `+0x1c` (`:104`), copy lại tên (`:112`); nếu `obj+0x37C` (cửa sổ slot đang mở) có `+0xD == slot` → `FUN_007209fc(obj+0x37C, w1, w2)` (`:113–116`). → **cập nhật state/giá của slot đang dùng**.
+- **0x11 — `FUN_0074e400`** (`0074e400_FUN_0074e400.c:45–98`): `kind=RP[1]` (chỉ nhận 1..5, `:51–52`); `id=DWORD RP[2..5]` (`Copy(RP,3,4)` `:54`); resolve obj; mỗi kind chọn cặp animation id từ {0x4668..0x4673} (`:74–95`) rồi `FUN_0074e20c(obj, &danh_sách_4_id, 3, 4, obj+0x57C, ...)` (`:97`) — **phát bộ animation lên mảng slot** (lá không bóc).
+- **0x12 — `FUN_0074edd0`** (`0074edd0_FUN_0074edd0.c:35–68`): `slot=RP[1]`; điều kiện chạy `slot-1 < 4` theo **unsigned** ⇒ `slot ∈ 1..4` — `slot==0` hoặc `≥5` → **dừng im lặng, không BoundErr** (`:43`); guard `Len<3→BoundErr(2)`, `Len<4→BoundErr(3)`; ghi `subobj(slot)+0x56A := RP[2]`, `subobj(slot)+0x56B := RP[3]` (2 byte; chỉ số dùng nguyên `slot`, guard `slot≤4` thừa). Payload tối thiểu 5.
+- **0x13 — `FUN_005a71bc`** (`005a71bc_FUN_005a71bc.c:45–71`): `mã=RP[1]` (guard `Len<2`); `==1`: guard `Len<3`, `FUN_0077eaa4(char RP[2])` → byte 0/1 (`0077eaa4.c:51-52`: `char=='\x01'`) → `form+0x180 := kết quả` + `FUN_005a7584(form)` — đổi ảnh nút **"btn_ExpressOn"/"btn_ExpressOff"** (`005a7584_FUN_005a7584.c:21–29`) → **bật/tắt chế độ "tốc hành/express" của SystemForm**; `==2`: ghi dòng chat-log hằng `DAT_005A7280` (tag 0) (`:70`).
+- **0x14 — `FUN_007a5b74`** (`007a5b74_FUN_007a5b74.c:37–118`): batch của 0x15: `n=(Len-1)/3` record `[slot:1][b1:1][b2:1]`; mỗi record: `subobj(slot)+0x5CA := b1`, `+0x5C9 := b2`, `+0x408 (Short) := b1*50`, `+0x40A (Short) := b2*10`, rồi `FUN_007a5d54(mgr, slot)` (`:116`).
+- **0x15 — `FUN_007a4e94`** (`007a4e94_FUN_007a4e94.c:37–93`): một record `[slot:1][b1:1][b2:1]` (3 guard `Len<2/3/4` → payload ≥5; slot guard `≤4`); ghi y hệt 0x14 (`+0x5CA`, `+0x5C9`, `+0x408 = b1*50`, `+0x40A = b2*10`) + `FUN_007a5d54(mgr, slot)` (`:93`).
+- Lá `FUN_007a5d54` / `FUN_007a5e1c` (refresh mgr theo slot) **không có file body** — giữ mức call-site.
 
 ---
 
@@ -147,8 +164,12 @@ case 0xf:
 
 ## 6. Chuỗi tiếng Việt / mã hóa
 
-- Handler tầng case **không tham chiếu bất kỳ hằng chuỗi nào** (chỉ `gvar_*` + địa chỉ hàm). Cả 5 hàm con đọc được body **không chứa một `DAT_…/UNK_0079…` chuỗi nào**.
-- Do đó **không có gì để tra `ts_decompile/redump/lit_*.hex`, không giải mã gì cho OP này — ghi rõ để tránh bịa đặt**. Ghi nhận tiền lệ đúng của game là **cp1258 → NFC** (theo `opcode_02.md` mục 5), không phải VISCII, để dùng khi cần trong tương lai.
+- Handler tầng case **không tham chiếu bất kỳ hằng chuỗi nào** (chỉ `gvar_*` + địa chỉ hàm).
+- 15 body mới (2026-09-14) xác nhận: **không có chuỗi nào trên wire**; các handler gọi `FUN_0077ef7c/eb9c` decode số. Chỉ tìm thấy **3 hằng chuỗi vùng code** trong callee — tất cả **không có trong `redump/` → chưa dịch được, không bịa**:
+  - `DAT_007A42B0` — hậu tố dòng chat-log của SubOp 0x02 (`007a40e8_FUN_007a40e8.c:98`).
+  - `DAT_005A7280` — dòng chat-log của SubOp 0x13 nhánh `mã==2` (`005a71bc_FUN_005a71bc.c:70`).
+  - `"btn_ExpressOn" / "btn_ExpressOff"` — tên asset nút trong `FUN_005a7584` (SubOp 0x13, ASCII thuần, không cần giải mã).
+- Tiền lệ mã hóa: **VISCII đơn-byte tiền tổ hợp** (đính chính 2026-09-14 — bản cũ ghi cp1258 theo `opcode_02.md` mục 5; cp1258 đã bị bác bỏ bằng chứng byte ở `opcode_09.md §7.1`), dùng khi dump literal các chuỗi còn treo.
 
 ---
 
@@ -166,8 +187,8 @@ case 0xf:
 | SubOp 0x0E: id=1,w=2 | `0F 0E 01 00 00 00 02 00` | `F4 44 08 00 …` | `59 E9 A5 AD A2 A3 AC AD AD AD AF AD` |
 | SubOp 0x0F: w=0 (clear buff self),b=0 | `0F 0F 00 00 00` | `F4 44 05 00 …` | `59 E9 A8 AD A2 A2 AD AD AD` |
 
-3. **Thứ tự test an toàn:** `0F 0B 01` (1 byte, ít tác động nhất) → `0F 0F 00 00 00` (clear buff self, hàm lá đã rõ) → `0F 09 …` với id lạ (dừng ở `FUN_0070c20c==0` nếu actor chưa tồn tại) → `0F 05/0E` với id tồn tại → cuối cùng `0F 0A` (parser vòng lặp) và các pass-through mù.
-4. **Không gửi SubOp `0x00 / 0x03 / ≥0x16`** — rơi qua switch (vô hại nhưng vô nghĩa). Payload ngắn hơn mức tối thiểu → `_BoundErr`, coi như gói lỗi.
+3. **Thứ tự test an toàn (cập nhật 2026-09-14):** `0F 0B 01` (clear WORD slot 1, hàm đã rõ) → `0F 0F 00 00 00` (clear buff self) → `0F 09 …` với id lạ (dừng ở `FUN_0070c20c==0`) → `0F 05/0E/0D` với id tồn tại → `0F 01/02/06/10/11/12/14/15` (giờ đã biết chính xác field: dùng id tồn tại + slot 0..4) → `0F 04/07/0A/08` (parser vòng lặp, dễ BoundErr nếu record cụt). Chú ý: `0C/12/13/14/15` không chứa id — ghi thẳng lên self/form; còn các gói theo id khi actor chưa tồn tại đa số **rơi im lặng** (bỏ qua).
+4. **Không gửi SubOp `0x00 / 0x03 / ≥0x16`** — rơi qua switch (vô hại nhưng vô nghĩa). Payload ngắn hơn mức tối thiểu trong bảng §3 → `_BoundErr` trong callee, coi như gói lỗi. Lưu ý 0x12: `slot=0` hoặc `≥5` **không lỗi, chỉ im lặng bỏ qua**.
 5. **Không cần** mock chiều C→S cho OP 0x0F.
 
 ---
@@ -189,8 +210,11 @@ case 0xf:
 | 11 | `0077eb1c/0077ee84/0077f098` | body tồn tại | Xác minh **không dùng** ở OP này |
 | 12 | `0051189c / 0050a4a0` | khởi tạo form | `TFNpcManage`, `TWF_CartManage`, `TSe_SystemForm` |
 | 13 | `0050a248`, `token_send.hex`, `token_recv.hex` | XOR + token | Framing `F4 44` + XOR `0xAD` |
+| 14 | `007a3ed0 / 007a40e8 / 007a4694 / 007a42ec / 007a43c8 / 007a5010 / 00751c7c / 00746fc8 / 0052a898 / 0074dfd4 / 0074e400 / 0074edd0 / 005a71bc / 007a5b74 / 007a4e94` (`*_FUN_*.c`) | **15 body mới 2026-09-14** | verify từng SubOp §3/§4.7 — field offsets, guard, lá |
+| 15 | `0071d058 / 0071c8dc / 0072a7a8(qua 0b) / 007209fc(không body) / 0074e20c / 0072fa98 / 005a7584 / 0077eaa4 / 0077ed68` | lá được gọi từ body mới | phân loại "presentation / setter slot" |
 
-**Giới hạn (không suy diễn):**
-- 15/20 hàm con không có body — ý nghĩa các SubOp đó chỉ biết ở mức `(objectForm, forward RP)`.
-- Tên class của `gvar_007DA2FC` chưa tìm thấy dòng `Create` trực tiếp — vai trò suy từ call-site, đã đánh dấu mức chắc chắn.
-- Ý nghĩa game-design chi tiết (buff nào, NPC nào, cart dùng ở đâu) nằm ngoài tầng case — chỉ kết luận ở mức "đồng bộ NPC/cart/buff".
+**Giới hạn (không suy diễn) — cập nhật 2026-09-14:**
+- ~~15/20 hàm con không có body~~ → **cả 20/20 đường đã có body**. Khoảng trống còn lại chỉ là LÁ: `FUN_0071c3a0`, `FUN_007a5d54`, `FUN_007a5e1c`, `FUN_0074e20c`, `FUN_007209fc` (không file `.c`) — các field slot `+0x55F..+0x568`, `+0x3EA..+0x40A` ghi từ body mới có tên/ý nghĩa **chưa kết luận được**, chỉ mô tả offset+size đúng code.
+- Mâu thuẫn ghi nhận nguyên trạng ở SubOp 0x04: nhánh "actor không tồn tại" skip `7·n` byte trong khi nhánh kia tiêu thụ `12+len`/entry → **chưa kết luận được** wire thật sự hay bug.
+- Tên class của `gvar_007DA2FC` chưa tìm thấy dòng `Create` trực tiếp (body 0x0D lại bỏ qua arg1 — vai trò vẫn mở).
+- Ý nghĩa game-design chi tiết (buff nào, slot dùng ở đâu, chuỗi `007A42B0/005A7280`) nằm ngoài tầng case; các hằng chuỗi chưa dump.

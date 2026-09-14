@@ -3,6 +3,8 @@
 Ngày: 2026-09-10 · Workspace: `/mnt/d/VUDT/GIT_PCC/test` · Feature: `op-code`  
 Trạng thái: **Đã xác minh 100% từ decompile jump-table và case functions (sửa đổi và hoàn thiện các phỏng đoán trong handoff trước)**
 
+> Cập nhật 2026-09-14: bổ sung phân tích từ các body/hex dump mới (theo `missing_opcode_sources.md`). Riêng bảng chuỗi OP 0x00 (`0x796418…0x796d38`): **3/53 chuỗi đã có dump và được giải mã** (`0x7967f8`, `0x796a8c`, `0x796ae8` — xem ghi chú dưới bảng); **50 chuỗi còn lại — bao gồm `0x796d10` (SubOp 0x38) và `0x796d38` (default) — VẪN CHƯA CÓ DUMP** (`ls ts_decompile/redump/` không có `lit_796d10/796d38.hex`), giữ nguyên placeholder, KHÔNG đặt tên suy đoán.
+
 ---
 
 ## 1. Bối cảnh & Đính chính từ Handoff trước
@@ -95,7 +97,7 @@ Lệnh `switch(SubOp)` tra cứu chuỗi thông báo tĩnh trong bộ nhớ:
 | `0x15` | 21 | `0x796770` | Chuỗi lỗi / thông báo hệ thống |
 | `0x16` | 22 | `0x7967a4` | Chuỗi lỗi / thông báo hệ thống |
 | `0x17` | 23 | `0x7967d8` | Chuỗi lỗi / thông báo hệ thống |
-| `0x18` | 24 | `0x7967f8` | Chuỗi lỗi / thông báo hệ thống |
+| `0x18` | 24 | `0x7967f8` | **ĐÃ GIẢI MÃ** (`lit_7967f8.hex`, first-str 30B, NUL `0x796816`): VISCII→NFC (đính chính recipe — xem `opcode_09.md §7.1`) = **`Mật khẩu quá ngắn, mất kết nối`** |
 | `0x19` | 25 | `0x796820` | Chuỗi lỗi / thông báo hệ thống |
 | `0x1A` | 26 | `0x796844` | Chuỗi lỗi / thông báo hệ thống |
 | `0x1B` | 27 | `0x79686c` | Chuỗi lỗi / thông báo hệ thống |
@@ -112,9 +114,9 @@ Lệnh `switch(SubOp)` tra cứu chuỗi thông báo tĩnh trong bộ nhớ:
 | `0x26` | 38 | `0x796a04` | Chuỗi lỗi / thông báo hệ thống |
 | `0x28` | 40 | `0x796a3c` | Chuỗi lỗi / thông báo hệ thống |
 | `0x29` | 41 | `0x796a68` | Chuỗi lỗi / thông báo hệ thống |
-| `0x2A` | 42 | `0x796a8c` | Chuỗi lỗi / thông báo hệ thống |
+| `0x2A` | 42 | `0x796a8c` | **ĐÃ GIẢI MÃ** (`lit_796a8c.hex`, first-str 25B, NUL `0x796AA5`): raw `SØa đ±i tß li®u chiªn đ¤u` ≈ **`Sửa đổi thông tin chiến đấu`** |
 | `0x2B` | 43 | `0x796ab0` | Chuỗi lỗi / thông báo hệ thống |
-| `0x2C` | 44 | `0x796ae8` | Chuỗi lỗi / thông báo hệ thống |
+| `0x2C` | 44 | `0x796ae8` | **ĐÃ GIẢI MÃ** (`lit_796ae8.hex`, first-str 42B): decode VISCII: **`Sự kiện và quang cảnh xẩy ra không phù hợp`** (chốt — văn nguyên game) |
 | `0x2D` | 45 | `0x796b1c` | Chuỗi lỗi / thông báo hệ thống |
 | `0x2E` | 46 | `0x796b5c` | Chuỗi lỗi / thông báo hệ thống |
 | `0x2F` | 47 | `0x796b8c` | Chuỗi lỗi / thông báo hệ thống |
@@ -125,8 +127,8 @@ Lệnh `switch(SubOp)` tra cứu chuỗi thông báo tĩnh trong bộ nhớ:
 | `0x35` | 53 | `0x796c88` | Chuỗi lỗi / thông báo hệ thống |
 | `0x36` | 54 | `0x796cac` | Chuỗi lỗi / thông báo hệ thống |
 | `0x37` | 55 | `0x796cd8` | Chuỗi lỗi / thông báo hệ thống |
-| `0x38` | 56 | `0x796d10` | Chuỗi lỗi / thông báo hệ thống |
-| `default` | - | `0x796d38` | Mã lỗi không xác định, gán SubOp = `0xFF` |
+| `0x38` | 56 | `0x796d10` | Chuỗi lỗi / thông báo hệ thống — **chưa dump** (tái xác nhận 2026-09-14: không có `lit_796d10.hex`) |
+| `default` | - | `0x796d38` | Mã lỗi không xác định, gán SubOp = `0xFF` — **chuỗi default chưa dump** (không có `lit_796d38.hex`) |
 
 * **Hành vi sau giải mã**:
   1. Nối chuỗi thông báo với mã số lỗi `IntToStr(SubOp)`.

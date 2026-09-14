@@ -3,6 +3,8 @@
 Ngày: 2026-09-12 · Workspace: `/mnt/d/VUDT/GIT_PCC/test` · Feature: `op-code` · Client: `aLogin.exe` (Delphi)
 Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (`ts_decompile/`). Ánh xạ jump table đã kiểm: `jumptable_byte200_0x78A8EE[0x16] = 0x13 (=19)` → `jumptable_dword200_0x78A9B6[19]` (entry `0x0078AA02`, giá trị `AF FE 78 00`) → target `0x0078FEAF` = **Case 19**.
 
+> Cập nhật 2026-09-14: bổ sung phân tích từ các body/hex dump mới (theo `missing_opcode_sources.md`).
+
 > Phạm vi: **core logic opcode**. Bỏ qua chi tiết thuần **graphics/animation** (chỉ nhắc khi cần định vị). Một số field là *ô chiếm dụng lưới* / *hướng sprite* — mô tả đúng bản chất dữ liệu, không đi sâu vẽ.
 
 ---
@@ -19,10 +21,10 @@ Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (`ts_decompile/`). 
 | Trạng thái | `0x03` | **Gắn mốc thời gian / trạng thái hẹn giờ** cho object `idx` (`v×1000`). |
 | Trạng thái | `0x06` | **Bật/ghi byte trạng thái** `obj+0x34c` cho object `idx`. |
 | Hành động | `0x09` | **Lệnh hành động/kỹ năng có kiểm tra + quay hướng**: A dùng action B nhắm/hướng tới C. |
-| Registry/đội | `0x01, 0x07, 0x08, 0x10` | Delegate sang helper **chưa trích xuất** (team roster & thao tác registry `gvar_007D9D34`). |
+| Registry/đội | `0x01, 0x07, 0x08, 0x10` | **ĐÃ BÓC TỪ BODY MỚI (2026-09-14)** — xem §4.7: `0x01` ghi byte trạng thái `obj+0xe1` (KHÔNG phải party roster như suy luận cũ), `0x07` đặt asset-index `obj+0x3d8 = payload[4]+100`, `0x08` chạy method VMT+0x18 + restore `+0xe3/+0x384`, `0x0A` dặt neo `+0x4c/+0x50` + ô lưới |
 
 - `SubOp 0x00` và `≥0x0B`: **không có `default` → âm thầm bỏ qua** (`case_019.c:36–190` chỉ có `case 1..10`).
-- **Không có chuỗi in-game** trong mọi nhánh đã khôi phục (toàn bộ field là Word/DWORD/byte nguyên) → không có gì để dịch (xem §7).
+- Chuỗi trong các nhánh đã khôi phục: **chỉ có literal asset** — `sound\WA0014.wav` (SubOp 1, `007a2be8.c:68`) và tên sprite `"Boat06R…"` (đuôi SubOp 3, `0052b694.c:208`); **không có chuỗi tiếng Việt in-game** (xem §7).
 
 **Sửa lại ghi chú cũ ở `opcode_14.md`:** tài liệu 0x14 tóm tắt `FUN_007127BC(obj,X,Y)` là "dặt tọa độ" — **chưa chính xác**. Đọc trực tiếp `007127bc.c` (mục 4.1) cho thấy nó **chỉ đặt ĐÍCH ĐẾN (walk-to)**, không đụng trường vị trí hiện hành. Trường vị trí thật do `FUN_0071BF18` (SubOp 5) đảm nhiệm.
 
@@ -58,16 +60,16 @@ Quy ước object: `idx = payload[2..3]` (Word LE, **bound `≤100`**), con tr�
 
 | SubOp | Độ dài payload | Layout (`payload[...]`) | Hành vi | Handler |
 | :---: | :---: | :--- | :--- | :--- |
-| `0x01` | opaque | `[16][01][<RestPayload>]` | Team/party (suy luận) | `func_0x007a2be8(TCY_TeamManage=gvar_007D9D64, RP)` — **chưa có** |
+| `0x01` | 5 | `[16][01][idx:W=payload[2..3]][state:1B=payload[4]]` | Ghi `obj+0xe1=state` (+WA0014.wav nếu `obj+0x2a==0x0B && state==1`) — **ĐÃ BÓC** `007a2be8.c:44-70`; **đính chính: không phải party roster** | `func_0x007a2be8(gvar_007D9D64, RP)` |
 | `0x02` | 8 | `[16][02][idx:W][X:W][Y:W]` (`X=payload[4..5]`, `Y=[6..7]`) | **Walk-to** | `FUN_007127BC(obj,X,Y)` |
-| `0x03` | ≥6 (8) | `[16][03][idx:W][v:W=payload[4..5]][payload[6..7]: bỏ]` | Gắn **timer/trạng thái** `v*1000` | `FUN_00712940` (+`func_0x0073c524`, +`func_0x0052b694` — xem 4.3) |
+| `0x03` | ≥6 (8) | `[16][03][idx:W][v:W=payload[4..5]][payload[6..7]: bỏ]` | Gắn **timer/trạng thái** `v*1000` | `FUN_00712940` (+`0073c524` TLight-mark +`0052b694` TWreck — xem 4.3) |
 | `0x04` | `2+13N` | `[16][04][ N× record 13B ]` — record = `[idx:W][r2:1B][pad:1B][X:W][Y:W][status:1B][timer:D]` (xem 4.4) | **Batch** move+state+timer | `FUN_0064246C(TFightManage=gvar_007D9CE4, RP)` |
 | `0x05` | 8 | `[16][05][idx:W][X:W][Y:W]` | **Relocate** vị trí thật + grid | `FUN_0071BF18(obj,X,Y)` |
 | `0x06` | ≥5 | `[16][06][idx:W][flag:1B = payload[4]]` | Ghi `obj+0x34c = flag` | inline (`case_019.c:156–177`) |
-| `0x07` | opaque | `[16][07][<RestPayload>]` | Registry op (UNKNOWN) | `func_0x0073d29c(gvar_007D9D34, RP)` — **chưa có** |
-| `0x08` | opaque | `[16][08][<RestPayload>]` | Registry op (UNKNOWN) | `func_0x0073d374(gvar_007D9D34, RP)` — **chưa có** |
+| `0x07` | 5 | `[16][07][idx:W][n:1B]` | `obj+0x3d8 = n+100` + resolve asset `"<prefix><n+100>"` (hiệu ứng/overlay) — **ĐÃ BÓC** `0073d29c.c:43-66`+`0072a7a8.c:60-68` | `func_0x0073d29c(gvar_007D9D34, RP)` |
+| `0x08` | ≥5 | `[16][08][idx:W][b:1B]` | `VMT+0x18(obj,b)` đổi state/action, keep/restore `+0xE3/+0x384`, action-set validation `FUN_005f4194` rồi `FUN_0072b390(obj,b)` — **ĐÃ BÓC** `0073d374.c:50-124` | `func_0x0073d374(gvar_007D9D34, RP)` |
 | `0x09` | 6 | `[16][09][A:W][B:1B=payload[4]][C:1B=payload[5]]` | **Lệnh action A→(nhắm)C, action-code B** | `FUN_00747E38(gvar_007D9D34, RP)` |
-| `0x0A` | opaque | `[16][0A][<RestPayload>]` | Registry op (UNKNOWN) | `func_0x007481d4(gvar_007D9D34, RP)` — **chưa có** |
+| `0x0A` | 8 | `[16][0A][idx:1B=payload[2]][pad][X:W=payload[4..5]][Y:W=payload[6..7]]` | Dặt **neo** `+0x4c/+0x50`+ô lưới, không đổi vị trí hiện hành — **ĐÃ BÓC** `007481d4.c:46-69`+`00711944.c` | `func_0x007481d4(gvar_007D9D34, RP)` |
 
 ---
 
@@ -109,8 +111,8 @@ obj+0x358 = v*1000;            // giá trị ms (v = Word payload[4..5])
 // + block xóa bit ô lưới như trên
 ```
 **Bản chất `+0x358`:** các hàm đọc nó (`FUN_007C4D30`: `Now(); Round(); return (rounded < param_1)`) đối xử như **mốc thời gian tuyệt đối (ms)** ⇒ `v` trên wire nên hiểu là "**giây đồng hồ máy chủ ×1000**" hơn là "duration". Hết hạn → `FUN_0072073C.c:62–67` cắt liên kết `obj+0x4c7/+0x4c8`.
-- Nhánh đặc biệt: nếu `obj+0x4 == 0x947A` (class id 38010 — cùng họ `THuman`) → gọi thêm **`func_0x0073c524(gvar_007D9D34, obj+0x1c)`** (chưa trích xuất; có thể cập nhật registry theo X-hoặc-ID).
-- Cuối nhánh: nếu **`LocalActor+0x145c == 2`** (byte "chế độ map hiện hành" — tra từ map id `LocalActor+0x63a`) → gọi `func_0x0052b694(gvar_007DA2FC, idx)` (chưa trích xuất, `gvar_007DA2FC` chỉ xuất hiện đúng 1 chỗ ⇒ **UNKNOWN**).
+- Nhánh đặc biệt: nếu `obj+0x4 == 0x947A` (class id 38010 — cùng họ `THuman`) → gọi **`func_0x0073c524(gvar_007D9D34, obj+0x1c [,obj+0x20])`** — **đã bóc từ body mới** (`0073c524_FUN_0073c524.c:31-61`): ghi vào registry `gvar_007D9D34`: `+0x5508=1`, `+0x5510=GetTickCount()`, `+0x5514/+0x5518 = X/Y (param_2/param_3)`, tạo `TLight` (VMT_772E1C) tại `+0x550c` nếu chưa có, rồi `FUN_00774220(light, 10016, 30, …, tọa độ minus camera-origin `gvar_007D9C28+0xc/+0x10`)` — bản chất: **bật hiệu ứng ánh sáng đánh dấu vị trí (X,Y)** (graphics, tóm 1 dòng). *Lưu ý:* call-site (`case_019.c:103`) chỉ model 2 tham số; `param_3` (Y) nhiều khả năng là `obj+0x20` qua ECX — chưa kết luận được chắc chắn từ bản C.
+- Cuối nhánh: nếu **`LocalActor+0x145c == 2`** (byte "chế độ map hiện hành" — tra từ map id `LocalActor+0x63a`) → gọi `func_0x0052b694(gvar_007DA2FC, idx)` — **đã bóc từ body mới** (`0052b694_FUN_0052b694.c:63-216`): `slot = FUN_0052b944(self)` (cấp slot hiệu ứng, bound `≤0x28`=40); gate `obj+0x54 ∈ [0,0x321)` && `obj+0x58 ∈ [0,0x259)`; đọc class `obj+4` → `FUN_00623f00(gvar_007D9DE4)` → byte kind `gvar_007D9DE4+0x42+idx*0x17*4` (1..6) + bit 2 của `obj+0xE4` (hướng); tạo **`TWreck`** (`VMT_525EDC_TWreck`) tại `self+0xf18+slot*4`, sprite tra bảng tên `PTR_s_Boat06R_007d7578[(kind-1)*2+hướng]`, vẽ qua `FUN_007742e4` tại `obj+0x1c/0x20` trừ origin camera. ⇒ **`gvar_007DA2FC` không còn UNKNOWN: là manager hiệu ứng xác/boat-wake (≤40 slot)** — hiệu ứng đồ họa trên map nước, không phải dữ liệu wire mới.
 
 ### 4.4. `SubOp 0x04` — Batch chiến đấu (`FUN_0064246C`, `0064246c.c:73–185`)
 Method của **`TFightManage` (gvar_007D9CE4)**. Số record `N = (len(RestPayload)-1)/13`. Đầu record thứ `i` (0-based) tại `payload[base]` với `base = i*13 + 2`. **Mỗi record đúng 13 byte (r0..r12), trong đó `r3` là byte đệm KHÔNG đọc** (mã `_LStrCopy` nhảy thẳng từ `base+2` sang `base+4` — xem `0064246c.c:96–143`):
@@ -148,10 +150,15 @@ C = payload[5];            // object thứ 2 (đích/hướng)
 ```
 `FUN_00731A9C` **chính là hàm mà `TForm1.DXDraw1MouseDown` gọi khi người chơi click** ⇒ SubOp 9 = "server ra lệnh cho A dùng action B nhắm/hướng tới C", mô phỏng y hệt thao tác chuột.
 
-### 4.7. SubOp 1, 7, 8, 10 — delegate chưa trích xuất
-Toàn bộ nhận nguyên `RestPayload`:
-- `0x01` → `func_0x007a2be8(gvar_007D9D64 = **TCY_TeamManage**)`. Họ hàm cùng object: `FUN_007A2604` (clear roster), `FUN_007A273C` (parse **`[leaderID:DWORD][N:byte][N×memberID:DWORD]`**) ⇒ suy luận `0x01` = **cập nhật roster/thành viên party** (độ tin **trung bình**, hàm chưa có body).
-- `0x07/0x08/0x0A` → `func_0x0073d29c / 0x0073d374 / 0x007481d4` trên **`gvar_007D9D34`** (registry entity/target) ⇒ **UNKNOWN** (thao tác registry chưa có body).
+### 4.7. SubOp 1, 7, 8, 10 — delegate (**ĐÃ BÓC TỪ BODY MỚI 2026-09-14 — đính chính lớn**)
+
+Tất cả nhận `(self-global, RestPayload)`; wire thực sự được parse **bên trong callee**, không phải "opaque":
+
+- **`0x01` → `func_0x007a2be8(gvar_007D9D64 = TCY_TeamManage, RP)`** (`007a2be8_FUN_007a2be8.c:44-70`):
+  `idx = Word(Copy(RP,2,2))` (`:44-45`, guard `≤100`), `state = byte payload[4]` (`:46-52`); nếu `gvar_007DA6DC[idx]≠0` → **`obj+0xe1 = state`** (`:62`); đặc biệt: `obj+0x2a == 0x0B && state == 1` → phát `sound\WA0014.wav` (`:67-69`). **Đính chính:** suy luận cũ "cập nhật roster/thành viên party `[leaderID][N][members]`" là **SAI** — đây là **ghi byte trạng thái `+0xe1` theo slot + gắn âm thanh**, không đụng field party nào; `self` (`TCY_TeamManage`) không được đọc. Wire: `[16][01][idx:W][state:1B]` (≥5B).
+- **`0x07` → `func_0x0073d29c(gvar_007D9D34, RP)`** (`0073d29c_FUN_0073d29c.c:43-66`): `idx = Word(payload[2..3])`; `v = byte payload[4] + 100`; `FUN_0072a7a8(obj, v)` → `obj+0x3d8 = v` (byte), `+0x3d9=0`, `+0x3da=1`, `+0x3df=Now()` (double), `+0x3db = FUN_007c9b38(gvar_007D9ED8, "<prefix>"+IntToStr(v))` (`0072a7a8_FUN_0072a7a8.c:60-68`) — **đặt chỉ số tài nguyên/overlay (hiệu ứng) cho object** (tra tên asset theo số). Wire `[16][07][idx:W][assetIdx:1B]` (≥5B).
+- **`0x08` → `func_0x0073d374(gvar_007D9D34, RP)`** (`0073d374_FUN_0073d374.c:50-124`): `idx = Word(payload[2..3])`, `b = byte payload[4]`; lưu `obj+0xE3`, `obj+0x384` (900); gọi **method ảo `VMT+0x18(obj, b)`** (`:79-80`); khôi phục `+0xE3/+0x384` (`:96,107`); đọc `obj+0xE3` sau call, validate `FUN_005f4194(gvar_007D9ECC, obj+0x7c+1000, E3)` → nếu OK: `FUN_0072b390(obj, b)` (`:118-124`). ⇒ cùng khung "đổi state/action theo `b`" như SubOp 9 nhưng không có object thứ hai; **ý nghĩa `b` phụ thuộc action-set, chưa kết luận được enum**. Wire ≥5B.
+- **`0x0A` → `func_0x007481d4(gvar_007D9D34, RP)`** (`007481d4_FUN_007481d4.c:46-69`): **`idx = byte payload[2]`** (1 byte — khác mọi SubOp khác dùng Word!), guard `≤100`; `X = Word(payload[4..5])` (`Copy(RP,4,2)`, byte `payload[3]` bị bỏ qua), `Y = Word(payload[6..7])`; `FUN_00711944(obj, X, Y)` → `obj+0x4c=X, +0x50=Y` (neo), `+0xe5=0`, `+0xf0=X/20, +0xf4=Y/20` (ô lưới), `FUN_00711aa4(obj)` (`00711944_FUN_00711944.c:20-26`). ⇒ **dặt neo server-truth + lưới cho object mà không đổi vị trí hiện hành** (bản "chỉ neo" của SubOp 5). Wire: `[16][0A][idx:1B][pad][X:W][Y:W]` (≥8B).
 
 ---
 
@@ -162,13 +169,13 @@ Toàn bộ nhận nguyên `RestPayload`:
 | `gvar_007DA6DC` | **Mảng con trỏ toàn cục chỉ số 0..100**; slot `1..100` = **world object / NPC**; element layout: `+4`=class id, `+0x1c/+0x20`=X/Y hiện hành, `+0x4c/+0x50`=X/Y neo, `+0x54/+0x58`=spawn, `+0x24`=zone, `+0x2a`=kind, `+0x100/+0x104/+0x118/+0x11c`=lệnh đi, `+0x34c`=state, `+0x350`=Now double, `+0x358`=deadline ms, `+0xe1/+0x582` | `005e8534.c:189–190` (`TMapNpc_Create`), bound `100` `case_019.c:51…`, field `007127bc/0071bf18/00712940/0064246c/00747e38` |
 | `gvar_007D9D34` | **Registry entity/target**: `+0x60` số actor biết, `+0x6c/6d/71/75` trạng thái, `+0x76/7b/7f` target; method ID→index (`FUN_0070C20C`) | `0070c20c.c:1`, `0070c284.c:27–57`, `005e9d94.c:114–141`, callers `case_019.c:103,180,183,186,189` |
 | `gvar_007D9CE4` | **`TFightManage`** (combat manager, VMT_63CCDC); method `FUN_0064246C` | `0050a4a0_TForm1.FormCreate.c:615–617` |
-| `gvar_007D9D64` | **`TCY_TeamManage`** (party manager, VMT_7A1838); methods `007A2604/007A273C` | `0051189c.c:1387–1388`; caller `case_019.c:38` |
+| `gvar_007D9D64` | **`TCY_TeamManage`** (party manager, VMT_7A1838); methods `007A2604/007A273C` | `0051189c.c:1387–1388`; caller `case_019.c:38`. **Lưu ý:** SubOp 1 (`func_0x007a2be8`) nhận self này nhưng **không đọc** — chỉ ghi `obj+0xe1` vào `gvar_007DA6DC[idx]` |
 | `gvar_007DA7BC` | **LocalActor** | khắp nơi; gate SubOp 3 tại `case_019.c:125` |
 | `LocalActor+0x145c` | byte "chế độ/bản đồ hiện hành" tra từ map id `+0x63a`; `==2` kích hoạt `func_0x0052b694` | `case_004_0078BC95.c:107–115`, `0077f414.asm.txt:281–283` |
 | `gvar_007D9C28` | **Map grid**: origin cam `+0xc/+0x10`, origin lưới `+0x14/+0x18`, byte-grid `+400`, stride `0xFB` (251); **bit 2 (=4)=ô bị chiếm** | `007127bc.c:53–74`, `0071bf18.c:50–93` |
 | `gvar_007D9ECC` | Registry asset/action-set (TList `+0x49c`, item byte-flag `+0x10..`), key=`obj+0x7c+1000` | `005f4194.c:55–62`, `00517054.c:159–167` |
 | `gvar_007D9D30` | **Codec/self** cho `FUN_0077EB9C/ED68/EF7C` (không phải dữ liệu wire) | `0064246c.c:97,143`, `00747e38.c:69` |
-| `gvar_007DA2FC` | **UNKNOWN** — chỉ 1 tham chiếu (`case_019.c:126`) | grep toàn cây |
+| `gvar_007DA2FC` | **Manager hiệu ứng nước/xác wreck** — object có ≤40 slot `TWreck` tại `+0xf18`, helper cấp slot `FUN_0052b944` | **ĐÃ XÁC MINH (2026-09-14)** từ `0052b694_FUN_0052b694.c:63-216` (trước: UNKNOWN) |
 | class id `0x947A` (38010) | loại object đặc thù (họ `THuman`) → bật `+0x582` khi chọn/enter | `case_019.c:79`, `005e9d94.c:140–145` |
 
 ---
@@ -184,9 +191,10 @@ Toàn bộ nhận nguyên `RestPayload`:
 
 ## 7. Chuỗi literal & encoding
 
-- Quét `UNK_/DAT_` trên `case_019.c` + 5 helper đã khôi phục (`007127bc/00712940/0071bf18/0064246c/00747e38`): **0 kết quả** ⇒ **OP 0x16 không mang chuỗi** ở các nhánh đã khôi phục; mọi field là Word/DWORD/byte nguyên → **không có gì để dịch sang UTF-8**.
-- Chuỗi chỉ có thể nằm trong 6 callee **chưa có body** (`0x007a2be8, 0x0073c524, 0x0073d29c, 0x0073d374, 0x007481d4, 0x0052b694`) → **chưa có dump ⇒ không dịch được**.
-- Tham chiếu encoding (để_redump đối chiếu sau này): dự án dùng bảng đơn-byte tiền tổ hợp; `windows-1258` đã chứng minh **sai** (xem `opcode_13.md` mục 7).
+- Quét `UNK_/DAT_` trên `case_019.c` + các helper đã khôi phục: **không có chuỗi hiển thị tiếng Việt**; mọi field là Word/DWORD/byte nguyên → **không có gì để dịch sang UTF-8**.
+- Literal ASCII duy nhất tìm thấy trong 6 callee (trước đây "chưa có body", **nay đã có**): `sound\WA0014.wav` trong `007a2be8.c:68`; tên sprite `"Boat06R"` (và chuỗi prefix asset trong `0072a7a8.c:63` + `007c9b38` tra `.bmp`) — **asset/game-internal name, không phải text in-game**, không cần dịch.
+- 4 helper `0x0073d29c/0x0073d374/0x007481d4/0x007a2be8` và `0x0073c524/0x0052b694` **đã bóc xong**, không còn suy đoán chuỗi.
+- Tham chiếu encoding (để redump đối chiếu sau này): dự án dùng bảng đơn-byte tiền tổ hợp; `windows-1258` đã chứng minh **sai** (xem `opcode_13.md` mục 7).
 
 ---
 
@@ -200,7 +208,12 @@ Toàn bộ nhận nguyên `RestPayload`:
 3. **Trạng thái có thời hạn**: `[16][03][idx:W][v:W]` → client set `state=4`, `deadline=v*1000` (đọc là **mốc giờ tuyệt đối ms**, không phải duration). Chỉ gửi 2 byte `v` (payload[4..5]); payload[6..7] client vứt.
 4. **Bật/tắt cờ**: `[16][06][idx:W][flag:1B]` → `obj+0x34c=flag` (`2`/`4` = trạng thái bị các vòng xử lý bỏ qua).
 5. **Hành động/kỹ năng**: `[16][09][A:W][B:1B][C:1B]`. `B` **phải hợp lệ** với action-set của `A` (tra `gvar_007D9ECC`), ngược lại `FUN_005F4194` fail → không thi hành. `C` là object thứ hai (đích/hướng); nếu `obj[C]` ở (0,0) thì chỉ thi hành action không quay.
-6. **SubOp 1/7/8/10**: chưa đặc tả (helper thiếu) → **chưa mock được**; cần redump `func_0x007a2be8` (party roster, khuôn ứng viên `[leaderID][N][N×memberID]`) và 3 hàm registry `0x0073d29c/0x0073d374/0x007481d4`.
+6. **SubOp 1/7/8/10 — ĐÃ MOCK ĐƯỢC (2026-09-14, body mới)**:
+   - `0x01`: `[16][01][idx:W][state:1B]` → ghi `obj+0xe1`. **KHÔNG còn là party roster** (đính chính).
+   - `0x07`: `[16][07][idx:W][n:1B]` → `obj+0x3d8 = n+100` + resolve asset hiệu ứng.
+   - `0x08`: `[16][08][idx:W][b:1B]` → `VMT+0x18(obj,b)` (đổi state/action) + validate action-set.
+   - `0x0A`: `[16][0A][idx:1B][pad][X:W][Y:W]` → ghi neo `+0x4c/+0x50` + ô lưới.
+   Vẫn còn thiếu: không có gì của 4 SubOp này là "cần redump" nữa; enum `b`/`state` đầy đủ vẫn chưa kết luận được.
 7. **Cảm ơn client tự gửi C→S `(16 01)`** khi người chơi bấm nút được gate class `0x69` — mock chỉ cần sẵn sàng nhận, không bắt buộc xử lý.
 
 ---
@@ -219,5 +232,6 @@ Toàn bộ nhận nguyên `RestPayload`:
 | 8 | `functions/0050a4a0_TForm1.FormCreate.c:615–617`, `0051189c.c:1387–1388` | tên VMT `TFightManage`/`TCY_TeamManage` |
 | 9 | `functions/0077f414_FUN_0077F414.c:927` + `.asm.txt:246–254,281–283,318–345`; `005fc840_FUN_005fc840.asm.txt:15–19` | chiều C→S (mục 6) |
 | 10 | `functions/0077eb9c_FUN_0077eb9c.c` (Word LE) | bẫy SubOp 3 |
+| 11 | **Bodies mới (2026-09-14)**: `functions/007a2be8_FUN_007a2be8.c` (SubOp 1), `0073d29c` (7), `0073d374` (8), `007481d4` (0A), `0073c524`+`0052b694` (đuôi SubOp 3), `0072a7a8` (asset `+0x3d8`), `00711944` (neo `+0x4c/50`) | §4.7 + §4.3 — đặc tả 4 delegate + 2 helper đuôi SubOp 3; `gvar_007DA2FC` = manager TWreck |
 
-**UNKNOWN / cần redump:** wire của SubOp 1,7,8,10 (`func_0x007a2be8/0073d29c/0073d374/007481d4` chưa có body); `func_0x0073c524` & `func_0x0052b694` ở đuôi SubOp 3; `gvar_007DA2FC`; bảng gửi C→S `0x77F474/0x77F53C`; enum đầy đủ của `obj+0x34c`, `obj+0x2a`, class `0x947A`.
+**Còn là UNKNOWN / cần redump (cập nhật 2026-09-14):** bảng gửi C→S `0x77F474/0x77F53C` (vẫn chưa dump); enum đầy đủ của `obj+0x34c`, `obj+0x2a`, `obj+0xe1`, class `0x947A`, tham số `b` SubOp 8; param thứ 3 của `0x0073c524` (Y?) không rõ từ call-site C. **Đã gỡ khỏi UNKNOWN:** `func_0x007a2be8/0073d29c/0073d374/007481d4` (SubOp 1/7/8/10 — đã bóc §4.7), `func_0x0073c524`/`func_0x0052b694` (đuôi SubOp 3 — §4.3), `gvar_007DA2FC` (manager TWreck).

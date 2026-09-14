@@ -1,7 +1,9 @@
 # PHÂN TÍCH — Main OP 0x21 (33) / Case 29 / `FUN_007928E4` @ `0x007928E4`
 
 Ngày: 2026-09-12 · Workspace: `/mnt/d/VUDT/GIT_PCC/test` · Feature: `op-code` · Chiều: **Server → Client (S→C) một chiều**
-Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (`ts_decompile/` only). Handler nhỏ (111 dòng), không codec, 2 nhánh.
+Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (`ts_decompile/` only). Handler nhỏ (111 dòng), không codec, 2 nhánh. `func_0x00602f68` **đã có body trong bản dump mới** — xem §4.2.
+
+> Cập nhật 2026-09-14: bổ sung phân tích từ các body/hex dump mới (theo `missing_opcode_sources.md`).
 
 ---
 
@@ -10,7 +12,7 @@ Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (`ts_decompile/` on
 - **Vai trò**: Server push 2 loại không liên quan chung một MainOp, cấu trúc **2 tầng** (không phải switch phẳng):
   - Tầng 1: `T = RP[0] = P[1]` — chỉ `1` và `2` có nghĩa.
   - Tầng 2 (chỉ khi `T==1`): `K = RP[1] = P[2]` — `switch(K)` `1..8` → 8 **Toast/banner tĩnh** 2000ms qua `TSe_TalkMsgFormPlus` (`gvar_007DA084`, VMT `+0x90`). Không đọc số, không ghi state, không sound/light.
-  - Nhánh `T==0x02`: **set 2 byte option** vào `TCY_OptionForm` (`gvar_007D9F74`, `+0x180/+0x181`) rồi gọi `func_0x00602f68(optionForm)` (apply/refresh — body chưa phục hồi).
+  - Nhánh `T==0x02`: **set 2 byte option** vào `TCY_OptionForm` (`gvar_007D9F74`, `+0x180/+0x181`) rồi gọi `func_0x00602f68(optionForm)` — **xác minh được từ body mới**: đây là hàm **đồng bộ nhãn 2 nút bấm** (không phải apply giá trị): với mỗi i=0..1, đọc cờ `+0x180+i`, tra tài nguyên `"btn_on"`/`"btn_off"` và ghi kết quả vào điều khiển `*(form+0x16C+i*4)+0x4C`.
 - Không DWORD/Word codec, không text trên dây, không chạm bản ghi player (`gvar_007DA7BC` không xuất hiện).
 - Chiều C→S `case 0x21: break;` rỗng → client không bao giờ gửi OP này.
 
@@ -60,7 +62,7 @@ Mọi phép đọc là dereference byte trực tiếp + guard `len`, không `_LS
 | `0x01` | `0x06` | `[21][01][06]` | Banner `UNK_00798530` |
 | `0x01` | `0x07` | `[21][01][07]` | Banner `UNK_00798570` |
 | `0x01` | `0x08` | `[21][01][08]` | Banner `UNK_00798594` |
-| `0x02` | — | `[21][02][A:1B][B:1B]` (4B) | `*(OptionForm+0x180)=A`, `+0x181=B`, gọi apply |
+| `0x02` | — | `[21][02][A:1B][B:1B]` (4B) | `*(OptionForm+0x180)=A`, `+0x181=B`, đồng bộ ảnh 2 nút `btn_on/btn_off` |
 | `0x00`,`≥0x03` | — | — | no-op |
 | `0x01` | `0x00`,`≥0x09` | `[21][01][K lạ]` | no-op (switch không default) |
 
@@ -84,15 +86,23 @@ Mọi phép đọc là dereference byte trực tiếp + guard `len`, không `_LS
   *(*(gvar_007D9F74) + 0x181) = B;
   func_0x00602f68(*(gvar_007D9F74));
   ```
-  `gvar_007D9F74 = TCY_OptionForm` (gán tại `0051189c:1588-1590` qua `VMT_5FA1CC`). Bằng chứng `+0x180` là cờ gate boolean: `00642c2c.c:100-104` (`if (*(OptionForm+0x180)==0){banner(...);return;}`). `func_0x00602f68` chưa có body (`index.csv` không entry) → phần apply ở mức unknown; tầng handler chỉ đảm bảo ghi 2 byte + gọi apply.
+  `gvar_007D9F74 = TCY_OptionForm` (gán tại `0051189c:1588-1590` qua `VMT_5FA1CC`). Bằng chứng `+0x180` là cờ gate boolean: `00642c2c.c:100-104` (`if (*(OptionForm+0x180)==0){banner(...);return;}`).
+- **`func_0x00602f68` — ĐÃ PHỤC HỒI** (`ts_decompile/functions/00602f68_FUN_00602f68.c`, 141B, `index.csv:6360`; chữ ký 1 tham số EAX=form). **Đính chính nhận định cũ "phần apply ở mức unknown"**: hàm **không apply giá trị nào** — nó chỉ đồng bộ hình 2 nút toggle:
+  ```
+  for i in 0..1:                                  (vòng lặp do..while, :50)
+    if *(form + 0x180 + i) == 0: h = FUN_007C9B38(*gvar_007D9ED8, "btn_off")   (:31-32)
+    else:                      h = FUN_007C9B38(*gvar_007D9ED8, "btn_on")    (:41)
+    *(*(form + 0x16C + i*4) + 0x4C) = h                                        (:38/:47)
+  ```
+  `FUN_007C9B38` = helper tra handle ảnh theo tên (load `.bmp` nếu thiếu — như trong `opcode_20.md` §4.1.1); `gvar_007D9ED8` = resource manager toàn cục. Mảng điều khiển nút tại `form+0x16C` (2 phần tử; guard range decompiler `≤5` là artifact Delphi array — thực dụng chỉ 0..1 theo `:50`). → **Nghiệp vụ**: server bật/tắt 2 option (`A`,`B`) và form Option vẽ lại nút on/off tương ứng; không có action nào khác.
 
 ---
 
 ## 5. Chuỗi VISCII → UTF-8
 
 - Không có payload text trên dây — mọi text là chuỗi tĩnh: `UNK_00798418/44/78/C0/F0/30/70/94`.
-- `redump/` hiện không có dump cho cả 8 địa chỉ → **không decode được từ source cho phép**. Cần redump `.rodata` tại đó (Delphi `[len:4LE][chars][00]`).
-- Nhánh `T==0x02` không chạm chuỗi nào.
+- `redump/` (kể cả bản mới) **vẫn không có dump** cho cả 8 địa chỉ → **không decode được từ source cho phép**. Cần redump `.rodata` tại đó (Delphi `[len:4LE][chars][00]`).
+- Nhánh `T==0x02`: body mới `00602f68` chỉ lộ 2 chuỗi **ASCII tài nguyên** `"btn_off"` / `"btn_on"` (`00602f68_FUN_00602f68.c:32,41` — tên file ảnh, không phải text VISCII hiển thị).
 
 ---
 
@@ -107,7 +117,7 @@ Mọi phép đọc là dereference byte trực tiếp + guard `len`, không `_LS
 
 ```
 S→C [21][01][01..08]      ; 8 toast tĩnh 2000ms
-S→C [21][02][A u8][B u8]  ; set OptionForm+0x180=A,+0x181=B + apply
+S→C [21][02][A u8][B u8]  ; set OptionForm+0x180=A,+0x181=B + vẽ lại nút btn_on/btn_off
 C→S [21]: KHÔNG TỒN TẠI
 ```
 
@@ -115,6 +125,15 @@ C→S [21]: KHÔNG TỒN TẠI
 2. Không gửi `T` ngoài 01/02, `K` ngoài 01..08 (no-op). Không gửi `L=1` (`_BoundErr(0)`). Nhánh 01 cần `L>=3`, nhánh 02 cần `L>=4`.
 3. Muốn test yên lặng (không banner) → dùng `[21][02]`; test banner → `[21][01][K]`. Không sound/light đi kèm.
 4. Nội dung 8 banner chưa đọc được — test trên client thật chỉ kiểm tra banner có hiện hay không.
+5. Nhánh 02 giờ kiểm chứng được bằng mắt: 2 nút option trên `TCY_OptionForm` phải đổi ảnh on/off theo `A`/`B` (`0x00` → `btn_off`, khác 0 → `btn_on`).
+
+---
+
+## 9. Giới hạn còn lại (cập nhật 2026-09-14)
+
+- [ ] 8 toast `UNK_00798418..00798594` vẫn cần redump `.rodata` (không nằm trong batch dump mới).
+- [x] ~~`func_0x00602f68` chưa có body~~ → đã phục hồi (`00602f68_FUN_00602f68.c`): chỉ đồng bộ ảnh nút, không apply logic sâu hơn.
+- [ ] Ý nghĩa nghiệp vụ cụ thể của 2 option `A`/`B` (label người dùng của 2 nút) chưa xác định từ mã.
 
 ---
 
@@ -128,3 +147,4 @@ C→S [21]: KHÔNG TỒN TẠI
 | 4 | `functions/0051189c_FUN_0051189c.c:1265-1266` + `:1588-1590` | Định danh `TSe_TalkMsgFormPlus` + `TCY_OptionForm` |
 | 5 | `functions/00642c2c_FUN_00642c2c.c:100-104` | Chứng minh `+0x180` là cờ option |
 | 6 | `functions/0077f414_FUN_0077F414.c:962-963` | C→S rỗng |
+| 7 | `functions/00602f68_FUN_00602f68.c:25-50` | **Mới**: body apply — vòng 2 lần đọc `+0x180/+0x181`, tra `btn_off`/`btn_on` (`:32,41`), ghi handle vào `*(+0x16C+i*4)+0x4C` (`:38,47`) |

@@ -3,6 +3,8 @@
 Ngày: 2026-09-12 · Workspace: `/mnt/d/VUDT/GIT_PCC/test` · Feature: `op-code` · Client: `aLogin.exe` (Delphi)
 Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (`ts_decompile/`). Ánh xạ jump table đã kiểm: `jumptable_byte200_0x78A8EE[0x13] = 0x11 (=17)` → `jumptable_dword200_0x78A9B6[17]` (entry `0x0078A9FA`) → target `0x0078EADC` = **Case 17**.
 
+> Cập nhật 2026-09-14: bổ sung phân tích từ các body/hex dump mới (theo `missing_opcode_sources.md`).
+
 > Phạm vi tài liệu: chỉ **core logic xử lý từng opcode**. Các khối thuần **graphics/sound/animation** (đổi ảnh nút `.bmp`, tắt nhạc `FUN_0079b620`, repaint form) chỉ được nêu khái quát để định vị nhánh, không đi sâu vẽ vời.
 
 ---
@@ -15,12 +17,12 @@ Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (`ts_decompile/`). 
 | :---: | :--- |
 | `0x01` | **CHỌN một NPC trong đội hình 4 ô** theo `unitID` gửi từ server → ghi vào bộ ba field chọn của nhân vật local (`LocalActor+0x12E1` = ID, `+0x12E5` = slot 1..4), rồi đẩy con trỏ đơn vị đó vào thanh trạng thái chính (`TSe_MainStatus+0x1E4`) và làm mới menu NPC. |
 | `0x02` | **BỎ CHỌN** — xóa đúng bộ ba field trên (`+0x12E1=0`, `+0x12E5=0`, `MainStatus+0x1E4=0`) và làm mới menu. Đối xứng SubOp 1. |
-| `0x04` | Delegate toàn bộ `RestPayload` cho `func_0x007a2ae8(TCY_TeamManage)` — **hàm chưa được trích xuất decompile** (xem §9). Suy luận: cập nhật **danh sách/thành viên đội (party roster)** (theo họ hàm `0x7a26xx/0x7a27xx` cùng object). |
-| `0x06` | Delegate toàn bộ `RestPayload` cho `func_0x007a4d68(TFNpcManage)` — **chưa trích xuất**. Suy luận: cập nhật **cửa sổ quản lý NPC đội hình**. |
+| `0x04` | **CHỌN Cưỡng bức NPC đội hình (xác minh từ body mới — đính chính suy luận cũ "roster/party")**: `_LStrCopy(RP,2,4)`→DWORD `unitID` ghi **vô điều kiện** vào `LocalActor+0x12E1`; dò 4 ô đội `LocalActor+0x57C[slot*4]`, nếu `unit+0x78≠0 && unit+4==unitID` thì ghi `LocalActor+0x12E5=slot`; không có match → slot cũ giữ nguyên. Sau đó tầng case vẫn gọi refresh `TSe_TeamForm` (`FUN_005A3018`). — `func_0x007a2ae8(TCY_TeamManage)`, body tại `007a2ae8_FUN_007a2ae8.c:39-58` (param_1 self không dùng). |
+| `0x06` | **Ghi byte trạng thái 4 ô đội hình + refresh TeamForm (đính chính suy luận cũ "cửa sổ TFNpcManage")**: lặp `(len(RP)-1)/2` record `[slot:1B][val:1B]`; `slot∈1..4` → `LocalActor+0x636..0x639 = (val==1)`; cuối hàm gọi `FUN_005a3018(TSe_TeamForm)`. — `func_0x007a4d68`, body tại `007a4d68_FUN_007a4d68.c:51-102` (self `gvar_007D9E00` không dùng; không đụng TFNpcManage). |
 
 - `SubOp 0x00 / 0x03 / 0x05 / ≥0x07`: **không có nhánh → âm thầm bỏ qua** (handler `case_017.c:29–63` chỉ so sánh `==1, ==2, ==4, ==6`; không có `default`).
 - **Không có bất kỳ đường gửi C→S nào** cho OP 0x13 (bằng chứng §6): đây là kênh **server-push thuần túy**.
-- Có **dọn dẹp trạng thái chọn mục tiêu** ở preamble (chỉ SubOp 1 & 2) và **refresh TeamForm** ở hậu đề (SubOp 1, 2, 4) — xem §4.5, §4.6.
+- Có **dọn dẹp trạng thái chọn mục tiêu** ở preamble (chỉ SubOp 1 & 2) và **refresh TeamForm** ở hậu đề (SubOp 1, 2, 4) và ngay **bên trong callee SubOp 6** (`007a4d68.c:102`) — xem §4.5, §4.6, §4.8.
 
 **Lưu ý giả định trong handoff:** bảng "Lộ trình" không xếp 0x13 vào nhóm ưu tiên. Kết quả: đây **không phải** opcode dữ liệu gameplay nặng, mà là **opcode điều khiển UI chọn đơn vị/party**. Vẫn quan trọng khi mock server muốn dựng lại màn hình quản lý đội/NPC sau khi vào game.
 
@@ -59,8 +61,8 @@ else if (iVar3 == 6) { func_0x007a4d68(gvar_007D9E00, ECX); }  // SubOp 0x06
 | :---: | :---: | :--- | :--- | :--- |
 | `0x01` | **6** | `[13][01][unitID: DWORD LE]` → `unitID = payload[2..5]` | Chọn NPC đội hình | `FUN_007a63dc` (`007a63dc.c:45–49`) |
 | `0x02` | 2 | `[13][02]` (không field) | Bỏ chọn | `FUN_0072b34c` (`0072b34c.c:18–25`) |
-| `0x04` | ≥2 (opaque) | `[13][04][<RestPayload>]` | Roster đội (suy luận) | `func_0x007a2ae8` — **chưa có** |
-| `0x06` | ≥2 (opaque) | `[13][06][<RestPayload>]` | Quản lý NPC (suy luận) | `func_0x007a4d68` — **chưa có** |
+| `0x04` | **6** | `[13][04][unitID: DWORD LE P2..5]` | Chọn NPC (ghi `LocalActor+0x12E1` + tự tìm slot `+0x12E5`) | `func_0x007a2ae8` — **có body mới** `007a2ae8.c:39-58` |
+| `0x06` | **2+2N** | `[13][06][{slot:1B ∈1..4][val:1B}] × N` (N=`(len(RP)-1)/2`) | Ghi byte cờ `LocalActor+0x636..0x639` + refresh TeamForm | `func_0x007a4d68` — **có body mới** `007a4d68.c:51-102` |
 
 Ghi chú SubOp 1: `FUN_007a63dc` gọi `_LStrCopy(ECX,2,4)` = `payload[2..5]`; nếu `len(ECX) < 5` (payload < 6 byte) thì `FUN_0077EF7C` chạm BoundErr ⇒ **cần đúng 6 byte**.
 
@@ -118,8 +120,20 @@ if (LocalActor+0x376 != 0 && gvar_007DA51C+0xE78 != -1) {   // có cờ chọn &
 - `FUN_00650E40` (`00650e40.c:24–33`): đặt `mgr+0xE5B=0xFF`, `mgr+0xE78=0xFF` (**hủy chọn mục tiêu**), rồi gọi **Refresh** (vtable+0x24) của 5 form HUD (`gvar_007DA32C` EquipForm2, `gvar_007D9D7C` TeamForm, `gvar_007D9E5C` StatusInfoForm, `gvar_007D9EB8` HUD, `gvar_007DA1F0` FightForm). (Có kèm tắt âm `FUN_0079b620` — **bỏ qua, thuộc sound**.)
 - **Ý nghĩa:** khi server đổi chọn đội hình (SubOp 1/2), nếu mục-tiêu-chuột đang trỏ vào một đơn vị vừa chuyển sang `state 4`, thì phải **giải phóng selection cũ** để HUD không treo trên đơn vị hết hiệu lực.
 
-### 4.6. Hậu đề — `SubOp 0x04`
+### 4.6. Hậu đề — `SubOp 0x04` (**ĐÃ XÁC MINH TỪ BODY MỚI — đính chính**)
 `func_0x007a2ae8(gvar_007D9D64 /*TCY_TeamManage*/, RestPayload)` rồi `FUN_005A3018(gvar_007D9D7C /*TSe_TeamForm*/)`.
+
+`007a2ae8_FUN_007a2ae8.c` (`:39-58`) **không phải cập nhật roster**. Thực tế:
+```c
+Copy(RP,2,4) → unitID = FUN_0077ef7c(codec);        // :39-40  (DWORD LE, payload[2..5])
+LocalActor(gvar_007DA7BC)+0x12E1 = unitID;           // :41  GHI VÔ ĐIỀU KIỆN (khác SubOp 1!)
+for slot in 1..4:                                    // :43-62
+    u = LocalActor+0x57C[slot*4];
+    if (u+0x78 != 0 && u+4 == unitID) {              // đơn vị hoạt động & đúng ID
+        LocalActor+0x12E5 = slot; break;             // :58
+    }
+```
+**Đính chính suy luận cũ ("roster/thành viên đội")**: đây là bản **chọn NPC đội hình kiểu force-set** — ghi `unitID` vào `+0x12E1` bất kể có trong đội hay không (SubOp 1 chỉ ghi khi `FUN_0071D1BC` tìm thấy), và tự dò slot 1..4 để ghi `+0x12E5`. `self` (`gvar_007D9D64`) **không được đọc** — cùng khuôn stub như `FUN_007a63dc` SubOp 1.
 
 ### 4.7. `FUN_005A3018` — Refresh TeamForm (gọi sau SubOp 1, 2, 4) — `005a3018.c`
 Thuần **UI của `TSe_TeamForm` (gvar_007D9D7C)**, **không gửi mạng, không toast**:
@@ -129,8 +143,21 @@ Thuần **UI của `TSe_TeamForm` (gvar_007D9D7C)**, **không gửi mạng, khô
 - Vẽ **party**: `LocalActor+0x548` (leader/team ID, ≠0 = đang có đội), `+0x578` = số thành viên (≤4), `+0x550 + s*8` = cặp `(memberID, memberIndex)`; chọn `btn_dismiss` (mình là trưởng) vs `btn_LeaveTeam`.
 - Các `btn_*` là **tên file ảnh** tra qua `FUN_007C9B38` (`<name>.bmp`) → **graphics, không hiển thị text cho người chơi.**
 
-### 4.8. `SubOp 0x06`
-`func_0x007a4d68(gvar_007D9E00 /*TFNpcManage*/, RestPayload)` — **chưa trích xuất decompile** ⇒ không dựng được wire.
+### 4.8. `SubOp 0x06` — **ĐÃ XÁC MINH TỪ BODY MỚI (`007a4d68_FUN_007a4d68.c`) — đính chính**
+`func_0x007a4d68(gvar_007D9E00 /*TFNpcManage*/, RestPayload)`.
+
+`007a4d68.c:51-102`:
+```c
+count = (Len(RP)-1) >> 1;                             // :51-59  → đúng 1 byte mỗi field pair, 2 byte/record
+for i in 1..count:                                    // :60-100
+    slot = byte RP[1 + 2*(i-1)];                      // :70
+    s    = string(RP[2 + 2*(i-1)]);                   // :84 (_LStrFromChar, 1 byte)
+    val  = FUN_0077eaa4(codec, s);                     // :86  (trả về 1 nếu byte==1, xem 0077eaa4)
+    if (slot-1 < 4)                                   // :87  chỉ slot 1..4
+        LocalActor(gvar_007DA7BC)+0x635+slot = val;   // :92  field byte theo slot (0x636..0x639)
+FUN_005a3018(gvar_007D9D7C /*TSe_TeamForm*/);         // :102 refresh form đội
+```
+**Đính chính suy luận cũ** ("cập nhật cửa sổ quản lý NPC"): hàm **không đụng `TFNpcManage`** (`self` bị lưu `local_8` không đọc, y như SubOp 1/4). Nó ghi một chuỗi byte trạng thái vào **4 ô đội hình của LocalActor** (`+0x636..+0x639`, byte = 0/1 qua `FUN_0077eaa4`) rồi refresh TeamForm. Wire dựng được: `[13][06][slot][val]×N` với `slot∈1..4`, `val∈{0,1}`. `0077eaa4` chỉ so `byte==1` (`0077eaa4_FUN_0077eaa4.c:44-46`).
 
 ---
 
@@ -142,8 +169,8 @@ Thuần **UI của `TSe_TeamForm` (gvar_007D9D7C)**, **không gửi mạng, khô
 | `gvar_007DA530` → **TSe_MainStatus** | thanh trạng thái chính; `+0x1E4` = con trỏ đơn vị đang hiển thị | `0051189c.c:1576–1577`; dùng `007a63dc.c:49`, `0072b34c.c:23` |
 | `gvar_007D9D7C` → **TSe_TeamForm** | form đội/NPC, đích refresh của `FUN_005A3018` | `0051189c.c:1570–1571` |
 | `gvar_007DA0CC` → **TCY_FNpcManageMenu** | menu danh sách NPC đội (refresh qua `FUN_0063AFA4`) | `0051189c.c:1304–1306` |
-| `gvar_007D9E00` → **TFNpcManage** | cửa sổ quản lý NPC (self SubOp 1 & 6) | `0051189c.c:1389–1390`; SubOp 6 → `func_0x007a4d68` |
-| `gvar_007D9D64` → **TCY_TeamManage** | panel quản lý đội (self SubOp 4) | `0051189c.c:1387–1388`; họ hàm `007a2604/007a273c` |
+| `gvar_007D9E00` → **TFNpcManage** | cửa sổ quản lý NPC (self SubOp 1 & 6) | `0051189c.c:1389–1390`; SubOp 6 → `func_0x007a4d68`. **Lưu ý từ body mới**: `self` chỉ được lưu, **không đọc** trong `007a4d68` (cũng như `007a63dc`) → đích thật của SubOp 6 là field `LocalActor`, không phải chính object này |
+| `gvar_007D9D64` → **TCY_TeamManage** | panel quản lý đội (self SubOp 4) | `0051189c.c:1387–1388`; **thân `func_0x007a2ae8` không dùng self** (`007a2ae8.c:33`) |
 | `gvar_007DA51C` → **UnitList/Target manager** | mảng mục tiêu `[0..20]@+0x158`, slot chọn `+0xE78`, `+0xE5B` | click `0050bff8.c:99`; hủy chọn `00650e40.c:24–25`; **nơi tạo: UNKNOWN** |
 | `gvar_007D9D30` | codec/self khi gọi `FUN_0077EF7C` | `007a63dc.c:46`; **giá trị thật: UNKNOWN** |
 
@@ -171,7 +198,7 @@ Thuần **UI của `TSe_TeamForm` (gvar_007D9D7C)**, **không gửi mạng, khô
 | `0x007A2094` | `10 47 69 E4 69 20 74 E1 6E 20 F0 B5 69 20 6E 67 FB` | **Giải tán đội ngũ** |
 | `0x007A20A8` | `0E 52 B6 69 20 62 F6 20 F0 B5 69 20 6E 67 FB` | **Rời bỏ đội ngũ** |
 
-> **Hiệu chỉnh encoding:** kiểm chứng bằng Python cho thấy `windows-1258/cp1258` cho ra `Giäi tán đµi ngû` (**SAI**). Bảng đúng là **đơn-byte tiền tổ hợp VISCII/TCVN-5712** với các neo: `E4=ả, E1=á, F0=đ, B5=ộ, FB=ũ, B6=ờ, F6=ỏ`. Kết quả đọc được xác nhận chéo bởi ngữ nghĩa party (giải tán/rời bỏ đội). ⇒ Nhận định của `opcode_09.md` ("cp1258") **không đứng vững** với các byte này; cần rà lại toàn dự án (nằm ngoài phạm vi tài liệu này).
+> **Hiệu chỉnh encoding:** kiểm chứng bằng Python cho thấy `windows-1258/cp1258` cho ra `Giäi tán đµi ngû` (**SAI**). Bảng đúng là **đơn-byte tiền tổ hợp VISCII/TCVN-5712** với các neo: `E4=ả, E1=á, F0=đ, B5=ộ, FB=ũ, B6=ờ, F6=ỏ`. Kết quả đọc được xác nhận chéo bởi ngữ nghĩa party (giải tán/rời bỏ đội). ⇒ Nhận định của `opcode_09.md` ("cp1258") **không đứng vững** với các byte này; cần rà lại toàn dự án. **ĐÃ XÁC MINH TOÀN DỰ ÁN (2026-09-14)**: các dump mới `lit_7967f8/797ee8/797fe0/729d0c.hex` decode sạch 100% bằng **VISCII** — xem `opcode_17.md` §6 và `opcode_18.md` §6; bảng mã chính thức của client là VISCII (+ Big5 cho nhãn Trung phồn thể).
 
 ---
 
@@ -180,7 +207,10 @@ Thuần **UI của `TSe_TeamForm` (gvar_007D9D7C)**, **không gửi mạng, khô
 1. **Chọn NPC đội hình**: gửi `[13][01][unitID:4B LE]`. **Bắt buộc** `unitID` đã tồn tại trong đội hình 4 ô (`LocalActor+0x57C[1..4]`, `+0x78==1`) — nếu không client **im lặng bỏ qua** (`FUN_0071D1BC` trả 0). Đây là kênh *chọn* chứ không phải *thêm* thành viên.
 2. **Bỏ chọn**: gửi `[13][02]` (2 byte). An toàn, không điều kiện.
 3. **Không phải để điều khiển party roster**: mọi request party của client đi **OP 0x0F**; mock chỉ cần đẩy 0x13 khi muốn **tự chuyển selection/HUD** phía client.
-4. **SubOp 0x04 / 0x06**: chưa đặc tả được vì `func_0x007a2ae8` / `func_0x007a4d68` vắng mặt trong decompile → **cần dump 2 hàm này** trước khi mock dựng panel đội/NPC đầy đủ.
+4. **SubOp 0x04 / 0x06 (ĐÃ DÙNG ĐƯỢC TỪ BODY MỚI)**:
+   - `0x04`: gửi `[13][04][unitID:4B LE]` — ghi `LocalActor+0x12E1` **vô điều kiện** + tự dò slot 1..4 ghi `+0x12E5` (không cần unit có thật, khác SubOp 1 vốn chỉ chọn khi có trong đội). Cần ≥6 byte.
+   - `0x06`: gửi `[13][06][slot∈1..4][val∈{0,1}]×N` — ghi byte `LocalActor+0x636..0x639` rồi refresh TeamForm (`007a4d68.c:51-102`).
+   Hai hàm `func_0x007a2ae8` / `func_0x007a4d68` **không còn vắng mặt** → không cần dump nữa.
 5. SubOp ngoài {01,02,04,06} vô hại nhưng vô nghĩa — client không xử lý.
 
 ---
@@ -192,11 +222,11 @@ Thuần **UI của `TSe_TeamForm` (gvar_007D9D7C)**, **không gửi mạng, khô
 | 1 | `.scratch/op-code/handoff-opcode-exploration-guide.md` (mục 1, 2) | framing, dispatcher, mapping |
 | 2 | `ts_decompile/redump/jumptable_byte200_0x78A8EE.hex` + `jumptable_dword200_0x78A9B6.hex` | xác minh `0x13 → idx 0x11 → 0x0078EADC` |
 | 3 | `ts_decompile/case_functions/functions/case_017_0078EADC_FUN_0078eadc.c:21–93` | **handler chính** + preamble + các switch |
-| 4 | `007a63dc_FUN_007a63dc.c`, `0072b2d8_FUN_0072b2d8.c`, `0072c124_FUN_0072c124.c`, `0071d1bc_FUN_0071d1bc.c:118–147`, `0072b34c_FUN_0072b34c.c` | logic chọn/bỏ chọn NPC (SubOp 1,2) |
+| 4 | `007a63dc_FUN_007a63dc.c`, `0072b2d8_FUN_0072b2d8.c`, `0072c124_FUN_0072c124.c`, `0071d1bc_FUN_0071d1bc.c:118–147`, `0072b34c_FUN_0072b34c.c`, **`007a2ae8_FUN_007a2ae8.c` (SubOp 4)**, **`007a4d68_FUN_007a4d68.c` (SubOp 6)** | logic chọn/bỏ chọn NPC (SubOp 1,2) + force-select (4) + byte trạng thái 4 ô (6) |
 | 5 | `00650e40_FUN_00650e40.c:24–33`, `005a3018_FUN_005a3018.c` | preamble hủy target + hậu đề refresh TeamForm |
 | 6 | `0051189c_FUN_0051189c.c:1304–1585`, `00603f20_FUN_00603f20.c:189–190`, `007450f4_FUN_007450f4.c:248` | gán tên VMT cho gvar + field `+0x376` |
 | 7 | `0077f414_FUN_0077F414.c:923–924` + `.asm.txt:33–34`; `005a197c`, `005a217c` | chiều C→S (không có 0x13; party dùng 0x0F) |
 | 8 | `redump/lit_7A2094.hex`, `lit_7A20A8.hex`; kiểm bằng `python3` | bảng chuỗi VISCII (mục 7) |
 | 9 | `0077ef7c_FUN_0077ef7c.c`, `0077eb9c_FUN_0077eb9c.c` | codec DWORD/Word LE |
 
-**UNKNOWN / cần redump tiếp:** wire của SubOp 4 & 6 (`func_0x007a2ae8`, `func_0x007a4d68` chưa có body); nội dung `DAT_005A402C/4044`, `LAB_0063B0DC` (chưa dump); nghĩa chính xác `LocalActor+0x376`, `unit+0x79==4`, `unit+0x55F`; nơi tạo `gvar_007DA51C` và `gvar_007D9D30`.
+**UNKNOWN / cần redump tiếp (cập nhật 2026-09-14):** wire SubOp 4 & 6 **đã bóc xong** từ `007a2ae8/007a4d68` (§4.6, §4.8) — **không còn là gap**. Còn thiếu: nội dung `DAT_005A402C/4044`, `LAB_0063B0DC` (chưa dump); nghĩa chính xác `LocalActor+0x376`, `unit+0x79==4`, `unit+0x55F`, và các byte `LocalActor+0x636..0x639` mà SubOp 6 ghi (đọc-ở-đâu chưa trace hết); nơi tạo `gvar_007DA51C` và `gvar_007D9D30`.

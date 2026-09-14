@@ -3,6 +3,8 @@
 Ngày: 2026-09-12 · Workspace: `/mnt/d/VUDT/GIT_PCC/test` · Feature: `op-code` · Chiều: **Server → Client (S→C) một chiều**
 Trạng thái: **Đã xác minh 100% từ mã nguồn sơ cấp** (`ts_decompile/` only).
 
+> Cập nhật 2026-09-14: bổ sung phân tích từ các body/hex dump mới (theo `missing_opcode_sources.md`). **7 dump `lit_*.hex` mới đã giải mã toàn bộ chuỗi cố định** từng bị đánh dấu "chưa dump" ở §4.1/§4.3/§4.4/§4.7/§4.8 — nội dung + byte offset ghi ở §6.1. **Chỉ còn thiếu vùng `0x525xxx`** (chuỗi SubOp `0x16/0x17/0x18`) — vẫn chưa có file nào phủ.
+
 ---
 
 ## 1. Tóm Tắt Nghiệp Vụ Cốt Lõi
@@ -50,16 +52,16 @@ Main OP 0x42 (66) → byte_table[0x78A8EE][0x42] = 0x3B (59)
 | **`0x01`** | `[42][01][Mode:1B][...]` | ≥2B | `FUN_00522ab8` | Ghi 10 giá trị vào bảng kỹ năng 2 chiều 18×10 của người chơi (xem 4.1, nhánh Mode 1). |
 | **`0x02`** | `[42][02][Value:4B LE]` | 6B | `FUN_00522ab8` | Ghi trực tiếp **một giá trị DWORD** vào bộ đệm hiển thị của Local Player (`player+0x146C`), rồi refresh. |
 | **`0x03`** | `[42][03][Mode:1B][...]` | ≥3B | `FUN_00522ab8` | Cập nhật giá trị qua trung gian bảng tra (xem 4.1, nhánh Mode 3). |
-| **`0x04`** | `[42][04][Sel:1B]` | 3B | `FUN_00522ab8` | **Chọn 1 trong 4 chuỗi văn bản** hiển thị cố định (Sel = 1..4) vào ô văn bản của object. |
+| **`0x04`** | `[42][04][Sel:1B]` | 3B | `FUN_00522ab8` | **Chọn 1 trong 4 chuỗi văn bản** cố định (Sel 1..4, đã giải mã ở §4.1/6.1.1) vào ô `+0x13C`. |
 | **`0x0B`** | `[42][0B][Value:4B LE]` | 6B | `FUN_005c0b20` | Ghi DWORD vào ô đếm của object (`+0x1AC`), rồi refresh. |
-| **`0x0C`** | `[42][0C][Value:4B LE][F:2B LE][X:1B]` | 9B | `FUN_005c088c` | Cập nhật giá trị + **hiển thị dòng log "±X"** kèm hiệu ứng (xem 4.3). |
-| **`0x0E`** | `[42][0E][Sel:1B]` | 3B | `FUN_005c0a3c` | Hiển thị 1 trong 2 thông báo cố định (Sel = 1 hoặc 2). |
+| **`0x0C`** | `[42][0C][Value:4B LE][F:2B LE][X:1B]` | 9B | `FUN_005c088c` | Cập nhật giá trị + **log "có được <tên><số> cái"** (format `0x5C0A0C` đã giải mã, xem 4.3). |
+| **`0x0E`** | `[42][0E][Sel:1B]` | 3B | `FUN_005c0a3c` | Hiển thị 1 trong 2 thông báo cố định (Sel=1: `Máy chủ đang bận...` / Sel=2: `Điểm số không đủ...` — đã giải mã, §4.4). |
 | **`0x15`** | `[42][15][A:4B LE][B:4B LE]` | 10B | `FUN_005253a8` | Ghi **cặp chỉ số A→`player+0x1470`, B→`player+0x1474`**, refresh + reset cờ chờ `+0x168=0`. |
 | **`0x16`** | `[42][16][Mode:1B=0][ID:2B][A:4B][B:4B]` | ≥14B | `FUN_005250e8` | Ghi cặp chỉ số như 0x15 **+ nối chuỗi mô tả tên** (tra từ bảng `gvar_007DA540`) vào ô văn bản. |
 | **`0x17`** | `[42][17][Sel:1B]` | 3B | `FUN_00524ff0` | Gán 1 trong 2 chuỗi văn bản cố định (Sel = 1 hoặc 2) vào ô văn bản `+0x154`. |
 | **`0x18`** | `[42][18][1B=0x01][Idx:2B LE][Count:1B][Text:...]` | ≥6B | `FUN_00525488` | Thông báo dạng **"tên + số lượng + văn bản tự do"** (xem 4.6). |
-| **`0x1F`** | `[42][1F][Delta:1B][Arg:4B LE]` | 7B | `FUN_005be098` | **Ghi 1 dòng log** "giá trị cũ `Δ` mới" (Arg định dạng `%d`, Delta là số cộng thêm có dấu) vào khung log. |
-| **`0x20`** | `[42][20][Sel:1B]` | 3B | `FUN_005be240` | Hiển thị 1 trong 3 thông báo cố định (Sel = 1, 2 hoặc 3) thời lượng 2000ms. |
+| **`0x1F`** | `[42][1F][Delta:1B][Arg:4B LE]` | 7B | `FUN_005be098` | **Ghi log 2 dòng** (template `0x5BE1F8` `Đẳng cấp từ %d nâng lên %d` + `0x5BE228` `Cần số điểm ... %d`, đã giải mã) nối `\r` vào khung log. |
+| **`0x20`** | `[42][20][Sel:1B]` | 3B | `FUN_005be240` | Hiển thị 1 trong 3 thông báo cố định (Sel 1/2/3: `Server trừ điểm thất bại` / `Đẳng cấp vượt quá giới hạn cao nhất` / `Đẳng cấp trước mắt không thể sử dụng phương thức nâng cấp này`, đã giải mã §4.8) thời lượng 2000ms. |
 
 Các SubOp không liệt kê (`0x05–0x0A, 0x0D, 0x0F–0x14, 0x19–0x1E`) rơi vào nhánh `default` — chỉ dọn dẹp stack local, **không xử lý gì**.
 
@@ -110,7 +112,10 @@ if (sub == 1) {
 }
 ```
 - `FUN_00774a84` là hàm **tra tên từ bảng CSDL `gvar_007DA540`** theo ID (cùng họ hàm với các tài liệu opcode khác — `gvar_007DA540` đã được xác minh là **CSDL vật phẩm/kỹ năng** trong `opcode_41.md` mục 2.1 và `opcode_23.md`).
-- Hai tiền tố/hậu tố chuỗi cố định nằm tại `DAT_00522e54` / `DAT_00522e40` — **hằng chuỗi Delphi, chưa có trong dump `ts_decompile/`** (không decomplie được vùng .data literal này; đây là ràng buộc của single source of truth).
+- Hai tiền tố/hậu tố chuỗi cố định nằm tại `DAT_00522e40` / `DAT_00522e54` — **ĐÃ GIẢI MÃ từ `redump/lit_522e40.hex`** (hằng AnsiString Delphi `FFFFFFFF + len:4LE`):
+  + `0x522E40` (11B, không header — chính là nội dung tại DAT): `Mua hư bảo[` (VISCII→NFC, byte cuối `5B '['` — nguyên văn game) — tiền tố.
+  + content `0x522E54` (header tại `0x522E4C`, len=48, NUL tại `0x522E84`): `]Thất bại! nguyên nhân: số điểm có được không đủ` (raw cp1258→NFC: `]Th¤t bƠi! nguyên nhân: s¯ đi¬m có đß₫c không đü`) — hậu tố.
+  + Ghép theo asm `00522ab8_FUN_00522ab8.asm.txt:201-212` (`PUSH 0x522e40`, `CALL FUN_00774a84`, `PUSH name`, `PUSH 0x522e54`, `_LStrCatN(dest,obj+0x13C,3)`): thông báo hoàn chỉnh dạng **`Mua hư bảo[<tên tra CSDL>]Thất bại! nguyên nhân: số điểm có được không đủ`** (cặp ngoặc vuông ôm tên — VISCII, đã chốt).
 
 **Mode 4** (SubOp `0x04`) — chọn văn bản:
 ```c
@@ -122,7 +127,14 @@ switch (sel) {
   case 4: _LStrAsg(local_8 + 0x4f, &DAT_00522f28); break;
 }
 ```
-- Gán 1 trong 4 **chuỗi văn bản cố định** (vùng .data `0x522E90–0x522F28`, chưa dump) vào ô văn bản tại offset `+0x13C` của object.
+- Gán 1 trong 4 **chuỗi văn bản cố định** vào ô văn bản `+0x13C` của object — **ĐÃ GIẢI MÃ từ `redump/lit_522e40.hex`** (mỗi chuỗi = header `FFFFFFFF` + len:4LE đứng ngay trước nội dung):
+  | `Sel` | Content address | len | VISCII→NFC (văn nguyên) |
+  | :---: | :--- | :---: | :--- |
+  | 1 | `0x522E90` (hdr `0x522E88`) | 41 | `Máy hầu hạ đang bận, vui lòng thử lại sau` |
+  | 2 | `0x522EC4` (hdr `0x522EBC`) | 37 | `Máy hầu hạ hư bảo đang offline update` |
+  | 3 | `0x522EF4` (hdr `0x522EEC`) | 41 | `Kho nguyên liệu thương phẩm không phù hợp` |
+  | 4 | `0x522F28` (hdr `0x522F20`) | 51 | `Giới hạn lượng thương phẩm đã phân phối hoàn thành.` |
+- **Đính chính**: bản cũ để nguyên 4 chuỗi này ở trạng thái "chưa dump"; dữ kiện đã nằm trong dump `lit_522e40.hex` (512B phủ `0x522E40–0x523040`).
 
 ### 4.2. SubOp `0x0B` — `FUN_005c0b20` (object `gvar_007D9FA0`)
 
@@ -148,7 +160,8 @@ _LStrCat3(&s, gvar_007DA010, "sound\\WB0011.wav"); FUN_007a7f20(s);// phát âm 
 FUN_005c084c(local_8[local_8[0x66] + 0x4c]);                       // cập nhật ô con theo con trỏ hiện hành
 if (local_8[0x6a] > 0x18) (**(code **)(*local_8 + 0x20))();       // refresh nếu đủ điều kiện
 ```
-- Core logic: **cập nhật giá trị + ghi log biến động** "tên đối tượng ±X". Phần âm thanh `sound\WB0011.wav` liên quan media — bỏ qua khi mô phỏng.
+- **Format string `DAT_005c0a0c` ĐÃ GIẢI MÃ** (first string tại `0x5C0A0C`, 16B, không header — chỉ nội dung tới NUL): `có được %s%d cái` (cp1258→NFC `'có đß₫c %s%d cái'`) → dòng log "có được \<tên\>\<số\> cái". Bản sao `AnsiString` của tên file âm thanh nằm tại content `0x5C0A28` (header `0x5C0A20`, len 16): `sound\WB0011.wav` — trùng literal inline trong `.c:87`.
+- Core logic: **cập nhật giá trị `+0x1AC` + ghi log "có được <tên><số> cái"** (format vừa giải mã — *đính chính mô tả "±X" cũ: template chỉ có chiều "có được"*). Phần âm thanh `sound\WB0011.wav` liên quan media — bỏ qua khi mô phỏng.
 
 ### 4.4. SubOp `0x0E` — `FUN_005c0a3c` (object `gvar_007D9FA0`)
 
@@ -158,7 +171,11 @@ sel = payload[1];
 if (sel == 1) VirtualCall_0x90(gvar_007DA084, &DAT_005c0abc, 0x5DC /*1500*/, 0, 0);
 if (sel == 2) VirtualCall_0x90(gvar_007DA084, &DAT_005c0af4, 0x5DC, 0, 0);
 ```
-- Hiển thị 1 trong 2 **thông báo cố định** (chuỗi tại `0x5C0ABC` / `0x5C0AF4`, chưa dump) trong 1500ms qua object `gvar_007DA084` (message box manager — cùng object đã dùng trong `opcode_00_01.md` cho System Error Notice).
+- Hiển thị 1 trong 2 **thông báo cố định** trong 1500ms (`0x5DC`) qua object `gvar_007DA084` (toast manager — cùng object đã dùng trong `opcode_00_01.md` cho System Error Notice). **ĐÃ GIẢI MÃ từ `redump/lit_5c0abc.hex` / `lit_5c0af4.hex`** (header + content):
+  | `Sel` | Content address (header) | len | cp1258→NFC (≈ VISCII) |
+  | :---: | :--- | :---: | :--- |
+  | 1 | `0x5C0ABC` (hdr `0x5C0AB4`) | 46 | `Máy chủ đang bận, xin vui lòng đợi rồi thử lại` |
+  | 2 | `0x5C0AF4` (hdr `0x5C0AEC`) | 41 | `Điểm số không đủ, mời bạn bổ sung điểm số` |
 
 ### 4.5. SubOp `0x15`–`0x17` — nhóm `FUN_005253a8` / `FUN_005250e8` / `FUN_00524ff0` (object `gvar_007DA348`)
 
@@ -219,12 +236,13 @@ delta  = payload[1];                                // 1 byte — phần cộng 
 _LStrCopy(payload, 3, 4, &s);
 newVal = DWORD_LE(s);                               // giá trị mới
 oldVal = *(byte *)(player + 0x3fa);                 // giá trị cũ (1 byte trên Local Player!)
-Format(&DAT_005be1f8, [oldVal], &line1);            // dòng 1: giá trị cũ
-Format(&DAT_005be228, [newVal], &line2);            // dòng 2: giá trị mới (định dạng %d)
+Format(&DAT_005be1f8, [oldVal], &line1);            // dòng 1: "Đẳng cấp từ %d nâng lên %d" (đã giải mã)
+Format(&DAT_005be228, [newVal], &line2);            // dòng 2: template %d (xem 6.1)
 line = line1 + "\r" + line2;
 FUN_0063c674(gvar_007D9D6C, line, 0, 0, 0x5bdff4, self, 0x5be048, self); // ghi vào khung log cuộn
 ```
-- **Ghi 2 dòng log** vào khung log của object (`FUN_0063c674` — hàm append dòng chữ có tham số callback). Điểm đáng chú ý cho mock server: giá trị cũ chỉ là **1 byte** tại `player+0x3FA`, còn giá trị mới là **DWORD** từ payload. Format string thực tại `DAT_005be1f8`/`DAT_005be228` (chưa dump — chỉ xác nhận được tham số truyền vào).
+- **Ghi 2 dòng log** vào khung log của object (`FUN_0063c674` — hàm append dòng chữ có tham số callback). Điểm đáng chú ý cho mock server: giá trị cũ chỉ là **1 byte** tại `player+0x3FA`, còn giá trị mới là **DWORD** từ payload.
+- **Format strings ĐÃ GIẢI MÃ** từ `redump/lit_5be1f8.hex` (first-str content `0x5BE1F8`, 26B) và `redump/lit_5be228.hex` (header `0x5BE220`, len 23, NUL `0x5BE240`) — **đính chính**: template dòng 1 chứa **hai** `%d` ("Đẳng cấp từ %d nâng lên %d"); xáo trộn tham số Format trong pseudocode cũ (`[oldVal]`) chưa phản ánh đúng số lượng `%d` — chỉ kết luận được text template, không kết luận được mapping tham số. Separator `\r` là AnsiString content `0x5BE21C` (len 1, header `0x5BE214`).
 
 ### 4.8. SubOp `0x20` — `FUN_005be240` (object `gvar_007D9EF8`)
 
@@ -235,7 +253,12 @@ if (sel == 1) VirtualCall_0x90(gvar_007DA084, &DAT_005be314, 2000, 0, 0);
 if (sel == 2) VirtualCall_0x90(gvar_007DA084, &DAT_005be338, 2000, 0, 0);
 if (sel == 3) VirtualCall_0x90(gvar_007DA084, &DAT_005be364, 2000, 0, 0);
 ```
-- Hiển thị 1 trong 3 **thông báo cố định** trong 2000ms (cùng cơ chế `gvar_007DA084` như SubOp 0x0E, thời lượng dài hơn).
+- Hiển thị 1 trong 3 **thông báo cố định** trong 2000ms (cùng cơ chế `gvar_007DA084` như SubOp 0x0E, thời lượng dài hơn). **ĐÃ GIẢI MÃ** (nằm gọn trong `redump/lit_5be1f8.hex`/`lit_5be228.hex` — *đính chính: vùng `0x5BE314/338/364` hóa ra đã được hai dump mới phủ*):
+  | `Sel` | Content address (header) | len | cp1258→NFC (≈ VISCII) |
+  | :---: | :--- | :---: | :--- |
+  | 1 | `0x5BE314` (hdr `0x5BE30C`) | 24 | `Server trừ điểm thất bại` |
+  | 2 | `0x5BE338` (hdr `0x5BE330`) | 35 | `Đẳng cấp vượt quá giới hạn cao nhất` |
+  | 3 | `0x5BE364` (hdr `0x5BE35C`) | 61 | `Đẳng cấp trước mắt không thể sử dụng phương thức nâng cấp này` |
 
 ---
 
@@ -256,8 +279,28 @@ if (sel == 3) VirtualCall_0x90(gvar_007DA084, &DAT_005be364, 2000, 0, 0);
 
 ## 6. Ghi Chú Mock Server & Điểm Chưa Kết Luận Được
 
-1. **Chuỗi cố định chưa dump**: các chuỗi tại `0x522E40–0x522F28`, `0x5C0A0C`, `0x5C0ABC/0x5C0AF4`, `0x5250x8…`, `0x5252FC/0x525310/0x52534C`, `0x525600/0x525614`, `0x5BE1F8/0x5BE228`, `0x5BE314/0x5BE338/0x5BE364` nằm trong vùng .data **chưa có trong `ts_decompile/`** — khi mock chỉ cần biết rằng đó là hằng chuỗi định dạng/văn bản hiển thị; nếu cần nội dung chính xác phải dump thêm vùng `.data` của aLogin.exe (ngoài phạm vi SSOT hiện tại).
-2. **Không có VISCII**: không handler nào của 0x42 xử lý chuỗi tiếng Việt VISCII trong luồng được phân tích (các chuỗi hiển thị đều là hằng Delphi hoặc văn bản tự do từ server — server có thể gửi VISCII trong phần FreeText của SubOp `0x18`, client hiển thị nguyên trạng).
+1. **Chuỗi cố định — CẬP NHẬT 2026-09-14**: nhóm `0x522E40–0x522F28` (Mode 3/4), `0x5C0A0C`, `0x5C0ABC/0x5C0AF4`, `0x5BE1F8/0x5BE228`, `0x5BE314/0x5BE338/0x5BE364` **đã được giải mã** từ các dump mới trong `ts_decompile/redump/` (`lit_522e40/522e54/5c0a0c/5c0abc/5c0af4/5be1f8/5be228.hex`, mỗi file 512B tính từ content address) — toàn bộ giá trị + offset ở bảng 6.1.1.
+   **Vẫn chưa có dump** (không file nào phủ): `0x525xxx` = `DAT_00525088`, `DAT_005250BC` (SubOp `0x17`), `DAT_005252FC/0x525310/0x52534C` (SubOp `0x16`), `DAT_00525600/0x525614` (SubOp `0x18`) — chốt nội dung 3 SubOp này cần dump thêm `lit_525088/5250bc/5252fc/525310/52534c/525600/525614.hex`.
+   6.1.1 **Bảng giá trị decoded** (Delphi AnsiString = header `FF FF FF FF` + len 4LE + bytes + `00`; cột "Raw" giữ pipeline cp1258 cũ cho tham chiếu, **cột cuối là decode VISCII xác định** — `iconv -f VISCII`, không còn là giải đoán):
+   | Content address (header) | len | Raw cp1258→NFC | ≈ Tiếng Việt | Dùng tại |
+   | :--- | :---: | :--- | :--- | :--- |
+   | `0x522E40` (first-str, ko hdr; NUL `0x522E4B`) | 11 | `Mua hß bäo[` | Mua hư bảo[ | §4.1 Mode 3 prefix |
+   | `0x522E54` (hdr `0x522E4C`; NUL `0x522E84`) | 48 | `]Th¤t bƠi! nguyên nhân: s¯ đi¬m có đß₫c không đü` | ]Thất bại! nguyên nhân: số điểm có được không đủ | §4.1 Mode 3 suffix |
+   | `0x522E90` (hdr `0x522E88`) | 41 | `Máy h¥u hƠ đang b§n, vui ḷng thØ lƠi sau` | Máy hầu hạ đang bận, vui lòng thử lại sau (VISCII chốt) | §4.1 Mode 4 Sel 1 |
+   | `0x522EC4` (hdr `0x522EBC`) | 37 | `Máy h¥u hƠ hß bäo đang offline update` | Máy hầu hạ hư bảo đang offline update (VISCII chốt) | §4.1 Mode 4 Sel 2 |
+   | `0x522EF4` (hdr `0x522EEC`) | 41 | `Kho nguyên li®u thß½ng ph¦m không phù h₫p` | Kho nguyên liệu thương phẩm không phù hợp (VISCII chốt) | §4.1 Mode 4 Sel 3 |
+   | `0x522F28` (hdr `0x522F20`) | 51 | `Gi¾i hƠn lß₫ng thß½ng ph¦m đă phân ph¯i hoàn thành.` | Giới hạn lượng thương phẩm đã phân phối hoàn thành. (VISCII chốt) | §4.1 Mode 4 Sel 4 |
+   | `0x5C0A0C` (first-str, ko hdr; NUL `0x5C0A1C`) | 16 | `có đß₫c %s%d cái` | có được %s%d cái | §4.3 format |
+   | `0x5C0A28` (hdr `0x5C0A20`) | 16 | `sound\WB0011.wav` | (ASCII) | §4.3 âm thanh |
+   | `0x5C0ABC` (hdr `0x5C0AB4`) | 46 | `Máy chü đang b§n, xin vui ḷng đ₫i r°i thØ lƠi` | Máy chủ đang bận, xin vui lòng đợi rồi thử lại | §4.4 Sel 1 |
+   | `0x5C0AF4` (hdr `0x5C0AEC`) | 41 | `Đi¬m s¯ không đü, m¶i bƠn b± sung đi¬m s¯` | Điểm số không đủ, mời bạn bổ sung điểm số | §4.4 Sel 2 |
+   | `0x5BE1F8` (first-str, ko hdr; NUL `0x5BE212`) | 26 | `ĐÆng c¤p t× %d nâng lên %d` | Đẳng cấp từ %d nâng lên %d | §4.7 dòng 1 |
+   | `0x5BE21C` (hdr `0x5BE214`) | 1 | `\r` | CR separator | §4.7 |
+   | `0x5BE228` (hdr `0x5BE220`; NUL `0x5BE240`) | 23 | `C¥n s¯ đi¬m tṛ ch½i %d` | Cần số điểm trò chơi %d (đọc ≈) | §4.7 dòng 2 |
+   | `0x5BE314` (hdr `0x5BE30C`) | 24 | `Server tr× đi¬m th¤t bƠi` | Server trừ điểm thất bại | §4.8 Sel 1 |
+   | `0x5BE338` (hdr `0x5BE330`) | 35 | `ĐÆng c¤p vß₫t quá gi¾i hƠn cao nh¤t` | Đẳng cấp vượt quá giới hạn cao nhất | §4.8 Sel 2 |
+   | `0x5BE364` (hdr `0x5BE35C`) | 61 | `ĐÆng c¤p trß¾c m¡t không th¬ sØ døng phß½ng thÑc nâng c¤p này` | Đẳng cấp trước mắt không thể sử dụng phương thức nâng cấp này | §4.8 Sel 3 |
+2. **Cập nhật 2026-09-14**: các hằng chuỗi .data của 0x42 **có dấu tiếng Việt** (decode `cp1258 → NFC` theo chuẩn `opcode_02.md §5`; bản chất lưu trữ là VISCII nên raw decode ra mojibake một số ký tự — cột "≈ Tiếng Việt" bảng 6.1.1 là giải đoán). Luồng handler không tự biến đổi chuỗi; FreeText SubOp `0x18` server gửi gì hiển thị nấy.
 3. **SubOp rỗng**: mọi SubOp ngoài `{1,2,3,4,0x0B,0x0C,0x0E,0x15,0x16,0x17,0x18,0x1F,0x20}` đều không làm gì (`default` chỉ dọn stack — `case_059...c:28-57`).
 4. **Chuẩn wire format chung** (khớp handoff `handoff-opcode-exploration-guide.md` mục 1): frame `[F4 44][Len:2B LE][Payload]`, toàn frame XOR `0xAD`; payload = `[0x42][SubOp][...]`.
 
@@ -272,3 +315,4 @@ if (sel == 3) VirtualCall_0x90(gvar_007DA084, &DAT_005be364, 2000, 0, 0);
 - Chiều C→S (rỗng): `ts_decompile/functions/0077f414_FUN_0077F414.c:1066-1067`
 - Helper codec: `ts_decompile/functions/0077eb9c_FUN_0077eb9c.c` (Word LE) · `0077ef7c_FUN_0077ef7c.c` (DWORD LE)
 - Tra CSDL tên: `FUN_00774a84` / `FUN_007746ac` (gọi với `gvar_007DA540`)
+- Hex dumps mới (2026-09-14): `ts_decompile/redump/lit_522e40.hex` · `lit_522e54.hex` · `lit_5c0a0c.hex` · `lit_5c0abc.hex` · `lit_5c0af4.hex` · `lit_5be1f8.hex` · `lit_5be228.hex` — decode bảng 6.1.1

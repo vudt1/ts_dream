@@ -3,18 +3,20 @@
 Ngày: 2026-09-12 · Workspace: `/mnt/d/VUDT/GIT_PCC/test` · Feature: `op-code` · Client: `aLogin.exe` (Delphi)
 Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (`ts_decompile/`). Ánh xạ jump table đã kiểm: `jumptable_byte200_0x78A8EE[0x3A] = 0x33 (=51)` → `jumptable_dword200_0x78A9B6[51]` (entry `0x0078AA82` = base + 51×4) → target `0x007956B9` = **Case 51**. Đối chiếu kép: inline trong dispatcher tổng `0078a89c_FUN_0078a89c.c:6920–6934` (marker `UNK_007956cc` / `UNK_007956ee`) khớp `case_051`.
 
+> Cập nhật 2026-09-14: bổ sung phân tích từ các body/hex dump mới (theo `missing_opcode_sources.md`). Ba khoảng trống lớn nhất của tài liệu này ĐÃ ĐƯỢC LẤP: (1) body RTL `@PStrNCat` xuất hiện (`00402b60__PStrNCat.c`) → semantics §6 xác minh trực tiếp; (2) nhãn Tài/Xỉu đã dump & giải mã VISCII = **"Tiểu"/"Đại"** → suy luận 比大小 chốt 100%; (3) creator `gvar_007DA42C` tìm thấy trong `0055374c_FUN_0055374c.c:29–31` → class scene #1 **xác minh đúng tên `TRE_BiDaXiao`** (VMT `VMT_547800_TRE_BiDaXiao`), không còn là suy luận từ dải method.
+
 > Phạm vi: **core logic opcode**. Toàn bộ "trái tim" nằm ở helper `FUN_00547c84` (handler chỉ là passthrough 1 nhánh). Phần paint/sound chỉ nêu để chứng minh consumer của dữ liệu.
 
 ---
 
 ## 1. Tóm tắt nghiệp vụ
 
-**OP 0x3A là "packet trả kết quả" của màn hình cảnh scene #1** — một object thuộc **họ class `TRE_*` ("BiDaXiao" = 比大小 — Tài Xỉu / so lớn-nhỏ)** trong cùng unit với `TRE_BackGround`, `TRE_BiDaXiaoHelp`, `TRE_Bet` (VMT định danh `VMT_547718_TRE_BackGround`… tại `0051189c_FUN_0051189c.c:1747–1755`).
+**OP 0x3A là "packet trả kết quả" của màn hình cảnh scene #1** — object đích là instance **`TRE_BiDaXiao`** (比大小 — Tài Xỉu / so lớn-nhỏ), cùng unit với `TRE_BackGround`, `TRE_BiDaXiaoHelp`, `TRE_Bet` (VMT định danh `VMT_547718_TRE_BackGround`… tại `0051189c_FUN_0051189c.c:1747–1755`). **Tên class xác minh trực tiếp từ dòng tạo**: `0055374c_FUN_0055374c.c:30–31` gọi `TRE_BiDaXiao::TRE_BiDaXiao_Create(VMT_547800_TRE_BiDaXiao, 1, param_3)` rồi gán `gvar_007DA42C` (hàm chạy từ OP 0x39 — `case_050_00795579_FUN_00795579.c:39`).
 
 - **Chỉ có SubOp 1**. Mọi SubOp khác: **silent drop** (`case_051.c:26–29`).
 - Payload sau SubOp là **fixed 8 byte**: `[c1][c2][c3][flag][token:4B LE]` — helper `FUN_00547c84` cắt đúng tới RP[9] (1-based), byte thừa ignored.
 - Client: ghi 3 byte vào **3 ô hiển thị** (`f78[1..3]`), tính **tổng** giữ tại `f60` (bắt buộc ≤255, ngược lại ERangeError), dựng flag `f5` = RP[5], cất **token DWORD** `f18` = RP[6..9], rồi **chuyển state machine sang 5** (`f61:=5`) để chạy nốt hoạt ảnh.
-- Ở state 6, client **vẽ banner = IntToStr(tổng f60) + nhãn, phân dải theo tổng**: `[3..10]` nối thêm chuỗi tại `DAT_00548930`, `[11..18]` nối `DAT_00548940` (`0054886c_FUN_0054886c.c:40–48`) — hai dải `[3..10]`/`[11..18]` **chính là Xỉu/Tài của tổng 3 xúc xắc** (suy luận confidence khá, khớp tên unit `BiDaXiao`; chuỗi nhãn chưa dump — §7).
+- Ở state 6, client **vẽ banner = IntToStr(tổng f60) + nhãn, phân dải theo tổng**: `[3..10]` nối chuỗi `DAT_00548930`, `[11..18]` nối `DAT_00548940` (`0054886c_FUN_0054886c.c:40–48`). **ĐÃ XÁC MINH TỪ DUMP (2026-09-14)**: hai nhãn là **"Tiểu"** (`54 69 AC 75`, VISCII = 小 = Xỉu) và **"Đại"** (`D0 D5 69`, = 大 = Tài) — xem §7; đúng cặp Tài/Xỉu của 比大小 (BiDaXiao).
 - Ở state 7 (sau chờ 1000 ms + play sound theo `f5`), client **tự-inject OP 0x1A cục bộ** với payload `[tiền-tố?][token f18:4B LE]` (`00548080.c:151–166`) — OP 0x1A đã kiểm chứng ở `opcode_1a.md` là kênh **"đồng bộ bộ đếm/tài khoản số + banner thưởng"** → `f18` nhiều khả năng là **số tiền/điểm cộng-trừ** mà server muốn áp sau phiên cược.
 - **C→S CÓ THẬT**: nhà của gói này cũng chính là state machine — tại state 4 client gửi **`[0x3A][f4:1B][f0c:4B LE]`** (6 byte; byte 2 = byte biến thể bảng `obj+4`, KHÔNG phải hằng SubOp — xem §6). Tức 0x3A là cặp **request ↔ response** một-vs-một SubOp (chỉ chiều S→C dùng SubOp `0x01`).
 
@@ -114,10 +116,10 @@ Lưu ý idiom `FUN_0077ef7c(*(undefined4*)gvar_007D9D30, s)`: param_1 là **rác
 | 0xc | cuộn/tính lại `f8 += f14(=f10/33)` theo phím, chờ điều kiện → về 0 |
 | 0xb | (force từ `FUN_00549978` — handler ESC/cancel, 00549978.c:21–23) inject nốt 0x1A nếu `f18<>0`, rồi **`FUN_00553818` = gửi OP 0x39 rời scene** (`00553818.c: FUN_0077f414(...,0x39)`), `f6:=0` dừng máy |
 
-### 4.5. Chuỗi giá trị 3 byte là gì? (suy luận, ghi rõ mức tin)
-- `f60` tổng được **in ra banner** với hai dải nhãn `[3..10]` và `[11..18]` (`0054886c.c:42–46`) — trùng khít tập giá trị tổng của **3 viên xúc xắc 1..6** và điểm cắt Tài/Xỉu trong "比大小" (BiDaXiao — tên class cùng unit).
+### 4.5. Chuỗi giá trị 3 byte là gì? (ĐÃ CHỐT 2026-09-14)
+- `f60` tổng được **in ra banner** với hai dải nhãn — **dump + giải mã VISCII xác nhận**: `DAT_00548930` = `54 69 AC 75` → **"Tiểu"** (小, tức Xỉu); `DAT_00548940` = `D0 D5 69` → **"Đại"** (大, tức Tài) (`0054886c.c:42–46`).
 - Mỗi byte `f78[i]`喂 vào thông số sprite của ô i; 3 ô + chống chồng 15px.
-- **Kết luận làm việc (medium confidence):** `RP[2..4]` = **3 giá trị xúc xắc/lá bài**, `RP[5]` = cờ kết quả (thắng/cách xử lý), `RP[6..9]` = token số (tiền thưởng) echo qua OP 0x1A. Không có chuỗi literal để khẳng định 100% (nhãn chưa dump — §7, §9).
+- **Kết luận (đã xác minh, confidence CAO):** `RP[2..4]` = **3 giá trị xúc xắc**, `RP[5]` = cờ kết quả, `RP[6..9]` = token số (tiền thưởng) echo qua OP 0x1A. Tên class scene #1 xác minh đúng `TRE_BiDaXiao` (比大小 = Đại/Tiểu — đúng bài toán 3 xúc xắc 1..6, tổng Tài ≥ 11). Không còn là suy luận.
 
 ---
 
@@ -125,10 +127,10 @@ Lưu ý idiom `FUN_0077ef7c(*(undefined4*)gvar_007D9D30, s)`: param_1 là **rác
 
 | Global | Vai trò | Bằng chứng |
 | :--- | :--- | :--- |
-| `gvar_007DA42C` | **Con trỏ object scene #1** (họ unit `TRE_BiDaXiao`; methods `FUN_00547b94…FUN_00548e98`) — param_1 của helper. **Không tìm thấy nơi gán trong mọi file .c export** (grep `7da42c`: 6 hit, duy nhất `=0` lúc free) ⇒ creator nằm trong **HOLE `0x00514C62–0x00516108`** (đã check `index.csv` bằng python; chính HOLE này chứa call-site `0x515c15`/`0x515d8e` của 2 dispatcher scene) | `00553410.c:32–33`; `00553840.c:35`; `0055391c.c:35` |
+| `gvar_007DA42C` | **Con trỏ object scene #1 — class `TRE_BiDaXiao`** (methods `FUN_00547b94…FUN_00548e98`) — param_1 của helper. **Nơi gán ĐÃ TÌM THẤY (2026-09-14)**: `0055374c_FUN_0055374c.c:29–31` — nhánh `mode==1` gọi `TRE_BiDaXiao::TRE_BiDaXiao_Create(VMT_547800_TRE_BiDaXiao,'\x01',param_3)` rồi `*(int**)gvar_007DA42C = piVar3`; cuối hàm ghi byte mode `*(byte*)(param_1+4) = param_2` (`:58`). `FUN_0055374c` được gọi từ handler OP 0x39 (`case_050_00795579_FUN_00795579.c:39`, param_1 = `gvar_007D9D88^` = TSportManage). HOLE `0x00514C62–0x00516108` (vẫn chưa có body — đã kiểm `index.csv` bằng python: không hàm nào phủ) KHÔNG chứa creator như nghi vấn trước đây | `0055374c.c:30–31,58`; `00553410.c:32–33`; `00553840.c:35`; `0055391c.c:35` |
 | `DAT_00948de4` | **Alias toàn cục khác của cùng object** (đọc `f61`, ghi `f0c` y hệ) | `005492dc.c:27,34`; `00548080.c:103` |
 | Controller scene | Object có byte `+4` = **mã cảnh** (1…6,0xff); mode 1 ↔ `gvar_007DA42C`; holder `gvar_007D9D88`; free tập trung khi out-world | `00553410.c:24–52`, gọi từ `00603f20.c:227` (hàm rời world — kế thừa `opcode_36.md` §5.2) |
-| Họ anh em | mode 2 `gvar_007DA0F4`, 3 `gvar_007DA778`, 4 `gvar_007D9F98`, 6 `gvar_007DA4EC`, 0xff `gvar_007DA0A0` — mỗi cảnh một object | `00553410.c:28–51` |
+| Họ anh em | mode 2 `gvar_007DA0F4` = `TSBDManager`, 3 `gvar_007DA778` = `TRE_ZMChessMain`, 4 `gvar_007D9F98` = `TLottoManager`, 6 `gvar_007DA4EC` = `TMachineManager`, 0xff `gvar_007DA0A0` = `TSportDemo` — mỗi cảnh một object; **tất cả tên class xác minh từ chính dòng Create trong `0055374c_FUN_0055374c.c:25–57`** | `00553410.c:24–52`; `0055374c.c:25–57` |
 | `gvar_007DA084` | Banner `TSe_TalkMsgFormPlus` (kế thừa `opcode_1a.md` §0: vtable+0x90 = ShowText(text, ms)) | `0054886c.c:51` |
 | `gvar_007D9ED8` | Image Manager (kế thừa `opcode_36.md` §5.1) | `00548080.c:75,82` |
 | `gvar_007D9D30` | Context vô nghĩa (rác) của codec/sender — param_1 không dùng | `0077ef7c.c:162–189` |
@@ -153,25 +155,24 @@ Lưu ý idiom `FUN_0077ef7c(*(undefined4*)gvar_007D9D30, s)`: param_1 là **rác
 ; CALL 0x0077ee84 : append DWORD LE [obj+0xc]
 ; CY_AddSedQueue(gvar_007DA664 = TFConnect)
 ```
-⇒ **Body C→S = `[0x3A][f4:1B][f0c:4B LE]` (6 byte)** — byte 2 là **biến thể bảng f4** (1|2), không phải SubOp; `@LStrFromString` bỏ length byte của shortstring nên payload bắt đầu thẳng bằng `0x3A`. RTL `@PStrNCat` @ `0x402b60` **không export** (HOLE `0x00402B1C–0x00402B90` — check `index.csv`); ngữ nghĩa "nối min(count, src[0]) ký tự data" là **khuôn đã được 3 tài liệu trước hiệu chuẩn độc lập** (`opcode_37.md §6.3`, `opcode_03.md`, `opcode_06.md` — cùng builder `#1[op] + #1[arg] → [op][arg]` 2 byte; `login_flow_research.md §3.7`: khối 1 auth = `[0x01][lenPw]` đúng 2 byte).
-Gate đầu hàm: `if (*gvar_007DA3A0 = 0) → không gửi` (`0077f414.c:768`) = cờ đã kết nối. `f0c` = **số người dùng nhập (10..1000, ≤ f8)**; `f4` = byte biến thể bảng (1|2) — **nơi ghi f4 không có trong export** (HOLE).
+⇒ **Body C→S = `[0x3A][f4:1B][f0c:4B LE]` (6 byte)** — byte 2 là **biến thể bảng f4** (1|2), không phải SubOp; `@LStrFromString` bỏ length byte của shortstring nên payload bắt đầu thẳng bằng `0x3A`. **`@PStrNCat` ĐÃ CÓ BODY (2026-09-14)** — HOLE `0x00402B1C–0x00402B90` đã được decompile: `00402b60__PStrNCat.c:584–606`. **Xác minh và đính chính chính xác hóa** semantics: `dest[0] += n` với `n = min(src[0], maxLen − dest[0])` (nếu `dest[0] > maxLen` hoặc phần bù = 0 thì KHÔNG nối gì); nội dung copy lấy từ `src[1..n]` — **byte độ dài `src[0]` không bao giờ được copy**; không có null-terminator. Với `dest=#1'3A'`, `src=#1'f4'`, `maxLen=2`: n = min(1, 2−1) = 1 → đúng 1 byte `f4` nối vào → `[3A][f4]`. **Khớp 100% với khuôn đã hiệu chuẩn ở `opcode_37.md §6.3` / `login_flow_research.md §3.7` — không cần suy luận chéo nữa.** Bản thân builder `FUN_0077f414` có call-site `_PStrNCat` nằm trong danh sách caller của RTL (`00402b60__PStrNCat.c:428–429`: `sub_0078a357`/`sub_0078a459` — chuỗi concat của `case 0x3d`). Gate đầu hàm: `if (*gvar_007DA3A0 = 0) → không gửi` (`0077f414.c:768`) = cờ đã kết nối. `f0c` = **số người dùng nhập (10..1000, ≤ f8)**; `f4` = byte biến thể bảng (1|2) — **nơi ghi f4 vẫn không có trong export** (grep `+ 0x4) =` trên các body mới không thấy writer cho instance `TRE_BiDaXiao`; có thể qua tham số `param_3` của `TRE_BiDaXiao_Create` — `0055374c.c:30`).
 
 ---
 
 ## 7. Chuỗi literal & encoding
 
 - **Trong `FUN_00547c84` (.c + .asm): ZERO literal** — chỉ hằng số render/SEH (`LAB_`, `0x70a3d70a`…). ✓
-- Chuỗi nghiệp vụ của **cả opcode nằm ở các helper lân cận**, tất cả là shortstring/ansistring lồng trong code-gap và **KHÔNG có trong `redump/`** (lit_* hiện có: 595xxx, 77F771, 78A854, 7A2094/A8, 7ABDxx/7ABExx — đã đối chiếu danh sách) → **chưa dump — cần redump, không dịch**:
+- Chuỗi nghiệp vụ của **cả opcode nằm ở các helper lân cận** (code-gap). **Cập nhật 2026-09-14**: `redump/lit_548930.hex` + `lit_548940.hex` ĐÃ CÓ và được giải mã (bảng **VISCII** — lưu ý `cp1258` trong Python KHÔNG giải mã đúng các byte thanh điệu 0xAC/0xD0/0xD5, phải dùng `iconv -f VISCII`); các địa chỉ còn lại vẫn **chưa dump — không dịch**:
 
 | Địa chỉ | Thuộc | Vai trò quan sát được |
 | :--- | :--- | :--- |
 | `DAT_00548614` / `DAT_00548620` | gap 0x5485bf–0x548640 | **Tiền tố khi inject local OP 0x1A** (f5≠0 / f5=0) — kỳ vọng 1 ký tự = SubOp 0x1A (0x1A sub 1/2/5/6 đọc 4B LE — khớp `opcode_1a.md` §0#4) |
 | `DAT_00548608` / `DAT_0054862c` | cùng gap | Banner "đang chờ"/"hết token" (state 4 / 0xb) |
-| `DAT_00548920` + `0x548930` / `0x548940` | gap sau `FUN_0054886c` | Nhãn tổng xúc xắc: hậu tố chung + nhãn dải [3..10] + nhãn dải [11..18] — **đầu mối xác nhận Tài/Xỉu** |
+| `DAT_00548920` + `0x548930` / `0x548940` | gap sau `FUN_0054886c` | Nhãn tổng xúc xắc: hậu tố chung (`0x548920`, **chưa dump**) + **`DAT_00548930` = "Tiểu" (`54 69 AC 75` + `00`, VISCII; raw — content không header trong `lit_548930.hex`, 3 byte pad tới 0x548937)** + **`DAT_00548940` = "Đại" (`D0 D5 69`, VISCII; const AnsiString ĐẦY ĐỦ HEADER — `ff ff ff ff | 03 00 00 00` tại `0x548938–0x54893F`, thấy trong `lit_548930.hex`)** — **xác nhận Tài/Xỉu (小/大)** |
 | `DAT_005479c0` / `e4` / `a0` | gap sau `FUN_0054790c` | 3 banner lỗi validate số nhập |
 | `DAT_00548850` / `DAT_00548860` | sau `FUN_005487ec` | 2 tên sound theo `f5` (sound — ngoài phạm vi, 1 dòng) |
 
-Quyền ưu tiên giải mã khi redump: cp1258→NFC (tiền lệ `opcode_02.md` §5), thử thêm VISCII nếu vô nghĩa (`opcode_13.md`).
+Quyền ưu tiên giải mã khi redump: cp1258→NFC (tiền lệ `opcode_02.md` §5), thử thêm VISCII nếu vô nghĩa (`opcode_13.md`). **Kinh nghiệm 2026-09-14: chính VISCII (`iconv -f VISCII`) mới cho kết quả có nghĩa cho các byte 0xAC/0xD0/0xDF/0xB6… — `cp1258` của Python ánh xạ các byte này thành ký tự Latin-1 vô nghĩa; nên dùng cả hai và chọn kết quả đọc được.**
 
 ---
 
@@ -201,12 +202,18 @@ Quyền ưu tiên giải mã khi redump: cp1258→NFC (tiền lệ `opcode_02.md
 7. `functions/0077f414_FUN_0077f414.c:760–812, 1022–1031` + `.asm.txt:3617–3648` — body C→S.
 8. `functions/0078a89c_FUN_0078a89c.c:6920–6934` — inline case 0x3A (xác nhận kép); `redump/jumptable_*.hex` — parse python: `byte[0x3A]=0x33`, `dword[51]=0x007956B9`.
 9. `functions/0051189c_FUN_0051189c.c:1747–1756` — họ class `TRE_BackGround/TRE_BiDaXiaoHelp/TRE_Bet` (tên VMT thật).
-10. `index.csv` (python): HOLE `0x00514C62–0x00516108` (creator/switcher scene), HOLE `0x00402B1C–0x00402B90` (`@PStrNCat`), HOLE `0x547409–0x54790C` (VMT họ TRE_*).
-11. Kế thừa đối chiếu: `opcode_36.md` (framing, RP-cut, gvar_007DA664/ED8, out-world), `opcode_1a.md` (ngữ nghĩa 0x1A + banner vtable+0x90), `opcode_00_01.md` §5 (khuôn builder C→S), handoff S11 (sceneMode).
+10. `functions/0055374c_FUN_0055374c.c:25–58` — **creator toàn bộ 6 manager theo mode (`TRE_BiDaXiao`/`TSBDManager`/`TRE_ZMChessMain`/`TLottoManager`/`TMachineManager`/`TSportDemo`) + ghi byte mode `TSportManage+4`** (gọi từ OP 0x39, `case_050...c:39`).
+11. `functions/00402b60__PStrNCat.c:584–606` — **body RTL `@PStrNCat` mới export** — xác minh semantics nối shortstring §6.
+12. `redump/lit_548930.hex` + `lit_548940.hex` — decode VISCII → "Tiểu"/"Đại" (§4.5, §7).
+13. `index.csv` (python): HOLE `0x00514C62–0x00516108` (vẫn trống, nhưng creator KHÔNG nằm ở đây), HOLE `0x547409–0x54790C` (VMT họ TRE_* — vẫn chưa dump). HOLE `0x00402B1C–0x00402B90` **ĐÃ ĐƯỢC LẤP** (`00402b60__PStrNCat.c`).
+14. Kế thừa đối chiếu: `opcode_36.md` (framing, RP-cut, gvar_007DA664/ED8, out-world), `opcode_1a.md` (ngữ nghĩa 0x1A + banner vtable+0x90), `opcode_00_01.md` §5 (khuôn builder C→S), handoff S11 (sceneMode).
 
-**UNKNOWN (cần redump/phân tích thêm):**
-- Nơi gán `gvar_007DA42C` + tên class chính xác của instance scene #1 (HOLE 0x514C62–0x516108) — mới khẳng định được **cùng unit** với họ `TRE_BiDaXiao` qua dải method 0x547b94–0x548e98 và controller mode-1.
-- Nội dung 10+ chuỗi literal §7 (nhãn Tài/Xỉu, prefix 0x1A, sound, lỗi validate) — code-gap, chưa dump.
+**CÒN THIẾU (cập nhật 2026-09-14 — cần redump/tiếp tục):**
+- ~~Nơi gán `gvar_007DA42C`~~ **ĐÃ TÌM THẤY**: `0055374c_FUN_0055374c.c:30–31`, class `TRE_BiDaXiao` (VMT `VMT_547800_TRE_BiDaXiao`).
+- ~~Ngữ nghĩa business (xúc xắc 3 viên, dải Tài/Xỉu)~~ **ĐÃ XÁC MINH**: dump `lit_548930/548940.hex` → "Tiểu"/"Đại" (小/大), khớp dải [3..10]/[11..18] của tổng 3×(1..6).
+- VMT họ `TRE_*` HOLE `0x547409–0x54790C` — **vẫn chưa dump** (không có `vmt_5474*.hex` trong `redump/`).
+- Call-site `SendCommand(0x3A)` byte `CL` — asm sender `00547fbc.asm.txt` (`MOV CL,1`) đã có nhưng **builder `case 0x3a` bỏ quên CL, dùng `[obj+4]`** (không đổi); call-site thật với `CL` ngữ nghĩa vẫn chưa thấy ngoài HOLE.
+- Vùng `0x0051Bxxx` (tài nguyên scene) **chưa dump**.
+- Nội dung 8 chuỗi literal §7 **còn lại** (tiền tố inject 0x1A `DAT_00548614/20`, banner chờ/hết token `DAT_00548608/2c`, 3 lỗi validate `DAT_005479c0/e4/a0`, 2 sound `DAT_00548850/60`) — code-gap, chưa dump.
 - Nơi ghi `f4` (biến thể 1|2), `f8` (limit), cấp phát mảng slot `f7c[0..3]` + set state slot `+4` (đều ngoài export).
 - Ý nghĩa chính xác byte `flag` (RP[5]) và các tham số render cuối của `FUN_00774220` (param_15=6, param_16/17) — graphics RTL chưa đi sâu.
-- Ngữ nghĩa business cuối cùng (xúc xắc 3 viên) là **suy luận level khá** từ dải [3..10]/[11..18] + tên `BiDaXiao`; chốt 100% cần dump `DAT_00548930/0x548940`.

@@ -13,7 +13,7 @@ Tài liệu hướng dẫn (`.scratch/op-code/handoff-opcode-exploration-guide.m
 
 Chuỗi bằng chứng quyết định:
 1. **Mọi sub-op đều gọi chung một hàm** `FUN_007ab870` (`ts_decompile/functions/007ab870_FUN_007ab870.c`) với đối số 1 là `gvar_007DA1B0`. Global này được gán trong `ts_decompile/functions/0051189c_FUN_0051189c.c:1590` từ `VMT_7AB774_TTalkMsgForm` → **bảng tin nhắn / chat log** (TTalkMsgForm).
-2. **Đối số 4 của `FUN_007ab870` (param_4) = "tag kênh"** (0..7, 0x0B) mà nội bộ nó dùng để **nối tiền tố nhãn kênh** vào dòng hiển thị (`_LStrCat3`/`_LStrCatN`). Các tiền tố này là chuỗi tiếng Việt có dấu (cp1258) định vị tại `0x7ABD54`… đã giải mã trực tiếp từ dump hằng số (xem mục 5).
+2. **Đối số 4 của `FUN_007ab870` (param_4) = "tag kênh"** (0..7, 0x0B) mà nội bộ nó dùng để **nối tiền tố nhãn kênh** vào dòng hiển thị (`_LStrCat3`/`_LStrCatN`). Các tiền tố này là chuỗi tiếng Việt có dấu (VISCII đơn-byte — xem đính chính mục 5) định vị tại `0x7ABD54`… đã giải mã trực tiếp từ dump hằng số (xem mục 5).
 3. **Các byte điều kiện `ECX[1]` được gate bằng cờ kênh** trong `gvar_007DA6E0` = `TFT_ChannelForm` (`0051189c_FUN_0051189c.c:1592`), các offset `+0x168…+0x16D` được **khởi tạo = 1 cho 6 kênh** trong vòng lặp `for(local_10=0..5)` của `ts_decompile/functions/006037dc_FUN_006037dc.c:178`.
 4. Hàm "đệ trình" `case 0x0C` ghi trực tiếp dòng `ECX[1..]` như một **thông báo hệ thống thuần** (id=0), không có cấu trúc nhân vật nào (không có byte class/race/name-slot, không dựng grid danh sách).
 
@@ -143,9 +143,11 @@ Quy ước: `P[.]` = byte payload gốc sau header (`P[0]=0x02 MainOp`, `P[1]=Su
 
 ## 5. Giải mã bảng hằng số nhãn kênh (bằng chứng chuỗi)
 
-Trích từ `ts_decompile/redump/lit_7ABD54/7ABDAC/7ABDF0/7ABE40/7ABE64/7ABE74.hex` (Delphi `ansistring`: `[len:4LE][chars][00...]`; giải mã **cp1258 → NFC**). Đây là các chuỗi `param_4` được `FUN_007ab870` nối vào tên:
+Trích từ `ts_decompile/redump/lit_7ABD54/7ABDAC/7ABDF0/7ABE40/7ABE64/7ABE74.hex` (Delphi `ansistring`: `[len:4LE][chars][00...]`; giải mã **VISCII đơn-byte tiền tổ hợp → NFC**). Đây là các chuỗi `param_4` được `FUN_007ab870` nối vào tên:
 
-| Địa chỉ | Byte | cp1258 | Tiếng Việt (NFC) | Vai trò |
+> **Đính chính 2026-09-14**: bản cũ ghi recipe là "cp1258 → NFC". Khi đối chiếu bằng chứng byte mới (15 toast `opcode_09.md §7.1`, `lit_797ee8` `opcode_17.md`, `lit_7282ec/728300` `opcode_19.md`): pipeline `cp1258+NFC` trả kết quả vô nghĩa (`63 A7 70` → `c§p`), còn bảng **VISCII (RFC 1456, đơn-byte tiền tổ hợp)** đọc đúng 100% — áp dụng cả cho chính `lit_7ABD54.hex` ở bảng dưới (`f4=ô, af=ố, ae=ệ`). Cột "Byte" giữ nguyên; nhãn mã hóa đúng là **VISCII → NFC**.
+
+| Địa chỉ | Byte | VISCII (trước NFC) | Tiếng Việt (NFC) | Vai trò |
 | :--- | :--- | :--- | :--- | :--- |
 | `0x7ABD54` | `28 43 f4 6e 67 20 62 af …` | `(Công bâ… h® th¯ng)` | **(Công bố hệ thống)** | tag 0 / 0x0C |
 | `0x7ABD70` | `28 54 68 a5 6e 29 …` | `(Th¥n)Thiên th¥n` | **(Thần)Thiên thần** | tag 1 |
@@ -203,7 +205,7 @@ case 2:
 | 2 | `ts_decompile/functions/007ab870_FUN_007ab870.c` | @`0x007AB870`; switch tag d.253–332; gate ignore d.251 | Hàm hội tụ hiển thị + bảng tiền tố theo tag |
 | 3 | `ts_decompile/functions/007ab870_FUN_007ab870.asm.txt` | `PUSH 0x7ABD54/D70/DAC/DC0/DF0/E00/E14/E40/E54/E64/E74/DA0`, `CALL 0x00404148`(LStrCatN), `CALL 0x004040d4`(LStrCat3) | Xác minh thứ tự nối chuỗi + địa chỉ hằng số |
 | 4 | `ts_decompile/functions/007ad614_FUN_007ad614.c` | @`0x007AD614`; ring buffer `[str,color,id]` d.107–138; filter d.99; VMT+0x88 d.158 | Bộ đệm chat 100 dòng + màu + lọc từ |
-| 5 | `ts_decompile/redump/lit_7ABD54.hex` … `lit_7ABE74.hex` | `0x7ABD54`…`0x7ABE94` | Giải mã cp1258→NFC nhãn kênh (bằng chứng nghiệp vụ) |
+| 5 | `ts_decompile/redump/lit_7ABD54.hex` … `lit_7ABE74.hex` | `0x7ABD54`…`0x7ABE94` | Giải mã VISCII→NFC nhãn kênh (bằng chứng nghiệp vụ) |
 | 6 | `ts_decompile/functions/00722508_FUN_00722508.c` | @`0x00722508`; 2100 slot `gvar_007DA6BC` | Tra id→tên (cache) |
 | 7 | `ts_decompile/functions/0075ddb8_FUN_0075ddb8.c` | @`0x0075DDB8` | Wrapper resolve tên (gọi FUN_00722508) |
 | 8 | `ts_decompile/functions/005631c4_FUN_005631c4.c` | @`0x005631C4`; mảng `DAT_00949284` | Ignore-list |

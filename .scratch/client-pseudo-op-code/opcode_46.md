@@ -3,6 +3,8 @@
 Ngày: 2026-09-12 · Workspace: `/mnt/d/VUDT/GIT_PCC/test` · Feature: `op-code` · Chiều: **Server → Client (S→C) một chiều**  
 Trạng thái: **Đã xác minh 100% từ mã nguồn sơ cấp** (`ts_decompile/` only).
 
+> Cập nhật 2026-09-14: bổ sung phân tích từ các body/hex dump mới (theo `missing_opcode_sources.md`). Vùng `0x0051Bxxx` (tên/hằng chuỗi đua thuyền) đối chiếu `redump/` **vẫn chưa có dump** — giữ nguyên giới hạn §7, không đổi phân tích.
+
 ---
 
 ## 1. Tóm Tắt Nghiệp Vụ Cốt Lõi
@@ -238,7 +240,7 @@ if (*(int *)(iVar2 + -4) == 0) {     // Kiểm tra Length(RP) == 0
   + `"02_start"`: Tên animation đếm ngược 5 giây xuất phát.
   + `"L10788"`: Tên hiệu ứng âm thanh hoàn thành cuộc đua.
   + `"\\sty\\"` & `".sty"`: Phần mở rộng file phim kịch bản cutscene.
-- Tên tay đua được nạp động từ CSDL người chơi tại thời điểm chạy. Không có chuỗi VISCII/CP1258 tĩnh nào trong thư mục `ts_decompile/redump/` cho các địa chỉ `0x0051Bxxx`.
+- Tên tay đua được nạp động từ CSDL người chơi tại thời điểm chạy. **Đối chiếu `ts_decompile/redump/` (ls 2026-09-14)**: không có `lit_51b*.hex` cho các địa chỉ `0x0051Bxxx` → vùng hằng chuỗi `DAT_0051b370`, `DAT_0051bc38/c58`, `LAB_0051bc78` **vẫn chưa dump**, giữ nguyên giới hạn bản 2026-09-12.
 
 ---
 

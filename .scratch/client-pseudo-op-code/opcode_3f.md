@@ -1,7 +1,9 @@
 # PHÂN TÍCH — Main OP 0x3F (63) / Case 56 / FUN_00795ac4 @ 0x00795AC4
 
 Ngày: 2026-09-12 · Workspace: `/mnt/d/VUDT/GIT_PCC/test` · Feature: `op-code` · Chiều: **Server → Client (S→C) một chiều**  
-Trạng thái: **Đã xác minh 100% từ mã nguồn sơ cấp** (`ts_decompile/` only).
+Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (`ts_decompile/` only). 12 callee trước đây "khe chưa decompile" **nay đã có body** (đợt redump 2026-09-14) — §4.4 được viết lại toàn bộ, nhiều suy đoán cũ bị **đính chính**.
+
+> Cập nhật 2026-09-14: bổ sung phân tích từ các body/hex dump mới (theo `missing_opcode_sources.md`).
 
 ---
 
@@ -10,7 +12,7 @@ Trạng thái: **Đã xác minh 100% từ mã nguồn sơ cấp** (`ts_decompile
 Main OP `0x3F` (thập phân: `63`, ánh xạ tới **Case 56**) phụ trách hai phân hệ chiến đấu đặc thù trong game:
 1. **Hệ thống Lôi Đài / Đấu Trường Võ Thuật (`TMRBatterManage` & `TPlayers` / Scene Actor Manager)**:
    - Tiếp nhận và phát các thông báo giải đấu lôi đài, cập nhật hệ ngũ hành áp dụng cho trận đấu (Địa, Thủy, Hỏa, Phong), thông báo tên NPC phụ trách lôi đài, mức tiền cược thi đấu (5.000 lượng hoặc 10.000 lượng) và danh tính tuyển thủ tham chiến.
-   - Đồng bộ hóa trực tiếp các chỉ số / trạng thái thi đấu lôi đài vào cấu trúc dữ liệu của người chơi bản địa (`Local Player` - `gvar_007DA7BC` tại offset `+0x1464` và `+0x1468`).
+   - Đồng bộ hóa trực tiếp các chỉ số / trạng thái thi đấu lôi đài vào cấu trúc dữ liệu của người chơi bản địa (`Local Player` - `gvar_007DA7BC` tại offset `+0x145A`, `+0x145B`, `+0x1460` (mới xác minh từ body redump 2026-09-14) và `+0x1464`, `+0x1468`).
    - Quản lý giao diện bảng trợ giúp và thông tin quy tắc thi đấu lôi đài (`TMR_BattleHelp` - `gvar_007DA7E0`).
 2. **Hệ thống Chiến Trường Thủy Chiến (Water Battle - `TMR_WaterBattleManage` & `TMR_WBManageOrgManage`)**:
    - Quản lý trạng thái khởi tạo, tiến trình và kết thúc trận thủy chiến (`TMR_WaterBattleManage` - `gvar_007DA27C`).
@@ -51,23 +53,23 @@ if (*(int *)(iVar2 + -4) == 0) {     // Kiểm tra Length(RP) == 0
 
 ## 3. Bảng Tổng Hợp Toàn Bộ SubOp
 
-| SubOp (Hex) | SubOp (Dec) | Đối Tượng Đích (`param_1`) | Hàm Callee | Min Len | Tình trạng SSOT | Ý Nghĩa Nghiệp Vụ Cốt Lõi |
+| SubOp (Hex) | SubOp (Dec) | Đối Tượng Đích (`param_1`) | Hàm Callee | Min Len | Tình trạng SSOT | Ý Nghĩa Nghiệp Vụ Cốt Lõi (cập nhật 2026-09-14 từ body mới) |
 | :---: | :---: | :--- | :--- | :---: | :---: | :--- |
 | **`0x01`** | 1 | `gvar_007D9DFC` (`TMRBatterManage`) | `FUN_0054c348` | 2B | ✔ Đã decompile | Quản lý 8 loại sự kiện/thông báo võ đài (ngũ hành, NPC, tiền cược 5k/10k, tuyển thủ). |
-| **`0x02`** | 2 | `gvar_007D9DFC` (`TMRBatterManage`) | `func_0x0054cbc0` | ≥1B | ✘ Khe chưa decompile | Cập nhật dữ liệu danh sách/bảng thi đấu võ đài (`TMRBatterManage`). |
-| **`0x03`** | 3 | `gvar_007D9D34` (`TPlayers` - Scene Mgr) | `func_0x00747ca4` | ≥1B | ✘ Khe chưa decompile | Đăng ký / thêm đối thủ lôi đài vào danh sách thực thể Scene. |
-| **`0x04`** | 4 | `gvar_007D9D34` (`TPlayers` - Scene Mgr) | `func_0x00747cdc` | ≥1B | ✘ Khe chưa decompile | Xóa / gỡ bỏ đối thủ lôi đài khỏi thực thể Scene. |
+| **`0x02`** | 2 | `gvar_007D9DFC` (`TMRBatterManage`) | `FUN_0054cbc0` | 2B | ✔ **Body mới** | **Toast 1200ms chọn theo `RP[1]`∈1..10** (10 chuỗi cố định, ko đụng self) — *đính chính: không phải "cập nhật bảng thi đấu"* |
+| **`0x03`** | 3 | `gvar_007D9D34` (`TPlayers`) | `FUN_00747ca4` | 2B | ✔ **Body mới** | **Byte `RP[1]` → `LocalPlayer+0x145A`** — *đính chính: không tạo actor nào* |
+| **`0x04`** | 4 | `gvar_007D9D34` (`TPlayers`) | `FUN_00747cdc` | 5B | ✔ **Body mới** | **DWORD LE `RP[1..4]` → `LocalPlayer+0x1460`** — *đính chính: không xóa actor* |
 | **`0x05`** | 5 | `gvar_007D9D34` (`TPlayers` - Scene Mgr) | `FUN_00747d50` | 5B | ✔ Đã decompile | Đọc DWORD LE, cập nhật chỉ số lôi đài vào `LocalPlayer + 0x1468`. |
 | **`0x06`** | 6 | `gvar_007D9D34` (`TPlayers` - Scene Mgr) | `FUN_00747dc4` | 5B | ✔ Đã decompile | Đọc DWORD LE, cập nhật trạng thái lôi đài vào `LocalPlayer + 0x1464`. |
-| **`0x07`** | 7 | `gvar_007D9D34` (`TPlayers` - Scene Mgr) | `func_0x00748110` | ≥1B | ✘ Khe chưa decompile | Thiết lập cờ trạng thái chiến đấu võ đài cho Scene Actor. |
-| **`0x08`** | 8 | `gvar_007DA7E0` (`TMR_BattleHelp`) | `func_0x005581cc` | ≥1B | ✘ Khe chưa decompile | Cập nhật nội dung bảng giao diện Trợ giúp Võ đài. |
-| **`0x0A`** | 10 | `gvar_007D9D34` (`TPlayers` - Scene Mgr) | `func_0x0074c5bc` | ≥1B | ✘ Khe chưa decompile | Đồng bộ điểm trận / thời gian thi đấu lôi đài trong Scene. |
-| **`0x0B`** | 11 | `gvar_007DA27C` (`TMR_WaterBattleManage`) | `func_0x0054a4f8` | ≥1B | ✘ Khe chưa decompile | Khởi tạo / cập nhật dữ liệu chiến trường Thủy chiến. |
-| **`0x0C`** | 12 | `gvar_007DA27C` (`TMR_WaterBattleManage`) | `func_0x0054aaa0` | ≥1B | ✘ Khe chưa decompile | Đồng bộ trạng thái kết thúc / điểm số chiến trường Thủy chiến. |
-| **`0x0D`** | 13 | `gvar_007DA164` (`TMR_WBManageOrgManage`) | `func_0x0054b5e8` | ≥1B | ✘ Khe chưa decompile | Quản lý danh sách phe phái / bang hội tham gia Thủy chiến. |
-| **`0x14`** | 20 | `gvar_007DA164` (`TMR_WBManageOrgManage`) | `func_0x0054b6d0` | ≥1B | ✘ Khe chưa decompile | Cập nhật phân bổ vị trí thành viên quân đoàn Thủy chiến. |
-| **`0x15`** | 21 | `gvar_007D9F10` (`TMR_WaterBattleHelp`) | `func_0x00558d80` | ≥1B | ✘ Khe chưa decompile | Cập nhật / hiển thị bảng hướng dẫn & quy tắc Thủy chiến. |
-| **`0x16`** | 22 | `gvar_007D9F10` (`TMR_WaterBattleHelp`) | `func_0x00558d1c` | ≥1B | ✘ Khe chưa decompile | Đóng / ẩn giao diện Hướng dẫn Thủy chiến. |
+| **`0x07`** | 7 | `gvar_007D9D34` (`TPlayers`) | `FUN_00748110` | 4B | ✔ **Body mới** | `RP[1]`=slot 0..100, `RP[2..3]`=Word LE → ghi vào world object `gvar_007DA6DC[slot]+0x3EA` (bỏ nếu slot rỗng) |
+| **`0x08`** | 8 | `gvar_007DA7E0` (`TMR_BattleHelp`) | `FUN_005581cc` | 2B | ✔ **Body mới** | `self+0x150 := RP[1]`; hiện control `+0x148/+0x14C`, ẩn `+0x144` (qua `FUN_00558bfc`); rồi gọi ảo `[VMT+0x20]()` — **đúng hướng "bảng trợ giúp"** (chọn trang/mode hiển thị) |
+| **`0x0A`** | 10 | `gvar_007D9D34` (`TPlayers`) | `FUN_0074c5bc` | 2B | ✔ **Body mới** | **Byte `RP[1]` → `LocalPlayer+0x145B`** — *đính chính: không phải điểm/thời gian; chính byte này được `0054a4f8` (SubOp 0x0B) đọc đối chiếu* |
+| **`0x0B`** | 11 | `gvar_007DA27C` (`TMR_WaterBattleManage`) | `FUN_0054a4f8` | 2B (case 5: 4B; case 4/6: 8B) | ✔ **Body mới** | Thủy chiến: `switch(RP[1])` 1..6 → **ghép chuỗi thông báo vào chat** (`FUN_007ab870`), case 4/6 tra tên NPC từ bảng `gvar_007D9DE4` theo NPCID `RP[4..7]`; kết chung: nếu `LocalPlayer+0x145B == RP[3]` và SubSubOp∈4..6 → đẩy tiếp qua `FUN_0054b8c8(DAT_009490a4, msg)` |
+| **`0x0C`** | 12 | `gvar_007DA27C` (`TMR_WaterBattleManage`) | `FUN_0054aaa0` | 2B | ✔ **Body mới** | **Toast 1200ms chọn theo `RP[1]`∈1..14** (14 chuỗi cố định) — *đính chính: không có điểm số/kết thúc trong payload* |
+| **`0x0D`** | 13 | `gvar_007DA164` (`TMR_WBManageOrgManage`) | `FUN_0054b5e8` | 2B | ✔ **Body mới** | **Toast 1200ms**: `RP[1]==1` → `DAT_0054b660`, `==2` → `DAT_0054b6a4` — *đính chính: không quản lý danh sách phe* |
+| **`0x14`** | 20 | `gvar_007DA164` (`TMR_WBManageOrgManage`) | `FUN_0054b6d0` | 2B (+23B record) | ✔ **Body mới** | **Ghi bản ghi 23B (0x17)**: `RP[1]`=slot 1..6, thân `RP[2..]` chuyển bytes qua `FUN_0077f298` rồi `Move` vào **`self+0x119 + slot*0x17`** — khớp hướng "phân bổ thành viên/quân đoàn" (bảng 6 slot trong object) |
+| **`0x15`** | 21 | `gvar_007D9F10` (`TMR_WaterBattleHelp`) | `FUN_00558d80` | 3B | ✔ **Body mới** | `RP[1]`=chỉ số 1..5 → `self+0x158+(RP[1]-1) := RP[2]` (byte); rồi gọi ảo `[VMT+0x88]()` — ghi 5 cờ/byte bảng hướng dẫn |
+| **`0x16`** | 22 | `gvar_007D9F10` (`TMR_WaterBattleHelp`) | `FUN_00558d1c` | 3B | ✔ **Body mới** | `self+0x150 := RP[1]` (decompile ghi `param_1 + 0x54` với `param_1` kiểu `int*` → byte offset `0x150`, trùng field của `FUN_00558bfc`); `self+0x15D := RP[2]`; `FUN_00559384(self,1)` (set hiện/ẩn control `+0x144/148/14C`); gọi ảo `[VMT+0x20]()` — *đính chính nhẹ: không "đóng form" mà là đổi 2 byte state + layout lại control* |
 
 ---
 
@@ -202,22 +204,30 @@ if (*(int *)(iVar2 + -4) == 0) {     // Kiểm tra Length(RP) == 0
 
 ---
 
-### 4.4. Đánh Giá 12 Callee Nằm Trong Khoảng Trống (Gaps)
+### 4.4. Phân tích 12 callee — HOLE ĐÃ ĐƯỢC DECOMPILE (đính chính 2026-09-14)
 
-12 hàm sau không có file mã nguồn rời trong `ts_decompile/functions/` (vắng mặt trong `index.csv`), tuy nhiên ngữ cảnh đối tượng và vai trò nghiệp vụ đã được xác minh đối chiếu qua địa chỉ VMT và Constructor trong `FormCreate` (`0050a4a0.c`) và `LoadingThread` (`0051189c.c`):
+Bản cũ để mục này ở trạng thái "✘ khe chưa decompile, suy đoán theo VMT/constructor". **Cả 12 hàm nay đã có entry trong `index.csv`** (các dòng `6324-6327`, `6329`, `6337-6339`, `6462-6464`, `6471`) và file body trong `ts_decompile/functions/`. Kết quả đối chiếu từng hàm — **nhiều suy đoán cũ bị bác**:
 
-1. **`func_0x0054cbc0`**: Thuộc class `TMRBatterManage` (`gvar_007D9DFC`, VMT: `0x0054C1D4`). Khoảng trống `0x54C95A - 0x54D784`. Cập nhật bảng xếp hạng / dữ liệu cặp đấu võ đài.
-2. **`func_0x00747ca4`**: Thuộc class `TPlayers` (`gvar_007D9D34`). Khoảng trống `0x747C7D - 0x747D50`. Khởi tạo thực thể đối thủ lôi đài trên Scene.
-3. **`func_0x00747cdc`**: Thuộc class `TPlayers` (`gvar_007D9D34`). Khoảng trống `0x747C7D - 0x747D50`. Hủy thực thể đối thủ lôi đài trên Scene.
-4. **`func_0x00748110`**: Thuộc class `TPlayers` (`gvar_007D9D34`). Khoảng trống `0x748102 - 0x74927C`. Đặt hiệu ứng / cờ chiến đấu võ đài cho Scene Actor.
-5. **`func_0x005581cc`**: Thuộc class `TMR_BattleHelp` (`gvar_007DA7E0`, VMT: `0x00553E84`). Khoảng trống `0x557DFB - 0x558BFC`. Cập nhật nội dung bảng trợ giúp võ đài.
-6. **`func_0x0074c5bc`**: Thuộc class `TPlayers` (`gvar_007D9D34`). Khoảng trống `0x74C5AF - 0x74CC84`. Đồng bộ thời gian / điểm số trận võ đài.
-7. **`func_0x0054a4f8`**: Thuộc class `TMR_WaterBattleManage` (`gvar_007DA27C`, VMT: `0x0054A0DC`). Khoảng trống `0x54A381 - 0x54AFE0`. Khởi tạo / cập nhật chiến trường Thủy chiến.
-8. **`func_0x0054aaa0`**: Thuộc class `TMR_WaterBattleManage` (`gvar_007DA27C`, VMT: `0x0054A0DC`). Khoảng trống `0x54A381 - 0x54AFE0`. Đồng bộ kết quả / trạng thái Thủy chiến.
-9. **`func_0x0054b5e8`**: Thuộc class `TMR_WBManageOrgManage` (`gvar_007DA164`, VMT: `0x0054A140`). Khoảng trống `0x54B52D - 0x54B804`. Quản lý danh sách phe phái Thủy chiến.
-10. **`func_0x0054b6d0`**: Thuộc class `TMR_WBManageOrgManage` (`gvar_007DA164`, VMT: `0x0054A140`). Khoảng trống `0x54B52D - 0x54B804`. Phân bổ quân số / đơn vị Thủy chiến.
-11. **`func_0x00558d80`**: Thuộc class `TMR_WaterBattleHelp` (`gvar_007D9F10`, VMT: `0x00553F70`). Khoảng trống `0x558CF5 - 0x558E20`. Mở và cập nhật giao diện Trợ giúp Thủy chiến.
-12. **`func_0x00558d1c`**: Thuộc class `TMR_WaterBattleHelp` (`gvar_007D9F10`, VMT: `0x00553F70`). Khoảng trống `0x558CF5 - 0x558E20`. Đóng giao diện Trợ giúp Thủy chiến.
+1. **`FUN_0054cbc0`** (62B, `0054cbc0_FUN_0054cbc0.c:22-56`) — SubOp `0x02`, self `TMRBatterManage` **không được dùng**. Guard `RP!=0`; `len(RP)<2` → `_BoundErr(1)` (`:25`). `switch(RP[1])` 1..10 → **toast 0x4B0=1200ms** qua virtual `[**gvar_007DA084+0x90]` với 10 chuỗi cố định `DAT_0054cd7c/cd9c/cdcc/ce0c/ce38/ce74/cea0/cedc/cf20/cf50` (chưa dump bytes). *(đính chính: không có "cập nhật bảng thi đấu" nào trong payload — byte thừa sau `RP[1]` bị bỏ.)*
+2. **`FUN_00747ca4`** (54B, `00747ca4_FUN_00747ca4.c:20-28`) — SubOp `0x03`: `len(RP)<2` → ERangeError; **`LocalPlayer(gvar_007DA7BC)+0x145A := byte RP[1]`** (`:27`). *(đính chính: không đăng ký thêm actor Scene.)*
+3. **`FUN_00747cdc`** (104B, `00747cdc_FUN_00747cdc.c:35-37`) — SubOp `0x04`: `Copy(RP,2,4)` = `RP[1..4]` → `FUN_0077ef7c` DWORD LE → **`LocalPlayer+0x1460`** (`:37`). *(đính chính: không hủy actor.)*
+4. **`FUN_00748110`** (183B, `00748110_FUN_00748110.c:40-60`) — SubOp `0x07`: `idx = RP[1]` (`>100` → `_BoundErr`, `:51-53`); `w = Word LE(RP[2..3])` qua `FUN_0077eb9c` (`:50`); nếu `gvar_007DA6DC[idx] != 0` → **`world[idx]+0x3EA := w`** (`:55-60`). `gvar_007DA6DC` = mảng ≤101 con trỏ world object (`opcode_14.md:56`, `opcode_16.md:57`). **Giữ được hướng suy cũ** ("đặt cờ/hiệu ứng cho thực thể") — field `+0x3EA` chưa biết tên.
+5. **`FUN_005581cc`** (64B, `005581cc_FUN_005581cc.c:20-28`) — SubOp `0x08`, self `TMR_BattleHelp`: gọi `FUN_00558bfc(self, RP[1], 1)` — `self+0x150 := RP[1]`, set control `+0x144→ẩn, +0x148/+0x14C→hiện` (`00558bfc_FUN_00558bfc.c:20-33`, helper hiển thị `FUN_007b0094`) — rồi **virtual `[VMT+0x20]()`** (`:28`). Khớp "bảng trợ giúp đổi trang/mode"; **không đọc chuỗi nào trong handler**.
+6. **`FUN_0074c5bc`** (54B, `0074c5bc_FUN_0074c5bc.c:20-27`) — SubOp `0x0A`: **`LocalPlayer+0x145B := byte RP[1]`**. *(đính chính: không phải điểm/thời gian; byte này chính là điều kiện ở SubOp 0x0B item 7 dưới đây — hai SubOp ghép cặp ghi/đọc.)*
+7. **`FUN_0054a4f8`** (773B, `0054a4f8_FUN_0054a4f8.c`) — SubOp `0x0B`, self `TMR_WaterBattleManage` **không dùng field nào của self**: `switch(RP[1])` 1..6, tất cả đổ ra **chat `FUN_007ab870(gvar_007DA1B0↑, 0, msg, 0)`**:
+   - case 1/3: chuỗi cố định `DAT_0054a910` / `DAT_0054a9cc` (`:76-88`).
+   - case 2: gọi `FUN_0054bde4(DAT_009490a4)` rồi chat `DAT_0054a96c` (`:80-84`).
+   - case 4 (`:89-149`): đọc `RP[2]` (phe, bắt `<2` — `:117-121`), `RP[3]` (số, `IntToStr` vào msg), `RP[4..7]` = NPCID DWORD LE → `FUN_00623f00(gvar_007D9DE4, id)` tra index NPC (`:113`); **index 0 → bỏ hết** (`goto LAB_0054a8e2`, `:115`); tên NPC = `gvar_007D9DE4↑ + 4 + idx*0x5C` (`:144`, stride 92B như SubOp 0x01); ghép 7 mảnh (`DAT_0054a9ec/9f8/aa10`… `:124-147`).
+   - case 5 (`:150-182`): chỉ ghép chuỗi từ `RP[2]`(0..1), `RP[3]` + các constant `DAT_0054a9ec/9f8/aa10/aa48`; không tra NPC.
+   - case 6 (`:183-237`): như case 4 nhưng ghép 8 mảnh (thêm `DAT_0054aa78`).
+   - **Đuôi chung** (`:239-249`): nếu `LocalPlayer+0x145B == RP[3]` **và** `RP[1]∈4..6` **và** msg khác rỗng → đẩy tiếp msg vào `FUN_0054b8c8(DAT_009490a4, msg)` (không clear msg — vừa chat vừa feed `DAT_009490a4`).
+8. **`FUN_0054aaa0`** (62B, `0054aaa0_FUN_0054aaa0.c:22-72`) — SubOp `0x0C`: giống hệt cấu trúc item 1 — `switch(RP[1])` **1..14** → toast 1200ms với 14 chuỗi `DAT_0054acf4…DAT_0054afb8`. *(đính chính: payload không chứa "điểm số/kết thúc" nào.)*
+9. **`FUN_0054b5e8`** (112B, `0054b5e8_FUN_0054b5e8.c:20-33`) — SubOp `0x0D`: `RP[1]==1` → toast `DAT_0054b660`; `==2` → toast `DAT_0054b6a4` (1200ms). *(đính chính: không đụng bảng phe phái.)*
+10. **`FUN_0054b6d0`** (197B, `0054b6d0_FUN_0054b6d0.c:49-86`) — SubOp `0x14`, self `TMR_WBManageOrgManage` ** CÓ dùng field**: `slot = RP[1]` (chấp nhận 1..6, `:66-70`); `raw = Copy(RP, 3, len(RP)-2)` = `RP[2..]` →    `FUN_0077f298` (**AnsiString→byte buffer**, chia mảng 200B — `0077f298_FUN_0077f298.c`) vào stack 28B; `Move` **0x17 = 23 byte** vào **`self + 0x119 + slot*0x17`** (`:71-86`). ⇒ bảng 6 record tổ chức ngay trong object. Giữ hướng "phân bổ thành viên" nhưng thực chất = **ghi 1 record 23B chưa parse**.
+11. **`FUN_00558d80`** (149B, `00558d80_FUN_00558d80.c:36-58`) — SubOp `0x15`, self `TMR_WaterBattleHelp`: `i = RP[1]` (1..5), `v = RP[2]` (`:52-56` len guard riêng); `self + 0x158 + (i-1) := byte v` (`:57`); **virtual `[VMT+0x88]()`** (`:58`). Khớp "cập nhật bảng hướng dẫn" (5 ô byte).
+12. **`FUN_00558d1c`** (100B, `00558d1c_FUN_00558d1c.c:23-38`) — SubOp `0x16`, self `TMR_WaterBattleHelp`: `self+0x150 := RP[1]` (dạng `param_1 + 0x54` với `int*` — đã scale hệ số 4, `:30`), `self+0x15D := RP[2]` (`:36`), `FUN_00559384(self, 1)` = set control `+0x144→ẩn / +0x148,+0x14C→hiện` (`00559384_FUN_00559384.c:20-31`), **virtual `[VMT+0x20]()`** (`:38`). *(đính chính: không có lệnh đóng/ẩn cả form.)*
+
+**Điểm chung rút ra từ 12 body mới**: (a) không hàm nào **tham chiếu literal tên người chơi/NPC tĩnh** — mọi tên đều đọc runtime từ bảng `gvar_007D9DE4` (NPC) / `LocalPlayer` (`§7` giữ nguyên, đã xác minh); (b) **toàn bộ chuỗi thông báo là AnsiString hằng trong code-segment** `DAT_0054cd7c…DAT_0054cf50`, `DAT_0054acf4…DAT_0054afb8`, `DAT_0054b660/6a4`, `DAT_0054a910…DAT_0054aa78` — **chưa có dump `lit_54c*.hex`/`lit_54a*.hex`/`lit_54b*.hex` trong `redump/`**; (c) 4/12 handler là UI thuần (toast/chat theo mã chọn), chỉ `00748110`, `0054b6d0`, `00558d80`, `00558d1c`, `005581cc` và 3 handler ghi `LocalPlayer` là đụng state.
 
 ---
 
@@ -262,6 +272,7 @@ if (*(int *)(iVar2 + -4) == 0) {     // Kiểm tra Length(RP) == 0
   + `DAT_0054cb48`: Chuỗi kết thúc thông tin NPC võ đài.
   + `DAT_0054cb64`, `DAT_0054cb78`: Chuỗi tiền tố / hậu tố bao bọc tên tuyển thủ tham chiến.
 - Thư mục `ts_decompile/redump/` hiện không có file trích xuất riêng `lit_54xxxx.hex`. Tên người chơi và tên NPC được lấy động từ CSDL tại thời điểm thực thi. Mọi chuỗi thông báo được đưa vào kênh chat hệ thống qua `FUN_007ab870`.
+- **Xác nhận 2026-09-14 từ 12 body mới**: đúng là **không có literal tên player/NPC tĩnh** trong các body (mọi tên đều đọc runtime: bảng NPC `gvar_007D9DE4 + 4 + idx*0x5C`, `LocalPlayer+9`, cache `gvar_007DA6BC`) — **giữ nguyên kết luận cũ**. Tuy nhiên các body mới **lộ thêm ~40 hằng thông báo tĩnh** chưa dump: `DAT_0054cd7c/cd9c/cdcc/ce0c/ce38/ce74/cea0/cedc/cf20/cf50` (SubOp 2), `DAT_0054acf4/ad30/ad64/ada4/ade4/ae0c/ae4c/ae7c/ae9c/aed8/af04/af40/af84/afb8` (SubOp 12), `DAT_0054b660/b6a4` (SubOp 13), `DAT_0054a910/a96c/a9cc/a9ec/a9f8/aa10/aa48/aa78` (SubOp 11) → **cần redump `lit_54a910…lit_54cf50`** để decode VISCII.
 
 ---
 
@@ -334,3 +345,5 @@ Sub-SubOp 0x08: [0x01][0x08][PlayerID: 4B LE]                     (6 bytes)
 | **FormCreate Globals**| `ts_decompile/functions/0050a4a0_TForm1.FormCreate.c` | Khởi tạo `gvar_007D9DFC`, `gvar_007DA27C` |
 | **LoadingThread Globals**| `ts_decompile/functions/0051189c_FUN_0051189c.c` | Khởi tạo `gvar_007DA7E0`, `gvar_007DA164`, `gvar_007D9F10` |
 | **C → S Dispatcher**| `ts_decompile/functions/0077f414_FUN_0077F414.c` | Dòng 1060 (`case 0x3f: break;`) |
+| **12 callee mới decompile** | `ts_decompile/functions/0054cbc0 / 00747ca4 / 00747cdc / 00748110 / 005581cc / 0074c5bc / 0054a4f8 / 0054aaa0 / 0054b5e8 / 0054b6d0 / 00558d80 / 00558d1c` (`*_FUN_*.c`) | `index.csv:6324-6327,6329,6337-6339,6462-6464,6471`; phân tích §4.4 |
+| **Help-form helpers** | `ts_decompile/functions/00558bfc_FUN_00558bfc.c:20-33`; `00559384_FUN_00559384.c:20-31`; `0077f298_FUN_0077f298.c` | Set control +0x144/148/14C; AnsiString→bytes |

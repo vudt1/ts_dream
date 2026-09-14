@@ -1,7 +1,9 @@
 # PHÂN TÍCH — Main OP 0x2B (43) / Case 39 / `FUN_00794799` @ `0x00794799`
 
 Ngày: 2026-09-12 · Workspace: `/mnt/d/VUDT/GIT_PCC/test` · Feature: `op-code` · Chiều: **Server → Client (S→C) một chiều**
-Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (`ts_decompile/` only). 6 SubOp `0x01–0x06`, có `default` cleanup. 4/5 hàm con có body.
+Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (`ts_decompile/` only). 6 SubOp `0x01–0x06`, có `default` cleanup. 4/5 hàm con có body (riêng `0x05` vẫn thiếu).
+
+> Cập nhật 2026-09-14: bổ sung phân tích từ các body/hex dump mới (theo `missing_opcode_sources.md`). **Kết quả cho OP 0x2B: không có thay đổi — callee `00758270` vẫn vắng mặt sau đợt redump** (xem §4.5).
 
 ---
 
@@ -10,7 +12,7 @@ Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (`ts_decompile/` on
 - **Vai trò**: Kênh **quản lý party/guild** kiểu OP 0x24/0x29 — không phải kênh số cộng/trừ, không chat-log `FUN_007ab870`.
 - Cùng manager cả 5 nhánh passthrough: `*gvar_007D9C20` (`+0xb3` current-ID, `+0xd4` TList, `+0xe0/+0xb7` slot).
 - 2 họ:
-  - **Passthrough + decode trong hàm con (5 nhánh)**: `0x01–0x05` trao nguyên `RP` cho `FUN_0075771c/0075785c/00757b70/007573a8/func_0x00758270` (05 chưa body).
+  - **Passthrough + decode trong hàm con (5 nhánh)**: `0x01–0x05` trao nguyên `RP` cho `FUN_0075771c/0075785c/00757b70/007573a8/func_0x00758270` (05 chưa body — **vẫn chưa sau redump 2026-09-14**, §4.5).
   - **Banner 2 tầng (1 nhánh)**: `0x06` + byte thứ 2 `01/02/03` → 3 banner `DAT_00798EB4/00798F14/00798F7C` 2000ms.
 - Đặc biệt: `case 3` **rơi qua `default`** nếu `*(mgr+0xb3)==0 && *(player+0x15c)==7` sai → cleanup no-op, không đi tiếp `case 6`.
 - Chiều C→S `case 0x2b: break;` rỗng → client không bao giờ gửi OP này.
@@ -65,7 +67,7 @@ Không gọi codec trực tiếp ở dispatcher; codec gọi gián tiếp trong 
 | `0x02` | `[2B][02][sel:1B][id1:4B][id2?:4B]` (≥7B, sel==1 ≥11B) | `sel=RP[1]`; `id1=P[3..6]`; sel==1 thêm `id2=P[7..10]` → `*(mgr+0xb3)=id2` | sel 1–5 chọn hậu tố + banner 6000ms; sel==1 + `id1!=*(mgr+0xb7)` → patch list + sort |
 | `0x03` | `[2B][03][flag:1B]` (3B) | `flag=RP[1]` | flag 00/01/02/FF → literal + banner 5000ms + refresh; nếu `mgr+0xb3==0 && player+0x15c==7` → `FUN_005952f4(player,2)` (mở editorBG), sai → rơi default |
 | `0x04` | `[2B][04][records...]` (≥2B, record biến dài) | loop `pos=2`: `a/b/c` DWORD + `len1/s1/len2/s2/f` | Mỗi record → `FUN_00757264(mgr,a,b,f,s2,s1,c)`; xong sort + refresh. Rỗng vẫn sort; cụt → BoundErr |
-| `0x05` | `[2B][05][blob...]` (≥2B) | passthrough | `func_0x00758270(mgr,RP)` — chưa body |
+| `0x05` | `[2B][05][blob...]` (≥2B) | passthrough | `func_0x00758270(mgr,RP)` — chưa body (xác nhận vẫn thiếu sau redump 2026-09-14) |
 | `0x06` | `[2B][06][sub:1B]` (3B) | `sub=RP[1]` | `01→798EB4`, `02→798F14`, `03→798F7C` banner 2000ms; còn lại im lặng |
 | `0x00`,`≥0x07` | — | — | no-op (default cleanup) |
 
@@ -95,6 +97,7 @@ Không gọi codec trực tiếp ở dispatcher; codec gọi gián tiếp trong 
 ### 4.5. SubOp `0x05` — Opaque
 
 - Chỉ `func_0x00758270(mgr,RP)`; grep toàn cây chỉ trúng dispatcher → chưa body. Mock tối thiểu 2B / replay blob live.
+- **Đối chiếu lại sau đợt redump 2026-09-14** (`missing_opcode_sources.md` đã bổ sung ~245 body): vẫn **không có** file `ts_decompile/functions/00758270*` và `ts_decompile/index.csv` (6550 entry) **0 dòng** khớp `00758270`. Hai họ kề được export: `FUN_0075816c` (dừng tại `0x0075822C`) và `FUN_00758318` (`index.csv:5554-5555`) → `0x00758270` nằm gọn trong khe HOLE chưa decompile giữa hai hàm này. Gap giữ nguyên.
 
 ### 4.6. SubOp `0x06` — Banner 2 tầng
 
@@ -139,6 +142,7 @@ Không gọi codec trực tiếp ở dispatcher; codec gọi gián tiếp trong 
 | 2 | `functions/0078a89c_FUN_0078a89c.c:6284-6347` + `:718-719` | Bản inline 1:1 + tên debug `0x796ab0` |
 | 3 | `redump/jumptable_byte200_0x78A8EE.hex` (`[0x2B]=0x27`) + `jumptable_dword200_0x78A9B6.hex` (`dw[39]`) + `.csv:41` + `manifest.csv:41` | Mapping tự parse |
 | 4 | `functions/0075771c/0075785c/00757b70/007573a8` | Body 4/5 hàm con |
+| 8 | `ls ts_decompile/functions/00758270*` (rỗng) + grep `00758270` `index.csv` (0/6550 dòng, kiểm 2026-09-14) + `index.csv:5554-5555` (kề `0075816c`/`00758318`) | Xác nhận gap SubOp 0x05 vẫn còn sau redump |
 | 5 | `functions/0077ed68/0077ef7c/0077eb9c/0077eb1c/0077ee84/0077f098` | Codec |
 | 6 | `functions/005952f4_FUN_005952f4.c:69-77` | Nhánh phụ editorBG |
 | 7 | `functions/0077f414_FUN_0077F414.c:980-981` | C→S rỗng |

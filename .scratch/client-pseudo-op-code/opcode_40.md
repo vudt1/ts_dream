@@ -1,7 +1,9 @@
 # PHÂN TÍCH — Main OP 0x40 (64) / Case 57 / FUN_00795c7b @ 0x00795C7B
 
 Ngày: 2026-09-12 · Workspace: `/mnt/d/VUDT/GIT_PCC/test` · Feature: `op-code` · Chiều: **Server → Client (S→C) một chiều**  
-Trạng thái: **Đã xác minh 100% từ mã nguồn sơ cấp** (`ts_decompile/` only).
+Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (`ts_decompile/` only). HOLE `0x00607D73–0x00608904` chứa `func_0x00607d94` (SubOp 0x02) **đã được decompile** (đợt redump 2026-09-14) → §4.2 viết lại theo body, suy đoán cũ bị đính chính.
+
+> Cập nhật 2026-09-14: bổ sung phân tích từ các body/hex dump mới (theo `missing_opcode_sources.md`).
 
 ---
 
@@ -12,8 +14,8 @@ Main OP `0x40` (thập phân: `64`, ánh xạ tới **Case 57**) phụ trách to
    - Xử lý các đợt công kích bằng thuyền, tính toán trừ trực tiếp máu thuyền (Ship HP), năng lượng thuyền (Ship SP) và sĩ khí thuyền (Ship Morale) của người chơi bản địa (`gvar_007DA7BC`).
    - Khấu trừ độ bền / HP của các thuyền bè đồng minh và kẻ địch tham chiến trong danh sách thực thể thủy chiến (`gvar_007DA6DC`).
    - Quản lý vòng đời và hiệu ứng hình ảnh/âm thanh của các thực thể chiến thuyền chiến đấu (`TSeaWarfare` / `TLight`) trên mặt nước.
-2. **Quản lý Bảng điều khiển Kỹ năng Chiến thuyền (`Panel17` - `gvar_007DA5BC`)**:
-   - Điều khiển trạng thái bật/tắt và đồng bộ hóa các nút kỹ năng lái thuyền, công kích, phòng thủ trên giao diện bảng điều khiển chiến thuyền khi người chơi bước lên thuyền (`Player + 0x378 == 2`).
+2. **Quản lý Bảng điều khiển Kỹ năng Chiến thuyền (`Panel17` - `gvar_007DA5BC`, thực tế là instance `Tse_MapFrame`, tạo tại `0051189c_FUN_0051189c.c:1600-1601`)**:
+   - SubOp `0x02` (đã có body mới): ghi **một DWORD LE từ `RP[1..4]`** vào `+0x70` của object mà panel tham chiếu qua field `self+0x130`, đồng thời **xóa `+0x74` của object đó về 0** (`00607d94_FUN_00607d94.c:37-40`). *Đính chính suy đoán cũ: payload không chứa trạng thái bật/tắt 8 nút kỹ năng.*
 3. **Đồng bộ hóa hàng loạt chỉ số Chiến thuyền (`FUN_0074cdd8`)**:
    - Cập nhật định kỳ chỉ số độ bền / HP vỏ tàu cho toàn bộ danh sách 100 chiến thuyền tham gia chiến trường thủy chiến.
 
@@ -67,7 +69,7 @@ Main OP 0x40 (64) → byte_table[0x78A8EE][0x40] = 0x39 (57)
 | SubOp | Tên nghiệp vụ | Đối tượng tiếp nhận | Callee chính | Min Payload Len | Tình trạng SSOT |
 | :---: | :--- | :--- | :--- | :---: | :---: |
 | **`0x01`** | Thi triển Kỹ năng & Khấu trừ Sát thương Thủy chiến | `*(uint *)gvar_007DA2FC` (`TWaterManage`) | `FUN_00527674` | Action 1: 17B<br>Action 2: 14B | ✔ Đã decompile |
-| **`0x02`** | Cập nhật Bảng điều khiển Kỹ năng Chiến thuyền (`Panel17`) | `*(undefined4 *)gvar_007DA5BC` (UI Panel17) | `func_0x00607d94` | ≥1B | ✘ Khe chưa decompile |
+| **`0x02`** | Ghi 1 DWORD vào control của Panel17 (`Tse_MapFrame`) | `*(undefined4 *)gvar_007DA5BC` (Panel17) | `func_0x00607d94` | 5B (`RP[0..4]`) | ✔ **Body mới** (HOLE đã giải) |
 | **`0x03`** | Đồng bộ hàng loạt Chỉ số Độ bền / HP Chiến thuyền | `*(undefined4 *)gvar_007D9D34` (World Entity Mgr) | `FUN_0074cdd8` | $1 + 3 \times K$ Bytes | ✔ Đã decompile |
 
 ---
@@ -125,14 +127,26 @@ Main OP 0x40 (64) → byte_table[0x78A8EE][0x40] = 0x39 (57)
 
 ---
 
-### 4.2. SubOp `0x02` — Cập Nhật Bảng Điều Khiển Chiến Thuyền (`func_0x00607d94`)
-- **Đối tượng**: `*(undefined4 *)gvar_007DA5BC` (Bảng điều khiển Thủy chiến `Panel17`).
-- **Tình trạng file**: Nằm trong khoảng trống nhị phân `0x00607D73 - 0x00608904` (không có file source rời).
-- **Phân tích đối chiếu nghiệp vụ**:
-  - `gvar_007DA5BC` đại diện cho giao diện `panel17` (khởi tạo tại `00607cb0.c`), kích thước cố định tại tọa độ $X = 600$, $Y = 60$ trên màn hình.
-  - Chứa 8 ô nút kỹ năng chiến thuyền và nút điều hướng `btn_015`.
-  - Giao diện này tự động hiển thị khi người chơi chuyển sang trạng thái lái thuyền (`Player + 0x378 == 2` hoặc `Player + 0x145c != 0`).
-  - **Nghiệp vụ SubOp 2**: Tiếp nhận dữ liệu từ Server để cập nhật trạng thái kích hoạt/khóa của 8 nút kỹ năng thuyền và đồng bộ thanh kỹ năng trên bảng Panel17.
+### 4.2. SubOp `0x02` — Ghi DWORD Vào Control Của Panel17 (`func_0x00607d94`) — **ĐÃ CÓ BODY**
+
+- **Tệp nguồn**: `ts_decompile/functions/00607d94_FUN_00607d94.c` (129 bytes, HOLE `0x00607D73–0x00608904` đã giải).
+- **Đối tượng**: `*(undefined4 *)gvar_007DA5BC` — instance **`Tse_MapFrame`** (VMT `0x604620`, tạo tại `0051189c_FUN_0051189c.c:1600-1601`; giao diện tạo tại `00607cb0.c:31` label `"panel17"`).
+- **Core logic** (nguyên văn):
+  ```c
+  void FUN_00607d94(int param_1, int param_2) {   // param_1 = Panel17, param_2 = RestPayload
+    local_10 = 0;
+    _LStrCopy(local_c, 2, 4, &local_10);          // RP[1..4]
+    uVar1 = FUN_0077ef7c(*(gvar_007D9D30), local_10);   // DWORD LE
+    *(undefined4 *)(*(int *)(local_8 + 0x130) + 0x70) = uVar1;   // Panel17+0x130 → sub-obj, offset +0x70 := value
+    *(undefined4 *)(*(int *)(local_8 + 0x130) + 0x74) = 0;       // offset +0x74 := 0 (reset)
+    ...
+  }
+  ```
+  (`00607d94_FUN_00607d94.c:37-40`; `Copy` 1-based index 2 → `RP[1..4]`, tức **bỏ qua byte SubOp `RP[0]`**).
+- **Đối tượng con `Panel17 + 0x130`**: field `+0x130` của Panel17 trỏ tới một object khác (đọc tại `00607530.c:47,97` = control có `+0x14`, `+0x18` là counter/limit int; `00607728.c:26` byte `+0x38`). SubOp 0x02 **ghi 1 giá trị DWORD vào `subobj+0x70` và reset `subobj+0x74 := 0`** (cặp field kiểu "current/limit" hoặc "value/elapsed" — **chưa kết luận được** bản chất nghiệp vụ).
+- **Điều kiện hiển thị panel**: giữ nguyên ghi chú bản cũ (`Player+0x378 == 2` — kiểm tra dạng này có ở `00603f20_FUN_00603f20.c:117`); điều kiện `+0x145C` của bản cũ **chưa tái kiểm chứng được**, không có citation dòng.
+- **Ý nghĩa (đã grounded)**: SubOp 0x02 = "cập nhật một bộ đếm/threshold 32-bit trên control của panel thủy chiến và xóa bộ đếm kèm" — **KHÔNG** "đồng bộ trạng thái 8 nút kỹ năng" (suy đoán cũ, **đính chính**).
+- **Wire layout**: `[40][02][Value: 4B LE]` (5 bytes; `Value` ghi vào `subobj+0x70`).
 
 ---
 
@@ -237,12 +251,13 @@ Offset   Kiểu        Tên trường        Mô tả
 ```
 *Độ dài cố định:* 14 bytes.
 
-### 8.3. SubOp 0x02: Cập nhật Bảng điều khiển Thủy chiến
+### 8.3. SubOp 0x02: Ghi Giá Trị 32-bit Vào Control Panel17
 ```
 Offset   Kiểu        Tên trường        Mô tả
 +00      uint8       SubOp             0x02
-+01..    bytes       PanelData         Dữ liệu trạng thái các nút kỹ năng Panel17
++01..04  uint32 LE   Value             Ghi vào *(Panel17+0x130)+0x70; +0x74 của cùng object bị reset 0
 ```
+*Độ dài RestPayload:* 5 bytes (cần `len(RP)>=5`, `_LStrCopy(RP,2,4)` lấy nguyên 4 byte — `00607d94_FUN_00607d94.c:37`).
 
 ### 8.4. SubOp 0x03: Đồng bộ danh sách chỉ số Chiến thuyền
 ```
@@ -276,6 +291,7 @@ Offset   Kiểu        Tên trường        Mô tả
 | **Case 57 Function** | `ts_decompile/case_functions/functions/case_057_00795C7B_FUN_00795c7b.c` | Dòng 1–66 |
 | **Main Dispatcher** | `ts_decompile/functions/0078a89c_FUN_0078a89c.c` | Dòng 7173–7196 (`case 0x40`) |
 | **SubOp 1 Handler** | `ts_decompile/functions/00527674_FUN_00527674.c` | Dòng 37–715 |
+| **SubOp 2 Handler** | `ts_decompile/functions/00607d94_FUN_00607d94.c` | Dòng 16–46 (HOLE `0x607D73–0x608904` đã giải, redump 2026-09-14; `index.csv:6362`) |
 | **SubOp 3 Handler** | `ts_decompile/functions/0074cdd8_FUN_0074cdd8.c` | Dòng 23–113 |
 | **TWaterManage Create** | `ts_decompile/functions/00526448_TWaterManage.Create.c` | Dòng 21–46 |
 | **Slot Allocator** | `ts_decompile/functions/005265d4_FUN_005265d4.c` | Dòng 19–38 |

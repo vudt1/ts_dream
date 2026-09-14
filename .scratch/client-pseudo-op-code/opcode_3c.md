@@ -1,8 +1,10 @@
 # PHÂN TÍCH — Main OP 0x3C (60) / Case 53 / FUN_0079575c @ 0x0079575C
 
-Ngày: 2026-09-12 · Workspace: `/mnt/d/VUDT/GIT_PCC/test` · Feature: `op-code` · Chiều: **Server → Client (S→C) là chiều chính**. Chiều C→S: **bản C decompile cho `case 0x3c:` RỖNG** (xem §6); **ASM có một body chưa được gán nhãn dùng đúng đối tượng `gvar_007DA778`** → mâu thuẫn cần redump bảng byte C→S `0x77F474` để chốt.
-Trạng thái: **Đã xác minh phần vỏ (framing / dispatch / SubOp / nhánh xử lý) từ SSOT** (`ts_decompile/` only).
-**BỐN method callee CỦA HANDLER (`func_0x00541098`, `func_0x005408f4`, `func_0x0053fd78`, `func_0x0053f8fc`) NẰM TRONG KHE TRỐNG CHƯA DECOMPILE** (`0x0053F8FC..0x005418F8`) → **unknown / cần redump**. **Đối tượng đích `gvar_007DA778` KHÔNG có dòng gán trong SSOT** → định danh class là **suy luận mạnh** (§4.1), không khẳng định tuyệt đối.
+Ngày: 2026-09-12 · Workspace: `/mnt/d/VUDT/GIT_PCC/test` · Feature: `op-code` · Chiều: **Server → Client (S→C) là chiều chính**. Chiều C→S: **Mâu thuẫn "bản C `case 0x3c:` rỗng vs ASM có body" ĐÃ CHỐT (2026-09-14)** — bảng dispatch `0x77F474`/`0x77F53C` đã redump: `byte[0x3C]=0x32 ≠ 0`, `dword[0x3C]=0x0078A142 ≠ 0` ⇒ **builder C→S 0x3C CÓ THẬT**; bản C `break;` là artifact của decompiler.
+Trạng thái: **Đã xác minh toàn bộ phần lõi từ SSOT** (`ts_decompile/`).
+**BỐN method callee của handler (`FUN_00541098`, `FUN_005408f4`, `FUN_0053fd78`, `FUN_0053f8fc`) ĐÃ ĐƯỢC DECOMPILE (2026-09-14)** — HOLE `0x0053F8FC..0x005418F8` đã lấp; phân tích field/wire từng SubOp tại §4.2. **Đối tượng đích `gvar_007DA778` ĐÃ CÓ DÒNG GÁN trực tiếp** (`0055374c_FUN_0055374c.c:41–44` — tạo `TRE_ZMChessMain` qua `VMT_53D8B8_TRE_ZMChessMain`) ⇒ **suy luận tên class §4.1 chính thức được XÁC MINH BẰNG CODE**, không còn là suy luận.
+
+> Cập nhật 2026-09-14: bổ sung phân tích từ các body/hex dump mới (theo `missing_opcode_sources.md`).
 
 > Phạm vi: framing, dispatch, SubOp, layout `RestPayload`, lõi logic, wire format. Bỏ qua graphics / sound / animation / chi tiết render form (chỉ nhắc 1 dòng khi bắt buộc).
 
@@ -10,14 +12,14 @@ Trạng thái: **Đã xác minh phần vỏ (framing / dispatch / SubOp / nhánh
 
 ## 1. Tóm tắt nghiệp vụ
 
-- **Vai trò**: OP 0x3C là opcode **điều khiển form "ZMChess Main"** — instance toàn cục `gvar_007DA778` (rất nhiều khả năng là `TRE_ZMChessMain`, form chính của **minigame Cờ Tướng / Chinese Chess**, xem §4.1).
+- **Vai trò**: OP 0x3C là opcode **điều khiển form "ZMChess Main"** — instance toàn cục `gvar_007DA778`, **tên class `TRE_ZMChessMain` XÁC MINH TỪ CODE** (không còn suy luận): `0055374c_FUN_0055374c.c:41–44` tạo qua `TRE_ZMChessMain_Create(VMT_53D8B8_TRE_ZMChessMain, 1, param_3)` khi OP 0x39 mở mode 3 (form chính của **minigame Cờ Tướng / Chinese Chess**, §4.1).
 - **Payload S→C tối thiểu 1 byte điều khiển**: `RestPayload[0]` = SubOp. Handler **không `switch`** mà dùng chuỗi `if (==1) else if (==2) else if (==3) else if (==4)`; **không có `default`**.
-- **4 hành vi hiệu lực** — mỗi SubOp gọi **một method của `TRE_ZMChessMain`** truyền nguyên `RestPayload` làm tham số:
-  - `SubOp == 0x01` → `func_0x00541098(gvar_007DA778, RP)` (dòng 29).
-  - `SubOp == 0x02` → `func_0x005408f4(gvar_007DA778, RP)` (dòng 32).
-  - `SubOp == 0x03` → `func_0x0053fd78(gvar_007DA778, RP)` (dòng 35).
-  - `SubOp == 0x04` → `func_0x0053f8fc(gvar_007DA778, RP)` (dòng 38).
-- **Cả 4 method callee đều KHÔNG có body trong SSOT** (§4.2) → **ý nghĩa nghiệp vụ chi tiết của từng SubOp là `unknown / cần redump`**. Chỉ biết chắc: cùng một đối tượng đích, cùng một tham số (`RestPayload`).
+- **4 hành vi hiệu lực** — mỗi SubOp gọi **một method của `TRE_ZMChessMain`** truyền nguyên `RestPayload` làm tham số (callee tự rẽ nhánh tiếp theo `RP[1]` — byte ngay sau SubOp — xem §4.2):
+  - `SubOp == 0x01` → `FUN_00541098(gvar_007DA778, RP)` (dòng 29) — đồng bộ bàn/bước cờ/lịch ván.
+  - `SubOp == 0x02` → `FUN_005408f4(gvar_007DA778, RP)` (dòng 32) — cập nhật trạng thái cờ + banner người vào/rời bàn.
+  - `SubOp == 0x03` → `FUN_0053fd78(gvar_007DA778, RP)` (dòng 35) — điều khiển pha ván đấu (bắt đầu/hết giờ/kết quả/penalty/time-out đối thủ).
+  - `SubOp == 0x04` → `FUN_0053f8fc(gvar_007DA778, RP)` (dòng 38) — **bảng 13 mã thông báo lỗi/chú thích** qua banner `gvar_007DA084+0x90` (1500 ms).
+- **Cả 4 method callee ĐÃ CÓ BODY (2026-09-14)** — `functions/00541098_FUN_00541098.c` (521 dòng), `005408f4_FUN_005408f4.c` (475 dòng), `0053fd78_FUN_0053fd78.c` (739 dòng), `0053f8fc_FUN_0053f8fc.c` (84 dòng) + `.asm.txt` từng hàm; wire layout sau `RP[0]` khôi phục ở §4.2. (Lưu ý: metadata `Size:` trong header Ghidra của `005408f4/0053fd78` nhỏ hơn thân thực tế — boundary Ghidra cắt tại khe chuỗi code-gap; phân tích theo thân decompile.)
 - **Cổng chặn độ dài**: `RestPayload` rỗng (payload `[3C]`, L=1) → `_BoundErr(0)` = **ERangeError** (dòng 22-25). Không có chốt `< n` nào khác.
 - **Bối cảnh họ opcode (đối xứng đã xác minh từ S→C)**: bốn opcode liền kề `0x3A/0x3B/0x3C/0x3D` lần lượt điều khiển **bốn singleton** cùng một hệ form-game:
   | MainOp | Case | Handler | Singleton đích |
@@ -78,7 +80,7 @@ else if (iVar2 == 4) { ... }                 // dòng 37-39
 Diễn giải:
 - `RestPayload` rỗng → `_BoundErr(0)`; `iVar2 = extraout_EDX`/`iVar1` là đường phục hồi giả của decompiler cho nhánh exception (thực tế là lỗi range). **L=1 → ERangeError.**
 - `SubOp = RP[0]`, so sánh `== 1..4` (không `switch`), **không có `default`**.
-- **Không đọc/parse thêm field nào ở handler** — toàn bộ `RestPayload` (kể cả byte SubOp) được chuyển nguyên cho callee. Layout field phía sau `RP[0]` phụ thuộc callee (hole) → unknown.
+- **Không đọc/parse thêm field nào ở handler** — toàn bộ `RestPayload` (kể cả byte SubOp) được chuyển nguyên cho callee. Layout field phía sau `RP[0]` do callee parse — **đã khôi phục §4.2 (2026-09-14)**.
 
 ### 2.4. Codec & API
 
@@ -90,13 +92,13 @@ Diễn giải:
 | `_LStrCopy` | **Không gọi** (handler không cắt field chuỗi) |
 | `_BoundErr` | Chốt chặn độ dài `RestPayload` (dòng 23) |
 | `gvar_007DA778` | Con trỏ singleton `TRE_ZMChessMain` (đối tượng đích, §4.1) |
-| `func_0x00541098` | Callee SubOp 1 (dòng 29) — **hole, không body** |
-| `func_0x005408f4` | Callee SubOp 2 (dòng 32) — **hole, không body** |
-| `func_0x0053fd78` | Callee SubOp 3 (dòng 35) — **hole, không body** |
-| `func_0x0053f8fc` | Callee SubOp 4 (dòng 38) — **hole, không body** |
+| `func_0x00541098` | Callee SubOp 1 (dòng 29) — **ĐÃ CÓ BODY §4.2** (`00541098_FUN_00541098.c`) |
+| `func_0x005408f4` | Callee SubOp 2 (dòng 32) — **ĐÃ CÓ BODY §4.2** (`005408f4_FUN_005408f4.c`) |
+| `func_0x0053fd78` | Callee SubOp 3 (dòng 35) — **ĐÃ CÓ BODY §4.2** (`0053fd78_FUN_0053fd78.c`) |
+| `func_0x0053f8fc` | Callee SubOp 4 (dòng 38) — **ĐÃ CÓ BODY §4.2** (`0053f8fc_FUN_0053f8fc.c`) |
 | `_LStrArrayClr/_LStrClr` (dòng 43-67) | **Dọn dẹp frame cục bộ** của dispatcher (giống hệt `case_051/052/054`), **không liên quan wire** |
 
-> Không có helper giải mã nhị phân nào được gọi trong handler: 4 SubOp chỉ là **tín hiệu**; việc parse nằm trong callee (hole).
+> Không có helper giải mã nhị phân nào được gọi trong handler: 4 SubOp chỉ là **tín hiệu**; việc parse nằm trong callee — **callee parse bằng `_LStrCopy` + codec `FUN_0077ef7c` (4B→DWORD LE) và đọc byte trực tiếp (§4.2)**.
 
 ### 2.5. Đối chiếu file case vs bản inline (1:1)
 
@@ -125,12 +127,12 @@ Khác biệt **duy nhất**:
 | SubOp (RP[0]) | Payload S→C | Điều kiện đọc | Core logic |
 | :---: | :--- | :--- | :--- |
 | *(rỗng)* | `[3C]` (L=1) | `*(int*)(RP-4) == 0` | `_BoundErr(0)` → **ERangeError** (dòng 22-25) |
-| `0x01` | `[3C][01]` | `SubOp = 1` | **`func_0x00541098(gvar_007DA778, RP)`** (dòng 29) — **unknown** |
-| `0x02` | `[3C][02]` | `SubOp = 2` | **`func_0x005408f4(gvar_007DA778, RP)`** (dòng 32) — **unknown** |
-| `0x03` | `[3C][03]` | `SubOp = 3` | **`func_0x0053fd78(gvar_007DA778, RP)`** (dòng 35) — **unknown** |
-| `0x04` | `[3C][04]` | `SubOp = 4` | **`func_0x0053f8fc(gvar_007DA778, RP)`** (dòng 38) — **unknown** |
+| `0x01` | `[3C][01]` | `SubOp = 1` | **`FUN_00541098(gvar_007DA778, RP)`** (dòng 29) — đồng bộ bàn/nước đi/người chơi, switch tiếp `RP[1]` (§4.2) |
+| `0x02` | `[3C][02]` | `SubOp = 2` | **`FUN_005408f4(gvar_007DA778, RP)`** (dòng 32) — cập nhật trạng thái + banner vào/rời ghế (§4.2) |
+| `0x03` | `[3C][03]` | `SubOp = 3` | **`FUN_0053fd78(gvar_007DA778, RP)`** (dòng 35) — máy trạng thái pha đấu, đồng hồ, phạt (§4.2) |
+| `0x04` | `[3C][04]` | `SubOp = 4` | **`FUN_0053f8fc(gvar_007DA778, RP)`** (dòng 38) — 13 mã banner thông báo, 1500 ms (§4.2) |
 | `0x00`, `>= 0x05` | `[3C][xx]` | không khớp `1..4` | **no-op im lặng** |
-| `0x01..0x04` + byte dư | `[3C][01..04][...]` | khớp `1..4` | gọi callee với **toàn bộ RP** (byte dư chuyển tiếp; callee xử lý ra sao = unknown) |
+| `0x01..0x04` + byte dư | `[3C][01..04][...]` | khớp `1..4` | gọi callee với **toàn bộ RP**; parse chi tiết theo `RP[1]` (cmd) — đã khôi phục §4.2 |
 
 **Tổng: 4 nhánh có hiệu lực** (`0x01..0x04`) + **1 dạng gây ERangeError** (`[3C]`, L=1). Mọi SubOp khác là no-op.
 
@@ -146,17 +148,50 @@ Khác biệt **duy nhất**:
   - `functions/00553840_FUN_00553840.c:40-42` — `bVar1 == 3` → `FUN_00541c6c(*(uint *)gvar_007DA778);` (update/timer form).
   - `functions/0055391c_FUN_0055391c.c:40-42` — `bVar1 == 3` → `FUN_00541f8c(*(uint *)gvar_007DA778);`.
   - `functions/005538cc_FUN_005538cc.c:30-32` — `cVar1 == 3` → `FUN_00541f78();`.
-- **Suy luận định danh class = `TRE_ZMChessMain` (Cờ Tướng) — độ tin cậy CAO nhưng KHÔNG khẳng định**:
-  - Vùng code `0x0053DB88..0x00541F8C` là **subsystem ZMChess**: `functions/0053db88_TRE_ZMChessMain.Create.c:22-49` (constructor `TRE_ZMChessMain`), `functions/0053f450_FUN_0053f450.c:60-70` (tạo `TRE_ZMChessPlayer`, `VMT_4DC5F8_TRE_ZMChessPlayer`).
-  - Hàm cleanup type-3 `functions/00541c6c_FUN_00541c6c.c:187` phát `"Sound\\WA0045.wav"`; `:45` đọc `param_1+8`; `:197-204` gọi Show/Hide qua `DAT_00948dd8+0x20/+0x24` — **cùng file/region** dùng `DAT_00948dd0`/`DAT_00948dd8` với `TRE_ZMChessMain.Create` (`0053db88...c:42-43`).
-  - `gvar_007DA778 + 0x38 = 100/1000` (OP 0x39, `case_050...c:53-58`) khớp vùng field của form-game này.
-  - **Giới hạn**: **KHÔNG có dòng gán `gvar_007DA778 = <kết quả Create>` trong toàn bộ SSOT** (grep `007DA778` chỉ ra 22 match, toàn call-site + `= 0`) → constructor/đăng ký nằm trong vùng HOLE. Nhãn `TRE_ZMChessMain` là **suy luận**, muốn chốt phải redump.
+- **Định danh class = `TRE_ZMChessMain` — XÁC MINH TRỰC TIẾP (2026-09-14)**:
+  - **Dòng gán tìm thấy**: `0055374c_FUN_0055374c.c:41–44` — `piVar3 = TRE_ZMChessMain_Create((int *)VMT_53D8B8_TRE_ZMChessMain, 1, param_3); *(int **)gvar_007DA778 = piVar3;` (nhánh `mode==3` của dispatcher tạo scene theo OP 0x39, caller `case_050_00795579_FUN_00795579.c:39`). Tên symbol + VMT do Ghidra đặt từ RTTI — **tên class đúng, không phải suy luận**.
+  - Các suy luận cũ vẫn đứng vững và nay là nhất quán: vùng code `0x0053DB88..0x00541F8C` là subsystem ZMChess (`0053db88_TRE_ZMChessMain.Create.c`, `0053f450_FUN_0053f450.c:60–70` tạo `TRE_ZMChessPlayer`), cleanup type-3 `00541c6c_FUN_00541c6c.c:187` phát `"Sound\\WA0045.wav"`, `gvar_007DA778 + 0x38 = 100/1000` (OP 0x39, `case_050...c:53-58`).
+  - **Ghi chú thêm từ 4 callee mới**: cùng class còn có các alias global `DAT_00948dcc` / `DAT_00948dd0` / `DAT_00948dd4` được dùng trực tiếp như instance con trỏ trong `00541098.c:151–156,503` (field `+0x10/+0x18/+0x98[·]/+0x144/+0x148` của chúng trùng bộ field ZMChess) — nhiều khả năng là biến trỏ-chùng-cùng-object của form bàn cờ và form con; chưa kết luận được chính xác từng cái.
+- **Grep nơi ghi field trên các body mới (2026-09-14)**: `+0x34` — duy nhất `005418f8.c:51,63` (AnsiString, clear `:67`, xem §6.2); `+0x38` (100/1000) — vẫn chỉ `0078a89c_FUN_0078a89c.c:6891,6894` (= inline OP 0x39, cùng nguồn `case_050` đã cite) — 4 callee + các hàm ZMChess mới (`00541c6c/00541f8c/00541bf8/005419c8` đã decompile) **không ghi `+0x38`**; no new writer.
 
-### 4.2. Bốn callee nằm trong khe trống chưa decompile
+### 4.2. Bốn callee — PHÂN TÍCH TỪ BODY MỚI (2026-09-14)
 
-- `func_0x00541098`, `func_0x005408f4`, `func_0x0053fd78`, `func_0x0053f8fc` — **không có file `.c`** trong `functions/` và **không có dòng trong `index.csv`**.
-- Khe trống xác định: hàm export trước là `FUN_0053f88c` @ `0x0053F88C` (`index.csv:3048`, size 109); hàm export sau là `FUN_005418f8` @ `0x005418F8` (`index.csv:3049`). Cả 4 callee (`0x0053F8FC`, `0x0053FD78`, `0x005408F4`, `0x00541098`) nằm trong khoảng `0x0053F8FC..0x005418F8` → **HOLE**.
-- Do đó: **layout field của `RestPayload` sau `RP[0]` và nghiệp vụ từng SubOp là `unknown / cần redump`**. Đây là 4 method nội bộ của `TRE_ZMChessMain` (mỗi SubOp một method).
+Cả 4 hàm đều có signature `(Self: TRE_ZMChessMain, RP: AnsiString nguyên)` và **tự switch trên `cmd = RP[1]`** (byte ngay sau SubOp; chỉ số là 0-based trong bài này). Kí hiệu `board = *(Self+0x20)` — con trỏ **bàn cờ phụ** (field: `+8` ghế đang tới lượt, `+0x10` trạng thái/bước, `+0x11`, `+0x12` quân được chọn, `+0x14[1..5]`, `+0x1a[1..5]` mã quân theo vị trí). `Now()` = timer; các hàm refresh `FUN_0053f88c` (redraw) / `FUN_00541bf8` / `FUN_0053da48` / `FUN_0053d930` / `FUN_005419c8` thuộc cùng subsystem.
+
+**`FUN_00541098` — SubOp 0x01: đồng bộ bàn & nước cờ** (`00541098_FUN_00541098.c:99–513`, switch `RP[1]`):
+| `RP[1]` | Hành vi (field ghi) | Line |
+| :-- | :-- | :-- |
+| 1 | `Self+0x1d := RP[2]`; `Self+0xac[1..4] := RP[3..6]` (4 tọa độ nước đi); `board+0x12 := +0xac[board+8]`; `RP[7] → board+0x1a[board+0x12]`; `board+0x10 := 1`; redraw; `DAT_00948dcc+0x10 := Now`, `+0x18 := 5` | `:100–152` |
+| 2 | lời chess-nước kiểu bảng: `FUN_005465dc(DAT_00948dd4,1,0)`; `FUN_0053e2b4(Self, board+8, RP[2], RP, DAT_00948dd4+0x148)`; `DAT_00948dd4+0x144 := 1` | `:154–176` |
+| 3 | như cmd 1 nhưng `Self+0x1c := RP[2]`, `board+0x10 := 3` | `:178–230` |
+| 4 | clear `board+0x14[1..5] := 0` | `:232–242` |
+| 5 | **nước đi có quân**: như cmd 1 + `Self+0x4d[Self+0x1d] := RP[7]` (mảng mã quân 33 phần tử); `board+0x10 := 5`; `RP[9] → board+0x11`, `board+0x1a[board+0x11] := 0`; `Now → Self+0x40`; `Self+0x31 := Self+0x1e`; `Self+0x1e := RP[8]`; `FUN_0053da48`; **play `"Sound\\WB0007.wav"`** (move sound); cần `len(RP) ≥ 10` | `:244–318` |
+| 7 | `Self+0x1e := Self+0x4b := RP[2]`; `board+0x1a[1..4] := RP[3..6]`; `Now → Self+0x40` | `:320–351` |
+| 9 | `board+8 := RP[2]` (đổi ghế tới lượt) | `:353–360` |
+| 0xB | **đồng bộ danh sách 4 người chơi**: `board+8 := RP[2]`; ghế mình `gvar_007DA7BC^+4 → Self+0x70[i*4]`, tên `+9 → Self+0x98[i*4]` (`_LStrFromString`), `gvar_007DA7BC^+0x12F8 → Self+0x84[i*4]`; vòng 4 ghế: `FUN_00541bf8`… đọc từng **2 × 4-byte LE** qua codec `FUN_0077ef7c` (`_LStrCopy(RP,5,4)` / `(RP,9,4)`) → `Self+0x70[i]` = player ID, `Self+0x84[i]`; tra actor slot `FUN_0070c20c(gvar_007D9D34^, id)` (cận 800 — cùng cơ chế slot actor `opcode_03/04.md`), lấy tên `gvar_007DA300^+slot*4+9 → Self+0x98[i]`; tên rỗng → **`"Gamer" + IntToStr(i)`** (literal tại `:479`); `Self+0xb1[i] := 1` | `:362–494` |
+| *(đuôi)* | nếu `RP[1]==5`: clear cờ `+0x59` của 4 quân (`DAT_00948dd0+0x1a0+i*4`); ngược lại `FUN_005419c8(Self, board)`; nếu `RP[1] ∈ 1..5`: `board+0x13 := 0` — **chính latch "đã gửi 0x3C" của `FUN_005418f8` (§6.2) được server reset** | `:496–513` |
+
+**`FUN_005408f4` — SubOp 0x02: cập nhật trạng thái bàn + banner vào/rời** (`005408f4_FUN_005408f4.c:98–468`, switch `RP[1]`): các cmd 1/3/5/7/9/10:
+| `RP[1]` | Hành vi | Line |
+| :-- | :-- | :-- |
+| 1 | `Self+0x1d := RP[2]`; `+0xac[1..4] := RP[3..6]`; **`Self+0x101[Self+0x1e*3] := 1`** (bảng cờ 3 entry/ghế) | `:99–137` |
+| 2 | như 0x01-cmd2: `FUN_0053e2b4(Self, RP[2], RP[3], RP, DAT_00948dd4+0x148)` | `:138–162` |
+| 3 | `Self+0x1c := RP[2]`; `+0xac[1..4]`; clear 4 quân `+0x59`; **`board+0x20[1..5] := 2`** | `:163–216` |
+| 5 | quân đi: `+0x4d[+0x1d] := RP[7]`; `Now→+0x40`; `+0x31:=+0x1e`; `+0x1e := RP[8]`; clear `Self+0xfc[+0x30][+0x31] := 0` (bảng record 3 entry/ghế stride 2); `FUN_0053da48`; `"Sound\\WB0007.wav"` | `:217–290` |
+| 7 | `Self+0x1c := RP[2]`; `+0xac[1..4]`, và khi `+0xac[i] ≠ 0` → `Self+0xfc[+0x1e][i] := 1`; `"Sound\\WA0017.wav"` | `:292–348` |
+| 9 | **một ghế nhận người**: `i := RP[2]`; `RP[3..6]` → `Self+0x70[i]` (player ID, 4B LE qua `FUN_0077ef7c`), `RP[7..10]` → `Self+0x84[i]`; tên từ actor slot (`FUN_0070c20c`/`gvar_007DA300`), rỗng → `"Gamer"+i`; `+0xb1[i] := 1`; **banner = text `[DAT_00948dcc+0x98[i]] + &DAT_00541068` (1500 ms, vtable+0x90 `gvar_007DA084`)** — mẫu chuỗi thông báo chưa dump | `:350–433` |
+| 10 | ghế rời: `+0xb1[i] := 2`; banner `+ &LAB_00541084` (1500 ms); giảm counter `Self+0x49` | `:435–464` |
+
+**`FUN_0053fd78` — SubOp 0x03: máy trạng thái pha đấu** (`0053fd78_FUN_0053fd78.c:99–510`; gate `RP[1] ∈ 1..9` → `Self+8 := RP[1]`, `Self+0x3d := 1`):
+- cmd **1/7**: bắt đầu ván — `Self+0x1c9 := 0`; (7: `FUN_0053f2a8`); `FUN_0054698c(DAT_00948dd4,1)`; `Self+0x24 := RP[2]`; bảng đồng hồ 7 dòng `+0x158[1..7]` (mã), `+0x159[·] := 1`, `+0x15b[·] := Now`, `+0x163[·] := 1000` (ms); gọi vtable `DAT_00948dd0+0x24/+0x20` (show/hide); clear `_FillChar(Self+0xfc[i],6,0)` 4 ghế (`:103–170`).
+- cmd **3**: kết/trừ giờ — `+0x31 := +0x1e`; `+0x1e := RP[2]`; `FUN_0053da48`; nếu `DAT_00948dd0[99]+0x58 == 5` và `board+0x12 ≠ 0`: trừ **5 + 2·n** đơn vị giờ từng quân `DAT_00948dd0[+0x62+i]` (`:172–230`), redraw.
+- cmd **5/6**: kết quả — clear record `_FillChar(+0xfc[i],6,0)`; (5: `FUN_0053ee00`; 6: đặt đồng hồ dòng 1 := 4, `Self+0x4a := 7`); cập nhật Now từng dòng active; clear `+0x59` 4 quân; đọc **mảng n_i = RP[·] rồi n_i mã quân** ghi `board+0x1a[·]` (ghế mình) / `Self+0xfc[ghế][·]`; nếu `Self+0x11b[i] == 6` → copy `Self+0x4d[+0x1d]` vào `board+0x1f`/`Self+0x101[i]` và đặt `+0xac[i] := 5`; redraw; **phát WAV theo `switch(Self+0x4a)` với 8 tên chuỗi tại khe mã `DAT_00540854…DAT_005408e8` — CHƯA DUMP** (`:488–510`).
+- cmd **8**: timeout/phạt ghế khác — nếu `i := RP[2]` ∈1..4 và ≠ ghế mình: `FUN_005465dc`, `DAT_00948dd4+0x144 := 1`, `FUN_0053ec8c(Self, i)`, chạy đồng hồ, clear `+0x59`, parse 4 ghế từ offset RP[3], `FUN_0053ee00` (`:512–649`).
+- cmd **9**: reset quân — `+0xac[1..4] := 4`; `_FillChar(+0xfc[i],5,1)` ghế khác; `Self+0x1c := 0x10`; nếu chưa kết (`DAT_00948dd0[99]+0x58 ≠ 5`): `Now→Self+0x28`, `FUN_0053d930`, cộng **5+2·n** giờ từng quân, `+0x58 := 5` (`:651–729`).
+
+**`FUN_0053f8fc` — SubOp 0x04: bảng mã thông báo (banner)** (`0053f8fc_FUN_0053f8fc.c:28–80`): đọc `code = RP[1]`; với `code ∈ {1..6, 0xB, 0xC, 0xD, 0xE, 0xF, 0x10, 0xFF}` phát `gvar_007DA084^.vtable+0x90(text, 1500ms, 0, 0)` với text là một trong **13 con trỏ chuỗi `DAT_0053FB4C…DAT_0053FD5C` (khe trong code-gap của chính hàm này — chưa redump)**; `code` ngoài tập → im lặng. Đây là kênh "lý do từ chối/cảnh báo bàn cờ" (ý nghĩa từng mã chưa kết luận được vì thiếu chuỗi).
+
+**Bảng SubOp cập nhật (thay cho §3 các dòng "unknown")**: xem 4 bảng trên; các điều kiện độ dài tối thiểu thực tế từng cmd đều do callee kiểm `_BoundErr` (client exception, không crash) — ví dụ SubOp 1 cmd 5 yêu cầu `len(RP) ≥ 10` (`00541098.c:292–316`); SubOp 2 cmd 9 yêu cầu `len(RP) ≥ 11` (`005408f4.c:369–376` cắt `RP[7..10]`).
 
 ### 4.3. Vì sao không còn nhánh nào khác
 
@@ -171,17 +206,33 @@ Khác biệt **duy nhất**:
 
 ## 5. Chuỗi VISCII → UTF-8
 
-- **Handler `FUN_0079575c` KHÔNG tham chiếu bất kỳ string constant / `UNK_xxxx` / `DAT_xxxx` dạng text nào** — chỉ có `gvar_007DA778` và 4 con trỏ hàm. Vì vậy **không có gì để decode VISCII ở chiều S→C cho OP 0x3C**.
-- Các literal `UNK_0079576f/9b/af/d7` là **nhãn SEH** (§4.4), không phải dữ liệu chuỗi.
-- Bảng `lit_*.hex` trong `redump/` **không chứa** địa chỉ nào quanh `0x007957xx` dùng bởi handler này.
+- **Handler `FUN_0079575c` vẫn KHÔNG tham chiếu string constant** — chỉ có `gvar_007DA778` và 4 con trỏ hàm; `UNK_0079576f/9b/af/d7` là **nhãn SEH** (§4.4). Bảng `lit_*.hex` không chứa `0x007957xx`.
+- **ĐÍNH CHÍNH 2026-09-14 — 4 callee CÓ chứa chuỗi** (handler passthrough nên trước đây không thấy):
+  - **ASCII literal nằm ngay trong code** (không cần redump): `"Gamer"` (`00541098.c:479`, `005408f4.c:410` — fallback tên người chơi), `"Sound\\WB0007.wav"` (`00541098.c:318`, `005408f4.c:290` — sound đi quân), `"Sound\\WA0017.wav"` (`005408f4.c:348`), `"Sound\\WA0045.wav"` (cleanup `00541c6c.c:187`).
+  - **13 con trỏ chuỗi banner trong code-gap của `FUN_0053f8fc`**: `DAT_0053FB4C, 053FB68, 053FB94, 053FBAC, 053FBC8, 053FBFC, 053FC18, 053FC44, 053FC70, 053FCB4, 053FCE0, 053FD28, 053FD5C` (một cho mỗi mã 1..6, 0xB..0x10, 0xFF — `0053f8fc.c:31–79`) — dải `0x0053FB4C..0x0053FD6C` **chưa có `lit_*.hex`** → cần redump (đây là bảng "mã lỗi bàn cờ" SubOp 4).
+  - **8 tên WAV theo `switch(Self+0x4a)` trong `FUN_0053fd78`**: `0x00540854…0x005408E8` (`0053fd78.c:490–508`) — cùng loại gap, **chưa dump**.
+  - 2 chuỗi ghép banner SubOp 2: `&DAT_00541068` / `&LAB_00541084` (`005408f4.c:424,455`) — sau `FUN_00541098`, code-gap, **chưa dump**.
 
-> **Kết luận §5**: OP 0x3C không mang chuỗi. Muốn tìm chuỗi (nếu có) phải redump 4 callee trong hole `0x0053F8FC..0x005418F8` (ví dụ tên/side/chat của bàn cờ) — hiện **không có dump trong SSOT**.
+> **Kết luận §5 (mới)**: bản thân packet OP 0x3C **không mang chuỗi**; nhưng các handler con chứa nhiều chuỗi tĩnh (banner mã lỗi, tên WAV, hậu tố "Gamer"). Muốn đọc nội dung banner 0x3C-SubOp4 → redump dải `0x0053FB4C–0x0053FD6C` (VISCII).
 
 ---
 
 ## 6. Chiều Client → Server (C→S)
 
-### 6.1. Bản C decompile: `case 0x3c:` RỖNG
+### 6.0. CHỐT MÂU THUẪN BẰNG BẢNG ĐỎ (2026-09-14)
+
+`redump/table_0x77F474_200B.hex` (bảng byte C→S, 200 B) và `redump/table_0x77F53C_dword200.hex` (200 dword) — parse python, little-endian:
+
+| Index | byte @ `0x77F474` | dword @ `0x77F53C` | Interpretation |
+| :-- | :-- | :-- | :-- |
+| 0x3A | `0x30` | `0x00789F7A` | builder case 0x3A (khớp C `case 0x3a` có body) |
+| 0x3B | `0x31` | `0x00789FDA` | builder case 0x3B (khớp C) |
+| **0x3C** | **`0x32` (≠ 0)** | **`0x0078A142` (≠ 0)** | **builder case 0x3C TỒN TẠI — C `break;` là artifact decompiler** |
+| 0x3D | `0x33` | `0x0078A318` | builder case 0x3D (khớp C `case 0x3d` 7-byte) |
+
+⇒ **Kết luận §3.1 cũ ("cần redump bảng để chốt") đã đóng**: C→S OP 0x3C **CÓ THẬT**, với entry `0x0078A142` nằm giữa entry 0x3B (`0x00789FDA`) và 0x3D (`0x0078A318`) — tức chính khối asm `0077f414_FUN_0077F414.asm.txt:3686–3765` (mô tả §6.2). Builder thật **tự dispatch tiếp theo byte CL**: `MOV AL,[EBP-0x6]; DEC AL; JZ 0x007892D1; DEC AL; JZ 0x0078933C; DEC AL; JZ 0x00789391; JMP <return>` (asm:3686–3693) — **chỉ CL ∈ {1,2,3} mới gửi** (nhảy tới 3 body dùng chung với builder `0x32` ở `0x7892B9–0x7893E5`; payload tự lấy op từ `[EBP-0x5] = DL` nên một body phục vụ cả hai opcode), CL khác → trở về không gửi gì.
+
+### 6.1. Bản C decompile: `case 0x3c:` RỖNG (artifact — đã giải thích)
 
 `functions/0077f414_FUN_0077F414.c:1042-1043` (trong `switch(param_2 & 0xff)`):
 
@@ -192,9 +243,16 @@ case 0x3c:
 
 → **Theo bản C decompile, client KHÔNG dựng payload nào cho opcode 0x3C** (rỗng). Nếu chỉ dựa vào file C, kết luận là **C→S KHÔNG tồn tại**.
 
-### 6.2. Bản ASM: có một body chưa được C gán nhãn
+### 6.2. Bản ASM: các body C→S thật (đã gán nhãn nhờ bảng §6.0)
 
-`functions/0077f414_FUN_0077f414.asm.txt:3694-3721` — một case body hoàn chỉnh (kết thúc bằng `JMP 0x0078a4f2` = return), dựng payload và gửi:
+**Call-site gửi 0x3C ĐÃ TÌM THẤY trong export (2026-09-14)** — hai sender, hết nghi vấn "call-site nằm trong HOLE":
+
+1. **`FUN_005418f8`** (ngay mép phải của HOLE cũ, giờ có body — `005418f8_FUN_005418f8.c` + `.asm.txt`): method của `TRE_ZMChessMain` (caller: `0x542add/542b2d/542b7d/542be1/542d4d` — click bàn cờ). Logic: latch `board+0x13 == 0` (đặt 1 — chính latch mà SubOp 1 §4.2 reset khi server ack); nếu `param_3 ∈ 1..4`: **`Self+0x34 := _LStrFromChar(char tại (DAT_00948dcc^+0x20)^+0x10)`** (1 ký tự); nếu `param_3 == 5`: `Self+0x34 := shortstring [0x01, byte board+0x11]` (2 ký tự) qua `_PStrNCat`; rồi `SendCommand(gvar_007D9D30^, op=0x3C)` với **`CL = 1`** (`005418f8_FUN_005418f8.asm.txt:62–64`: `MOV CL,0x1; MOV DL,0x3c; CALL 0x0077f414`); cuối cùng `_LStrClr(Self+0x34)`. ⇒ **field `+0x34` được CHỨNG MINH là AnsiString** (`_LStrFromChar/_LStrFromString/_LStrClr` trên chính nó — `.c:51,63,67`), hết suy luận kiểu.
+2. **`FUN_00546798`** (`00546798_FUN_00546798.c:22–29`): gửi `SendCommand(0x3C)` với **`CL = 2`** (`00546798...asm.txt:10–12`: `MOV CL,0x2; MOV DL,0x3c`), không đụng `+0x34`; kèm `FUN_00545d0c`, vtable `+0x24`, `DAT_00948dcc^+0x1c9 := 1`.
+
+Khối asm `0077f414_FUN_0077F414.asm.txt:3694-3721` (trích ở dưới) là **body CL=1** của builder — khớp đối xứng: sender CL=1 duy nhất là `FUN_005418f8`, và sender này vừa ghi `Self+0x34` vừa gọi gửi, còn builder đọc đúng `[Self+0x34]` tại asm:3715. Hai khối gửi thô `[op][CL]` 2-byte tại asm:**3722–3743** và **3744–3765** nằm cùng vùng builder 0x3C/0x3D; body 0x7892D1/0x78933C/0x789391 (CL=1/2/3 dùng chung với op 0x32) nằm trong vùng builder 0x32. (Ghidra `case_032` C-truncated — xem `opcode_32.md`; mapping dòng↔địa chỉ tuyệt đối không recover được 100% từ asm.txt vì file không kèm cột address, nhưng **vị trí region đã chốt bằng bảng dword**.)
+
+Body asm `3694–3721` (nguyên văn cũ, nay là **builder xác minh được**, payload = `[0x3C][CL=1]` + toàn bộ text của `Self+0x34`):
 
 ```asm
 3694 LEA EAX,[EBP + -0x34]
@@ -231,9 +289,9 @@ Dịch ngược:
 - `[0x007da778] → [EDX] → [EDX+0x34]`: lấy **trường `+0x34` của `TRE_ZMChessMain`** và nối trực tiếp vào payload qua `@LStrCat` (khác `case 0x3a/0x3b` dùng `FUN_0077ee84` để mã hoá DWORD → 4 byte LE; ở đây `+0x34` được đối xử như **AnsiString/PChar**).
 - Payload suy ra: **`[OpCode][CL][bytes của Self+0x34]`**.
 
-### 6.3. Vì sao block ASM 3694 gần như chắc chắn là `case 0x3C` (đối xứng hai chiều)
+### 6.3. Gán nhãn block ASM 3694: ĐÃ XÁC MINH (không còn là "đối xứng suy luận")
 
-Ánh xạ opcode ↔ singleton **đã xác minh ở chiều S→C** (§1) và **đối chiếu được ở chiều C→S**:
+Trước 2026-09-14, block `3694-3721` chỉ được gán cho `case 0x3C` bằng **lập luận đối xứng + loại trừ**; block nằm đúng trong vùng `[dword[0x3C], dword[0x3D]) = [0x0078A142, 0x0078A318)` và **call-site `FUN_005418f8` (CL=1) vừa ghi `Self+0x34` vừa gửi 0x3C** — trùng khít với việc block đọc `[Self+0x34]` (`asm:3715`). Đối chiếu vùng đã xác minh bằng python trên bảng dword:
 
 | MainOp | S→C handler dùng singleton | C→S body (theo asm) dùng singleton |
 | :---: | :-- | :-- |
@@ -242,19 +300,20 @@ Dịch ngược:
 | **`0x3C`** | **`gvar_007DA778`** | **`asm:3694-3721` → `gvar_007DA778+0x34`** |
 | `0x3D` | `gvar_007D9F98` | `asm:3768-3855` → `gvar_007D9F98+0x6a..0x6e` (khớp C `case 0x3d`) |
 
-- Ba opcode `0x3A/0x3B/0x3D` khớp **hoàn hảo** giữa hai chiều (bản C cũng xác nhận 0x3A/0x3B/0x3D). **Đối tượng `gvar_007DA778` (state type 3) chỉ xuất hiện duy nhất tại block asm 3694** — mà theo đối xứng, `0x3C` là opcode gắn với state type 3.
-- ⇒ Bản C decompile đã **bỏ sót nhãn** cho `case 0x3c` (IDA xuất `break;`), trong khi ASM chứa body thật. Kết luận: **C→S 0x3C RẤT CÓ KHẢ NĂNG TỒN TẠI** với payload `[0x3C][CL][Self.field_34]`.
+- Ba opcode `0x3A/0x3B/0x3D` khớp **hoàn hảo** giữa hai chiều (bản C cũng xác nhận 0x3A/0x3B/0x3D). **Đối tượng `gvar_007DA778` (state type 3) chỉ xuất hiện duy nhất tại block asm 3694** — và **bảng `0x77F53C` xác nhận entry builder 0x3C = `0x0078A142` nằm chính trong vùng block này** (§6.0).
+- ⇒ Bản C decompile đã **bỏ sót nhãn** cho `case 0x3c` (Ghidra xuất `break;` — giống đúng loại lỗi đã ghi nhận cho `case 0x32` ở `opcode_32.md`). **Kết luận CHỐT: C→S 0x3C TỒN TẠI** với payload `[0x3C][CL][Self.field_34]` (CL=1) hoặc `[0x3C][CL]` thuần (CL=2/3).
 
-### 6.4. Kết luận C→S (kèm mức tin cậy)
+### 6.4. Kết luận C→S (ĐÃ XÁC MINH — cập nhật 2026-09-14)
 
 ```
-Payload C→S (suy luận): [0x3C][CL][bytes của *(*(gvar_007DA778)+0x34)]   (field_34 là AnsiString)
+Payload C→S (CL=1, từ FUN_005418f8): [0x3C][0x01][bytes AnsiString *(*(gvar_007DA778)+0x34)]   (1–2 ký tự mã quân)
+Payload C→S (CL=2, từ FUN_00546798): [0x3C][0x02]                                              (2 byte, theo builder body)
+CL khác {1,2,3}: builder quay về, KHÔNG gửi (asm:3686–3693)
 ```
 
-- **Mâu thuẫn SSOT**: bản C (`0077f414_FUN_0077F414.c:1042`) nói rỗng; bản ASM (`0077f414_FUN_0077f414.asm.txt:3694-3721`) nói có body.
-- **Chưa thể chốt 100%** vì **bảng byte C→S `0x77F474` (200 bytes, dword table `0x77F53C` tại `0077f414_FUN_0077f414.asm.txt:33-34`) KHÔNG có dump trong `redump/`** → không kiểm tra được giá trị byte của index `0x3C`.
-- **Cần redump `0x77F474` (200B) + `0x77F53C`** để xác nhận `byte[0x3C]` trỏ tới block `asm:3694`.
-- `CL` = byte tham số thứ 3 của `TFConnect.SendCommand` (lưu ở `[EBP-0x6]`, `0077f414...asm.txt:17`); **giá trị `CL` và call-site gọi `SendCommand(0x3C)` KHÔNG có trong asm export** → **unknown** (nghi vấn vùng HOLE).
+- ~~Mâu thuẫn SSOT~~ **ĐÃ GIẢI QUYẾT**: bảng đỏ `0x77F474`/`0x77F53C` (dump 2026-09-14) chứng minh entry 0x3C khác 0 ⇒ C `break;` là lỗi decompiler (§6.0).
+- ~~`CL` và call-site `SendCommand(0x3C)` unknown~~ **ĐÃ TÌM THẤY**: `MOV DL,0x3c` xuất hiện trong đúng 2 asm export — `005418f8_FUN_005418f8.asm.txt:62–64` (`CL=1`) và `00546798_FUN_00546798.asm.txt:10–12` (`CL=2`).
+- Kiểu field `+0x34`: **AnsiString — xác minh bằng `_LStrFromChar`/`_LStrFromString`/`_LStrClr` tại `005418f8.c:51,63,67`** (không còn "suy luận từ @LStrCat").
 
 ---
 
@@ -267,12 +326,18 @@ Payload sau MainOp; khung ngoài = `[Token F4 44][Length L: Word LE][Payload]`, 
 ```
 [3C]          L=1  → ERangeError (BoundErr(0))       — ĐỪNG GỬI
 [3C][00]      L=2  → no-op im lặng
-[3C][01]      L=2  → func_0x00541098(TRE_ZMChessMain, RP)   (unknown)
-[3C][02]      L=2  → func_0x005408f4(TRE_ZMChessMain, RP)   (unknown)
-[3C][03]      L=2  → func_0x0053fd78(TRE_ZMChessMain, RP)   (unknown)
-[3C][04]      L=2  → func_0x0053f8fc(TRE_ZMChessMain, RP)   (unknown)
+[3C][01]      L=2  → FUN_00541098(TRE_ZMChessMain, RP) — callee đọc RP[1] (cmd): L=2 chỉ vừa đủ để vào switch, cmd nào cũng BoundErr bên trong (exception SEH swallow — không crash)
+[3C][02]      L=2  → FUN_005408f4(TRE_ZMChessMain, RP)   — như trên
+[3C][03]      L=2  → FUN_0053fd78(TRE_ZMChessMain, RP)   — gate cmd 1..9 tại RP[1]
+[3C][04]      L=2  → FUN_0053f8fc(TRE_ZMChessMain, RP)   — cmd=RP[1] ∈ {1..6,B..10,FF} → banner; thiếu → BoundErr swallow
 [3C][xx>=05]  L=2  → no-op im lặng
-[3C][01..04][...dư] L>2 → gọi callee với toàn RP (byte dư do callee xử lý — unknown)
+Gói mẫu CÓ HIỆU LỰC (từ §4.2):
+  [3C][01][09][seat]                L=4  → đặt ghế tới lượt (board+8)
+  [3C][01][0B][seat][id:4B LE][pts:4B LE]×4   L≥... → đồng bộ 4 người (id tra actor, tên rỗng → "Gamer<i>")
+  [3C][01][01][side][x1 y1 x2 y2][ma]  L=10 → bước chuẩn bị nước
+  [3C][01][05][side][x1 y1 x2 y2][maQuan][?][seatNext]  L=11 (RP[9]) → đi quân + sound WB0007
+  [3C][04][01]                      L=3  → banner mã lỗi 1 (text chưa dump)
+  [3C][03][01][?][?x4 tọa độ]       L=8  → bắt đầu ván (đồng hồ 1000ms)
 ```
 
 **Ví dụ khung hoàn chỉnh** (đã XOR):
@@ -296,18 +361,19 @@ on-wire  = 59 E9 AC AD 91
 ```
 
 - **Bắt buộc `L ≥ 2`**: nếu chỉ gửi `[3C]` (L=1) → `_BoundErr(0)` (delphi exception) ngay trong handler.
-- **Hiệu ứng từng SubOp chưa kiểm chứng được** (4 callee trong hole) — mock nên gửi tuần tự `[3C][01..04]` và log thay đổi UI/logic của form Cờ Tướng để dò ngược.
+- **Hiệu ứng từng SubOp ĐÃ KIỂM CHỨNG TỪ BODY (§4.2)** — không còn phải "gửi dò UI": payload theo từng cmd được liệt kê ở §7.1; ràng buộc `_BoundErr` là exception nội bộ Delphi (SEH dispatcher nuốt), nhưng **cmd không đạt độ dài sẽ không ghi gì** (callee return sớm).
 
 ### 7.2. C→S (client gửi lên — server phải nhận)
 
 ```
 Payload nhận được (sau khi bỏ Token/Length và giải XOR):
-  [0x3C][CL][... bytes của TRE_ZMChessMain+0x34 (AnsiString) ...]
+  [0x3C][0x01][text AnsiString Self+0x34]   — từ FUN_005418f8 (click quân/ô; text = 1–2 ký tự mã đi)
+  [0x3C][0x02]                              — từ FUN_00546798 (2 byte thuần)
 ```
 
-- **Cảnh báo**: đây là **suy luận** từ asm + đối xứng (§6.3); bản C decompile thể hiện `case 0x3c: break;`. **Cần redump bảng byte `0x77F474`** để xác nhận trước khi mock hard-code.
-- Server nên **đọc `0x3C` là "thao tác trên form Cờ Tướng"**, parse phần text phía sau (encoding dự kiến VISCII/cp1258 — chưa xác minh) và trả lời bằng một trong các gói S→C ở §7.1.
-- `CL` là byte thứ 2 — **ý nghĩa chưa xác định**; mock nên log cả `CL` để dò khi có traffic thật.
+- **Đã xác minh (2026-09-14)** — bỏ mọi cảnh báo "suy luận/cần redump bảng": bảng `0x77F474[0x3C]=0x32` / `0x77F53C[0x3C]=0x0078A142` (§6.0), call-site + `CL` đã tìm thấy (§6.2).
+- Server nên **đọc `0x3C` là "request thao tác bàn Cờ Tướng"**: byte 2 = **chọn hành động (CL)**: `0x01` = đi quân/chọn với payload text `+0x34` (mã quân 1 ký tự từ `Self+0x34`; ký tự này là **ASCII/VISCII — bản thân nó là mã quân, không phải chuỗi hiển thị**); `0x02` = hành động phụ (không text — có lẽ "hủy/chờ" theo `FUN_00546798.c:24–27`: gọi `FUN_00545d0c` + vtable+0x24 + đặt cờ `DAT_00948dcc^+0x1c9`); `CL` khác: client không gửi ⇒ không bao giờ thấy.
+- Response đề xuất: xác nhận bằng `[3C][01][01|03|05][...]` (§7.1) — cmd 1/3/5 của SubOp 1 cũng reset latch `board+0x13` để client được gửi nước tiếp.
 
 ---
 
@@ -326,17 +392,28 @@ Payload nhận được (sau khi bỏ Token/Length và giải XOR):
 | 9 | `case_functions/functions/case_051_007956B9_FUN_007956b9.c:27-29`; `case_052_007956F3_FUN_007956f3.c:28-36`; `case_054_007957DC_FUN_007957dc.c:28-101` | Đối xứng opcode 0x3A/0x3B/0x3D ↔ singleton |
 | 10 | `functions/0053db88_TRE_ZMChessMain.Create.c:22-49`; `functions/0053f450_FUN_0053f450.c:60-70` | Subsytem ZMChess (suy luận định danh `gvar_007DA778`) |
 | 11 | `functions/00541c6c_FUN_00541c6c.c:45,187,197-204`; `0053db88...c:42-43` | Dùng chung `DAT_00948dd0/dd8` + sound `WA0045.wav` |
-| 12 | grep `007DA778` (22 match, toàn call-site + `= 0`, **không có dòng gán**) | Xác nhận constructor/registration nằm trong HOLE |
-| 13 | `index.csv:3048` (`FUN_0053f88c` @`0053F88C`), `index.csv:3049` (`FUN_005418f8` @`005418F8`); grep 4 callee → 0 file/0 dòng | Xác nhận 4 callee nằm trong HOLE `0x0053F8FC..0x005418F8` |
-| 14 | `functions/0077f414_FUN_0077F414.c:1042-1043` (`case 0x3c: break;`) | Chiều C→S theo bản C (rỗng) |
-| 15 | `functions/0077f414_FUN_0077f414.asm.txt:3694-3721` + `:33-34` (byte table `0x77F474`, dword `0x77F53C`) | Body C→S chưa gán nhãn + xác nhận bảng byte C→S không có dump |
+| 12 | ~~grep `007DA778` không có dòng gán~~ **NAY CÓ**: `0055374c_FUN_0055374c.c:41–44` gán từ `TRE_ZMChessMain_Create` | Xác minh tên class |
+| 13 | ~~4 callee nằm trong HOLE~~ **NAY ĐÃ DECOMPILE**: `00541098_FUN_00541098.c` (521 dòng), `005408f4_FUN_005408f4.c` (475 dòng), `0053fd78_FUN_0053fd78.c` (739 dòng), `0053f8fc_FUN_0053f8fc.c` (84 dòng) + `.asm.txt` từng hàm | Wire/cmd layout từng SubOp (§4.2) |
+| 14 | `functions/0077f414_FUN_0077F414.c:1042-1043` (`case 0x3c: break;`) | Chiều C→S theo bản C — artifact, đã giải thích |
+| 15 | **`redump/table_0x77F474_200B.hex` + `redump/table_0x77F53C_dword200.hex`** (parse python): `byte[0x3C]=0x32`, `dword[0x3C]=0x0078A142` | CHỐT builder 0x3C (§6.0) |
 | 16 | `functions/00402b90_FUN_00402b90.c:392-411`; `functions/0051633c_TForm1.CY_AddSedQueue.c:141-181` | Copy shortstring + đóng gói khung `[Token][L 2B LE][payload]` |
+| 17 | `functions/005418f8_FUN_005418f8.c` + `.asm.txt:62–64` (`MOV CL,0x1; MOV DL,0x3c`); `functions/00546798_FUN_00546798.c` + `.asm.txt:10–12` (`CL=2`) | 2 call-site C→S 0x3C + giá trị `CL` |
+| 18 | `functions/00402b60__PStrNCat.c:584–606` | **RTL `_PStrNCat` ĐÃ CÓ BODY** — semantics nối `min(src[0], maxLen − dest[0])` ký tự data (xác nhận toàn bộ asm builder §6.2) |
+| 19 | `functions/00551fb8…c` (mode pending→active, dirty `+0xA0`), `functions/0053e13c/0053e2b4/0053f2a8/0053da48/0053d930/0053ee00/0053f88c/00541bf8/005419c8/005465dc/0054698c` — ZMChess subsystem | Field/bảng `+0x70/0x84/0x98/0xac/0xb1/0x4d/0x11b/0x158/0x1ca/0x101/0xfc/0x1c9` (§4.2) |
 
-### Điểm chưa xác minh được từ SSOT (không suy đoán)
+### Cập nhật 2026-09-14 — những mục đã ĐÓNG
 
-1. **Body + nghiệp vụ 4 method callee** (`func_0x00541098`, `func_0x005408f4`, `func_0x0053fd78`, `func_0x0053f8fc`): nằm trong HOLE `0x0053F8FC..0x005418F8` → **unknown / cần redump**. Do đó **layout field sau `RP[0]` và ý nghĩa từng SubOp chưa biết**.
-2. **Dòng gán `gvar_007DA778`** (constructor/đăng ký): **không có trong SSOT** → định danh `TRE_ZMChessMain` là **suy luận mạnh** (từ region ZMChess + `DAT_00948dd0/dd8` + sound `WA0045.wav` + state type 3), **chưa xác minh bằng dòng gán**.
-3. **Bảng byte C→S `0x77F474` (200B) và dword table `0x77F53C`**: **không có dump trong `redump/`** → không chốt được `byte[0x3C]` → **chiều C→S của OP 0x3C là suy luận (asm + đối xứng), cần redump để xác nhận**.
-4. **Giá trị byte `CL`** của C→S `case 0x3c` và **call-site gọi `SendCommand(0x3C)`**: không có trong asm export → **unknown** (nghi vấn vùng HOLE).
-5. **Kiểu dữ liệu chính xác của `TRE_ZMChessMain+0x34`**: ASM đối xử như **AnsiString/PChar** (`@LStrCat` trực tiếp); tên/ý nghĩa trường là **suy luận** (không có dòng khởi tạo `+0x34` trong các file export).
-6. **Encoding chuỗi** trong payload C→S (VISCII/cp1258/ASCII) **chưa xác minh**.
+1. ~~Body + nghiệp vụ 4 method callee~~ **XONG (§4.2)**: mỗi callee là `switch(cmd = RP[1])`; layout và field ghi được lập bảng; các hành vi chính (board pointer `+0x20`, seat table `+0x70/0x84/0x98/0xb1`, move coord `+0xac[1..4]`, piece code `+0x4d[33]`, timer rows `+0x158/0x15b/0x163`, latch `board+0x13`) xác minh bằng phép ghi trực tiếp.
+2. ~~Dòng gán `gvar_007DA778`~~ **XONG**: `0055374c.c:41–44` (VMT `VMT_53D8B8_TRE_ZMChessMain`) ⇒ `TRE_ZMChessMain` là **tên class xác minh**, không còn suy luận.
+3. ~~Bảng byte C→S `0x77F474`/`0x77F53C`~~ **ĐÃ DUMP + CHECK (§6.0)** ⇒ C→S 0x3C **xác nhận tồn tại**, mâu thuẫn C/asm đã giải quyết (Ghidra artifact, giống `case 0x32`).
+4. ~~`CL` và call-site `SendCommand(0x3C)`~~ **XONG**: CL=1 (`FUN_005418f8` — đi quân, kèm text `+0x34`) và CL=2 (`FUN_00546798` — thao tác phụ). CL ∉ {1,2,3}: builder return không gửi.
+5. ~~Kiểu dữ liệu `TRE_ZMChessMain+0x34`~~ **XONG: AnsiString Delphi chuẩn** — writer `005418f8.c:51,63` dùng `_LStrFromChar/_LStrFromString`, cleanup `:67` `_LStrClr`; builder chỉ `@LStrCat`. (Ý nghĩa field: **buffer chuỗi nhỏ "mã nước đi"** chứa 1–2 ký tự, không phải tên/ngữ cảnh.)
+
+### VẪN CÒN HỞ (giới hạn hiện tại — ghi đúng theo bằng chứng)
+
+1. **13 chuỗi banner SubOp 4** (`0x0053FB4C..0x0053FD6C`) và **8 tên WAV SubOp 3** (`0x00540854..0x005408E8`) + 2 hậu tố banner SubOp 2 (`0x00541068/0x00541084`) — code-gap, **chưa có `lit_*.hex`** → nghiệp vụ từng mã banner/chưa dịch được.
+2. **Mapping body↔CL của builder 0x3C**: khối asm `3694–3721` gán CL=1 bằng suy luận khớp (writer `+0x34` duy nhất); hai body CL=2/3 (jump `0x7892D1/0x78933C/0x789391`, dùng chung builder `0x32`) **chưa chỉ ra được 1-1 vì asm.txt không kèm cột address**; chưa kết luận được body nào đúng cho CL=2 hay CL=3.
+3. **Ý nghĩa 13 mã SubOp 4** — chỉ là mã số, nội dung text thiếu.
+4. **`DAT_00948dcc / DAT_00948dd0 / DAT_00948dd4`** được callee dùng trực tiếp như instance — quan hệ chính xác với `gvar_007DA778^` (cùng object hay bàn phụ/player con) **chưa kết luận được**.
+5. **Đối tượng `board = *(Self+0x20)`**: layout (`+8/+0x10..+0x12/+0x14[1..5]/+0x1a[1..5]/+0x1f/+0x20[1..5]/+0x13`) dựng từ các phép ghi; class của nó chưa định danh (nhiều khả năng `TRE_ZMChessPlayer`/bàn con — chưa kết luận được).
+6. **Ngữ nghĩa cuối cùng của các cmd** (tọa độ quân cờ kiểu gì — `+0xac` 4 byte / `+0x4d[33]` mã quân / `+0xfc` record 3 entry) — mới có shape + ràng buộc; cần traffic thật hoặc chuỗi để chốt.

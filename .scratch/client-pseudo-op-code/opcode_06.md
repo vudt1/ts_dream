@@ -3,6 +3,8 @@
 Ngày: 2026-09-12 · Workspace: `/mnt/d/VUDT/GIT_PCC/test` · Feature: `op-code` · Chiều chính: **Server → Client (S→C)**
 Trạng thái: **Xác minh từ mã nguồn sơ cấp** (case function + dispatcher inline + jump-table hex thực đo + các helper + nhãn chuỗi literal trong debug HUD + call-site ASM chiều C→S). Không có phỏng đoán suông; mọi kết luận gắn nhãn độ tin cậy.
 
+> Cập nhật 2026-09-14: bổ sung phân tích từ các body/hex dump mới (theo `missing_opcode_sources.md`).
+
 ---
 
 ## 0. Đính chính giả định nghiệp vụ
@@ -106,7 +108,7 @@ if (gself[0x145c] != 2 && gself[0x35f] == 1 && gself[0x578] != 0) {
 | `+0x548` | `"LeaderID: "` (0050debc:155) | như trên | ID trưởng nhóm (leader lưu chính ID mình → tự khớp). |
 | `+0x578` | `"PartnerNum: "` (0050debc:158) | như trên / `FillChar` zero 0x28 bytes tại `0x550` khi giải tán (007a2604:52–53) | Số thành viên trong bảng, **tối đa 4**. |
 | `+0x550 + i*8` (i=1..4) | duyệt trong 0050debc:169–185 (`id` + `+0x554` aux) | `FUN_007a273c`:158–159 | Bảng partner: `+0x550+i*8` = **charID thành viên**; `+0x554+i*8` = **index actor 1..800** (0 nếu chính là self — vì self không có trong mảng actor). |
-| `+0x145c` | (không nhãn) | chỉ `case_004` OP 0x03 dòng 115, nhận từ `func_0x0054a384(MapID)` (hàm chưa export) | "scene-class đặc biệt"; giá trị **2** vô hiệu hóa bộ lọc partner. Độ tin cậy ngữ nghĩa: **THẤP** (chỉ kết luận được: class-scene 2 → leader vẫn sync member). |
+| `+0x145c` | (không nhãn) | chỉ `case_004` OP 0x03 dòng 115, nhận từ `func_0x0054a384(MapID)` — **body ĐÃ export** (`0054a384_FUN_0054a384.c:44-152`, xác minh được từ body mới): hàm tra **bảng tĩnh tại `DAT_00948DF8`** (5 dòng, stride 54 byte): MapID khớp word `+0x07` → trả **1**; khớp word `+0x0D+6·k` (k=1..5) → trả **2**; khớp word `+0x31+6` → trả **3**; không khớp → 0 (param_1 không dùng — EAX-artifact) | "scene-class đặc biệt"; giá trị **2** (= MapID nằm ở cột thứ hai của bảng) vô hiệu hóa bộ lọc partner. Độ tin cậy cơ chế: **CAO** (lookup bảng, không phải tính toán); **nội dung bảng chưa dump** (`DAT_00948DF8` thuộc `.data` runtime) → vẫn chưa liệt kê được map nào class 2, và **ý nghĩa nghiệp vụ của class 2: chưa kết luận được** |
 | `+0x466` | (không nhãn) | `FUN_0072b390`:73 set **1** (mỗi lần client thi hành 1 action qua `VMT+0x18(code)` rồi `SendCommand(0x20)`); `FUN_0072b4b8`:38 clear **0**; `DXDraw1MouseDown`:74 yêu cầu `!=0` mới cho click-walk | Cờ "đang ở trạng thái hành-động/hoạt-động-world". Ý nghĩa chính xác: **TRUNG BÌNH**; cơ chế set/clear: **CAO**. |
 
 **Hiệu ứng:** tôi là **trưởng nhóm** → mọi gói đi-broadcast cho **chính 4 thành viên của tôi** bị **nuốt** (bỏ cả phần đặt đích). Giải thích hợp lý: client leader đang tự quản lý đội (panel `FUN_005a3018` đọc đúng bảng `0x550/0x578` này) nên không để server xen vào bước đi member. Độ tin cậy cơ chế: **CAO**.
@@ -125,7 +127,7 @@ if (gself[0x466] != 0 && gself[0x548] == actorID)
 idx = FUN_0070c20c(gvar_007D9D34 /*world*/, actorID);      // scan 1..count(+0x60) mảng 800 slot gvar_007DA300, khớp actor+4==ID
 if (idx != 0) {
     actor = *(gvar_007DA300 + idx*4);
-    func_0x00712d4c(actor, X, Y);       // [không export] đặt ĐÍCH đến (data-flow bắt buộc viết +0x4C/+0x50)
+    func_0x00712d4c(actor, X, Y);       // [body ĐÃ export — SetDestination, xem dưới]
     actor[0xE4] = dir + 8;              // hướng "render"
     actor[0xF0] = X / 20;               // tile đích X  (lưới 0x14 = 20px)
     actor[0xF4] = Y / 20;               // tile đích Y
@@ -137,10 +139,10 @@ if (idx != 0) {
   - `+0x1C/+0x20` (DWORD) = **vị trí hiện tại** (pixel);
   - `+0x4C/+0x50` (DWORD) = **đích đến** (destination — chính là cặp được báo C→S ở case 6 và được `KeyboardWalk` +80px mỗi lần gõ phím);
   - `+0x5C/+0x60` = **mirror "lần cuối đã báo server"** (chỉ case 6 C→S cập nhật);
-  - `+0xE3` = hướng logic (0..7 bởi `FUN_0070da54`; `0xC` khi teleport bởi `FUN_0071e2b8`), `+0xE4` = hướng sang phía render, `+0xE5` = cờ **"đã tới nơi/đứng yên"** (Create=1; bắt đầu đi=0 bởi `00731ffc`:105; tới nơi=1 bởi `0072b390`:80);
+  - `+0xE3` = hướng logic (0..7 bởi `FUN_0070da54`; `0xC` khi teleport bởi `FUN_0071e2b8`), `+0xE4` = hướng sang phía render, `+0xE5` = cờ **"đã tới nơi/đứng yên"** (Create=1; bắt đầu đi=0 bởi `00731ffc`:105 **và bởi `00712d4c`:21 — body mới xác minh**; tới nơi=1 bởi `0072b390`:80);
   - `+0xE8/+0xEC` tile hiện tại, `+0xF0/+0xF4` tile đích;
   - `+0x100` số waypoint, `+0x104` write-cursor, `+0x108 + i*8` danh sách node path.
-- `func_0x00712d4c` **không có trong thư mục export** (khe 48 byte `0x712D4A..0x712D7C`, ngay sau `FUN_00712c58`). Data-flow **bắt buộc** nó là *SetDestination(actor, X, Y)* vì: (a) `FUN_0070da54` ngay sau đó cần `+0x4C/0x50` khác `+0x1C/0x20` mới đổi được hướng; (b) `FUN_00715b28` đọc đúng `+0x4C/0x50` làm đích tính route; (c) handler tự viết tile đích `+0xF0/0xF4` từ cùng cặp X,Y. Độ tin cậy: **TRUNG BÌNH–CAO** (cần redump 48 byte này nếu muốn 100%).
+- `func_0x00712d4c` **đã có body** (47 byte @`0x00712D4C`, `ts_decompile/functions/00712d4c_FUN_00712d4c.c:16-23`) — phỏng đoán cũ "SetDestination(actor, X, Y)" **được xác minh từ body mới**: `param_1+0x4c = param_2 (X)`, `param_1+0x50 = param_3 (Y)`, **và thêm một tác dụng mới thấy**: `param_1+0xE5 = 0` — tức hàm **xóa luôn cờ "đã tới nơi/đứng yên"** (khớp chính xác model ở mục dưới: bắt đầu đi ⇒ `+0xE5 = 0`; trước đây writer này chưa được liệt kê, chỉ có `00731ffc:105`). Độ tin cậy: **CAO** (không còn là suy luận data-flow). Gọi duy nhất từ `sub_0078cd6b` (chính handler OP 0x06).
 - Hai hàm cuối thuộc tầng **pathfinding/render** → theo yêu cầu, **tóm 1 dòng**, không mổ xẻ animation.
 
 ### 4.2. SubOp `0x02` — Movement Lock + Force Echo (dòng 122–124)
@@ -231,7 +233,8 @@ payload = [0x06] [sub:1B] [X:Word LE] [Y:Word LE] [sigA:1B] [sigB:1B]   (8 byte)
 | 6 | `ts_decompile/functions/0071fdf8_FUN_0071fdf8.c` + `.asm.txt` | asm `MOV CL,2; MOV DL,6; CALL 0x0077f414` | **SubOp 2** = lock + snap + echo |
 | 7 | `ts_decompile/functions/0070da54_FUN_0070da54.c` | @`0x0070DA54` (đọc `+0x1C/0x20` vs `+0x4C/0x50`, ghi `+0xE3`∈0..7) | Hướng logic; chốt model offset di chuyển |
 | 8 | `ts_decompile/functions/00715b28_FUN_00715b28.c` | @`0x00715B28`; VMT+0x20 ở entry; gate `0x145c==2`/`0x35f==2`+`0x548`; path `+0x100/104/108+i*8` | Route recompute; đồng bộ follower `+0x35E`(NpcCount)/`+0x57C[i]` |
-| 9 | `ts_decompile/functions/0071e2b8 / 00712c58 / 00712d7c (+asm CL=1) / 0072b390 (d.73 0x466:=1, d.80 0xE5:=1) / 0072b4b8 (d.37–44)` | — | Phân vai `func_0x00712d4c` (khe `0x712D4A..0x712D7C` **không export** — đánh dấu cần redump); model `+0x466`, `+0xE5` |
+| 9 | `ts_decompile/functions/00712d4c_FUN_00712d4c.c` (body mới) | d.16-23 | Phân vai **xác minh**: `func_0x00712d4c` = SetDestination (`actor+0x4C/+0x50 := X/Y`, `actor+0xE5 := 0` — xóa cờ "đứng yên", writer mới của `+0xE5`) |
+| 9b | `ts_decompile/functions/0071e2b8 / 00712c58 / 00712d7c (+asm CL=1) / 0072b390 (d.73 0x466:=1, d.80 0xE5:=1) / 0072b4b8 (d.37–44)` | — | Model `+0x466`, `+0xE5` (nay có thêm writer `00712d4c`) |
 | 10 | `ts_decompile/functions/005186e4_TForm1.KeyboardWalk.c` | d.43 idiom `+0x3d09`; d.62 gate `0x653`; d.85–118 goal ±`0x50`; d.120 → `00731ffc` | Map-guard + walk-lock + sender step |
 | 11 | `ts_decompile/functions/0050bff8_TForm1.DXDraw1MouseDown.c` | d.58, d.74 (`0x466`), d.127 (`0x653`) | Xác nhận cùng idiom map-guard; gate click-walk |
 | 12 | `ts_decompile/functions/0050debc_FUN_0050debc.c` | **literal** `"TeamStatus: "` d.153, `"LeaderID: "` d.156, `"PartnerNum: "` d.159, `"NpcCount: "` d.312; loop `+0x550+i*8` d.161–197 | **BẰNG CHỨNG TÊN TRƯỜNG** cho các offset gate |
@@ -242,6 +245,7 @@ payload = [0x06] [sub:1B] [X:Word LE] [Y:Word LE] [sigA:1B] [sigB:1B]   (8 byte)
 | 17 | `ts_decompile/functions/0058b5a4_FUN_0058b5a4.c` (`-0xc2f7` index), `0051c2ec`, `00733b94` (`<6`) | — | Corroborate họ map `0xC2F7..` |
 | 18 | `ts_decompile/functions/00603f20_FUN_00603f20.c` | d.188–190 `TPlayer_Create(VMT_70B740_TPlayer)` → `gvar_007DA7BC`; d.164–181 free `gvar_007DA300[i]` + `gvar_007D9D34+0x60` reset | **Định danh 3 global** (player-object / world-manager / 800-slot actor array) |
 | 19 | `0051189c_FUN_0051189c.c` (registry VMT/form) | quét: **không** chứa `gvar_007DA7BC/007D9D34/007DA300` (chúng tạo động ở (18)) | Loại trừ nghi ngờ, đối chiếu theo yêu cầu |
+| 19b | `ts_decompile/functions/0054a384_FUN_0054a384.c` d.44–152 (body mới 2026-09-14) | tra bảng `DAT_00948DF8` → class 0..3 cho `+0x145c` | Nguồn giá trị `+0x145c==2` ở cổng #1 (mục (b) cũ trong danh sách thiếu) |
 | 20 | `.scratch/op-code/`: `handoff-opcode-exploration-guide.md`, `opcode_00_01.md` (mẫu + framing), `opcode_02.md`, `opcode_03.md` (`+0x63a` MapID, `0x145c`←`0054a384`), `opcode_08.md` (`0x3FA` job-state, `0x57C` party), `opcode_14.md` (0x653-cleared-by-0x08, C→S 6/7, tile 20px) | — | Đối chiếu helper nghiệp vụ đã biết, tránh trùng phỏng đoán sai |
 
-**Hằng số/cấu trúc còn thiếu cho 100%:** (a) thân `func_0x00712d4c` (48 byte @`0x712D4C`) — cần redump; (b) `func_0x0054a384` (nguồn giá trị `+0x145c==2`); (c) nội dung kinh doanh 5 map `0xC2F7..0xC2FB`; (d) tên thật của virtual `VMT+0x20` trên `TPlayer` (`VMT_70B740+0x20`). Cả 4 đều đã được thế chỗ bằng bằng chứng gián tiếp ≥ trung bình và **không** ảnh hưởng wire layout hay thứ tự phát gói của mock server.
+**Hằng số/cấu trúc còn thiếu cho 100%:** ~~(a) thân `func_0x00712d4c`~~ **ĐÃ BỔ SUNG** — body mới `00712d4c_FUN_00712d4c.c` xác minh SetDestination + xóa `+0xE5`; ~~(b) `func_0x0054a384`~~ **ĐÃ BỔ SUNG** — body mới là hàm **tra bảng MapID tại `DAT_00948DF8`** (trả 0..3, xem bảng §4.1.3; bản thân nội dung bảng vẫn chưa dump); **(c) vẫn mở**: nội dung kinh doanh 5 map `0xC2F7..0xC2FB` (không có chuỗi literal nào gắn với chúng); **(d) vẫn mở**: tên thật của virtual `VMT+0x20` trên `TPlayer` (`VMT_70B740+0x20`). (c)+(d) đã được thế chỗ bằng bằng chứng gián tiếp ≥ trung bình và **không** ảnh hưởng wire layout hay thứ tự phát gói của mock server.

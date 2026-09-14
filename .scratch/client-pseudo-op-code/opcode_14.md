@@ -3,6 +3,8 @@
 Ngày: 2026-09-12 · Workspace: `/mnt/d/VUDT/GIT_PCC/test` · Feature: `op-code` · Client: `aLogin.exe` (Delphi)
 Trạng thái: **Xác minh từ mã nguồn sơ cấp** (handler + helper + jump table + caller C→S). Đính chính: tài liệu cũ `.scratch/op-code/opcode_00_01.md` mục 6 ghi *"Case 21 ứng với OP 0x14"* là **SAI** — theo jump table đã kiểm chứng (`jumptable_byte200_0x78A8EE` + `jumptable_dword200_0x78A9B6`), **MainOp 0x14 → byte table index 18 → target 0x0078EC3F = Case 18**; còn Case 21 (`FUN_00790ed5`) thuộc MainOp **0x18**.
 
+> Cập nhật 2026-09-14: bổ sung phân tích từ các body/hex dump mới (theo `missing_opcode_sources.md`).
+
 ---
 
 ## 1. Tóm tắt nghiệp vụ
@@ -14,7 +16,7 @@ Theo evidence, Main OP 0x14 **KHÔNG phải đồng bộ chuyển động liên 
 - **S→C (chủ đạo)**: server đẩy 1 "lệnh kịch bản thế giới" 56 sub-op, trong đó:
   - **SubOp 0x01–0x06**: ghi khối tham số 15 byte vào `PlayerState + 0xA09B` rồi gọi `FUN_005EB530` — hàm *thi hành hiệu ứng*, có switch theo byte **loại hiệu ứng** (B2, `+0xA09F`): `1 = ĐỔI MAP/DI CHUYỂN LIÊN MAP` (set tọa độ vào tâm spawn map mới, cập nhật `a074 = slot map`, nạp tiêu đề bản đồ), `4 = TELEPORT TRONG MAP THEO TỌA ĐỘ Ô` (tile×20 px), `2 = SNAP/COPY CẶP TỌA ĐỘ`, `0 = hiệu ứng tài nguyên/số học/hộp thoại`, `5 = cắt cảnh FMV`, `6 = mở hộp thoại NPC/cửa hàng`. SubOp 1..6 chỉ là **6 biến thể kịch bản cùng layout** (byte đầu của payload lưu vào `+0xA09B`, không đọc lại).
   - **SubOp 0x07, 0x08, 0x09, 0x0A–0x11**: máy trạng thái **chuyển tiếp (transition)** — cấp "vé" trả về cổng (`+0x44F` của TFConnect), dựng/xóa cờ bận `a094`, cờ khóa nhập liệu `a096`, cờ dịch chuyển `a076`, và **hoàn tất/dọn dẹp sau load map** (case 0x08).
-  - **SubOp 0x12–0x38**: chuỗi thông báo — **Toast** (2000 ms, `gvar_007DA084 + VMT 0x90`), **chat hệ thống** (`FUN_007AB870`), **âm thanh** (`sound\WA0014.wav` qua `FUN_007A7F20`), message box, cập nhật cờ/Word lên actor cục bộ (`gvar_007DA7BC + 0x628/0x62A/0x62C`), và 8 sub-op delegate sang helper chưa trích xuất decompile (`0x2A, 0x2C, 0x31, 0x32, 0x33, 0x35, 0x36, 0x38`).
+  - **SubOp 0x12–0x38**: chuỗi thông báo — **Toast** (2000 ms, `gvar_007DA084 + VMT 0x90`), **chat hệ thống** (`FUN_007AB870`), **âm thanh** (`sound\WA0014.wav` qua `FUN_007A7F20`), message box, cập nhật cờ/Word lên actor cục bộ (`gvar_007DA7BC + 0x628/0x62A/0x62C`), và 8 sub-op delegate sang helper (`0x2A, 0x2C, 0x31, 0x32, 0x33, 0x35, 0x36, 0x38`) — **cập nhật 2026-09-14: 5/8 helper đã có body** (`0074641C, 00748430, 00749198, 007494D8, 0074E638` — phân tích §4.6); **vẫn thiếu: `005F16F4` (0x2A), `007485BC` (0x32), `00748860` (0x33), `0074E82C` (0x38-sel2)**.
 - **C→S**: client **gửi yêu cầu** OP 0x14 (qua `TFConnect.SendCommand = FUN_0077F414`, chọn nhánh theo `CL` nội bộ, **không phải SubOp wire tự do**) với 4 tình huống: **click lối thoát (sub 1)**, **đọc vùng/tự nhảy theo region (sub 4)**, **tự động quay lại cổng khi server phát vé (sub 6)**, **hủy/đóng UI (sub 9)**.
 
 **Đồng bộ tọa độ chạy realtime thuộc OP khác** — bằng chứng: trong `FUN_0077F414`, `case 6` gửi `[0x06][X:Word LE][Y:Word LE]...` (tọa độ actor `gvar_007DA7BC + 0x4C/0x50` khi thay đổi) và `case 7` gửi `[0x07][+0x138][+0x130][+0x134]` — tức movement báo cáo bằng OP 0x06/0x07, không phải 0x14.
@@ -97,19 +99,19 @@ Chuỗi framing/dispatcher đã xác minh ở `handoff-opcode-exploration-guide.
 | `0x27` | 2 | TOAST | `0x007979BC` |
 | `0x28` | 3 | CHAT chọn | 1→`0x7979E0`; 2→`0x797A08` |
 | `0x29` | 3 | TOAST/CHAT chọn | 1→toast `0x797A30`; 2→`0x797A5C`; 3→`0x797B00` |
-| `0x2A` | ? | HELPER | `func_0x005F16F4(PlayerState, ECX)` — **chưa có trong decompile** |
+| `0x2A` | ? | HELPER | `func_0x005F16F4(PlayerState, ECX)` — **VẪN chưa có body** (2026-09-14) |
 | `0x2B` | 2 | TOAST | `0x00797B64` |
-| `0x2C` | ? | HELPER | `func_0x0074641C(gvar_007D9D34, ECX)` — chưa trích xuất |
+| `0x2C` | **7** | TARGET-OP | `func_0x0074641C(gvar_007D9D34, ECX)` — **có body mới**: `Copy(RP,2,4)` DWORD id + byte `RP[5]` mode (1/2); id==self → LocalActor, ngược lại `FUN_0070c20c(gvar_007D9D34,id)≤800` → actor `gvar_007DA300[idx]`; mode 1→`FUN_0071e288`, mode 2→`FUN_0071f9ec` (2 hàm con **chưa có body** → hiệu ứng lên actor chưa kết luận được). §4.6 |
 | `0x2D` | 2 | TOAST | `0x00797BB8` |
 | `0x2E` | 3 | CHAT/TOAST chọn | 1→`0x797BE4`; 2→`0x797C24`; 3→toast `0x797C5C` |
 | `0x2F` | 3 | CHAT/TOAST chọn | 1,2→chat `0x797C98/0x797D28`; 3,4→toast `0x797D70/0x797DA0` |
 | `0x30` | 3 | TOAST chọn | 1,2,3 → `0x797DD0/0x797E24/0x797E54` |
-| `0x31,0x32,0x33` | ? | HELPER | `func_0x00748430/0x007485BC/0x00748860(gvar_007D9D34, ECX)` — chưa trích xuất |
+| `0x31` | **3** | UNIT-FLAG+TOAST | `func_0x00748430(gvar_007D9D34, ECX)` — **có body mới**: byte `RP[1]`=slot 1..4 của đội hình (`LocalActor+0x57C[slot*4]`), set `unit+0x566=1`, toast tên NPC (tra `gvar_007D9DE4`) + hằng `DAT_007485ac`. `0x32`→`func_0x007485BC`, `0x33`→`func_0x00748860` **vẫn chưa có body**. §4.6 |
 | `0x34` | 3 | FLAG | `PlayerState+0xA12A = byte payload[2]` (cờ điều kiện cho `FUN_005EB530` case 6) |
-| `0x35` | 3 | PANEL | 1→`func_0x00749198(LocalActor, ECX)`; 2→`FUN_0074927C` (đóng panel `+0x51E` + gửi **C→S OP 0x17**) |
-| `0x36` | ? | HELPER | `func_0x007494D8(LocalActor, ECX)` — chưa trích xuất |
+| `0x35` | **4** (sel=1) | TELEPORT-CONDITIONAL | sel `RP[1]`: 1→`func_0x00749198(LocalActor, ECX)` — **có body mới**: chỉ khi map class `LocalActor+0x63A` ∈ {0x3076,0x3077, 0x3082–0x3085, 0xC289–0xC28B, 0xC315, 0xD62B–0xD62D}; set tick `+0x147C`, cờ `+0x1478=1` (nếu chưa bật), `FUN_0072b390(self,0x2E)` rồi **dặt actor về spawn `gvar_007DA6DC[P[3]]+0x54/+0x58`** qua `FUN_00731a9c` (§4.6); 2→`FUN_0074927C` (đóng panel `+0x51E` + gửi **C→S OP 0x17**) |
+| `0x36` | **3–9** | QUEUE-5-SLOT | `func_0x007494D8(LocalActor, ECX)` — **có body mới**: bảng 5 record stride 18B tại `LocalActor+0x1481..` (`+0x1485` Word id, `+0x1487` DWord giờ/phút, `+0x1481` string); switch `RP[1]` 1..5 (thêm / xóa+chat / xóa timer / thêm có chống trùng / set timer) — chi tiết §4.6 |
 | `0x37` | 2 | TOAST | `0x00797E94` |
-| `0x38` | 3 | PANEL | 1→`0x0074E638`; 2→`0x0074E82C`; 3→`FUN_0074E8FC` (đóng panel `+0x1511` + gửi C→S 0x17) |
+| `0x38` | **4** (sel=1) | PANEL+TELEPORT | sel 1→`0x0074E638` — **có body mới** (gate map class ∈{0x3076,0x3082}, cờ `+0x1511=0` → set `+0x1511/+0x1512=1`, `+0x1514=GetTickCount`, `+0x1518=300000`, `FUN_0072b390(self,0x22)`, dặt về spawn slot `P[3]`); 2→`0x0074E82C` — **vẫn chưa có body**; 3→`FUN_0074E8FC` (đóng panel `+0x1511` + gửi C→S 0x17) |
 
 Không có `default:` — SubOp ngoài danh sách bị bỏ qua silently.
 
@@ -174,6 +176,56 @@ Logic: ghép `IntToStr(A) + const + name` → `FUN_007AB870(chatWin, selfActorId
 
 `LocalActor+0x628 = Word(payload[2..3])`; `LocalActor+0x62A = Word(payload[4..5])`. Hai field này được **zero ở `FUN_005EA3E0` ngay sau khi gửi sub-4** ⇒ là "vị trí/region chờ" do cả hai chiều cùng cập nhật. (Render: bỏ qua.)
 
+### 4.6. Bốn helper delegate — **ĐÃ BÓC TỪ BODY MỚI (2026-09-14)**
+
+Trước đây §3 đánh dấu `0x2C/0x31/0x35/0x36` là "chưa trích xuất". Nay cả 4 đã có file `.c` trong `ts_decompile/functions/`. Chi tiết (field offset tính trên `LocalActor = gvar_007DA7BC`):
+
+**`0x2C` — `0074641c_FUN_0074641c.c:42-72`** (self = `gvar_007D9D34`):
+```c
+Copy(RP,2,4) → id = FUN_0077ef7c(codec);          // :42-43  DWORD LE payload[2..5]
+mode = RP[5] guard len>=6;                         // :44-50  byte payload[6]
+obj = (id == LocalActor+4) ? LocalActor
+      : gvar_007DA300[FUN_0070c20c(gvar_007D9D34, id)*4]   // :52-64  registry id→actor
+if mode==1 FUN_0071e288(obj); else if mode==2 FUN_0071f9ec(obj);  // :66-71
+```
+→ "áp dụng/ gỡ 1 trạng thái lên actor `id` (self hoặc người khác)". Hai callee `FUN_0071e288/FUN_0071f9ec` **không có body** → **chưa kết luận được** tác động cụ thể.
+
+**`0x31` — `00748430_FUN_00748430.c:56-92`**:
+```c
+slot = RP[1]; if (slot-1 >= 4) no-op;             // :56-57  byte payload[2] ∈ 1..4
+u = *(LocalActor+0x57C + slot*4);  u+0x566 = 1;   // :62  set cờ "+0x566" trên NPC đội hình slot
+name = FUN_00623f00/FUN_005adf70 tra gvar_007D9DE4 theo u+4;  // :73-82  chuỗi tên/tab
+txt = PCharToShortString(u+9) & DAT_007485ac ... ; // :84-90
+toast VMT gvar_007DA084+0x90 (txt, 2000,0,0);      // :92
+```
+→ "đánh dấu 1 ô đội hình (`unit+0x566=1`) + toast tên". Payload min 3B. **`DAT_007485ac` chưa dump → chưa dịch.**
+
+**`0x35` sel=1 — `00749198_FUN_00749198.c:28-65`**:
+```c
+mapClass = *(ushort*)(LocalActor+0x63a);           // :28
+if (mapClass ∉ {0x3076,0x3077,0x3082,0x3083,0x3084,0x3085, 0xC289,0xC28A,0xC28B,0xC315,0xD62B,0xD62C,0xD62D}) return;  // :29-41
+LocalActor[0x51f] = GetTickCount();                 // :43-44  (field timer +0x147C)
+if (LocalActor[0x51e]==0) {                         // :45  cờ "đang teleport"
+  LocalActor[0x51e]=1;                              // :46
+  idx = RP[2]; guard len>=3;                        // :48-52  byte payload[3]
+  FUN_0072b390(LocalActor, 0x2e);                   // :53  action/motion code 0x2E
+  FUN_00731a9c(LocalActor, gvar_007DA6DC[idx]+0x54, gvar_007DA6DC[idx]+0x58);  // :64  dặt về spawn map-slot idx
+}
+```
+→ **Teleport về điểm spawn của `gvar_007DA6DC[idx]`, chỉ trên các map-class liệt kê**. `sel=2` → `FUN_0074927C` (giữ nguyên).
+
+**`0x36` — `007494d8_FUN_007494d8.c:66-301`** — bảng queue **5 record stride 18B** tại `LocalActor + 0x1481`(ptr str)/`+0x1485`(Word id)/`+0x1487`(DWORD giờ):
+| `RP[1]` | Hành vi |
+| :---: | :--- |
+| 1 | tìm slot trống → `+0x1485 = Word(RP,3,2)`, `+0x1487 = DWORD(RP,5,4)/60000` (`:67-109`) |
+| 2 | `id=DWORD(RP,3,4)`; slot nào có `+0x1485==id` → chat `FUN_007ab870(TTalkMsgForm,0,DAT_007499e4,tag)` + clear cả 5 field slot (`:111-176`) |
+| 3 | `slot=RP[2]` → clear `+0x1487` (`:178-199`) |
+| 4 | `x=Word(RP,3,2),y=Word(RP,5,2)`; kiếm slot trống, đặt vào slot cuối (`:201-224`) |
+| 5 | `slot=RP[2]; +0x1487[slot] = Word(RP,4,2)` (`:225-248`) |
+Ý nghĩa gameplay cụ thể (queue gì) **chưa kết luận được** — dữ liệu là bảng id→giờ (phút), có dòng chat xóa. `DAT_007499e4` chưa dump.
+
+**Gap còn lại của nhóm delegate (giữ nguyên):** `0x2A → func_0x005F16F4`, `0x32 → func_0x007485BC`, `0x33 → func_0x00748860`, `0x38-sel2 → func_0x0074E82C` — **vẫn chưa có file body trong `ts_decompile/`** (2026-09-14).
+
 ---
 
 ## 5. Chiều C→S liên quan
@@ -215,7 +267,7 @@ Server failure/map-lock→  S→C [14][14] / [15] toast theo a085
 4. **Cờ máy trạng thái phải tôn trọng handshake**: client set `a094=1` sau mọi request 0x14; gate của client từ chối request mới khi `a094!=0` hoặc `a096!=0` ⇒ **mock luôn phải phản hồi** (bằng `0x01..0x06` hoặc `0x09/0x0A/0x0D` để clear, hoặc `0x14` toast khi từ chối), nếu không người chơi kẹt "bận" vĩnh viễn.
 5. **Auto-return chỉ hoạt động khi server cấp vé**: gửi `[14][07]` ⇒ tick pump sẽ tự động gửi `[14][06]`.
 6. Gửi **0x08** để đóng màn hình transition (xóa `0x44F`, scene `+0x1D=0`, `a085=0`).
-7. Các helper **chưa trích xuất** (`0x005F16F4, 0x0074641C, 0x00748430, 0x007485BC, 0x00748860, 0x00749198, 0x007494D8, 0x0074E638, 0x0074E82C`) — khi cần đặc tả sub `0x2A, 0x2C, 0x31–0x33, 0x35, 0x36, 0x38` phải dump thêm hàm từ binary (Ghidra `Function` chưa export).
+7. **Cập nhật 2026-09-14:** helper `0x0074641C / 0x00748430 / 0x00749198 / 0x007494D8 / 0x0074E638` **đã có body** (§4.6) — dựng wire được cho sub `0x2C, 0x31, 0x35(sel1), 0x36, 0x38(sel1)`. **Vẫn phải dump từ binary:** `0x005F16F4` (0x2A), `0x007485BC` (0x32), `0x00748860` (0x33), `0x0074E82C` (0x38-sel2), và 2 lá bài effects `0x0071E288 / 0x0071F9EC` của 0x2C.
 8. Nội dung toast/chat (UNK_0x00797xxx) là chuỗi tĩnh phía client — mock chỉ chọn SubOp/sub-selector, không nhét text.
 
 ---
@@ -236,5 +288,6 @@ Server failure/map-lock→  S→C [14][14] / [15] toast theo a085
 | 10 | `005eec44/005eea58/005752a8/0070e834/0075ddb8` (.c) | chi tiết map-change (restore `+0xE3`, recenter, actor-kind==8, tên actor) |
 | 11 | `005efee8_FUN_005efee8.c` (dòng 200–215: `a070 = StrToInt(mapId)`, `a0DC` region), `007aaf68`, `00603f20`, `0051189c` (dòng 1419 `TWF_BigNpcBmp`) | định nghĩa global/offsets |
 | 12 | `ts_decompile/redump/` (`subtable_0x7853E5/0x78540F.hex`, `jumptable_*.hex`) | loại trừ: sub-table 0x7853E5 thuộc case 0x19, không phải 0x14 |
+| 13 | **Bodies delegate mới**: `0074641c_FUN_0074641c.c` (0x2C), `00748430_FUN_00748430.c` (0x31), `00749198_FUN_00749198.c` (0x35-sel1), `007494d8_FUN_007494d8.c` (0x36), `0074e638_FUN_0074e638.c` (0x38-sel1), `0070c20c.c` (id→index registry), `00623f00/005adf70/007485ac` (tra bảng `gvar_007D9DE4`) | §4.6 — đặc tả 4/8 helper từng "chưa trích xuất" |
 
 **Kết luận giả định:** "Movement/Map" → **ĐÚNG ở vế Map/Teleport** (chuyển map, teleport kịch bản, máy trạng thái transition, vị trí spawn từ map slot +0x54/0x58); **SAI ở vế Movement liên tục** (movement realtime nằm ở C→S OP 0x06/0x07). Tên chính xác nhất cho đặc tả: **"Map Transition & World Scene Script (S→C 0x14 ↔ C→S 0x14 request/handshake)"**.

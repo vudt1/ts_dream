@@ -1,7 +1,9 @@
 # PHÂN TÍCH — Main OP 0x22 (34) / Case 30 / `FUN_00792ACC` @ `0x00792ACC`
 
 Ngày: 2026-09-12 · Workspace: `/mnt/d/VUDT/GIT_PCC/test` · Feature: `op-code` · Chiều: **Server → Client (S→C) một chiều**
-Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (`ts_decompile/` only). `func_0x007a1218` (parser SubOp 2) chưa có body — ghi rõ giới hạn.
+Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (`ts_decompile/` only). `func_0x007a1218` (parser SubOp 2) **đã có body trong bản dump mới** (`index.csv:6534`, 793B) — phân tích ở §4.2.
+
+> Cập nhật 2026-09-14: bổ sung phân tích từ các body/hex dump mới (theo `missing_opcode_sources.md`).
 
 ---
 
@@ -9,7 +11,7 @@ Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (`ts_decompile/` on
 
 - **Vai trò**: Chỉ 2 nhánh (`if==1 / else if==2`, không switch/default).
 - SubOp `0x01`: banner số — decode **Word LE** `W = P[2..3]`, dựng `msg = hằng + IntToStr(W) + hằng` (`UNK_007973e0` + số + `UNK_007985c0`, thứ tự trái/phải mức suy luận có ràng buộc), hiện banner 2000ms qua `TSe_TalkMsgFormPlus` (`gvar_007DA084`). Không ghi field player, không sound/light.
-- SubOp `0x02`: passthrough **chuỗi biến dài** `P[2..end]` (có thể rỗng) cho form `Tjo_Charge` (`*gvar_007DA2B0`) qua `func_0x007a1218(obj, text)` — body chưa phục hồi nên đây là sub-op duy nhất có thể mang text mà chưa phân loại được encoding.
+- SubOp `0x02`: **không còn passthrough mù** — `func_0x007a1218(obj = *gvar_007DA2B0 Tjo_Charge, text)` đã có body: text mang cấu trúc `[M:1B][W:2B LE][dư...]`; M=1/2 → dựng phiếu ngày-giờ (`StrToDate` trên chuỗi ngày tại `P[5..]`) + dòng tiền `IntToStr(W)` vào memo `obj+0x140`; M=3 → phiếu hạn mức với hằng `350` (`0x15E`). Kết luận cũ "sub-op duy nhất có thể mang text chưa phân loại encoding" **được đính chính**: chuỗi trên dây là **ngày dạng text parse bởi `StrToDate`**, không phải blob VISCII tự do.
 - Chiều C→S `case 0x22: break;` rỗng → client không bao giờ gửi OP này.
 
 ---
@@ -50,7 +52,7 @@ Helper gọi trong Case 30: **chỉ `FUN_0077eb9c`** (SubOp 1). `0077ef7c/0077eb
 | SubOp | Wire (payload) | Đọc buffer | Core logic |
 | :---: | :--- | :--- | :--- |
 | `0x01` | `[22][01][W:2B LE]` (4B) | `_LStrCopy(RP,2,2)` + `FUN_0077eb9c` → `W & 0xFFFF` | Banner `hằng + IntToStr(W) + hằng` 2000ms |
-| `0x02` | `[22][02][text...]` (biến dài, tối thiểu 2B) | `_LStrLen(RP)`, `_LStrCopy(RP,2,len-1)` → `out = P[2..end]` | Passthrough cho `Tjo_Charge` |
+| `0x02` | `[22][02][M:1B][W:2B LE][text...]` (tối thiểu 5B với M=1..3) | `_LStrLen(RP)`, `_LStrCopy(RP,2,len-1)` → `out = P[2..end]`; callee đọc `M=out[1]`, `W=out[2..3]` | `Tjo_Charge`: phiếu theo mode 1/2 (ngày+tiền) hoặc 3 (hạn mức 350) |
 | `0x00`,`≥0x03` | — | — | no-op |
 
 ---
@@ -67,18 +69,28 @@ Helper gọi trong Case 30: **chỉ `FUN_0077eb9c`** (SubOp 1). `0077ef7c/0077eb
   3. Banner 2000ms qua `gvar_007DA084 = TSe_TalkMsgFormPlus` (gán tại `0051189c:1265-1266`). Đây là banner/marquee (`FUN_0063c84c → FUN_007bc1c8`), không phải log chat — nguồn hiểu nhầm "Talk" như đã chứng minh ở `opcode_1a.md` §0.
 - Không ghi player, không sound/light. Thuần hiển thị.
 
-### 4.2. SubOp `0x02` — Passthrough chuỗi cho `Tjo_Charge`
+### 4.2. SubOp `0x02` — `Tjo_Charge`: phiếu ngày-giờ / phiếu hạn mức (**đã phục hồi từ body mới**)
 
-- **Wire**: `[22][02][text...]` — mọi byte sau `P[2]` đều thuộc `out`; `[22][02]` (RP len=1) → chuỗi rỗng vẫn gọi hàm.
-- **Đọc**: `len=_LStrLen(RP)`, `cnt=len-1`, `_LStrCopy(RP,2,cnt,&out)`. Không codec.
-- **Xử lý**: `func_0x007a1218(*gvar_007DA2B0, out)` với `gvar_007DA2B0 = Tjo_Charge` (gán tại `0051189c:1463-1464` qua `VMT_79D22C`). Hàm này không có file `007a1218*`, `index.csv` không entry — mọi parse nằm trong method đó. Không banner/sound, không ghi player ở tầng handler.
+- **Wire**: `[22][02][M:1B][W:2B LE][text...]` — `out = P[2..end]` do tầng case cắt; trong `out`: `M=out[1]` (mode), `W=out[2..3]` (Word LE, decode bằng `FUN_0077eb9c` ctx `gvar_007D9D30`), phần còn lại = text.
+- **Đọc** (body `ts_decompile/functions/007a1218_FUN_007a1218.c`, 793B, `index.csv:6534`):
+  - `FUN_007ba180(*(obj+0x140),0)` — **xóa sạch memo** (điều khiển list tại `obj+0x140`) trước mỗi phiếu (`:69`).
+  - `_LStrCopy(out,2,2)` → `W = FUN_0077eb9c(*gvar_007D9D30, …)` (`:72-75`).
+  - `M = out[1]` (guard `len(out)!=0` → `BoundErr(0)`) (`:79-84`).
+- **Xử lý theo M**:
+  - **M=1** (`:85-120`): `dayStr = out[4..end]` (`:88-96`) → `StrToDate` (`:98`), cộng hằng double `_DAT_007a153c` (`:99` — giá trị TDateTime, chưa đọc được trực tiếp), `DateToStr` chuẩn hóa (`:101`); thêm 3 dòng vào memo qua `FUN_007b8060(*(obj+0x140), …)`: dòng tiêu đề `&DAT_007a1548` (`:103`), dòng ngày `_LStrCatN(5)` các mảnh `{…, DAT_007a1574, ngày đã StrToDate, DAT_007a159c, ngày DateToStr, DAT_007a15a8}` (`:104-111` — thứ tự chính xác bị Ghidra làm mờ qua register, chỉ chắc bộ 5 mảnh), dòng tiền `_LStrCatN(3)` `{DAT_007a15b4, IntToStr(W), DAT_007a15d8}` (`:112-120`).
+  - **M=2** (`:122-156`): y hệt M=1, chỉ khác tiêu đề `&DAT_007a15e8` (`:140`) → hai loại phiếu ngày (nghi "thu/chi" — chưa kết luận).
+  - **M=3** (`:158-192`): không dùng text ngày; dựng phiếu **hạn mức** với hằng `0x15E = 350`: dòng tiêu đề `DAT_007a1624` (`:160`), dòng `_LStrCatN(3)` `{DAT_007a1664, IntToStr(350), DAT_007a15d8}` (`:161-169`), dòng `{DAT_007a15b4, IntToStr(W), DAT_007a15d8}` (`:170-178`), dòng `{DAT_007a16a4, IntToStr(350-W), DAT_007a15d8}` (`:179-192`, `_IntOver` khi W>350 chỉ là guard Delphi).
+  - **M ∉ {1,2,3}**: chỉ xóa memo rồi thoát (`:69` + không nhánh nào khớp) — không crash.
+  - **Kết**: `FUN_007b0094(*(obj+0x138),0)` refresh điều khiển thứ hai `obj+0x138` (`:195`).
+- **Ý nghĩa**: `Tjo_Charge` hiển thị **biên lai nạp/cước phí**: mode 1/2 = phiếu "ngày + số tiền W" (hai nhãn khác nhau), mode 3 = phiếu "tổng hạn mức 350 / đã dùng W / còn lại 350−W". Nhãn từng dòng là hằng `.rodata` vùng `0x007A1548–0x007A16A4` — **chưa có dump** (xem §5).
 
 ---
 
 ## 5. Chuỗi VISCII → UTF-8
 
-- **SubOp 01**: `W` là số; 2 mảnh là hằng `UNK_007973e0` + `UNK_007985c0`. `redump/` không có `lit_7973E0/7985C0.hex` (grep chỉ thấy 2 địa chỉ này tại case_030 + case_018 dùng chung `0x7973e0`) → **chưa decode được**. Cần redump `.rodata` tại 2 địa chỉ rồi map cp1258/VISCII → UTF-8 NFC như OP 0x02.
-- **SubOp 02**: text trên dây (`P[2..end]`), encoding phụ thuộc body `0x007A1218` chưa có → không kết luận VISCII hay raw byte.
+- **SubOp 01**: `W` là số; 2 mảnh là hằng `UNK_007973e0` + `UNK_007985c0`. `redump/` (kể cả batch mới) không có `lit_7973E0/7985C0.hex` → **chưa decode được**. Cần redump `.rodata` tại 2 địa chỉ rồi map cp1258/VISCII → UTF-8 NFC như OP 0x02.
+- **SubOp 02 (đính chính)**: text trên dây (`P[5..end]` khi M=1/2) là **chuỗi ngày tháng đưa thẳng vào `StrToDate`** (`007a1218_FUN_007a1218.c:98,135`) → ASCII/format locale, không phải blob VISCII tự do. **Đính chính nhận định cũ**: encoding không còn "chưa phân loại được" với phần payload có ý nghĩa.
+- **Hằng mới lộ từ body `007a1218`** (vùng `.text` ngay sau hàm, **chưa có dump** — bổ sung vào danh sách redump): `0x007A153C` (double), `0x007A1548`, `0x007A1574`, `0x007A159C`, `0x007A15A8`, `0x007A15B4`, `0x007A15D8`, `0x007A15E8`, `0x007A1624`, `0x007A1664`, `0x007A16A4` — toàn bộ nhãn phiếu `Tjo_Charge`.
 - Không có codec XOR riêng ngoài XOR frame `0xAD` chung.
 
 ---
@@ -94,16 +106,17 @@ Helper gọi trong Case 30: **chỉ `FUN_0077eb9c`** (SubOp 1). `0077ef7c/0077eb
 
 ```
 S→C [22][01][W u16LE]   ; banner "nhãn + W + nhãn" 2000ms, đủ 4B payload
-S→C [22][02][bytes...]  ; passthrough Tjo_Charge, có thể rỗng ([22][02])
+S→C [22][02][M u8][W u16LE][ngày ascii]  ; phiếu Tjo_Charge; M=1/2 cần chuỗi ngày, M=3 không cần
 S→C [22][00]/[22][03+]  ; no-op, đừng gửi
 S→C [22] (L=1)          ; CẤM — _BoundErr(0) RangeError
 C→S [22]: KHÔNG TỒN TẠI
 ```
 
 1. Thừa byte SubOp 1 bị bỏ qua; thiếu 1 byte → RangeError.
-2. Test yên lặng → dùng SubOp 2 (không banner/sound/light); SubOp 1 luôn banner.
-3. Chưa đặt tên nghiệp vụ cho SubOp 2 (`Tjo_Charge` gợi ý nạp/thanh toán nhưng body chưa có — chỉ dừng ở "form Charge nhận chuỗi").
-4. Cần thêm: (a) `lit_7973E0` + `lit_7985C0`, (b) body `0x007A1218`.
+2. Test yên lặng → dùng SubOp 2 (không banner/sound/light; chỉ đổ memo form Charge nếu form đang mở); SubOp 1 luôn banner.
+3. **Đóng được một phần tên nghiệp vụ SubOp 2**: form Charge hiển thị **biên lai theo ngày (M=1/2) hoặc hạn mức 350 (M=3)** với số tiền `W` — từ body mới, không còn là "form nhận chuỗi" mù. Nhãn cụ thể chờ dump hằng `0x7A15xx`.
+4. Wire SubOp 2 tối thiểu 5B `[22][02][M][Wlo][Whi]`; M=1/2 cần thêm chuỗi ngày hợp lệ `StrToDate` — sai định dạng ngày → exception `ConvertError` của Delphi (có thể crash client test). **Đính chính ghi chú cũ** "`[22][02]` (out rỗng) vẫn gọi hàm an toàn": callee vẫn được gọi nhưng xóa memo xong rồi ném `_BoundErr(0)` khi đọc M (`007a1218_FUN_007a1218.c:69,79-84`) → frame `[22][02]` trần **không còn an toàn**; chỉ các `M∉{1,2,3}` kèm đủ 3 byte đầu là im lặng.
+5. Cần thêm: (a) `lit_7973E0` + `lit_7985C0`, (b) ~~body `0x007A1218`~~ **đã có**, thay bằng: dump dải hằng `0x007A153C–0x007A16A4`.
 
 ---
 
@@ -118,3 +131,13 @@ C→S [22]: KHÔNG TỒN TẠI
 | 5 | `functions/0051189c_FUN_0051189c.c:1265-1266` + `:1463-1464` | Định danh `TSe_TalkMsgFormPlus` + `Tjo_Charge` |
 | 6 | `case_018...c:265-278` | Đối chứng khuôn `0x7973e0 + IntToStr + hằng` |
 | 7 | `functions/0077f414_FUN_0077F414.c:964-965` | C→S rỗng |
+| 8 | `functions/007a1218_FUN_007a1218.c:69-195` + `index.csv:6534` | **Mới**: body SubOp 2 — xóa memo `+0x140` (`:69`), Word W (`:72-75`), mode (`:84`), phiếu ngày (`:85-156`), phiếu 350 (`:158-192`), refresh `+0x138` (`:195`) |
+
+---
+
+## 9. Giới hạn còn lại (cập nhật 2026-09-14)
+
+- [ ] Redump dải hằng `0x007A153C–0x007A16A4` (11 nhãn phiếu Tjo_Charge, nằm trong `.text` ngay sau hàm — batch dump mới chưa phủ).
+- [ ] `lit_7973E0` + `lit_7985C0` (banner SubOp 01) — vẫn thiếu.
+- [ ] Thứ tự chính xác 5 mảnh `_LStrCatN` dòng ngày (`007a1218:104-109`) — Ghidra lẫn register, chưa kết luận được thứ tự trái/phải các nhãn `0x7A1574/159C/15A8`.
+- [ ] Khác biệt nghiệp vụ M=1 vs M=2 (hai tiêu đề `0x7A1548` vs `0x7A15E8`) — chờ dump hằng.

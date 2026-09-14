@@ -3,6 +3,9 @@
 Ngày: 2026-09-12 · Workspace: `/mnt/d/VUDT/GIT_PCC/test` · Feature: `op-code` · Chiều: **Server → Client (S→C) một chiều**
 Trạng thái: **Đã xác minh 100% phần vỏ (framing / dispatch / SubOp) từ mã nguồn sơ cấp** (`ts_decompile/` only). Handler là một **no-op tuyệt đối** cho mọi SubOp: sau khi đọc `SubOp = RP[0]` nó **không hề dùng** giá trị này (không `switch`, không `if`, không truy cập toàn cục, không gọi callee). Hiệu ứng duy nhất trên wire là **`_BoundErr(0)` khi `RestPayload` rỗng** (payload `[38]`, L=1). **Không có unknown/needs-redump nào ở tầng handler.**
 
+> Cập nhật 2026-09-14: bổ sung phân tích từ các body/hex dump mới (theo `missing_opcode_sources.md`).
+> **Re-verify sau re-export**: `0078a89c_FUN_0078a89c.c` (7533 dòng) giữ nguyên `case 0x38:` MainOp tại dòng **6849** (thụt lề 2 space, `BoundErr(0)` + `break` — đúng như §2.6/§4.1) → **kết luận "no-op tuyệt đối" không đổi**. Hai callee `func_0x0074e638` / `func_0x00745898` (các `case 0x38:` **lồng nhau** của MainOp khác, §4.3) nay **đã có body** — phân tích ở §4.3; `func_0x0055374c` xuất hiện ở sibling 0x39 (§4.2) cũng đã có body (xem `opcode_39.md` §4.1).
+
 ---
 
 ## 1. Tóm tắt nghiệp vụ
@@ -145,7 +148,7 @@ Chứng minh không nhánh:
 ### 4.2. Đối chiếu sibling CÓ nhánh (chứng minh 0x38 đặc biệt)
 
 - **OP 0x37 / Case 48 (`case_048_007954A5_FUN_007954a5.c`)**: dòng 28 `if (... == 1)` → `(**(code**)(**(int**)gvar_007DA3B4 + 0x20))()` (method VMT+0x20 của **TSe_CafeIDForm**); dòng 31 `else if (... == 2)` → đọc `RP[1]`, dòng 38/41 rẽ nhánh `1`/`2` phát banner qua `gvar_007DA084` VMT+0x90 với `&UNK_007991d8` / `&UNK_007991ec` (2000 ms). → **có `if/else if` + đọc thêm byte.**
-- **OP 0x39 / Case 50 (`case_050_00795579_FUN_00795579.c`)**: dòng 32 `if (... == 1)` → `func_0x0055374c(gvar_007D9D88, RP[1], 0)` (dòng 39) rồi đọc `RP[1]==3` (dòng 46) → đọc `RP[2]` (dòng 53/56) đặt `*(gvar_007DA778+0x38)=100/1000`; dòng 61 `else if (... == 2)` → `FUN_00553410(gvar_007D9D88)`; dòng 64 `else if (... == 3)` → banner `&UNK_00799200`/`&UNK_00799224` qua `gvar_007DA084`. → **3 SubOp + đọc 2 byte phụ.**
+- **OP 0x39 / Case 50 (`case_050_00795579_FUN_00795579.c`)**: dòng 32 `if (... == 1)` → `func_0x0055374c(gvar_007D9D88, RP[1], 0)` (dòng 39) rồi đọc `RP[1]==3` (dòng 46) → đọc `RP[2]` (dòng 53/56) đặt `*(gvar_007DA778+0x38)=100/1000`; dòng 61 `else if (... == 2)` → `FUN_00553410(gvar_007D9D88)`; dòng 64 `else if (... == 3)` → banner `&UNK_00799200`/`&UNK_00799224` qua `gvar_007DA084`. → **3 SubOp + đọc 2 byte phụ.** *(mới 2026-09-14: `func_0x0055374c` đã có body `FUN_0055374c` — là `TSportManage.OpenForm(id, flag)` tạo form theo id rồi ghi `mgr+4 = id`; chi tiết `opcode_39.md` §4.1. Chỉ dùng ở đây làm **lân cận so sánh** — không phải callee của OP 0x38.)*
 - **OP 0x38 / Case 49**: **không có `if`/`else if` nào trên SubOp** — đúng là trường hợp rỗng giữa hai handler "đầy đủ".
 
 > Ghi chú bối cảnh (xác minh danh tính form, để giải thích sibling): `gvar_007DA3B4` = con trỏ **TSe_CafeIDForm** và `gvar_007DA084` = con trỏ **TSe_TalkMsgFormPlus**, theo `ts_decompile/functions/0051189c_FUN_0051189c.c:1186-1187` (`VMT_58A680_TSe_CafeIDForm` → `gvar_007DA3B4`) và dòng 1265-1266 (`VMT_63B39C_TSe_TalkMsgFormPlus` → `gvar_007DA084`).
@@ -163,6 +166,10 @@ Trong `0078a89c_FUN_0078a89c.c` có **5** lần xuất hiện `case 0x38:`; ch�
 | **6849** | **2 space** | **`case 0x38:` của `switch(local_9)` (MainOp, mở dòng 579)** — guard `BoundErr(0)` rồi `break` | **ĐÂY LÀ handler MainOp 0x38** |
 
 → Nhầm lẫn dễ xảy ra: các dòng 757/3603/4078/6104 là **SubOp 0x38 của các MainOp khác**, thụt lề sâu hơn (4 space); chỉ dòng 6849 (2 space, cùng cấp `case 0x2e`/`case 0x39`) mới là handler MainOp 0x38 thật.
+
+**Hai callee lồng nhau vừa có body (2026-09-14)** — chỉ là bối cảnh, KHÔNG phải hành vi của MainOp 0x38:
+- `func_0x00745898` (dòng 4078; body `functions/00745898_FUN_00745898.c`, 147 B; header ghi caller `sub_00790ad0` — đúng khối inline dispatcher tại 4078-4080): bỏ qua `self` (param_1 không dùng), đọc `RP[1]` (BoundErr nếu `len<2`) rồi **banner qua `gvar_007DA084`+0x90**: `1 → &DAT_00745934` 2000 ms; `2 → &DAT_00745974` 1200 ms; `3 → &DAT_00745998` 1200 ms (dòng 28-37). Ba literal là AnsiString nhúng trong code, **chưa redump** → chưa dịch được nội dung.
+- `func_0x0074e638` (dòng 3603; body `functions/0074e638_FUN_0074e638.c`, 207 B; caller `sub_0078fe80` khớp marker `UNK_0078fe60`): gate trên `self = *gvar_007DA7BC` — chỉ chạy khi `*(short*)(self+0x63A) ∈ {0x3076, 0x3082}` **và** byte `self+0x1511 == 0` (dòng 26-27); khi đó: ghi `GetTickCount()` vào `self+0x1514`, `300000` vào `self+0x1518` (timer 5 phút), set `+0x1511/+0x1512 = 1`; đọc `RP[2]` (bound `≤100`) → tra mảng world-object `*(gvar_007DA6DC + idx*4)`, lấy tọa độ `+0x54/+0x58` rồi `FUN_00731a9c(self, x, y)` (dòng 38-50) — **đưa avatar về tọa độ world object thứ idx** (khuôn teleport/walk-to đã biết từ các OP world-sync). Ngữ nghĩa 2 mã `0x3076/0x3082` của field `+0x63A` (loại cảnh?) — **chưa kết luận được**.
 
 ---
 
@@ -228,6 +235,9 @@ File `ts_decompile/functions/0077f414_FUN_0077F414.c` (hàm `TFConnect.SendComma
 | 8 | Sibling: `case_functions/functions/case_048_007954A5_FUN_007954a5.c:28,31,38,41` và `case_functions/functions/case_050_00795579_FUN_00795579.c:32,39,61,64,72,75` | Đối chiếu sibling CÓ nhánh (0x37 / 0x39) |
 | 9 | `functions/0051189c_FUN_0051189c.c:1186-1187` (TSe_CafeIDForm→`gvar_007DA3B4`), `:1265-1266` (TSe_TalkMsgFormPlus→`gvar_007DA084`) | Xác minh danh tính form trong bối cảnh sibling |
 | 10 | Grep `00795555` / `UNK_00795568` toàn SSOT | Không có caller/duplicate nào khác ngoài case 49, bundled case 49, manifest/CSV và nhãn exception inline 6852 |
+| 11 | `functions/00745898_FUN_00745898.c:23-37` (mới, 2026-09-14) | Body callee lồng SubOp-0x38 #1: dispatch banner theo `RP[1]` (`0x745934/974/998` — literal chưa dump) |
+| 12 | `functions/0074e638_FUN_0074e638.c:26-50` (mới, 2026-09-14) | Body callee lồng SubOp-0x38 #2: gate `self+0x63A ∈ {0x3076,0x3082}` + timer `+0x1514/0x1518` + đưa avatar về tọa độ world object `gvar_007DA6DC[RP[2]]` |
+| 13 | `functions/0055374c_FUN_0055374c.c` (mới, 2026-09-14) | Body callee của SIBLING 0x39 (lân cận so sánh §4.2) — không liên quan handler 0x38 |
 
 ### Điểm chưa xác minh được từ SSOT (không suy đoán)
 
@@ -235,3 +245,5 @@ File `ts_decompile/functions/0077f414_FUN_0077F414.c` (hàm `TFConnect.SendComma
 2. **Ý nghĩa phần đuôi `RP[1..]` (nếu có trên wire thực tế)** — handler bỏ qua hoàn toàn, không có cách suy layout từ SSOT.
 3. **Liệu server có thực sự phát 0x38 trong phiên live hay không, và ở thời điểm nào** — cần sample/redump traffic thật để xác nhận.
 4. **Quan hệ giữa 0x38 và 0x37/0x39** (ví dụ 3 OP có từng là một nhóm chức năng bị rút gọn) — chỉ là **suy luận từ thứ tự kề nhau trong bảng**, không có bằng chứng code.
+
+*(Ghi chú re-check 2026-09-14: các body mới của `00745898/0074e638/0055374c` chỉ làm sáng tỏ **SubOp lồng** và **sibling 0x39**; mục đích của MainOp 0x38 vẫn không suy ra được từ SSOT — kết luận §1 giữ nguyên.)*

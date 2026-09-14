@@ -3,6 +3,8 @@
 Ngày: 2026-09-12 · Workspace: `/mnt/d/VUDT/GIT_PCC/test` · Feature: `op-code` · Chiều: **Server → Client (S→C)**
 Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** — file case riêng `case_005_0078C7DB_FUN_0078c7db.c` **khớp 100%** với khối `case 4:` inline trong dispatcher `0078a89c_FUN_0078a89c.c` (dòng 1643–1733), và cả hai jump-table (byte `0x78A8EE`, dword `0x78A9B6`) + `manifest.csv` đều xác nhận định tuyến.
 
+> Cập nhật 2026-09-14: bổ sung phân tích từ các body/hex dump mới (theo `missing_opcode_sources.md`).
+
 ---
 
 ## 0. Đính chính giả định nghiệp vụ (quan trọng — đọc trước)
@@ -30,7 +32,7 @@ Luồng xử lý (2 tầng):
 | **A. Parse & cache hồ sơ** | `FUN_0072174c(gvar_007D9C48, RestPayload)` | Đọc toàn bộ payload, cấp slot trong **cache 2100 `TWorldPlayer`** (`gvar_007DA6BC`), ghi charID/MapID/cờ/2 mã ngoại hình/N cặp item trang bị/tên. Chạy **vô điều kiện**. |
 | **B. Spawn actor thật** | thân `case_005` | **Cổng lọc map**: chỉ đi tiếp nếu `p[10..11] == gself+0x63a`. Sau đó cấp slot actor 1..800 (`func_0x0070c158`), tạo `TPlayers` nếu trống, tăng bộ đếm actor, **nạp cache→actor** (`FUN_00722950`), đặt tọa độ, bật/tắt companion, neo render, ép cờ theo loại thực thể. |
 
-**Khác biệt so với OP 0x03 (nhánh OTHER):** OP 0x04 **KHÔNG** gọi refresh Party/Quân đoàn/Hảo hữu (`FUN_00760a88/00764844/00758318`), **KHÔNG** gọi blend/anim + camera (`FUN_0070d86c`, `FUN_00778510`, `func_0x00509e84`). → OP 0x04 là phiên bản **"gọn"** của enter-scene, thuần đồng bộ dữ liệu actor từ xa.
+**Khác biệt so với OP 0x03 (nhánh OTHER):** OP 0x04 **KHÔNG** gọi refresh Party/Quân đoàn/Hảo hữu (`FUN_00760a88/00764844/00758318`), **KHÔNG** gọi blend/anim + camera (`FUN_0070d86c`, `FUN_00778510`, `func_0x00509e84`). → OP 0x04 là phiên bản **"gọn"** của enter-scene, thuần đồng bộ dữ liệu actor từ xa. *(Bổ sung từ body mới: phần bị bỏ qua `func_0x00509e84` là routine tái khởi tạo theo map — load tài nguyên `data\<MapID>`, clear 50 gate `scene+0x540c[1..50]`, tạo lại `TBKSimServer`, phát C→S `SendCommand(0x25, CL=1)`, reset ~9 panel UI — xem `opcode_03.md` §4.1 bước 10. Việc OP 0x04 không đụng tới nó là hợp lý: gói này chỉ là spawn增量 cho actor khác, không phải sự kiện vào-map của chính client.)*
 
 **Không có nhánh nào đọc từ client:** OP 0x04 là **100% server-push** (mục 5 chứng minh `case 4` không tồn tại ở phía gửi).
 
@@ -58,7 +60,7 @@ _LStrCopy(ECX, 10, 2, &t);                                // t = p[10..11]
 sVar2 = FUN_0077eb9c(t);                                  // Word LE = MapID của hồ sơ
 if (sVar2 == *(short*)(*(int*)gvar_007DA7BC + 0x63a)) {   // CỔNG LỌC MAP: == map hiện tại?
     _LStrCopy(ECX, 1, 4, &t2); charID = FUN_0077ef7c(t2); // charID = p[1..4]
-    idx = func_0x0070c158(gvar_007D9D34, charID);         // cấp slot actor 1..800
+    idx = func_0x0070c158(gvar_007D9D34, charID);         // actor đã có? trả idx cũ : slot trống đầu : 0
     if (idx != 0) {                                       // (B) SPAWN
         if (gvar_007DA300[idx] == 0)
             gvar_007DA300[idx] = TPlayers_Create(VMT_70B5D0, 1, idx);
@@ -139,9 +141,9 @@ Không có SubOp thứ hai, không có `default`. Toàn bộ payload hiểu theo
 
 ### 4.3. Tầng B — spawn actor trong `case_005` — logic cốt lõi
 1. **Cổng lọc map:** `FUN_0077eb9c(Copy(10,2)) == gself+0x63a`. **Sai → không spawn** (actor chỉ nằm trong cache, chờ khi client đổi sang map đó).
-2. `idx = func_0x0070c158(gvar_007D9D34, charID)` — **find-or-allocate slot actor 1..800** (mảng `gvar_007DA300`). `idx==0` → bỏ qua.
+2. `idx = func_0x0070c158(gvar_007D9D34, charID)` — **find-or-allocate slot actor 1..800 — xác minh được từ body mới** (`0070c158_FUN_0070c158.c`): hàm bỏ qua param_1 (EAX-artifact, đọc thẳng global `gvar_007DA300`); **bước 1** quét `i=1..800` tìm actor đã có `actor+4 == charID` → trả chính idx đó (gửi lại OP 0x04 cho actor đang sống = **cập nhật tại chỗ**, không tốn slot); **bước 2** nếu không có ai khớp thì trả slot trống đầu tiên (`gvar_007DA300[i] == 0`); mảng 800 slot đầy → trả 0 (d.31–63). `idx==0` → bỏ qua.
 3. `if (gvar_007DA300[idx]==0) TPlayers_Create(VMT_70B5D0_TPlayers, 1, idx)` — tạo object actor (bên trong `TPlayers.Create` dựng sẵn 5 `TFollowNpc` tại `actor+0x15f[1..5]`, set `actor+0x79=2` = kind "TPlayers").
-4. `*(gvar_007D9D34 + 0x5c) += 1` — **tăng bộ đếm actor** (giảm ở OP 0x01 despawn).
+4. `*(gvar_007D9D34 + 0x5c) += 1` — **tăng bộ đếm actor, tăng vô điều kiện khi `idx != 0`** (guard `slot == 0` chỉ che việc `TPlayers_Create`; nếu `0070c158` trả idx của actor đã tồn tại — actor respawn — bộ đếm vẫn +1 thêm lần nữa; giảm ở OP 0x01 despawn).
 5. `FUN_00722950(gvar_007D9C48, charID, actor)` — **nạp cache→actor** (bảng cột cuối mục 4.1): charID, cờ, Class `+0x3e9`, ngoại hình `+0x9b`, 7 ô trang bị `+0x2c`, tên `+9`, cờ companion `+0x4b0/+0x4b1`, `actor+0x78=1` ("đã có hồ sơ").
 6. `FUN_0072a054(gvar_007D9D34)` — quét ngược mảng 800 tìm chỉ số actor đỉnh, ghi `gvar_007D9D34+0x60` (bound cho vòng render & cho `FUN_0070c20c`). *(presentation, 1 dòng)*.
 7. `FUN_0071e2b8(actor, posX, posY)` — **đặt tọa độ thế giới**: `actor+0x1c=posX`, `actor+0x20=posY`, `actor+0x4c/0x50` = bản sao, `actor+0x54/0x58` = `pos - camera`, `actor+0xe3=0xc`, `actor+0xe5=1`.
@@ -171,7 +173,7 @@ case 5:  break;                                              // RỖNG
 2. **charID:** `p[1..4]` = DWORD LE. Đây cũng là khóa tra cache/actor.
 3. **BẮT BUỘC `p[10..11]` = MapID hiện tại của người nhận** (Word LE, cùng hệ giá trị với `gself+0x63a`). Nếu khác → client **chỉ cache, không spawn** (gói "im lặng" mất tác dụng).
 4. **Tọa độ:** `p[12..13]=posX`, `p[14..15]=posY` (Word LE). Hai trường này **chỉ dùng lúc spawn**, không vào cache.
-5. **Slot actor:** `func_0x0070c158` trả 0 khi hết 800 slot → gói bị bỏ. Đảm bảo chưa vượt ngưỡng.
+5. **Slot actor:** `func_0x0070c158` trả 0 khi hết 800 slot → gói bị bỏ. Đảm bảo chưa vượt ngưỡng. Lưu ý (body mới): gửi OP 0x04 **lặp cho cùng một charID đã spawn** là hợp lệ — client tái sử dụng đúng actor cũ (cập nhật tại chỗ), không tạo bản thứ hai.
 6. **Ngoại hình:** `p[19..22]`/`p[23..26]` = 2 DWORD mã nén; gửi `0` nếu không cần tạo hình.
 7. **Trang bị:** `p[27]=N`; mỗi item code ở `p[28+2i]` **phải có trong CSDL item client** (`gvar_007DA540`) để `FUN_00774af8` trả ô 0..6 hợp lệ. **`N` và độ dài payload phải khớp chính xác** (sai → `_BoundErr` crash).
 8. **Độ dài:** `≥ 36 + 2·N + len(tên)` byte. Tên cắt còn 17 byte; ở **scene login** (`%100∈[90..99]`) client sẽ **thay tên bằng `IntToStr(p[2N+33])`** — khi mock ở map thường thì không liên quan.
@@ -195,7 +197,8 @@ case 5:  break;                                              // RỖNG
 | 8 | `ts_decompile/functions/0072174c_FUN_0072174c.c` | 177–829 | Tầng A: parse & cache `TWorldPlayer` (`FUN_00722464`, `FUN_00745bc0`, `FUN_00774af8/6ac`, tên + prefix login `FUN_00504c9c`) |
 | 9 | `ts_decompile/functions/00722950_FUN_00722950.c` | 40–196 | **Nạp cache→actor** (bảng cột cuối mục 4.1) |
 | 10 | `ts_decompile/functions/00722464_FUN_00722464.c` | 20–56 | find-or-allocate cache 2100 slot `gvar_007DA6BC` |
-| 11 | `ts_decompile/functions/0070c20c_FUN_0070c20c.c` | 121–150 | find actor theo charID trong mảng 800 `gvar_007DA300` (bound `+0x60`) — đối chứng `func_0x0070c158` |
+| 11 | `ts_decompile/functions/0070c158_FUN_0070c158.c` | 31–63 | find-or-allocate slot actor 1..800 (body mới — xác minh phỏng đoán cũ: ưu tiên actor đã có theo charID, rồi slot trống đầu, đầy → 0) |
+| 11b | `ts_decompile/functions/0070c20c_FUN_0070c20c.c` | 121–150 | chỉ định vị (find-by-charID, bound `+0x60`) — đối chứng |
 | 12 | `ts_decompile/functions/007169b4_TPlayers.Create.c` | 30–56 | Tạo actor `TPlayers` (kind `+0x79=2`, 5 `TFollowNpc` `+0x15f`) |
 | 13 | `ts_decompile/functions/0072a054_FUN_0072a054.c` | 18–38 | Recompute top-index actor `gvar_007D9D34+0x60` |
 | 14 | `ts_decompile/functions/0071e2b8_FUN_0071e2b8.c` | 18–47 | Đặt tọa độ `actor+0x1c/0x20/0x4c/0x50/0x54/0x58` |
@@ -212,8 +215,8 @@ case 5:  break;                                              // RỖNG
 | 25 | `ts_decompile/functions/0051189c_FUN_0051189c.c` | 234+ (FormCreate) | Định danh global/VMT (form, cache, DB) |
 
 ### Độ tin cậy kết luận
-- **Cao:** không có SubOp/switch; wire layout (mục 4.1); cổng lọc map `p[10..11]==gself+0x63a`; charID/posX/posY; `FUN_0072174c`+`FUN_00722950` là cặp parse-cache→nạp-actor; OP 0x04 không có chiều C→S; không có chuỗi thông báo (chỉ tên).
-- **Trung bình:** nhãn ngữ nghĩa từng cờ byte (`+0x08/0x448/0x455/0x7a/0x7b/0x462/0x464/0x465`) — xác định offset & hướng ghi nhưng chưa có label chuỗi trực tiếp; nội hàm `func_0x0070c158` (suy từ call-site + đối chứng `FUN_0070c20c`, không có file decompile riêng).
+- **Cao:** không có SubOp/switch; wire layout (mục 4.1); cổng lọc map `p[10..11]==gself+0x63a`; charID/posX/posY; `FUN_0072174c`+`FUN_00722950` là cặp parse-cache→nạp-actor; OP 0x04 không có chiều C→S; không có chuỗi thông báo (chỉ tên); **nội hàm `func_0x0070c158` — xác minh được từ body mới (`0070c158_FUN_0070c158.c:31-63`): find theo charID trước, rồi slot trống đầu tiên, đầy → 0** (không phải "chỉ cấp slot"; không tạo object bên trong).
+- **Trung bình:** nhãn ngữ nghĩa từng cờ byte (`+0x08/0x448/0x455/0x7a/0x7b/0x462/0x464/0x465`) — xác định offset & hướng ghi nhưng chưa có label chuỗi trực tiếp.
 - **Thấp / nghi vấn:** `gself+0x63a` = MapID (OP 0x03) vs TemplateID (OP 0x08) — cùng offset, hai cách gọi; trong OP 0x04 ngữ cảnh so khớp MapID nghiêng về **MapID**.
 
 > **ADR-0001:** mọi giá trị actor/đếm/tọa độ client ghi ở đây là **client prediction/presentation** — server vẫn là nguồn đúng; OP 0x04 chỉ là lệnh "dựng/đồng bộ actor từ xa" do server chủ động phát.

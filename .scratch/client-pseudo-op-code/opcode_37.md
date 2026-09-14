@@ -2,7 +2,9 @@
 
 Ngày: 2026-09-12 · Workspace: `/mnt/d/VUDT/GIT_PCC/test` · Feature: `op-code` · Chiều: **Server → Client (S→C)** là chiều chính, **nhưng C→S CÓ THẬT** (`case 0x37` trong `FUN_0077f414`, xem §6).
 Trạng thái: **Đã xác minh phần vỏ (framing / dispatch / SubOp / nhánh xử lý) từ SSOT** (`ts_decompile/` only).
-**HAI method ảo được gọi KHÔNG có body trong SSOT** (`gvar_007DA3B4`+0x20 và `gvar_007DA084`+0x90) → `unknown / cần redump`. **HAI chuỗi banner `UNK_007991d8` / `UNK_007991ec` KHÔNG có dump** → chưa decode được (§5).
+**Method ảo `gvar_007DA3B4`+0x20 KHÔNG có body trong SSOT** (giữ nguyên); method `gvar_007DA084`+0x90 **đã giải mã được slot thành `FUN_007BADB0` (có body — đính chính 2026-09-14, xem `opcode_39.md` §4.3)**. **HAI chuỗi banner `UNK_007991d8` / `UNK_007991ec` KHÔNG có dump** → chưa decode được (§5).
+
+> Cập nhật 2026-09-14: bổ sung phân tích từ các body/hex dump mới (theo `missing_opcode_sources.md`). Hai thay đổi chính: (1) `@PStrNCat @ 0x00402B60` **đã có body** — HOLE `0x00402B1C–0x00402B90` resolved (§6.3); (2) callee OP 0x39 `func_0x0055374c` **đã có body** (`FUN_0055374c`, §4.6).
 
 > Phạm vi: framing, dispatch, SubOp, layout `RestPayload`, lõi logic, wire format. Bỏ qua graphics / sound / animation / chi tiết render form.
 
@@ -216,7 +218,7 @@ else if (*(char *)(iVar2 + iVar1) == '\x02') {                 // case_048 dòng
   - `case_functions/functions/case_050_00795579_FUN_00795579.c:72,75` — `UNK_00799200` / `UNK_00799224`, duration `0x4b0` (1200) — **anh em của OP 0x37, xem §4.6**.
   - `case_functions/functions/case_054_007957DC_FUN_007957dc.c:50-82` — duration `0x898` (2200) / `0x4b0` (1200).
   - `functions/0077f414_FUN_0077F414.c:110,115` — `DAT_0051f7e4, 3000` / `DAT_0051f800, 2000` trong luồng validate CafeID.
-- **Suy luận vai trò**: "hiển thị một dòng thông báo văn bản với thời lượng `duration` (ms)"; 2 tham số cuối (`0,0`) chỉ là hằng 0 (khả năng cao là tọa độ/định vị mặc định). **Đây là SUY LUẬN**; **thân method `TSe_TalkMsgFormPlus`+0x90 KHÔNG có trong SSOT** (chỉ có `FUN_0063bb3c` = constructor; không có file method nào khác của class này).
+- **Suy luận vai trò**: "hiển thị một dòng thông báo văn bản với thời lượng `duration` (ms)"; 2 tham số cuối (`0,0`) chỉ là hằng 0 (khả năng cao là tọa độ/định vị mặc định). **Đây là SUY LUẬN**; **thân method `TSe_TalkMsgFormPlus`+0x90** *(bổ sung đối chiếu 2026-09-14 — nhất quán với `opcode_39.md` §4.3: chính xác thì slot `VMT_63B39C+0x90 = *[0x63B42C]` trỏ tới **`FUN_007BADB0`** — hàm **có body** trong SSOT (`functions/007badb0_FUN_007badb0.c:26` ghi `0063b42c -> 007badb0 [DATA]`), không phải method riêng của class TalkMsg; phần enqueue thực tail `0x7AFC1F+` của `FUN_007AFBF8` **vẫn cắt cụt**, xem `opcode_39.md` §4.3)*.
 - **Giới hạn**: vì text pointer là **con trỏ dữ liệu thô**, không đọc được nội dung nếu literal không có dump (§5).
 
 ### 4.6. So sánh với các OP anh em
@@ -230,6 +232,7 @@ else if (*(char *)(iVar2 + iVar1) == '\x02') {                 // case_048 dòng
 Chi tiết đối chiếu:
 - **OP 0x36** (`case_047_00795494_FUN_00795494.c:23-42`): vòng lặp `while _LStrLen(RP)>=1` lấy `a=RP[0]`, `b=RP[1]`, gọi `FUN_00708900(gvar_007D9CC4,a,b)` rồi `_LStrDelete(RP,1,2)` — **không phải baner, chỉ set mức tín hiệu server**.
 - **OP 0x39** (`case_050_00795579_FUN_00795579.c:32-77`): SubOp `1` đọc `RP[1]` → `func_0x0055374c(*(gvar_007D9D88), RP[1], 0)`; nếu `RP[1]==3` đọc tiếp `RP[2]` để set `*(gvar_007DA778+0x38)=100/1000`. SubOp `2` → `FUN_00553410(gvar_007D9D88)`. SubOp `3` + `RP[1]` = banner 1200 ms. → OP 0x39 và 0x37 **chia sẻ đúng khuôn `gvar_007DA084+0x90` + literal `.data` + ngay sau `case_047/048/050` trong jump table** (byte table hàng 4: `0x36→2F`, `0x37→30`, `0x38→31`, `0x39→32`).
+- **(mới 2026-09-14) `FUN_0055374c` đã có body** (`functions/0055374c_FUN_0055374c.c`, 201 B — HOLE `0x0055355D–0x00553818` đã decompile): đúng là **`TSportManage.OpenForm(id = param_2&0xFF, flag = param_3/ECX)`** — switch tạo form theo id: `1→TRE_BiDaXiao→gvar_007DA42C`, `2→TSBDManager→gvar_007DA0F4`, `3→TRE_ZMChessMain→gvar_007DA778`, `4→TLottoManager→gvar_007D9F98`, `6→TMachineManager→gvar_007DA4EC`, `0xFF→TSportDemo→gvar_007DA0A0`; cuối cùng ghi `*(byte*)(mgr+4)=id` (dòng 58); id khác 6 giá trị trên → return, không ghi `mgr+4` (`.c:23-59`). Phân tích đầy đủ ở `opcode_39.md` §4.1 (bản cập nhật 2026-09-14).
 
 ---
 
@@ -328,9 +331,9 @@ ASM thật cùng case: `functions/0077f414_FUN_0077F414.asm.txt:3561-3589`:
   ... copy uVar2*4 + uVar1 byte = đúng (*param_2 + 1) byte ...
   ```
   → Copy **`length_byte + length_byte` byte** (tức `*src + 1` byte) từ `src` sang `dest`. Ở đây `A = [01][37]` → `B = [01][37]`.
-- **`_PStrNCat(dest, src, 2)` — `@PStrNCat` @ `0x00402B60`** (`case_functions/...` header `functions/0051f5f4_FUN_0051f5f4.c:19` ghi rõ `@PStrNCat @ 00402b60`):
-  - **Không có body trong SSOT** (glob `00402b60*` → 0 file; không có trong `index.csv`) — đây là hàm RTL Borland.
-  - Ngữ nghĩa (theo RTL + đối chiếu chuỗi ghép): **nối (append) `src` vào `dest`, giới hạn độ dài đích = 2** → `B` từ `[01][37]` thành **`[02][37][CL]`** (thêm đúng 1 ký tự `CL`).
+- **`_PStrNCat(dest, src, 2)` — `@PStrNCat` @ `0x00402B60`** (header `functions/0051f5f4_FUN_0051f5f4.c:19` ghi rõ `@PStrNCat @ 00402b60`):
+  - ~~Không có body trong SSOT~~ **(đính chính 2026-09-14)**: **body ĐÃ có** — `functions/00402b60__PStrNCat.c` (47 byte, entry `index.csv` tên `"@PStrNCat"`, signature `@PStrNCat(byte *param_1 /*dest*/, byte *param_2 /*src*/, byte param_3 /*maxLen*/)`); HOLE `0x00402B1C–0x00402B90` resolved.
+  - **Ngữ nghĩa — xác minh được từ body mới** (`00402b60__PStrNCat.c:584-606`): `new = dest[0] + src[0]`; nếu không tràn byte và `new ≤ maxLen` → append **toàn bộ** `src` vào sau `dest`, cập nhật `dest[0]=new`; ngược lại nếu `dest[0] ≤ maxLen` thì append **cắt gọn** đúng `maxLen − dest[0]` byte (`dest[0]=maxLen`); các trường hợp còn lại **không đổi gì**. → Với `maxLen=2`: `B` từ `[01][37]` thành **`[02][37][CL]`** (thêm đúng 1 ký tự `CL`) — khớp kết luận bản cũ.
   - **Đây là "ghép header 2 byte `[DL][CL]` = `[OpCode][tham số]`"** — đúng khuôn đã hiệu chuẩn ở `opcode_03.md`/`opcode_06.md` (case 6: `_PStrNCat(buf,...,2)` ghép `[DL][CL]`).
 - **`_LStrFromString(dest, src)` — `@LStrFromString` @ `0x0040402C`** (RTL, không body): chuyển **Pascal shortstring** (byte [0] = độ dài) sang **Delphi AnsiString** → **bỏ byte độ dài**, nội dung `dest` = `37 CL` (2 byte).
 - **`_LStrCat(dest, src2)` — `@LStrCat` @ `0x00404090`** (RTL, không body): nối AnsiString → payload cuối = **`0x37, CL, <toàn bộ text của editor>`**.
@@ -353,7 +356,7 @@ Payload C→S = [0x37][CL][bytes của editor.text]        (không XOR ở tần
 ```
 
 - `CL` là **tham số thứ 3** của `TFConnect.SendCommand` — được lưu vào `[EBP-0x6]` ở prologue (`0077f414.asm.txt:11` `MOV byte ptr [EBP + -0x6],CL`), trong khi `[EBP-0x5] = DL = MainOp`. Signature decompile (`FUN_0077f414(undefined4 param_1, uint param_2)`) **chỉ hiện 2 tham số**; `CL` là **byte tham số ẩn (thanh ghi ECX)**.
-- **Giá trị `CL` cho case 0x37: CHƯA XÁC ĐỊNH** — không tìm thấy call-site nào nạp `MOV DL,0x37` trước `CALL 0x0077f414` trong toàn bộ asm đã export (grep `MOV DL,0x37` → **0 file**). Đối chiếu: opcode submit **0x23** có call-site đã export rõ ràng — `functions/0051f5c4_FUN_0051f5c4.c:27-30` / `.asm.txt:14-16`:
+- **Giá trị `CL` cho case 0x37: CHƯA XÁC ĐỊNH** — không tìm thấy call-site nào nạp `MOV DL,0x37` trước `CALL 0x0077f414` trong toàn bộ asm đã export (grep `MOV DL,0x37` → **0 file**; **kiểm tra lại 2026-09-14 sau đợt redump +245 hàm: vẫn 0 hit** — vùng chứa call-site vẫn nằm ngoài các HOLE đã bổ sung). Đối chiếu: opcode submit **0x23** có call-site đã export rõ ràng — `functions/0051f5c4_FUN_0051f5c4.c:27-30` / `.asm.txt:14-16`:
   ```asm
   MOV CL,0x5
   MOV DL,0x23
@@ -434,7 +437,7 @@ Payload nhận được (sau khi bỏ Token/Length và giải XOR):
 | 6 | `functions/0051189c_FUN_0051189c.c:1186-1189` | `gvar_007DA3B4` = `TSe_CafeIDForm` (create + register) |
 | 7 | `functions/0051189c_FUN_0051189c.c:1265-1277` | `gvar_007DA084` = `TSe_TalkMsgFormPlus` (create + `+8`/"panel10" + register) |
 | 8 | Grep `gvar_007DA3B4 + 0x20` (6 call-site, 0 body); grep `58A680` (2 chỗ, không phải VMT dump) | Xác nhận method `+0x20` không có body/không có VMT dump |
-| 9 | Grep `gvar_007DA084 + 0x90` (>130 call-site trong `case_functions/functions/`, >80 trong `functions/`); `functions/0063bb3c_FUN_0063bb3c.c` (chỉ constructor) | Xác nhận `+0x90` = method banner dùng chung, **không có body** |
+| 9 | Grep `gvar_007DA084 + 0x90` (>130 call-site trong `case_functions/functions/`, >80 trong `functions/`); `functions/0063bb3c_FUN_0063bb3c.c` (chỉ constructor) | Xác nhận `+0x90` = method banner dùng chung; **đối chiếu 2026-09-14**: slot giải mã được thành `FUN_007BADB0` (body có — `007badb0.c:26`, `0063b42c -> 007badb0 [DATA]`), xem `opcode_39.md` §4.3 |
 | 10 | `case_functions/functions/case_029_...c:39-60`, `case_031_...c:63-162`, `case_050_...c:72,75`, `case_054_...c:50-82` | Đối chiếu họ banner `+0x90` |
 | 11 | `case_functions/functions/case_047_00795494_FUN_00795494.c:23-42`; `case_050_00795579_FUN_00795579.c:32-77` | So sánh OP 0x36 / 0x39 |
 | 12 | Grep `007991d8\|007991ec\|00799200\|00799224` (8 match, toàn call-site); `ls redump/lit_*.hex` (16 file, không có `7991xx`) | Xác nhận literal **chưa có dump** |
@@ -444,12 +447,14 @@ Payload nhận được (sau khi bỏ Token/Length và giải XOR):
 | 16 | `functions/0051f5f4_FUN_0051f5f4.c:69-126`; `005492dc_FUN_005492dc.c:28-35`; `007b3f78_FUN_007b3f78.c:146-152` | `editor+0x1a0` = text |
 | 17 | `functions/0051f5c4_FUN_0051f5c4.c:27-31` + `.asm.txt:12-19` (`MOV CL,0x5; MOV DL,0x23`) | Call-site mẫu + xác nhận convention `DL=OpCode, CL=tham số`; `+0x24` = Show |
 | 18 | `functions/0051633c_TForm1.CY_AddSedQueue.c:141-181` | Đóng gói khung `[Token][L 2B LE][payload]` bằng `FUN_0077eb1c` |
-| 19 | Grep `MOV DL,0x37` trong `*.asm.txt` → 0 file | Xác nhận call-site C→S `0x37` **không có trong asm export** (nghi vấn vùng HOLE) |
+| 19 | Grep `MOV DL,0x37` trong `*.asm.txt` → 0 file (re-check 2026-09-14 sau redump: vẫn 0) | Xác nhận call-site C→S `0x37` **không có trong asm export** (nghi vấn vùng HOLE) |
+| 20 | `functions/00402b60__PStrNCat.c:584-606` (mới, 2026-09-14) | Body thật của `@PStrNCat` — xác minh semantics append/cắt theo maxLen (§6.3) |
+| 21 | `functions/0055374c_FUN_0055374c.c` (mới, 2026-09-14) | Body callee OP 0x39 `OpenForm(id,flag)` — phục vụ đối chiếu §4.6 (chi tiết: `opcode_39.md`) |
 
 ### Điểm chưa xác minh được từ SSOT (không suy đoán)
 
 1. **Thân method `gvar_007DA3B4` + `0x20`** (`TSe_CafeIDForm`): không có body, không có dump VMT `0x0058A680` → **unknown**. Nhãn `Hide` chỉ là **suy luận** từ cặp slot `+0x20`/`+0x24` và quy ước VCL.
-2. **Thân method `gvar_007DA084` + `0x90`** (`TSe_TalkMsgFormPlus`): không có body (chỉ có constructor `FUN_0063bb3c`) → **unknown**. Vai trò "show banner text + duration" là **suy luận mạnh** từ 200+ call-site nhưng chưa xác minh thân.
+2. ~~**Thân method `gvar_007DA084` + `0x90`** (`TSe_TalkMsgFormPlus`): không có body~~ → **(đính chính 2026-09-14, theo đối chiếu `opcode_39.md` §4.3)** slot `+0x90` giải mã được là `FUN_007BADB0` — **body có trong SSOT** (`007badb0.c:26`); vai trò "show banner text + duration" khớp wrapper chain `FUN_007AFBF8`/`FUN_007AFEF8`. Phần **enqueue/format đuôi `0x7AFC1F+` vẫn cắt cụt** → chi tiết thuật toán cuối: chưa kết luận được.
 3. **Nội dung `UNK_007991d8` / `UNK_007991ec`** (banner OP 0x37) và `UNK_00799200` / `UNK_00799224` (OP 0x39): **không có dump trong SSOT → chưa decode được; cần redump tới null-terminator**. Chưa xác định `PChar` hay Delphi `AnsiString`.
 4. **Giá trị byte `CL` của C→S `case 0x37`** và **call-site gọi `SendCommand(0x37)`**: không có trong asm export → **unknown** (nghi vấn nằm trong vùng HOLE).
 5. **Ý nghĩa nghiệp vụ chính xác của OP 0x37** (luồng "submit Cafe ID" / "ẩn form / banner lỗi") là **suy luận** từ cặp C→S `0x37` + S→C `0x01/0x02`; chưa có traffic thật để xác nhận.

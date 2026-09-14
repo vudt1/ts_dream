@@ -136,7 +136,7 @@ _LStrCatN(&out,4, ...); TForm1_CY_AddSedQueue(...);
 - Payload S→C và C→S đều **thuần số** (`CharID DWORD + MapID/X/Y Word`): không có trường chuỗi, không có byte text tiếng Việt trên wire.
 - File case (`case_008_0078CE37_FUN_0078ce37.c` toàn file 154 dòng) **không tham chiếu hằng chuỗi nào** (`DAT_*`, `UNK_*`, `lit_*` đều vắng mặt — grep toàn `ts_decompile/` không trúng).
 - Các handler (`FUN_00778510`, `FUN_0071e2b8`, `FUN_0071fae0`, `FUN_0070c20c`, `FUN_00722950`, `FUN_0070d86c`, `FUN_0071e080`, `FUN_004c9bf0`) đều là logic vị trí / slot / cache — không gọi toast `ShowMessage (+0x90)`, không gọi `SetText (FUN_007b372c)`.
-- Ghi chú mã hóa: tiền lệ đã xác minh ở `opcode_02.md` mục 5 cho thấy game dùng **cp1258 (Windows Vietnamese), KHÔNG phải VISCII** (ví dụ `lit_7ABD54.hex`: `(C\xf4ng b\xaf...)` → cp1258 → "(Công bố hệ thống)"). Nên ngay cả khi sau này phát hiện text liên quan map (tên map), hướng giải mã đúng là **cp1258 → NFC**, không phải VISCII → UTF-8.
+- Ghi chú mã hóa: *đính chính 2026-09-14* — tiền lệ cũ ở `opcode_02.md` mục 5 gọi bảng mã là "cp1258, KHÔNG phải VISCII"; khi có bytes dump mới (15 toast `opcode_09.md §7.1`, `lit_797ee8`, `lit_7282ec/728300`, và chính `lit_7ABD54.hex`), phép thử cho thấy hướng đúng là **VISCII đơn-byte tiền tổ hợp → NFC** (cp1258 trả garbage). Kết luận của OP 0x07 không đổi: không có bất kỳ text nào trong payload lẫn handler.
 
 → Không có gì để dịch / cập nhật thêm cho OP 0x07. Mock server không cần xử lý font hay chuỗi.
 

@@ -3,6 +3,8 @@
 Ngày: 2026-09-12 · Workspace: `/mnt/d/VUDT/GIT_PCC/test` · Chiều: **Server → Client (S→C)**
 Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (case function + dispatcher inline + codec + chiều C→S).
 
+> Cập nhật 2026-09-14: bổ sung phân tích từ các body/hex dump mới (theo `missing_opcode_sources.md`).
+
 ---
 
 ## 0. Kết luận quan trọng nhất
@@ -21,8 +23,8 @@ Vì vậy mục "SubOp = payload[1] = ECX[0]" **không áp dụng cho OP này** 
 
 - **Vai trò**: server đẩy **1 bản tin định vị actor**: `id (ai) + w1 + X + Y + w4 (trạng thái/hướng?)`, client đồng bộ vào object scene.
 - **2 nhánh duy nhất**:
-  - `id == myId (*(gvar_007DA7BC+4))` → cập nhật **object self**, set 2 cờ, gọi `func_0x007994a4`.
-  - `id != myId` → cập nhật **cache tên + actor khác**: `FUN_00729f88`, `func_0x00722578 / func_0x0072274c`, rồi nếu actor đã tồn tại trong scene (`FUN_0070c20c != 0`) thì đồng bộ tọa độ + trạng thái + hiển thị.
+  - `id == myId (*(gvar_007DA7BC+4))` → cập nhật **object self**, set 2 cờ, gọi `FUN_007994a4` (nay **đã có body** — xem §4 Nhánh A).
+  - `id != myId` → cập nhật **cache tên + actor khác**: `FUN_00729f88`, `FUN_00722578` (thêm/cập nhật actor — **đã có body**), `FUN_0072274c` (xóa actor — **đã có body**), rồi nếu actor đã tồn tại trong scene (`FUN_0070c20c != 0`) thì đồng bộ tọa độ + trạng thái + hiển thị.
 - **Không mang chuỗi/text nào.** Toàn bộ payload là số LE. Không có chat, không có memo.
 
 ---
@@ -99,14 +101,28 @@ if (*(gvar_007DA7BC+4) == id) {
 }
 ```
 
-- Ghi 5 field vào object `EAX`, bật 2 cờ, gọi `func_0x007994a4(EAX)`.
-- Nhánh `else` là **dead code trên thực tế** vì `cRam009f1650` vừa bị gán `'\0'` ngay trước `if`.
-- Giới hạn: `func_0x007994a4` **không có file body** trong `ts_decompile/functions/` — chỉ biết signature `(obj)`.
+- Ghi 5 field vào object `EAX`, bật 2 cờ, gọi `func_0x007994a4(EAX)` — **nay đã có body** (`007994a4_FUN_007994a4.c`):
+  - **Cấu trúc `EAX` (temp struct do handler dựng) được đọc**: `+4 = w1 (Word)`, `+8 = X (DWORD)`, `+0xc = Y (DWORD)`, `+0x14 = w4 (byte-index)`, `+0x18` chỉ dùng ở nhánh chết.
+  - Toàn bộ bị gate bởi `if (gvar_007DA5A0[+0xc] != 0)` (`007994a4_FUN_007994a4.c:41`) — form `gvar_007DA5A0` đang bật mới chạy.
+  - `w4` (guard `≤0xFF`) tra bản đồ: `FUN_0053558c(gvar_007DA3F0, *(self+0x63a)=mapId hiện tại, (char)w4, &shortstr)` → shortstring kết quả copy 0x14 byte vào `gvar_007DA5A0+0xa0b9`, rồi `_LStrFromString(gvar_007D9D34+0x5400, ...)` (`:43–52, 70–71`) — **bảng tên bản đồ theo map-id + chỉ số w4** (presentation của ô "tên cảnh đồ" 1 dòng).
+  - Ghi `w1 → +0xa0ae (Short, guard ≤0xFFFF)`, `X → +0xa0b0 (DWORD)`, `Y → +0xa0b4 (DWORD)` (`:53–59`).
+  - `w4` lần 2 (guard `≤100`): `+0xa0b8 (byte) := *(gvar_007DA5A0 + 0x4d8 + w4*0x25)` — bảng record stride `0x25` nội bộ form (`:60–69`).
+  - Nhánh đặc biệt (`:73–85`): nếu `DAT_009f1650=='\0'` và kết quả `FUN_0053558c == 0xE809(-0x17f7)` và `+0xa0ae == 0x2ee3 (12003)` → đè 5 DWORD tại `DAT_00799930` vào `+0xa0b9` (hardcode ghi đè tên cho map/slot 12003 — **ý nghĩa chưa kết luận được**), rồi `FUN_005ee508`.
+  - Nhánh `else` của callee (`:86–101`, chạy khi `DAT_009f1650 != '\0'`) dùng `EAX+0x18` — field mà handler 0x0C **không bao giờ set** (handler vừa gán `cRam009f1650='\0'` ngay trước call, xem §4 Nhánh A cũ) → trên thực tế bất khả đạt từ OP này.
+  - Đuôi hàm (`:102–157`): clear cờ `+0xa097`, `gvar_007DA5A0+0xc=0`, `gvar_007DA37C+0xc=0`; loạt refresh `FUN_00729fd0/FUN_0076bc64/FUN_007358b0/FUN_0074508c/FUN_0071c7a0/FUN_0061f8d4/6201c8/621f44` (UI, 1 dòng); **nếu `PlayerRec+0x35f != 1` → `FUN_007a1964(gvar_007D9D64, myId)`** (`:107–109`) — kiểm tra/roảng rời team khi đổi map (chính là hàm rời nhóm của OP 0x0D SubOp 4); rồi `PlayerRec+0x35f=0`, `+0x5f4=0`.
+  - Gọi `FUN_0077f414(self_struct, ...|0xC)` (`:118`) — đúng builder C→S OP 0x0C **đã biết là `break;` rỗng** (`0077f414.c:911–912`) → không phát gói gì thêm (xác nhận chéo §6, khớp với việc `gvar_007DA5A0` là form login/map).
+  - Nhánh theo `PlayerRec+0x378` (`:134–141`): `==2` → `FUN_0060788c` + VMT `+0x20`; else → `FUN_00607cb0` + VMT `+0x24` (presentation 1 dòng).
+  - `:142–151`: tra 4 bảng theo mapId `+0x63a` — `FUN_00634f3c → +0x1437`, `FUN_0075c184 → +0x1458`, `FUN_0054c29c → +0x1459`, `FUN_0054a384 → +0x145c` (3 hàm cuối **vẫn không có body** — các byte cờ per-map, chưa kết luận được).
+- Kết luận nâng cấp: nhánh A không chỉ "set cờ" mà là **toàn bộ nghi thức "self vào map/đến đích"** — ghi tên map + tọa độ vào form, reset cờ team/UI, tra cờ theo map.
+- ~~Giới hạn: `func_0x007994a4` không có file body~~ → **đã có body mới, khoảng trống đã điền** (chỉ còn 3 lá `0075c184/0054c29c/0054a384` chưa có body).
 
 ### Nhánh B — `id != myId` (dòng 68–143): cập nhật actor khác
 
 1. `FUN_00729f88(gvar_007D9C48, id, (short)w1)` — ghi `w1` vào `+0x1a` của record cache tên (`gvar_007DA6BC`, qua `FUN_00722508`; xem `00729f88_FUN_00729f88.c:24-30`).
-2. `if (w1 == *(ushort*)(self+0x63a)) func_0x00722578(map,id) else func_0x0072274c(map,id)` — 2 hàm xử lý map/scene theo map-id, **không có body, không suy diễn**.
+2. `if (w1 == *(ushort*)(self+0x63a)) func_0x00722578(map,id) else func_0x0072274c(map,id)` — **(đính chính + xác minh được từ body mới)** hai hàm này không phải "xử lý map/scene theo map-id" mù mờ mà là cặp **thêm/cập nhật actor** vs **gỡ actor**:
+   - `FUN_00722578(sceneObj, id)` (`00722578_FUN_00722578.c:34–116`): tra cache tên `uVar2=FUN_00722508(gvar_007D9C48, id)` (`:34`); nếu có → `slot=FUN_0070c158(sceneObj, id)` (cấp slot find-or-alloc, `:36`); ô trống thì tạo `TPlayers_Create(VMT_70B5D0_TPlayers, 1, slot)` gán vào `gvar_007DA300+slot*4` + tăng counter `sceneObj+0x5c` (guard `<800`) + `sceneObj+0x60 = max(...,slot)` (`:42–60`); rồi ghi actor: `+0x78=1` (byte cờ, `:66`), `+4=id` (`:71`), tên shortstring từ cache `rec+8` copy `0x11` byte vào `actor+9` (`:76–82`), `actor+0x7a := cache+0x3c`, `actor+0x7b := cache+0x3d`, `actor+0x7c(Short) := cache+0x3e` (`:83–116`). Nghĩa các byte `+0x7a..+0x7c` (class/race/hướng?) **chưa kết luận được**.
+   - `FUN_0072274c(sceneObj, id)` (`0072274c_FUN_0072274c.c:24–43`): tìm slot bằng `FUN_0070c20c`; nếu có → `TObject_Free(actor)` + `gvar_007DA300[slot]=0` + giảm `sceneObj+0x5c` (nếu `>0`) + `FUN_0072a054(scene)` refresh.
+   - Suy ra trực tiếp từ code: `w1 == mapId hiện tại` ⇒ đồng bộ actor thuộc bản đồ đang đứng (thêm/cập nhật), khác map ⇒ **gỡ actor khỏi scene**. (Không còn là "hai hàm xử lý map" chưa rõ.)
 3. `idx = FUN_0070c20c(map, id)` — tìm actor trong mảng 800 slot `gvar_007DA300` bằng cách so `*(obj+4)==id`; `0` = chưa có → dừng (không tạo mới ở OP này).
 4. Nếu `idx != 0`, với `obj = gvar_007DA300[idx]`:
    - `FUN_00722950(cache, id, obj)` — copy record cache (tên/class/byte trạng thái) vào object.
@@ -146,7 +162,7 @@ case 0xc:
 ## 7. Chuỗi hằng / tiếng Việt
 
 - Handler **không tham chiếu bất kỳ hằng chuỗi nào** (chỉ có `gvar_*`, `cRam009f1650`, và `&UNK_007994a4` — đây là **con trỏ code callback**, không phải chuỗi).
-- Do đó **không có gì để tra `ts_decompile/redump/lit_*.hex`**, không giải mã cp1258/VISCII nào cho OP này. Ghi rõ để tránh bịa đặt (khác OP 0x02 có 14 nhãn kênh đã dịch). Mã hóa đúng của game là **cp1258 → NFC** theo tiền lệ `opcode_02.md`, không phải VISCII.
+- Do đó **không có gì để tra `ts_decompile/redump/lit_*.hex`**, không giải mã cp1258/VISCII nào cho OP này. Ghi rõ để tránh bịa đặt (khác OP 0x02 có 14 nhãn kênh đã dịch). Mã hóa đúng của game là **VISCII đơn-byte tiền tổ hợp** (đính chính 2026-09-14 — cp1258 trong tiền lệ `opcode_02.md` cũ đã bị bác bỏ bằng chứng byte, xem `opcode_09.md §7.1`; `opcode_02.md` mục 5 đã ghi chú lại).
 
 ---
 
@@ -158,7 +174,7 @@ case 0xc:
    - Payload plain (id=1, w1=1, X=100, Y=200, w4=2): `0C 01 00 00 00 01 00 64 00 C8 00 02 00`
    - Plain frame (17B): `F4 44 0D 00 0C 01 00 00 00 01 00 64 00 C8 00 02 00`
    - Socket (XOR AD): `59 E9 A0 AD A1 AC AD AD AD AC AD C9 AD 65 AD AF AD`
-4. **Kịch bản test**: gửi `id != myId` + `w1 == mapId` trước (nhánh actor khác, an toàn nếu actor chưa tồn tại → dừng ở `FUN_0070c20c==0`); rồi gửi `id == myId` (nhánh self, gọi `func_0x007994a4` — chưa rõ body, nên quan sát crash/log).
+4. **Kịch bản test**: gửi `id != myId` + `w1 == mapId` trước (nhánh actor khác → `FUN_00722578` thêm/cập nhật actor từ cache tên — an toàn nếu id có trong cache); gửi `w1 != mapId` với id đang có trong scene để xem `FUN_0072274c` **gỡ actor**; rồi gửi `id == myId` (nhánh self, gọi `FUN_007994a4` — đã có body: ghi form map + refresh hàng loạt, quan sát log/UI).
 5. **Không cần** mock chiều C→S cho OP 0x0C.
 
 ---
@@ -176,8 +192,10 @@ case 0xc:
 | 7 | `0077eb9c_FUN_0077eb9c.c` / `0077ef7c_FUN_0077ef7c.c` | body codec | Word LE / DWORD LE + guard |
 | 8 | `0077eb1c / 0077ee84 / 0077f098` | body encode/copy | Xác nhận không dùng ở chiều S→C này |
 | 9 | `00729f88 / 0070c20c / 00722950 / 0071e2b8 / 0070d86c / 0071e080 / 0071fae0 / 004c9bf0 / 0050f2f8` | body từng file | Logic core nhánh other + phân loại |
+| 10 | `ts_decompile/functions/007994a4_FUN_007994a4.c` | d.41–157 | **Body mới (2026-09-14)** — nghi thức "self vào map": ghi form `gvar_007DA5A0` (`+0xa0ae/a0b0/a0b4/a0b8/a0b9`), bảng map `FUN_0053558c`, loạt refresh, `FUN_007a1964` khi `+0x35f!=1`, call builder C→S 0xC rỗng |
+| 11 | `ts_decompile/functions/00722578_FUN_00722578.c`, `0072274c_FUN_0072274c.c` | tồn bộ | **Body mới (2026-09-14)** — thêm/cập nhật actor (TPlayers_Create, cache tên) và gỡ actor |
 
-**Giới hạn (không suy diễn)**:
-- `func_0x007994a4`, `func_0x00722578`, `func_0x0072274c` **không có file body** trong `ts_decompile/functions/` — chỉ biết signature từ call-site.
-- `UNK_007994a4` là địa chỉ code, không phải chuỗi — chưa resolve.
-- Ý nghĩa game-design của `w1` (so với map-id `+0x63a`), `w4`, `X/Y` (pixel hay tile) nằm ngoài decompile tầng case — chỉ kết luận ở mức "đồng bộ actor".
+**Giới hạn (không suy diễn) — cập nhật 2026-09-14**:
+- `007994a4 / 00722578 / 0072274c` đã có body đầy đủ (khoảng trống cũ xóa). Còn thiếu: 3 lá `FUN_0075c184`, `FUN_0054c29c`, `FUN_0054a384` được `007994a4` gọi để tra cờ per-map (không có body — 4 byte ghi vào `PlayerRec+0x1458/1459/145c` và `+0x1437` chưa rõ nghĩa).
+- `UNK_007994a4` là địa chỉ code, không phải chuỗi — xác nhận qua body mới (hàm `__register FUN_007994a4(uint param_1)`).
+- Ý nghĩa game-design của `w1` (so với map-id `+0x63a`), `w4` (index bảng map), `X/Y` (pixel hay tile), các byte `actor+0x7a..0x7c` copy từ cache `+0x3c..0x3e` nằm ngoài decompile — chỉ kết luận ở mức "đồng bộ actor / vào map".

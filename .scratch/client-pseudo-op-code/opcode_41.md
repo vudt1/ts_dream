@@ -1,7 +1,9 @@
 # PHÂN TÍCH — Main OP 0x41 (65) / Case 58 / FUN_00795ce4 @ 0x00795CE4
 
 Ngày: 2026-09-12 · Workspace: `/mnt/d/VUDT/GIT_PCC/test` · Feature: `op-code` · Chiều: **Server → Client (S→C) một chiều**  
-Trạng thái: **Đã xác minh 100% từ mã nguồn sơ cấp** (`ts_decompile/` only).
+Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (`ts_decompile/` only). 3 callee trước đây "khe chưa decompile" (`0x005ba4c8`, `0x0074dbc4`, `0x005bb9f8`) **nay đã có body** (redump 2026-09-14, `index.csv:6347,6349,6475`) — SubOp 0x02 xác nhận suy đoán cũ; SubOp 0x04 và 0x07 **bị đính chính**.
+
+> Cập nhật 2026-09-14: bổ sung phân tích từ các body/hex dump mới (theo `missing_opcode_sources.md`).
 
 ---
 
@@ -12,7 +14,7 @@ Main OP `0x41` (thập phân: `65`, ánh xạ tới **Case 58**) phụ trách qu
    - Quản lý trạng thái kích hoạt khí quan của người chơi (bật/tắt cờ `+0x101`, kích hoạt animation bánh răng xoay `"Light_Gear0"`, chuyển đổi chế độ điều khiển và hiển thị các nút thao tác chiến đấu cơ quan: `Btn_Attack`, `Btn_Skill2`, `Btn_Defense`, `Btn_Off_Gray`).
    - Quản lý 3 ô trang bị / vật phẩm cơ quan (`slot 1..3`) với cấu trúc dữ liệu `[Slot: 1B][ItemID: 2B LE][Durability: 2B LE]`, liên kết tra cứu thông số và hình ảnh từ CSDL vật phẩm `gvar_007DA540`.
 2. **Quản lý Thú Cơ Quan Đồng Hành Trên Bản Đồ (`TPetNpc` - `Actor + 0x620`)**:
-   - Điều khiển vòng đời xuất hiện (Spawn) hoặc biến mất (Despawn) của cơ quan thú đi kèm nhân vật (`TPetNpc`) thông qua Scene World Manager (`gvar_007D9D34`).
+   - Điều khiển vòng đời xuất hiện (Spawn) hoặc biến mất (Despawn) của cơ quan thú đi kèm nhân vật (`TPetNpc`) thông qua Scene World Manager (`gvar_007D9D34`) — **đơn lẻ cho 1 nhân vật (SubOp 0x03) hoặc hàng loạt cho mọi actor khác bản địa (SubOp 0x04, body mới)**.
    - Tự động ánh xạ loại khí quan của nhân vật sang mã hình ảnh sprite / Model ID tương ứng (`40041` đến `40044`) thông qua hàm tra cứu `FUN_005bb3a0`.
 
 - **Chiều giao tiếp**: Thuần túy **Server → Client (S→C)**. Chiều Client → Server tại `FUN_0077f414:1064` (`case 0x41: break;`) là rỗng (`break;`). Client không gửi gói tin nào bằng Main Opcode `0x41`.
@@ -81,12 +83,12 @@ Main OP 0x41 (65) → byte_table[0x78A8EE][0x41] = 0x3A (58)
 | SubOp | Wire Format | Min Len | Đối Tượng Tiếp Nhận | Callee & Trạng Thái SSOT | Ý Nghĩa Nghiệp Vụ Cốt Lõi |
 | :---: | :--- | :---: | :--- | :--- | :--- |
 | **`0x01`** | `[41][01]` | 2B | `gvar_007D9D00` (`TLH_ApparatusMenu`) | `FUN_005ba554` (✔ Đã decompile) | **Bật trạng thái khí quan**: Đặt cờ `+0x101 = 1`, kích hoạt hiệu ứng bánh răng xoay `"Light_Gear0"`. |
-| **`0x02`** | `[41][02]` | 2B | `gvar_007D9D00` (`TLH_ApparatusMenu`) | `func_0x005ba4c8` (✘ Khe chưa decompile) | **Tắt trạng thái khí quan**: Xóa cờ kích hoạt, tắt animation bánh răng, khôi phục thanh chiến đấu. |
+| **`0x02`** | `[41][02]` | 2B | `gvar_007D9D00` (`TLH_ApparatusMenu`) | `FUN_005ba4c8` (**✔ body mới**) | **Tắt trạng thái khí quan** — **xác minh được từ body mới**: `self+0x101:=0`, `self+0xF4:=0`, `FUN_005baa1c` (dừng gear, đối ứng `FUN_005ba944` của SubOp 1), flag ngoại bộ `[gvar_007DA32C+0xE8+n*4]+0x10C := 1` (đảo giá trị với SubOp 1) (`005ba4c8_FUN_005ba4c8.c:19-33`). |
 | **`0x03`** | `[41][03][CharID:4B][Active:1B]` | 7B | `gvar_007D9D34` (`Scene Actor Mgr`) | `FUN_0074da00` (✔ Đã decompile) | **Spawn / Despawn Pet Khí Quan (`TPetNpc`)**: Quản lý vòng đời thú máy đi kèm tại `Actor + 0x620`. |
-| **`0x04`** | `[41][04][...]` | ≥2B | `gvar_007D9D34` (`Scene Actor Mgr`) | `func_0x0074dbc4` (✘ Khe chưa decompile) | Cập nhật hành động / trạng thái phụ trợ của Pet Khí Quan trên map. |
+| **`0x04`** | `[41][04] + N*[CharID:4B][Act:1B]` | ≥2B | `gvar_007D9D34` (`Scene Actor Mgr`) | `FUN_0074dbc4` (**✔ body mới**) | **Spawn/Despawn pet hàng loạt cho actor KHÁC local** — *đính chính: không phải "trạng thái phụ trợ"*; là bản lặp của SubOp 0x03 (tối thiểu 600 vòng, cap theo `TPlayers+0x5C`; CharID tra ra 0 = local → bỏ qua record) (`0074dbc4_FUN_0074dbc4.c:52-58,74-160`). |
 | **`0x05`** | `[41][05]` | 2B | `gvar_007D9D00` (`TLH_ApparatusMenu`) | `FUN_005bb420` (✔ Đã decompile) | **Mở / Toggle Menu Khí Quan**: Gọi phương thức ảo `VMT + 0x20` nếu menu chưa mở. |
 | **`0x06`** | `[41][06] + N*[Slot:1B][Item:2B][Dura:2B]` | 2B | `gvar_007D9D00` (`TLH_ApparatusMenu`) | `FUN_005bb43c` (✔ Đã decompile) | **Cập nhật danh sách trang bị khí quan**: Đọc mảng lặp 5B/slot nạp ItemID & Độ bền vào 3 ô trang bị. |
-| **`0x07`** | `[41][07][...]` | ≥2B | `gvar_007D9D00` (`TLH_ApparatusMenu`) | `func_0x005bb9f8` (✘ Khe chưa decompile) | Thao tác mở rộng / phản hồi kết quả lệnh khí quan trên Menu. |
+| **`0x07`** | `[41][07][m]` | 2B | `gvar_007D9D00` (`TLH_ApparatusMenu`, **self không dùng**) | `FUN_005bb9f8` (**✔ body mới**) | **Toast 1200ms**: `RP[1]==1` → `DAT_005bba70`, `==2` → `DAT_005bbac4` (chuỗi chưa dump) — *đính chính: không có "phản hồi lệnh" nào ngoài 2 toast* (`005bb9f8_FUN_005bb9f8.c:20-29`). |
 
 ---
 
@@ -122,9 +124,31 @@ Main OP 0x41 (65) → byte_table[0x78A8EE][0x41] = 0x3A (58)
 
 ---
 
-### 4.2. SubOp `0x02` — Tắt Trạng Thái Khí Quan (`func_0x005ba4c8`)
-- **Vị trí**: Địa chỉ `0x005ba4c8` nằm trong khoảng giữa `FUN_005ba21c` (kết thúc tại `0x005ba473`) và `FUN_005ba554`.
-- **Ý nghĩa nghiệp vụ**: Tác vụ đối ứng ngược lại với SubOp 1 — xóa cờ trạng thái `*(param_1 + 0x101) = 0`, hủy hiệu ứng bánh răng xoay và khôi phục giao diện điều khiển nhân vật bình thường.
+### 4.2. SubOp `0x02` — Tắt Trạng Thái Khí Quan (`func_0x005ba4c8`) — **ĐÃ CÓ BODY**
+
+- **Tệp nguồn**: `ts_decompile/functions/005ba4c8_FUN_005ba4c8.c` (139B, `index.csv:6347`).
+- **Core logic** (`:19-33`): đúng chiều đối ứng SubOp 1:
+  1. Nếu `gvar_007DA51C != 0`: `FUN_00659230(gvar_007DA51C↑)` + `FUN_00595a70(gvar_007DA1DC↑, 0)` (cùng cặp helper đóng/mở HUD như nhánh SubOp 1).
+  2. Slot ngoại bộ: `n = FUN_00768d94(gvar_007DA0D0↑, 0xB454, 0)` (bound `≤0x19`); `[gvar_007DA32C↑ + 0xE8 + n*4] + 0x10C := 1` — **đảo ngược** phép gán `= 0` của SubOp 1.
+  3. `FUN_005baa1c(self)` (đối ứng `FUN_005ba944` = hiệu ứng gear của SubOp 1 — tên effect cụ thể chưa kiểm trong body này).
+  4. **`self+0x101 := 0`** (xóa cờ kích hoạt — **xác minh được từ body mới**, khớp suy đoán cũ) và **`self+0xF4 := 0`** (field phụ thêm, tên chưa biết; lưu ý mảng slot trang bị của SubOp 0x06 nằm `+0xF1..+0xFF`, nên `+0xF4` **có thể trùng** vùng dữ liệu slot — chưa kết luận được).
+- **Kết luận**: nhánh "Tắt trạng thái khí quan" **được xác minh từ body mới**.
+
+### 4.2b. SubOp `0x04` — Spawn/Despawn Pet Khí Quan **Hàng Loạt** (`func_0x0074dbc4`) — **ĐÃ CÓ BODY (đính chính)**
+
+- **Tệp nguồn**: `ts_decompile/functions/0074dbc4_FUN_0074dbc4.c` (802B, `index.csv:6475`).
+- **Vòng lặp record** từ `RP[1]` (1-based `Copy` idx 2): mỗi record `[CharID:4B LE][Act:1B]`:
+  - Điều kiện dừng: số record đã xử lý **vượt** `*(TPlayers↑ + 0x5C)` (counter trong scene mgr) **hoặc** vượt 600 (`0074dbc4...c:52-58` — cap 600 actor).
+  - `idx = FUN_0070c20c(TPlayers↑, CharID)`; **idx == 0 (chính là LocalPlayer) → bỏ qua record** (chỉ nhảy 1 byte cờ) — khác SubOp 0x03 vốn map idx 0 về LocalPlayer.
+  - Ngược lại áp dụng **chính xác logic vòng đời `TPetNpc` của SubOp 0x03** cho `gvar_007DA300[idx]`: `Act==0` → `FreeAndNil(actor+0x620)`; `Act!=0` → tạo `TPetNpc_Create(VMT_70B4D8)` nếu trống, tra model `FUN_005bb3a0(gvar_007D9D00↑, actor+0x3E9)`, set `pet+0x1c virtual` (model), `pet+0x550 = ownerIdx`, `pet+0x35C = 1`, `pet+0x554 = actor+0xE3` (hướng chủ), `FUN_0074d7d4` đồng bộ vị trí (`:74-160`).
+- **Kết luận**: SubOp 0x04 = **"đồng bộ hàng loạt pet khí quan cho mọi actor khác người chơi bản địa"** — *đính chính suy đoán cũ "cập nhật hành động/trạng thái phụ trợ"*.
+- **Wire**: `[41][04] + N×[CharID:4B LE][Act:1B]`.
+
+### 4.2c. SubOp `0x07` — Hai Toast Khí Quan (`func_0x005bb9f8`) — **ĐÃ CÓ BODY (đính chính)**
+
+- **Tệp nguồn**: `ts_decompile/functions/005bb9f8_FUN_005bb9f8.c` (112B, `index.csv:6349`).
+- Guard `len(RP)<2` → `_BoundErr(1)` (`:22-23`); `RP[1]==1` → toast `(**gvar_007DA084+0x90)(…, &DAT_005bba70, 0x4B0, 0, 0)`; `==2` → `&DAT_005bbac4`; còn lại im lặng (`:25-28`). Self `TLH_ApparatusMenu` **không được đụng tới**.
+- *Đính chính*: "thao tác mở rộng / phản hồi kết quả lệnh" — thực tế chỉ là **2 thông báo toast 1200ms** (nội dung chuỗi chưa dump, cần `lit_5bba70/5bbac4.hex`).
 
 ---
 
@@ -263,6 +287,7 @@ Main OP 0x41 (65) → byte_table[0x78A8EE][0x41] = 0x3A (58)
   + `"Light_Gear0"` (`005ba944.c:41`): Sprite hiệu ứng bánh răng khí quan phát sáng xoay tròn.
   + `"Btn_Off_Gray"`, `"Btn_Attack"`, `"Btn_Skill2"`, `"Btn_Defense"` (`005ba21c.c`): Tên các sprite nút bấm thao tác trên thanh menu khí quan.
 - Tên vật phẩm và mô tả chi tiết của trang bị khí quan được nạp động từ CSDL `gvar_007DA540` theo `ItemID`.
+- **Bổ sung từ body mới (2026-09-14)**: SubOp 0x07 tham chiếu 2 hằng AnsiString `DAT_005bba70`, `DAT_005bbac4` — **chưa có trong `redump/`**, cần `lit_5bba70/5bbac4.hex` để decode VISCII; không có tên tĩnh nào khác trong 3 body mới.
 
 ---
 
@@ -309,6 +334,23 @@ Offset   Kiểu        Tên trường    Mô tả
 ```
 *Tổng độ dài:* $1 + 5 \times N$ bytes ($N \ge 0$).
 
+### 8.6. SubOp 0x04 (Spawn/Despawn Pet hàng loạt — actor khác local)
+```
+Offset   Kiểu        Tên trường    Mô tả
++00      uint8       SubOp         0x04
+--- Mảng lặp record, mỗi record 5 bytes (dừng khi vượt counter TPlayers+0x5C hoặc 600 record): ---
+  +00    uint32 LE   CharID        ID nhân vật (tra actor index)
+  +04    uint8       IsActive      0: FreeAndNil TPetNpc; ≠0: create/update TPetNpc
+```
+
+### 8.7. SubOp 0x07 (Toast khí quan)
+```
+Offset   Kiểu        Tên trường    Mô tả
++00      uint8       SubOp         0x07
++01      uint8       MsgCode       1 → toast @0x5BBA70; 2 → toast @0x5BBAC4 (1200ms); khác: im lặng
+```
+*Độ dài:* 2 bytes RestPayload.
+
 ---
 
 ## 9. Ma Trận Kiểm Thử / Hướng Dẫn Mock Server
@@ -337,7 +379,10 @@ Offset   Kiểu        Tên trường    Mô tả
 | **Case 58 Function** | `ts_decompile/case_functions/functions/case_058_00795CE4_FUN_00795ce4.c` | Dòng 1–81 |
 | **Main Dispatcher** | `ts_decompile/functions/0078a89c_FUN_0078a89c.c` | Dòng 7197–7236 (`case 0x41`) |
 | **SubOp 1 Handler** | `ts_decompile/functions/005ba554_FUN_005ba554.c` | Dòng 21–53 |
+| **SubOp 2 Handler** | `ts_decompile/functions/005ba4c8_FUN_005ba4c8.c` | Dòng 16–33 (body mới, `index.csv:6347`) |
 | **SubOp 3 Handler** | `ts_decompile/functions/0074da00_FUN_0074da00.c` | Dòng 23–115 |
+| **SubOp 4 Handler** | `ts_decompile/functions/0074dbc4_FUN_0074dbc4.c` | Dòng 44–170 (body mới, `index.csv:6475`) |
+| **SubOp 7 Handler** | `ts_decompile/functions/005bb9f8_FUN_005bb9f8.c` | Dòng 16–29 (body mới, `index.csv:6349`) |
 | **SubOp 5 Handler** | `ts_decompile/functions/005bb420_FUN_005bb420.c` | Dòng 20–25 |
 | **SubOp 6 Handler** | `ts_decompile/functions/005bb43c_FUN_005bb43c.c` | Dòng 23–96 |
 | **Tra Model Pet** | `ts_decompile/functions/005bb3a0_FUN_005bb3a0.c` | Ánh xạ ID `40041..40044` |

@@ -1,7 +1,10 @@
 # PHÂN TÍCH — Main OP 0x45 (69) / Case 61 / FUN_00795f82 @ 0x00795F82
 
 Ngày: 2026-09-12 · Workspace: `/mnt/d/VUDT/GIT_PCC/test` · Feature: `op-code` · Chiều: **Server → Client (S→C) một chiều**  
-Trạng thái: **Đã xác minh 100% từ mã nguồn sơ cấp** (`ts_decompile/` only).
+Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (`ts_decompile/` only). 8 handler trước đây chưa có body (`0x01,0x02,0x03,0x04,0x06,0x09,0x0A,0x0B`) **nay đã decompile** (redump 2026-09-14) — phân tích tại §4.5; một số nhãn cũ bị đính chính.
+
+> Cập nhật 2026-09-14: bổ sung phân tích từ các body/hex dump mới (theo `missing_opcode_sources.md`). 
+
 
 ---
 
@@ -24,8 +27,8 @@ Main OP `0x45` (thập phân: `69`, ánh xạ tới **Case 61**) phụ trách to
 5. **Hệ Thống Kỹ Năng & Quản Lý Quên/Xóa Kỹ Năng Con Cái (`TLH_ChildSkillDelForm` & `FUN_0074f504`)**:
    - Con cái lưu giữ 9 kỹ năng chia làm 3 bộ (mỗi bộ 3 kỹ năng) tại các offset `+0x573 .. +0x58b` trong cấu trúc thực thể `TFollowNpc` (`NPC Type = 4`).
    - Tương tác với form `TLH_ChildSkillDelForm` (`gvar_007D9E3C`) cho phép tẩy/xóa từng bộ kỹ năng con cái, có kiểm tra điều kiện (nếu cả 3 kỹ năng trong bộ đều bằng 0 thì bật cảnh báo và từ chối) và hiện hộp thoại xác nhận.
-6. **Đồng Bộ Roster Đồng Hành (`SubOp 0x09` - `func_0x007a4c28`)**:
-   - Quản lý con cái thông qua bộ điều phối đồng hành `TFNpcManage` (`gvar_007D9E00`), cho phép con cái xuất hiện hoặc ẩn trong danh sách quản lý NPC/pet của người chơi.
+6. **Đồng Bộ Roster Đồng Hành (`SubOp 0x09` - `func_0x007a4c28`)** *(cập nhật từ body mới)*:
+   - Thực chất là **nạp block 93B định tuyến theo loại**: `RP[1]` chọn slot active (`TPlayer+0x151C`), block có byte đầu `==4` → ghi vào vùng `TFollowNpc+0x56C` của slot, ngược lại → ghi vào `TPlayer+0x151D`. Self `TFNpcManage` (`gvar_007D9E00`) được truyền nhưng **không dùng field nào** (đính chính diễn giải "xuất hiện/ẩn trong danh sách").
 7. **Chiều Giao Tiếp Mạng**:
    - Thuần túy **Server → Client (S→C)**. Chiều Client → Server tại `FUN_0077f414:1070-1071` (`case 0x45: break;`) là rỗng (`break;`). Client không bao giờ chủ động gửi Main Opcode 0x45 lên server.
 
@@ -63,17 +66,17 @@ if (*(int *)(iVar2 + -4) == 0) {     // Kiểm tra Length(RP) == 0
 
 | SubOp | Hex | Tên Nghiệp Vụ | Đối Tượng Tiếp Nhận | Hàm Callee | Min Len | Tình trạng SSOT |
 | :---: | :---: | :--- | :--- | :--- | :---: | :---: |
-| **`1`** | `0x01` | Khởi tạo thông tin / Kích hoạt sinh con cái | `gvar_007DA7BC` (`TPlayer`) | `func_0x0074fca0` | 1B | ✔ Codebase |
-| **`2`** | `0x02` | Đồng bộ chỉ số chi tiết của con cái | `gvar_007DA7BC` (`TPlayer`) | `func_0x0074fe94` | 1B | ✔ Codebase |
-| **`3`** | `0x03` | Cập nhật tâm trạng / Hành động con cái | `gvar_007DA7BC` (`TPlayer`) | `func_0x0074ee74` | 1B | ✔ Codebase |
-| **`4`** | `0x04` | Phản hồi nuôi dưỡng / Chăm sóc con cái | `gvar_007DA7BC` (`TPlayer`) | `func_0x0074ef3c` | 1B | ✔ Codebase |
+| **`1`** | `0x01` | 6 thông báo chat cố định chọn theo `RP[1]`∈1..6 (**đính chính**: không đụng field nào của TPlayer; self không dùng) | `gvar_007DA7BC` (`TPlayer`) | `FUN_0074fca0` (**✔ body mới**) | 2B | ✔ **Body mới** |
+| **`2`** | `0x02` | Đồng bộ N cặp `[attr 0x1B..0x20:1B][value:4B LE]` từ `RP[2..]` → ghép toast 4000ms + set tab/refresh `TSe_ChildForm` (`+0x1D8/+0x1EC/+0x1E8`) (**✔ body mới**) | `gvar_007DA7BC` (`TPlayer`) | `FUN_0074fe94` (**✔ body mới**) | 2+5N B | ✔ **Body mới** |
+| **`3`** | `0x03` | Word LE `RP[1..2]` → `TPlayer+0x1547`; nếu kết quả == 0 → `+0x151D := 2` + toast `DAT_0074ef24` 2000ms (**✔ body mới**; nhãn "tâm trạng" cũ **chưa kết luận được**) | `gvar_007DA7BC` (`TPlayer`) | `FUN_0074ee74` (**✔ body mới**) | 3B | ✔ **Body mới** |
+| **`4`** | `0x04` | Word LE `RP[1..2]` → `TPlayer+0x1551` — chỉ 1 lệnh ghi, không refresh/toast (**✔ body mới**) | `gvar_007DA7BC` (`TPlayer`) | `FUN_0074ef3c` (**✔ body mới**) | 3B | ✔ **Body mới** |
 | **`5`** | `0x05` | Cập nhật trang bị con cái (Slots 0x1B..0x20) | `gvar_007DA7BC` (`TPlayer`) | [`FUN_0074f034`](file:///mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/0074f034_FUN_0074f034.c) | 5B | ✔ Đã decompile |
-| **`6`** | `0x06` | Đồng bộ danh sách & Cấp độ kỹ năng con cái | `gvar_007DA7BC` (`TPlayer`) | `func_0x0074f1ac` | 1B | ✔ Codebase |
+| **`6`** | `0x06` | Cập nhật **1 kỹ năng**: `RP[1]`=slot 0..9, `RP[2..3]` Word → `TFollowNpc(+0x570+3·slot)`, `RP[4]` byte → `+0x572+3·slot`; flag==1 / >1: phát `sound\WA0014.wav` + toast 4000ms (`FUN_0075aa4c` sinh mô tả) (**✔ body mới**) | `gvar_007DA7BC` (`TPlayer`) | `FUN_0074f1ac` (**✔ body mới**) | 5B | ✔ **Body mới** |
 | **`7`** | `0x07` | Nạp khối dữ liệu con cái 93 bytes & Báo sinh | `gvar_007DA7BC` (`TPlayer`) | [`FUN_0074fb94`](file:///mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/0074fb94_FUN_0074fb94.c) | 96B | ✔ Đã decompile |
 | **`8`** | `0x08` | Cập nhật điểm trưởng thành & Chuyển Adult | `gvar_007DA7BC` (`TPlayer`) | [`FUN_0074efac`](file:///mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/0074efac_FUN_0074efac.c) | 3B | ✔ Đã decompile |
-| **`9`** | `0x09` | Đồng bộ danh sách con cái trong Roster quản lý | `gvar_007D9E00` (`TFNpcManage`) | `func_0x007a4c28` | 1B | ✔ Codebase |
-| **`10`**| `0x0A` | Phản hồi / Đồng bộ form xóa kỹ năng con cái | `gvar_007D9E3C` (`TLH_ChildSkillDelForm`) | `func_0x005e7f90` | 1B | ✔ Codebase |
-| **`11`**| `0x0B` | Reset trạng thái hành động / Toggle con cái | `gvar_007DA7BC` (`TPlayer`) | `func_0x00750240` | 1B | ✔ Codebase |
+| **`9`** | `0x09` | **Nạp khối 93B có chọn slot**: `RP[1]`=slot 0..4 (ghi `TPlayer+0x151C`), `RP[2..3]` phải == `0x5D`, `RP[4..96]`=93B: byte đầu==4 → copy vào `TFollowNpc[slot]+0x56C`, ngược lại → copy vào `TPlayer+0x151D` (**✔ body mới**; self `TFNpcManage` không dùng) | `gvar_007D9E00` (`TFNpcManage`) | `FUN_007a4c28` (**✔ body mới**) | 97B | ✔ **Body mới** |
+| **`10`**| `0x0A` | **Xóa kỹ năng do server xác nhận**: `[0A][Mode][Result][SkillIdx]`; Result 0 / {1,2,5,-1} → toast 1200ms; Mode 1 xóa 1 skill (Word+Byte tại `Player+0x1521/0x1523+3·i` và `TFollowNpc+0x570/0x572+3·i`), Mode 2 xóa cả nhóm 3; chốt `form+0x146 := 0` + virtual `+0x24` (**✔ body mới**) | `gvar_007D9E3C` (`TLH_ChildSkillDelForm`) | `FUN_005e7f90` (**✔ body mới**) | 3B | ✔ **Body mới** |
+| **`11`**| `0x0B` | **Ghi thẳng byte `RP[1]` vào `TPlayer+0x151D`** (byte trạng thái giai đoạn con cái 0x01/0x02/0x03) — *đính chính: không phải "reset hành động" tổng quát* (**✔ body mới**) | `gvar_007DA7BC` (`TPlayer`) | `FUN_00750240` (**✔ body mới**) | 2B | ✔ **Body mới** |
 
 ---
 
@@ -207,6 +210,25 @@ Module con cái sở hữu logic xóa kỹ năng liên kết chặt chẽ với 
 
 ---
 
+### 4.5. Tám handler vừa có body (redump 2026-09-14) — phân tích chi tiết
+
+Tất cả đều nhận `(self, RestPayload)` theo bảng dispatch `case_061_00795F82_FUN_00795f82.c:28-59`.
+
+1. **SubOp 0x01 — `FUN_0074fca0`** (`0074fca0_FUN_0074fca0.c:22-46`, 57B, `index.csv:6487`): guard `len(RP)<2` → ERangeError; `switch(RP[1])` 1..6 → `FUN_007ab870(gvar_007DA1B0↑, 0, chuỗi, 0)` = **6 tin chat hệ thống cố định** (`DAT_0074fd8c/fdb8/fde4/fe10/fe3c/LAB_0074fe70` — chưa dump bytes). **Không đọc/ghi field `TPlayer` nào** → *đính chính nhãn "Kích hoạt sinh con cái"*: bản chất quan sát được chỉ là thông báo.
+2. **SubOp 0x02 — `FUN_0074fe94`** (`0074fe94_FUN_0074fe94.c:56-141`, 702B, `index.csv:6488`): `N = RP[1]` (`:62`, guard `<2`); lặp N record `[attr:1B][value:4B LE]` từ `RP[2]` (`:69-83`); với attr ∈ `0x1B..0x20`: set `TSe_ChildForm(gvar_007DA75C)+0x1E8` = mã tab (1B→1, 1C/1D→2, 1E→3, 1F/20→5, `:95-127`), `+0x1D8 := GetTickCount()`, `+0x1EC := 0` (`:89-91`); ghép chuỗi: `DAT_00750228` + [mô tả `DAT_0075018c/19c/1b4/1cc/1e4/1f8` + IntToStr(value) + `DAT_0075020c`, phân cách `DAT_00750180`] → **toast 4000ms** (`:139-141`). Attr ngoài `0x1B..0x20` chỉ được số hóa vào text, không map tab.
+3. **SubOp 0x03 — `FUN_0074ee74`** (`0074ee74_FUN_0074ee74.c:35-40`, 153B, `index.csv:6483`): `Word LE(RP[1..2])` → `TPlayer+0x1547`; **nếu giá trị vừa ghi == 0** → `TPlayer+0x151D := 2` + toast `DAT_0074ef24` 2000ms. Ý nghĩa `+0x1547` **chưa kết luận được** (nhãn "tâm trạng/hành động" cũ không có bằng chứng trong body).
+4. **SubOp 0x04 — `FUN_0074ef3c`** (`0074ef3c_FUN_0074ef3c.c:35-37`, 100B, `index.csv:6484`): chỉ `Word LE(RP[1..2])` → `TPlayer+0x1551`. Không toast, không refresh — **chưa kết luận được** tên field.
+5. **SubOp 0x06 — `FUN_0074f1ac`** (`0074f1ac_FUN_0074f1ac.c:58-184`, 756B, `index.csv:6485`): gate (dạng decompile artifact `8 < (byte)(~RP[1]-1)`, `:65`) **và** `TPlayer+0x151C != 0` (có slot active); `id = Word LE(RP[2..3])` → **`TFollowNpc(Player+0x57C + 0x151C·4) + 0x570 + 3·slot := id`** (`:85`); `flag = RP[4]` → `+0x572 + 3·slot` (`:108`). Nếu flag == 1: play `sound\WA0014.wav` (`:123-124`), `FUN_0075aa4c(gvar_007DA554, id, ...)` sinh mô tả → ghép `DAT_0074f4e4` → toast 4000ms (`:141-145`); flag > 1: nt. với `DAT_0074f4f0` (`:160-182`). Slot có bound `≤9` (ERangeError tại `:70,93,110`).
+6. **SubOp 0x09 — `FUN_007a4c28`** (`007a4c28_FUN_007a4c28.c:52-95`, 305B, `index.csv:6546`): `RP[1]`=chỉ số slot 0..4; `Word LE(RP[2..3])` **phải == 0x5D** (`:57-60`); `Copy(RP,5,0x5D)` = 93B từ `RP[4]` về stack; **`TPlayer+0x151C := RP[1]`** (`:61`); nếu **byte đầu block == 4** → `Move` 93B vào **`TFollowNpc(Player+0x57C + slot·4) + 0x56C`** (`:70-81`) — chính kiểm `Npc+0x56C == 4` đã biết (`opcode_45 §10` dòng "NPC Type = 4"); ngược lại `Move` vào **`TPlayer+0x151D`** (`:86-93`). Self `TFNpcManage` **không dùng**. ⇒ *đính chính*: không phải "ẩn/hiện trong roster" mà là **bản 93B định tuyến theo loại block**.
+7. **SubOp 0x0A — `FUN_005e7f90`** (`005e7f90_FUN_005e7f90.c:48-229`, 801B, `index.csv:6359`): wire `[45][0A][Mode:RP[1]][Result:RP[2]][SkillIdx:RP[3]]` (guard `len<3` → ERangeError `:48-51`):
+   - Result 0 → toast `DAT_005e82bc` 1200ms; Result ∈ {1,2,5,-1} → toast `DAT_005e82f0` rồi **return sớm** (`:52-56`).
+   - Mode (RP[1]) == 1: xóa **1 skill** `RP[3]` (0..9): `TPlayer+0x1521+3·i (Word) := 0`, `+0x1523+3·i (Byte) := 0` (`:79,88`) + `TFollowNpc(0x57C+0x151C·4)+0x570/0x572+3·i := 0` (`:104,119`) → virtual `[form+0x24]()` (`:120` — Hide/đóng theo quy ước `login_flow_research.md:185`).
+   - Mode == 2: vòng `k=1..3` xóa **cả nhóm 3 ô** `3·(RP[3]-1)+k` (`:126-227`).
+   - Chốt chung: **`form+0x146 := 0`** (`:228`) — khớp cờ `+0x146` đã biết ở §4.4.
+8. **SubOp 0x0B — `FUN_00750240`** (`00750240_FUN_00750240.c:20-27`, 55B, `index.csv:6489`): guard `len<2`; **`TPlayer+0x151D := byte RP[1]`** — lệnh ghi thẳng vào byte giai đoạn con cái (0x01/0x02/0x03 đã mô tả §1) **không kèm hiệu ứng nào** → *đính chính nhãn "Reset trạng thái hành động / Toggle"*.
+
+---
+
 ## 5. Khảo Sát Các Biến Toàn Cục Liên Quan
 
 | Biến Toàn Cục | Kiểu Dữ Liệu / Lớp | Khởi Tạo & VMT | Vai Trò Nghiệp Vụ |
@@ -255,6 +277,9 @@ Toàn bộ các chuỗi liên quan đến sự kiện con cái được lưu tro
 7. **`0x74f9a4`** (tham chiếu tại [`0074f504_FUN_0074f504.c:105`](file:///mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/0074f504_FUN_0074f504.c#L105)):
    - Hộp thoại câu hỏi xác nhận Yes/No về việc xóa bộ kỹ năng 3.
 
+**Bổ sung từ 8 body mới (2026-09-14)** — thêm ~20 hằng chuỗi/label mới lộ địa chỉ, **tất cả chưa có dump bytes** (cần `lit_5e82bc/5e82f0`, `lit_74ef24`, `lit_74f4e4/74f4f0`, `lit_74fd8c…74fe70`, `lit_750180…750228`):
+`DAT_0074fd8c/fdb8/fde4/fe10/fe3c`, `LAB_0074fe70` (6 tin chat SubOp 1) · `DAT_00750180/18c/19c/1b4/1cc/1e4/1f8/20c/228` (ghép toast SubOp 2) · `DAT_0074ef24` (toast SubOp 3) · `DAT_0074f4e4/f4f0` (template toast học kỹ năng, SubOp 6) · `DAT_005e82bc/5e82f0` (toast SubOp 0x0A). Literal inline `sound\WA0014.wav` (SubOp 6) thuộc âm thanh — ngoài phạm vi.
+
 ---
 
 ## 8. Cấu Trúc Rest Payload & Wire Format Chi Tiết
@@ -287,12 +312,18 @@ Offset   Kiểu        Tên trường    Mô tả
 ```
 *Độ dài:* 3 bytes.
 
-### 8.4. Các SubOp Khác (0x01, 0x02, 0x03, 0x04, 0x06, 0x09, 0x0A, 0x0B)
+### 8.4. Các SubOp 0x01–0x0B (ĐÃ ĐẶC TẢ TỪ BODY MỚI — xem §4.5)
 ```
-Offset   Kiểu        Tên trường    Mô tả
-+00      uint8       SubOp         Mã SubOp tương ứng
-+01..    bytes       Payload       Dữ liệu tham số truyền vào hàm xử lý con
+0x01: [45][01][Msg:1B 1..6]                                  (3B)     → chat cố định
+0x02: [45][02][N:1B] + N×[Attr:1B (0x1B..0x20)][Value:4B LE] (3+5N B) → toast 4000ms + set tab ChildForm
+0x03: [45][03][Value:2B LE]                                  (4B)     → TPlayer+0x1547; ==0 → state=2 + toast
+0x04: [45][04][Value:2B LE]                                  (4B)     → TPlayer+0x1551
+0x06: [45][06][Slot:1B 0..9][SkillID:2B LE][Flag:1B]         (6B)     → TFollowNpc +0x570/+0x572+3·Slot; Flag=1/>1 → sound+toast
+0x09: [45][09][Slot:1B 0..4][Len:2B LE == 0x5D][93B Block]   (98B)    → +0x151C; block[0]==4 ? TFollowNpc+0x56C : TPlayer+0x151D
+0x0A: [45][0A][Mode:1B][Result:1B][SkillIdx:1B 0..9]         (5B)     → xóa skill theo Mode; Result 0/{1,2,5,FF} → toast (§4.5)
+0x0B: [45][0B][State:1B]                                     (3B)     → TPlayer+0x151D := State
 ```
+*Giá trị trong ngoặc = tổng payload tối thiểu (kèm MainOp) theo guard `_BoundErr` của từng body (§4.5).*
 
 ---
 
@@ -319,6 +350,7 @@ Dưới đây là danh sách test cases chi tiết để kiểm thử độc l�
 | :--- | :--- | :--- |
 | **Case 61 Function** | [`ts_decompile/case_functions/functions/case_061_00795F82_FUN_00795f82.c`](file:///mnt/d/VUDT/GIT_PCC/test/ts_decompile/case_functions/functions/case_061_00795F82_FUN_00795f82.c) | Dòng 1–93 |
 | **Main Dispatcher** | [`ts_decompile/functions/0078a89c_FUN_0078a89c.c`](file:///mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/0078a89c_FUN_0078a89c.c) | Dòng 7317–7372 (`case 0x45`) |
+| **8 SubOp handlers mới decompile** | `ts_decompile/functions/0074fca0_FUN_0074fca0.c` · `0074fe94_FUN_0074fe94.c` · `0074ee74_FUN_0074ee74.c` · `0074ef3c_FUN_0074ef3c.c` · `0074f1ac_FUN_0074f1ac.c` · `007a4c28_FUN_007a4c28.c` · `005e7f90_FUN_005e7f90.c` · `00750240_FUN_00750240.c` | `index.csv:6359,6483-6485,6487-6489,6546`; phân tích §4.5 |
 | **SubOp 5 Handler** | [`ts_decompile/functions/0074f034_FUN_0074f034.c`](file:///mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/0074f034_FUN_0074f034.c) | Dòng 21–95 (Trang bị Slots 0x1B..0x20) |
 | **SubOp 7 Handler** | [`ts_decompile/functions/0074fb94_FUN_0074fb94.c`](file:///mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/0074fb94_FUN_0074fb94.c) | Dòng 23–66 (Nạp 93 bytes vào `+0x151d` & Toast sinh con) |
 | **SubOp 8 Handler** | [`ts_decompile/functions/0074efac_FUN_0074efac.c`](file:///mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/0074efac_FUN_0074efac.c) | Dòng 20–50 (Độ trưởng thành `+0x1565` & Chuyển Adult) |

@@ -1,7 +1,9 @@
 # PHÂN TÍCH — Main OP 0x48 (72) / Case 64 / FUN_00796248 @ 0x00796248
 
 Ngày: 2026-09-12 · Workspace: `/mnt/d/VUDT/GIT_PCC/test` · Feature: `op-code` · Chiều: **Server → Client (S→C) một chiều**  
-Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (`ts_decompile/` only). Hai hàm callee (`FUN_00508204`, `FUN_0050849c`) **có body đầy đủ trong SSOT**; 3 callee (`func_0x00507004`, `func_0x0050705c`, `func_0x00508714`) nằm trong khe trống chưa decompile.
+Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (`ts_decompile/` only). Năm callee đã có body: `FUN_00508204`, `FUN_0050849c` + **2 callee mới decompile 2026-09-14**: `FUN_0050705c` (SubOp 2, `index.csv:6309`) và `FUN_00508714` (SubOp 6, `index.csv:6310`). **Chỉ còn 1 khe trống**: `func_0x00507004` (SubOp 1) — vẫn chưa có file/entry.
+
+> Cập nhật 2026-09-14: bổ sung phân tích từ các body/hex dump mới (theo `missing_opcode_sources.md`).
 
 - Handler `FUN_00796248` quản lý toàn bộ giao thức mạng của **Hệ thống Minigame Máy Quay Số May Mắn / Đánh Bạc (Slot Machine Form - `TMR_Slotform`)**.
 - Đối tượng đích duy nhất của cả 6 nhánh `SubOp` là instance toàn cục `gvar_007D9C68` (con trỏ tới đối tượng `TMR_Slotform`, VMT `VMT_505340_TMR_Slotform`).
@@ -16,7 +18,7 @@ Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (`ts_decompile/` on
   - Bộ đệm lịch sử trúng thưởng của bản thân nằm tại `TMR_Slotform + 0x324`.
   - Cờ trạng thái sẵn sàng / khóa quay nằm tại byte `TMR_Slotform + 0x1d2`.
 - **Phân loại các nhánh SubOp**:
-  - `SubOp 0x01` & `0x02`: Khởi tạo và cập nhật trạng thái vòng quay (Callee nằm ngoài tập decompile).
+  - `SubOp 0x01`: Khởi tạo vòng quay — **callee vẫn chưa có body** (`func_0x00507004`, không có trong `index.csv`). `SubOp 0x02`: cập nhật kết quả quay — **đã có body mới** (`FUN_0050705c`, §4.4).
   - `SubOp 0x03`: Điều khiển cờ trạng thái (`+0x1D2 = 1`) và phát thông báo Toast / Chat cảnh báo.
   - `SubOp 0x04`: Lời gọi hàm ảo `VMT + 0x20` (Đóng / Mở / Reset giao diện máy quay).
   - `SubOp 0x05`: **Xử lý trao giải thưởng & Phát thanh thông báo toàn server**: Đọc `PlayerID (4B)`, `ItemID (2B)`, `Count (1B)`. Nếu là bản thân thì lưu vào bộ đệm cá nhân; nếu là người chơi khác thì phát thông báo tin tức vàng lên kênh Chat toàn máy chủ.
@@ -68,12 +70,14 @@ switch(*(undefined4 *)(unaff_EBP + -0x14)) {
 | SubOp | Wire Payload | Min Len | Callee & Trạng thái SSOT | Core Logic |
 | :---: | :--- | :---: | :--- | :--- |
 | **`0x01`** | `[48][01][...]` | 2B | `func_0x00507004` (Chưa decompile) | Khởi tạo thông số máy Slot / bắt đầu vòng quay. |
-| **`0x02`** | `[48][02][...]` | 2B | `func_0x0050705c` (Chưa decompile) | Dừng guồng quay / cập nhật kết quả các biểu tượng trúng. |
+| **`0x02`** | `[48][02][Sel:1B 1..16][A:1B][B:1B][Item:2B LE][Reel:1B]` | 7B | `FUN_0050705c` (**✔ body mới**) | Cập nhật kết quả vòng quay: ghi 2 byte chọn vào `+0x1CE/+0x1CF`, tra tên item (`gvar_007DA540`) cho reel `RP[6]` (0..16, mảng `+0x150[]`), dựng chuỗi vào `+0x1B0/+0x328`, rồi ẨN control theo `+0x1CE/+0x1CF` trên 3 form (`gvar_007DA32C/007DA0A4/007DA720`). *Nhãn cũ "dừng guồng" được xác minh một phần.* |
 | **`0x03`** | `[48][03][Action:1B]` | 3B | `FUN_00508204` (**Có body SSOT**) | Xử lý cờ sẵn sàng (`+0x1D2 = 1`) hoặc hiển thị Toast (`Action=2`) / Chat (`Action=3`). |
 | **`0x04`** | `[48][04]` | 2B | Virtual call `+0x20` (**Có body VMT**) | Gọi hàm ảo `+0x20` trên `TMR_Slotform` (Show / Reset giao diện). |
 | **`0x05`** | `[48][05][UID:4B][Item:2B][Cnt:1B]` | 9B | `FUN_0050849c` (**Có body SSOT**) | Trao thưởng vật phẩm: lưu buffer nếu là bản thân, phát tin tức toàn server qua Chat nếu là người khác. |
-| **`0x06`** | `[48][06][...]` | 2B | `func_0x00508714` (Chưa decompile) | Đóng / giải phóng phiên quay máy slot. |
+| **`0x06`** | `[48][06][Value:2B LE]` | 4B | `FUN_00508714` (**✔ body mới**) | **Chỉ ghi Word LE `RP[1..2]` vào `Slotform+0x1D0`** — *đính chính: không đóng/giải phóng gì cả* (`00508714_FUN_00508714.c:33-36`). |
 | **Khác** | `[48][00]`, `[48][07]`... | 2B | Không có | **No-op im lặng**. |
+
+*Min Len tính theo guard `_BoundErr` trong callee; SubOp 0x02/0x06 cập nhật từ body mới (§4.4).*
 
 ---
 
@@ -180,12 +184,26 @@ else {
   - `DAT_005086e0`: Ký tự kết thúc câu thông báo.
   - `FUN_007ab870`: Hàm đẩy chuỗi văn bản vào khung chat (kênh thông báo hệ thống màu vàng, `kind = '\0'`).
 
-### 4.4. Các Callee nằm trong khoảng trống chưa decompile (Cần Redump)
+### 4.4. Callee SubOp 2 & SubOp 6 — ĐÃ CÓ BODY (2026-09-14); SubOp 1 vẫn trống
 
-- `func_0x00507004` (SubOp 1), `func_0x0050705c` (SubOp 2), `func_0x00508714` (SubOp 6):
-  - Tra cứu `ts_decompile/index.csv`: Mục trước là `FUN_00506bf4` (dòng 2757), mục sau là `FUN_005074d8` (dòng 2758); mục `00508714` nằm ngay trước `FUN_00508784` (dòng 2764).
-  - Đây là các method nội bộ của `TMR_Slotform` xử lý chuyển động đồ họa của các guồng quay (Reels animation) và logic dừng số.
-  - Về mặt giao thức và state mạng, Server chỉ cần tương tác đúng chuẩn với SubOp `0x03`, `0x04`, `0x05`.
+**`FUN_0050705c` — SubOp 0x02, cập nhật kết quả quay** (`0050705c_FUN_0050705c.c:44-214`, 1097B, `index.csv:6309`):
+1. Mở đầu gọi `FUN_00506368(self)` (helper làm mới nội bộ, đã biết từ call-site `btn_SoltPlay` họ `00506bf4`) (`:47`).
+2. Guard `len(RP)<2` → ERangeError; `sel = RP[1]`; toàn bộ thân chỉ chạy khi `sel-1 < 0x10` (tức **sel ∈ 1..16 — đúng 16 ô reel** đã mô tả §1).
+3. Trường payload (mỗi bước guard `_BoundErr` riêng → cần `len(RP)≥7`, payload `L≥8`):
+   | Offset | Ghi vào | Dòng |
+   | :-- | :-- | :-- |
+   | `RP[2]` (Byte) | `Slotform + 0x1CE` | `:55-57` |
+   | `RP[3]` (Byte) | `Slotform + 0x1CF` | `:59-62` |
+   | `RP[4..5]` (Word LE, `FUN_0077eb9c`) | `itemId` tạm | `:63-67` |
+   | `RP[6]` (Byte, bound `≤0x10`) | `reelIdx` vào mảng reel | `:68-91` |
+4. Nếu `*(self+0x150 + reelIdx*4) != 0` và reel `+0xE4 != 0`: `FUN_00774a84(gvar_007DA540, itemId)` → **`self+0x1B0 := tên item`**, `self+0x1BC := byte cao của Word RP[4..5]` (`:92-95`); dựng chuỗi `DAT_005074b8 + IntToStr(RP[6]) + DAT_005074d4` nối vào `self+0x328` (bộ đệm lịch sử ~`+0x324`) (`:96-105`). Hai hằng `DAT_005074b8/074d4` **chưa dump bytes**.
+5. Nếu tên rỗng: fallback tra trang bị đang mặc của nhân vật qua `gvar_007DA32C` (EquipForm2 — `opcode_13.md:120`) entry `[+0xE8 + RP[2]*4] +0xE4` và so vòng 16 reel `+0xE4/+0x108` (`:107-166`).
+6. Chốt: nếu `self+0x1CE != 0` → **ẩn control** (`FUN_007b0094(x,0)`) trên 3 form `gvar_007DA32C +0xE8[0x1CE]`, `gvar_007DA0A4 +0xE4[0x1CE]`, `gvar_007DA720 +0xE4[0x1CE]`; tương tự cho `+0x1CF` (`:168-213`).
+7. **Chưa kết luận được**: ngữ nghĩa chính xác của cặp byte chọn `+0x1CE/+0x1CF` (hai ô nút/đèn trạng thái bị ẩn theo nó).
+
+**`FUN_00508714` — SubOp 0x06** (`00508714_FUN_00508714.c:29-36`, 100B, `index.csv:6310`): `Slotform + 0x1D0 (Word) := Word LE(RP[1..2])` (codec tự ERangeError nếu chuỗi <2 ký tự ⇒ `L≥4`). Không toast, không VMT call.
+
+**Vẫn thiếu**: `func_0x00507004` (SubOp 1) — `index.csv` không có entry, `functions/` không có file; khe `0x00507004…0x0050705c` chưa export → giữ nguyên trạng thái "cần redump" cho SubOp 0x01.
 
 ---
 
@@ -237,3 +255,5 @@ F4 44 03 00 48 03 01
 | `FUN_00774a84` | `ts_decompile/functions/00774a84_FUN_00774a84.c` | — | Tra cứu tên vật phẩm từ từ điển |
 | `FUN_0075ddb8` | `ts_decompile/functions/0075ddb8_FUN_0075ddb8.c` | — | Tra cứu tên người chơi theo UID |
 | `FUN_007ab870` | `ts_decompile/functions/007ab870_FUN_007ab870.c` | — | Đẩy tin nhắn vào khung chat hệ thống |
+| `FUN_0050705c` | `ts_decompile/functions/0050705c_FUN_0050705c.c` | 44–214 | Handler SubOp 0x02 (body mới, `index.csv:6309`) |
+| `FUN_00508714` | `ts_decompile/functions/00508714_FUN_00508714.c` | 29–36 | Handler SubOp 0x06 (body mới, `index.csv:6310`) |
