@@ -27,6 +27,20 @@ impl SqliteAccountRepository<'_> {
         verify(&self.pool.read, account_id, "pass2", pass).await
     }
 
+    pub async fn update_pass2(&self, account_id: i64, pass2: &[u8]) -> RepoResult<()> {
+        let s = std::str::from_utf8(pass2).unwrap_or("");
+        if !s.is_empty() {
+            let now_ms = chrono::Utc::now().timestamp_millis();
+            sqlx::query("UPDATE accounts SET pass2 = ?, updated_at = ? WHERE player_id = ?")
+                .bind(s)
+                .bind(now_ms)
+                .bind(account_id)
+                .execute(&self.pool.write)
+                .await?;
+        }
+        Ok(())
+    }
+
     /// Load role/suspension state after the numeric PC account id is known.
     /// `account_name` is derived from `player_id` (no `account` column exists;
     /// shared PK `accounts.player_id = characters.character_id`).
@@ -143,6 +157,10 @@ impl AccountRepository for SqliteAccountRepository<'_> {
 
     async fn verify_pass2(&self, account_id: i64, pass: &[u8]) -> RepoResult<bool> {
         self.verify_pass2(account_id, pass).await
+    }
+
+    async fn update_pass2(&self, account_id: i64, pass2: &[u8]) -> RepoResult<()> {
+        self.update_pass2(account_id, pass2).await
     }
 }
 

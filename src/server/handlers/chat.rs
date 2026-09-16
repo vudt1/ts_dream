@@ -44,7 +44,7 @@ pub async fn handle_chat(ctx: &mut OpcodeCtx<'_>) {
     match sub {
         // Sub 2: Global / Map chat (+ slash commands)
         2 => {
-            let text = String::from_utf8_lossy(payload);
+            let text = crate::encoding::viscii_decode(payload);
             if text.chars().count() > 60 {
                 return; // Dropped when longer than 60 chars
             }

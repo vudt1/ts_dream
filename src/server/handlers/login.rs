@@ -32,7 +32,14 @@ pub async fn handle_login(ctx: &mut OpcodeCtx<'_>) {
         return;
     }
 
-    let password = &payload[8..];
+    // ctx.sub chứa lenPw do dispatcher bóc tách từ byte thứ 5 của frame.
+    // Dùng lenPw để cắt đúng độ dài mật khẩu thực tế, loại bỏ byte đệm/rác (nếu có).
+    let len_pw = ctx.sub as usize;
+    let password = if len_pw > 0 && payload.len() >= 8 + len_pw {
+        &payload[8..8 + len_pw]
+    } else {
+        &payload[8..]
+    };
     conn.session.id = acc_id;
     conn.session.pending_pass = password.to_vec();
     // `authed` is set only once auth succeeds — never before the password /
@@ -59,6 +66,7 @@ pub async fn handle_login(ctx: &mut OpcodeCtx<'_>) {
                 out.send(spawn::LOGIN_WRONG_PASS);
             } else if conn.session.name.is_empty() && conn.session.pending_new_char_name.is_empty()
             {
+                conn.session.authed = true;
                 out.send(spawn::LOGIN_CREATE_CHAR);
             } else {
                 conn.session.authed = true;
@@ -156,6 +164,10 @@ async fn login_db(
     conn.session.gm_level = access.gm_level.clamp(0, 99);
     repos.accounts().touch_login(id, now_ms).await?;
 
+    // Xác thực tài khoản thành công. Đặt cờ authed để khi người chơi tạo nhân vật
+    // và gửi gói tin xác nhận vào game (Opcode 0x03 Sub 0x01) phiên kết nối được chấp nhận.
+    conn.session.authed = true;
+
     // Player existence: an account with no character goes to the create-char
     // screen (and is NOT registered as online — the online registry only gains
     // an entry once a character exists).
@@ -174,7 +186,6 @@ async fn login_db(
     }
 
     conn.session.logined = true;
-    conn.session.authed = true;
     let seq = spawn::build_logined_sequence_session(&conn.session);
     out.outgoing.extend(
         seq.into_iter()

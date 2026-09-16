@@ -40,16 +40,30 @@ pub fn parse_create(payload: &[u8]) -> Option<CreateCharData> {
         return None;
     }
     let pass1_len = payload[19] as usize;
-    if payload.len() < 20 + pass1_len + 1 {
+    if payload.len() < 20 + pass1_len {
         return None;
     }
     let pass1 = payload[20..20 + pass1_len].to_vec();
-    let pass2 = payload[20 + pass1_len + 1..].to_vec();
+    let pass2 = if payload.len() > 20 + pass1_len {
+        let pass2_len = payload[20 + pass1_len] as usize;
+        if payload.len() >= 20 + pass1_len + 1 + pass2_len {
+            payload[20 + pass1_len + 1..20 + pass1_len + 1 + pass2_len].to_vec()
+        } else {
+            payload[20 + pass1_len + 1..].to_vec()
+        }
+    } else {
+        Vec::new()
+    };
+    let sex = if payload[0] <= 1 { payload[0] } else { 0 };
+    let thuoctinh = match payload[12] {
+        1..=4 => payload[12],
+        _ => 1,
+    };
     Some(CreateCharData {
-        sex: payload[0],
+        sex,
         hair: u16::from(payload[2]),
         color_hex: encoder::hex(&payload[4..12]),
-        thuoctinh: payload[12],
+        thuoctinh,
         int1: payload[13],
         atk: payload[14],
         def: payload[15],
@@ -58,6 +72,21 @@ pub fn parse_create(payload: &[u8]) -> Option<CreateCharData> {
         agi: payload[18],
         pass1,
         pass2,
+    })
+}
+
+/// Kiểm tra tính hợp lệ của tên nhân vật nhập từ máy khách (mã hóa VISCII 1.1).
+/// Độ dài tối đa 16 bytes, không bắt đầu/kết thúc bằng khoảng trắng, không chứa ký tự điều khiển cấm.
+pub fn is_valid_char_name(name: &[u8]) -> bool {
+    if name.is_empty() || name.len() > 16 {
+        return false;
+    }
+    if name.first() == Some(&b' ') || name.last() == Some(&b' ') {
+        return false;
+    }
+    name.iter().all(|&b| {
+        (b >= 0x20 && b != 0x7F)
+            || matches!(b, 0x02 | 0x05 | 0x06 | 0x14 | 0x19 | 0x1E)
     })
 }
 
@@ -70,14 +99,22 @@ pub async fn handle_character(ctx: &mut OpcodeCtx<'_>) {
         // Sub 2: Name check
         2 => {
             let candidate = payload;
+            if !is_valid_char_name(candidate) {
+                conn.session.pending_new_char_name.clear();
+                out.send(crate::server::spawn::CHAR_NAME_INVALID);
+                return;
+            }
             match ctx.env.pool {
                 Some(_) => {
                     if let Some(repos) = ctx.env.repos {
                         match repos.characters().find_id_by_name(candidate).await {
-                            Ok(Some(_)) => out.send("F4440300090301"),
+                            Ok(Some(_)) => {
+                                conn.session.pending_new_char_name.clear();
+                                out.send(crate::server::spawn::CHAR_NAME_DUPLICATE);
+                            }
                             Ok(None) => {
                                 conn.session.pending_new_char_name = candidate.to_vec();
-                                out.send("F4440300090300");
+                                out.send(crate::server::spawn::CHAR_NAME_AVAILABLE);
                             }
                             Err(_) => out.shutdown = true,
                         }
@@ -87,39 +124,57 @@ pub async fn handle_character(ctx: &mut OpcodeCtx<'_>) {
                 }
                 None => {
                     if candidate == b"EXISTS" {
-                        out.send("F4440300090301"); // Name used
+                        conn.session.pending_new_char_name.clear();
+                        out.send(crate::server::spawn::CHAR_NAME_DUPLICATE); // Name used
                     } else {
                         conn.session.pending_new_char_name = candidate.to_vec();
-                        out.send("F4440300090300"); // Name available
+                        out.send(crate::server::spawn::CHAR_NAME_AVAILABLE); // Name available
                     }
                 }
             }
         }
         // Sub 1: Create character
         1 => {
+            if payload.is_empty() {
+                // Client confirmed entering game via 09 01 (Bear C# compatibility)
+                crate::server::handlers::login::handle_enter_game(ctx).await;
+                return;
+            }
+            let name = if !conn.session.pending_new_char_name.is_empty() {
+                conn.session.pending_new_char_name.clone()
+            } else {
+                conn.session.name.clone()
+            };
+            if !is_valid_char_name(&name) {
+                out.send(crate::server::spawn::CHAR_NAME_INVALID);
+                return;
+            }
             let Some(data) = parse_create(payload) else {
-                out.shutdown = true;
+                out.send(crate::server::spawn::CHAR_NAME_INVALID);
                 return;
             };
             match ctx.env.pool {
                 Some(_) => {
                     if let Some(repos) = ctx.env.repos {
-                        if create_char_db(repos, &mut conn.session, &data)
-                            .await
-                            .is_err()
-                        {
-                            out.shutdown = true; // Exception -> shutdown (modern cutover)
-                        } else {
-                            out.send("F44402000901"); // Character created success
+                        match create_char_db(repos, &mut conn.session, &data).await {
+                            Ok(()) => {
+                                conn.session.authed = true;
+                                out.send(crate::server::spawn::CHAR_CREATE_SUCCESS);
+                            }
+                            Err(_) => {
+                                // If insertion failed (e.g. name race condition duplicate), toast duplicate
+                                out.send(crate::server::spawn::CHAR_NAME_DUPLICATE);
+                            }
                         }
                     } else {
                         out.shutdown = true;
                     }
                 }
                 None => {
-                    conn.session.name = conn.session.pending_new_char_name.clone();
+                    conn.session.name = name;
                     apply_to_session(&mut conn.session, &data);
-                    out.send("F44402000901");
+                    conn.session.authed = true;
+                    out.send(crate::server::spawn::CHAR_CREATE_SUCCESS);
                 }
             }
         }
@@ -140,6 +195,9 @@ async fn create_char_db(
     } else {
         session.pending_new_char_name.clone()
     };
+    if name.is_empty() {
+        return Err(sqlx::Error::RowNotFound);
+    }
 
     // Reflect the new character into the live session before persisting the
     // complete modern row set.
@@ -160,6 +218,12 @@ async fn create_char_db(
         .sessions()
         .create_and_seed(account_id, &character_name, &seed, session)
         .await?;
+
+    // If a secondary password (pass2 / mã cá nhân) was specified during creation, persist it
+    if !data.pass2.is_empty() {
+        let _ = repos.accounts().update_pass2(account_id, &data.pass2).await;
+    }
+
     Ok(())
 }
 
@@ -201,12 +265,14 @@ pub fn apply_to_session(session: &mut Session, data: &CreateCharData) {
     session.gocnhin = 0;
     session.pk = 0;
     session.tham_chien = 1;
+    session.homdo.clear();
     session.homdo.push(InventoryItem {
         slot: 1,
         id: 32012,
         count: 4,
         ..Default::default()
     });
+    session.trangbi.clear();
     session.trangbi.push(InventoryItem {
         slot: 2,
         id: 19737,

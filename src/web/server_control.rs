@@ -339,6 +339,10 @@ async fn handle_client_connection(
     let mut buf = vec![0u8; 8192];
     let mut logined_id = 0u32;
 
+    // TS Online Client (aLogin.exe) hoàn toàn thụ động chờ Server gửi gói tin đầu tiên.
+    // Gửi ngay gói tin chào mừng chuyển sang Login Scene (Op 0x01, Sub 0x09, Scene 90 / 0x5A).
+    let _ = tx.send(crate::server::spawn::LOGIN_SCENE_GREETING.to_string());
+
     // One teardown path for every exit (peer close, read error, handler
     // shutdown, write error): set `close` and break, then run the cleanup once.
     let mut close = false;

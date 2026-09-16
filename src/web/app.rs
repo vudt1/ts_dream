@@ -55,11 +55,7 @@ impl NpcRow {
             .values()
             .map(|n| NpcRow {
                 id: n.id,
-                name: n
-                    .name
-                    .iter()
-                    .map(|&b| crate::encoding::viscii_to_unicode(b))
-                    .collect(),
+                name: crate::encoding::viscii_decode(&n.name),
                 lv: n.lv,
                 thuoctinh: n.thuoctinh,
                 hp: n.hp,

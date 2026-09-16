@@ -23,6 +23,7 @@ use crate::web::server_control::{ClientSender, ServerControl};
 /// Live-server environment threaded into the dispatcher: the DB pool and the
 /// shared client registry (double-login guard + broadcast). Absent (`none`)
 /// in golden replay, where handlers run purely in-memory over a seeded session.
+#[derive(Clone, Copy)]
 pub struct ServerEnv<'a> {
     pub pool: Option<&'a DbPool>,
     pub repos: Option<&'a crate::db::modern::sqlite::SqliteRepositories>,

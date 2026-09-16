@@ -22,6 +22,9 @@ pub trait AccountRepository {
 
     /// Byte-exact pass2 (secondary password) check.
     async fn verify_pass2(&self, account_id: i64, pass: &[u8]) -> RepoResult<bool>;
+
+    /// Update secondary password (pass2 / mã cá nhân).
+    async fn update_pass2(&self, account_id: i64, pass2: &[u8]) -> RepoResult<()>;
 }
 
 /// Character lifecycle against `characters` + `character_money`.

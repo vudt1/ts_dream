@@ -3,7 +3,7 @@
 //! Provides cursor-based reading over raw byte slices with bounds checking,
 //! Little-Endian primitive parsing, and VISCII 1.1 string decoding.
 
-use crate::encoding::viscii_to_unicode;
+use crate::encoding::viscii_decode;
 use crate::error::{Result, TsError};
 
 /// Zero-copy cursor over a binary packet slice.
@@ -132,7 +132,7 @@ impl<'a> PacketReader<'a> {
     pub fn read_viscii_pascal(&mut self) -> Result<String> {
         let len = self.read_u8()? as usize;
         let bytes = self.read_bytes(len)?;
-        Ok(bytes.iter().map(|&b| viscii_to_unicode(b)).collect())
+        Ok(viscii_decode(bytes))
     }
 
     /// Read a fixed-length VISCII string (reads `len` bytes, stops at first null byte if present).
@@ -142,7 +142,7 @@ impl<'a> PacketReader<'a> {
             Some(pos) => &bytes[..pos],
             None => bytes,
         };
-        Ok(content.iter().map(|&b| viscii_to_unicode(b)).collect())
+        Ok(viscii_decode(content))
     }
 
     /// Read a 35-byte `ThingData` struct from the stream.

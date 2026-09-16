@@ -41,9 +41,22 @@ fn now_banner() -> String {
 /// Login failure responses (op 0x01).
 pub const LOGIN_WRONG_PASS: &str = "F44402000106";
 pub const LOGIN_CREATE_CHAR: &str = "F4440300010300";
-pub const HELLO_REPLY: &str = "F4440300010901";
+/// Server Greeting Packet gửi ngay khi Client kết nối TCP thành công.
+/// Op: 0x01 (OP_AUTH), Sub: 0x09 (Scene Switch), SceneMode: 0x5A (90 - Login Scene).
+/// Payload 3 bytes: 01 09 5A -> Frame: F444030001095A.
+pub const LOGIN_SCENE_GREETING: &str = "F444030001095A";
 /// Op 0x03 enter-game when not authed → create char screen.
 pub const ENTER_GAME_CREATE: &str = "F4440300010300";
+
+/// Character creation responses (op 0x09).
+/// Op 0x09 Sub 0x03 ss 0x00 — Tên nhân vật hợp lệ và khả dụng (kích hoạt state-machine client).
+pub const CHAR_NAME_AVAILABLE: &str = "F4440300090300";
+/// Op 0x09 Sub 0x03 ss 0x01 — Tên nhân vật đã bị trùng lặp (toast: "Tên bị trùng lập, hãy lập lại tên mới").
+pub const CHAR_NAME_DUPLICATE: &str = "F4440300090301";
+/// Op 0x09 Sub 0x03 ss 0x02 — Tên nhân vật không hợp lệ (toast: "Tên không hợp lệ, hãy lấy tên khác").
+pub const CHAR_NAME_INVALID: &str = "F4440300090302";
+/// Op 0x09 Sub 0x01 — Tạo nhân vật thành công (client nhận được sẽ gửi Op 0x03 Sub 0x01 để vào game).
+pub const CHAR_CREATE_SUCCESS: &str = "F44402000901";
 
 /// Step 1 of Logined: end-talk + the `F4440300142100` marker.
 pub fn login_start() -> Vec<String> {
