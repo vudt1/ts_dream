@@ -65,7 +65,8 @@ CREATE TABLE IF NOT EXISTS characters (
     mapid       INTEGER DEFAULT 0,              -- Mã bản đồ hiện tại nhân vật đang đứng (theo Warp.Dat / CityEx.Dat)
     mapx        INTEGER DEFAULT 0,              -- Tọa độ trục X của nhân vật trên bản đồ hiện tại
     mapy        INTEGER DEFAULT 0,              -- Tọa độ trục Y của nhân vật trên bản đồ hiện tại
-    jobtype     INTEGER DEFAULT 0               -- Nghề nghiệp: 0=Dân thường, 1=Hiệp sĩ, 2=Nho gia, 3=Hiền triết, 4=Bá vương
+    jobtype     INTEGER DEFAULT 0,              -- Nghề nghiệp: 0=Dân thường, 1=Hiệp sĩ, 2=Nho gia, 3=Hiền triết, 4=Bá vương
+    newbie      INTEGER DEFAULT 0               -- Đánh dấu tân thủ nhận quà đặc biệt (0 = Chưa nhận, 1 = Đã nhận)
 );
 
 -- ============================================================================
@@ -157,6 +158,9 @@ CREATE TABLE IF NOT EXISTS character_pets (
     skill4_id    INTEGER DEFAULT 0,     -- Mã ID kỹ năng chiến đấu thứ 4
     skill4_level INTEGER DEFAULT 0,     -- Cấp độ kỹ năng thứ 4
     isactive     INTEGER DEFAULT 0,     -- Cờ trạng thái xuất chiến: 1=Đang chọn làm Pet chiến đấu chính, 0=Nghỉ ngơi
+    thd          INTEGER DEFAULT 0,     -- Điểm thuần phục (THD) của võ tướng
+    texp         INTEGER DEFAULT 0,     -- Điểm kinh nghiệm TEXP của võ tướng
+    quest        INTEGER DEFAULT 0,     -- Cờ nhiệm vụ / sự kiện của võ tướng
     PRIMARY KEY (playerid, storagetype, slot)
 );
 
@@ -268,3 +272,17 @@ CREATE TABLE IF NOT EXISTS item_code (
 
 CREATE INDEX IF NOT EXISTS item_code_code ON item_code (code);
 CREATE INDEX IF NOT EXISTS item_code_redeem ON item_code (code, password, playerid);
+
+-- ============================================================================
+-- gm_audit_log — Nhật ký ghi lại các thao tác phân quyền quản trị viên GM.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS gm_audit_log (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    actor_account_id  INTEGER NOT NULL,
+    actor_gm_level    INTEGER NOT NULL,
+    target_account_id INTEGER NULL,
+    action            TEXT NOT NULL,
+    details           TEXT NOT NULL,
+    created_at        INTEGER NOT NULL
+);
+

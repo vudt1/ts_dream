@@ -14,7 +14,7 @@ async fn character_id_tx(
     tx: &mut SqliteTx<'_>,
     account_id: i64,
 ) -> Result<Option<i64>, sqlx::Error> {
-    sqlx::query_scalar("SELECT character_id FROM characters WHERE character_id = ?")
+    sqlx::query_scalar("SELECT playerid FROM characters WHERE playerid = ?")
         .bind(account_id)
         .fetch_optional(&mut **tx)
         .await
@@ -22,26 +22,28 @@ async fn character_id_tx(
 
 fn character_column(column: &str) -> Option<&'static str> {
     Some(match column {
-        "Lv" => "level",
-        "Hp" => "hp",
-        "HpMax" => "hp_max",
-        "Sp" => "sp",
-        "SpMax" => "sp_max",
-        "Point" => "stat_point",
-        "SkillPoint" => "skill_point",
-        "Int" => "int_attr",
-        "Atk" => "atk",
-        "Def" => "def",
-        "Hpx" => "hpx",
-        "Spx" => "spx",
-        "Agi" => "agi",
-        "newbie" => "newbie",
-        "MapId" => "map_id",
-        "MapX" => "map_x",
-        "MapY" => "map_y",
-        "Reborn" => "reborn",
-        "Job" => "job",
-        "Hair" => "hair",
+        "Lv" | "level" => "level",
+        "Hp" | "curhp" => "curhp",
+        "HpMax" | "maxhp" => "maxhp",
+        "Sp" | "cursp" => "cursp",
+        "SpMax" | "maxsp" => "maxsp",
+        "Point" | "freepoints" => "freepoints",
+        "SkillPoint" | "skillpoint" => "skillpoint",
+        "Int" | "baseint" => "baseint",
+        "Atk" | "baseatk" => "baseatk",
+        "Def" | "basedef" => "basedef",
+        "Hpx" | "basehpx" => "basehpx",
+        "Spx" | "basespx" => "basespx",
+        "Agi" | "baseagi" => "baseagi",
+        "Pk" | "pk" => "pk",
+        "Texp" | "Exp" | "texp" | "exp" => "curexp",
+        "Newbie" | "newbie" => "newbie",
+        "MapId" | "mapid" => "mapid",
+        "MapX" | "mapx" => "mapx",
+        "MapY" | "mapy" => "mapy",
+        "Reborn" | "rebornstage" => "rebornstage",
+        "Job" | "jobtype" => "jobtype",
+        "Hair" | "hair" => "hair",
         _ => return None,
     })
 }
@@ -50,16 +52,42 @@ fn character_column(column: &str) -> Option<&'static str> {
 pub async fn update_player(pool: Option<&DbPool>, player_id: u32, column: &str, value: i64) {
     let Some(pool) = pool else { return };
     let account_id = i64::from(player_id);
+    if column == "SttPetXuatchien" {
+        let mut tx = match pool.write.begin().await {
+            Ok(tx) => tx,
+            Err(e) => {
+                tracing::warn!("begin SttPetXuatchien tx failed: {e}");
+                return;
+            }
+        };
+        let _ = sqlx::query("UPDATE character_pets SET isactive = 0 WHERE playerid = ?")
+            .bind(account_id)
+            .execute(&mut *tx)
+            .await;
+        if value > 0 {
+            let _ = sqlx::query(
+                "UPDATE character_pets SET isactive = 1 WHERE playerid = ? AND storagetype = 1 AND slot = ?",
+            )
+            .bind(account_id)
+            .bind(value)
+            .execute(&mut *tx)
+            .await;
+        }
+        if let Err(e) = tx.commit().await {
+            tracing::warn!("commit SttPetXuatchien tx failed: {e}");
+        }
+        return;
+    }
     if matches!(column, "Gold" | "BankGold" | "ShopPoint") {
         let field = match column {
             "Gold" => "gold",
-            "BankGold" => "bank_gold",
-            "ShopPoint" => "shop_point",
+            "BankGold" => "bankgold",
+            "ShopPoint" => "shoppoint",
             _ => unreachable!(),
         };
         let sql = format!(
-            "INSERT INTO character_money (character_id, {field}) VALUES (?, ?) \
-             ON CONFLICT(character_id) DO UPDATE SET {field} = excluded.{field}"
+            "INSERT INTO character_money (playerid, {field}) VALUES (?, ?) \
+             ON CONFLICT(playerid) DO UPDATE SET {field} = excluded.{field}"
         );
         if let Err(e) = sqlx::query(&sql)
             .bind(account_id)
@@ -75,7 +103,7 @@ pub async fn update_player(pool: Option<&DbPool>, player_id: u32, column: &str, 
         tracing::warn!("skipped unknown modern character column write: {column}");
         return;
     };
-    let sql = format!("UPDATE characters SET {field} = ? WHERE character_id = ?");
+    let sql = format!("UPDATE characters SET {field} = ? WHERE playerid = ?");
     if let Err(e) = sqlx::query(&sql)
         .bind(value)
         .bind(account_id)
@@ -90,9 +118,9 @@ pub async fn update_player(pool: Option<&DbPool>, player_id: u32, column: &str, 
 pub async fn update_skillsave(pool: Option<&DbPool>, player_id: u32, slot: u8, skill: u16) {
     let Some(pool) = pool else { return };
     let result = sqlx::query(
-        "INSERT INTO character_hotkeys (character_id, slot, skill_id)
+        "INSERT INTO character_hotkeys (playerid, slot, skillid)
          VALUES (?, ?, ?)
-         ON CONFLICT(character_id, slot) DO UPDATE SET skill_id = excluded.skill_id",
+         ON CONFLICT(playerid, slot) DO UPDATE SET skillid = excluded.skillid",
     )
     .bind(i64::from(player_id))
     .bind(i64::from(slot))
@@ -120,7 +148,7 @@ pub async fn clear_items(pool: Option<&DbPool>, player_id: u32, table: &str) {
     let Some(storage) = storage_type(table) else {
         return;
     };
-    let sql = "DELETE FROM inventories WHERE character_id = ? AND storage_type = ?";
+    let sql = "DELETE FROM inventories WHERE playerid = ? AND storagetype = ?";
     if let Err(e) = sqlx::query(sql)
         .bind(i64::from(player_id))
         .bind(storage)
@@ -153,7 +181,7 @@ pub async fn upsert_item(
             let id = character_id_tx(&mut tx, i64::from(player_id)).await?;
             if let Some(id) = id {
                 sqlx::query(
-                    "DELETE FROM inventories WHERE character_id = ? AND storage_type = ? AND slot = ?",
+                    "DELETE FROM inventories WHERE playerid = ? AND storagetype = ? AND slot = ?",
                 )
                 .bind(id)
                 .bind(storage)
@@ -190,7 +218,7 @@ async fn upsert_inventory_tx(
         return Ok(());
     };
     let _ = item;
-    sqlx::query("INSERT INTO inventories (character_id, storage_type, slot, item_id, quantity, damage) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(character_id, storage_type, slot) DO UPDATE SET item_id=excluded.item_id, quantity=excluded.quantity, damage=excluded.damage")
+    sqlx::query("INSERT INTO inventories (playerid, storagetype, slot, itemid, quantity, damage) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(playerid, storagetype, slot) DO UPDATE SET itemid=excluded.itemid, quantity=excluded.quantity, damage=excluded.damage")
         .bind(id).bind(storage).bind(i64::from(item.slot)).bind(i64::from(item.id)).bind(i64::from(item.count)).bind(i64::from(item.doben))
         .execute(&mut **tx).await?;
     Ok(())
@@ -258,7 +286,7 @@ async fn replace_inventory_tx(
     let Some(id) = character_id_tx(tx, account_id).await? else {
         return Ok(());
     };
-    sqlx::query("DELETE FROM inventories WHERE character_id = ? AND storage_type = ?")
+    sqlx::query("DELETE FROM inventories WHERE playerid = ? AND storagetype = ?")
         .bind(id)
         .bind(storage)
         .execute(&mut **tx)
@@ -277,14 +305,14 @@ async fn update_money_tx(
 ) -> Result<(), sqlx::Error> {
     let field = match field {
         "gold" => "gold",
-        "bank_gold" => "bank_gold",
-        "shop_point" => "shop_point",
+        "bank_gold" | "bankgold" => "bankgold",
+        "shop_point" | "shoppoint" => "shoppoint",
         _ => return Ok(()),
     };
     let Some(id) = character_id_tx(tx, account_id).await? else {
         return Ok(());
     };
-    let sql = format!("INSERT INTO character_money (character_id, {field}) VALUES (?, ?) ON CONFLICT(character_id) DO UPDATE SET {field}=excluded.{field}");
+    let sql = format!("INSERT INTO character_money (playerid, {field}) VALUES (?, ?) ON CONFLICT(playerid) DO UPDATE SET {field}=excluded.{field}");
     sqlx::query(&sql)
         .bind(id)
         .bind(value)
@@ -308,7 +336,7 @@ pub async fn persist_shop_point_and_item(
         update_money_tx(
             &mut tx,
             i64::from(player_id),
-            "shop_point",
+            "shoppoint",
             i64::from(points),
         )
         .await?;
@@ -345,17 +373,17 @@ pub async fn upsert_skill(
     save: u8,
 ) {
     let Some(pool) = pool else { return };
-    if let Err(e) = sqlx::query("INSERT INTO character_skills (character_id, skill_id, level, sp, save_flag) VALUES (?, ?, ?, ?, ?) ON CONFLICT(character_id, skill_id) DO UPDATE SET level=excluded.level, sp=excluded.sp, save_flag=excluded.save_flag")
+    if let Err(e) = sqlx::query("INSERT INTO character_skills (playerid, skillid, level, sp, saveflag) VALUES (?, ?, ?, ?, ?) ON CONFLICT(playerid, skillid) DO UPDATE SET level=excluded.level, sp=excluded.sp, saveflag=excluded.saveflag")
         .bind(i64::from(player_id)).bind(i64::from(skill_id)).bind(i64::from(lv)).bind(i64::from(sp)).bind(i64::from(save)).execute(&pool.write).await { tracing::warn!("modern upsert_skill failed: {e}"); }
 }
 
 pub async fn delete_reborn_skills(pool: Option<&DbPool>, player_id: u32) {
     let Some(pool) = pool else { return };
-    if let Err(e) = sqlx::query("DELETE FROM character_skills WHERE character_id=? AND skill_id BETWEEN 10001 AND 13033 AND skill_id NOT IN (10016,10017,10018,10019,11016,11017,11018,11019,12016,12017,12018,12019,13015,13016,13017,13018)")
+    if let Err(e) = sqlx::query("DELETE FROM character_skills WHERE playerid=? AND skillid BETWEEN 10001 AND 13033 AND skillid NOT IN (10016,10017,10018,10019,11016,11017,11018,11019,12016,12017,12018,12019,13015,13016,13017,13018)")
         .bind(i64::from(player_id)).execute(&pool.write).await { tracing::warn!("modern delete_reborn_skills failed: {e}"); }
 }
 
-pub const DELETE_SYSTEM_SKILLS_SQL: &str = "DELETE FROM character_skills WHERE character_id = ? AND skill_id >= 0 AND skill_id <= 9";
+pub const DELETE_SYSTEM_SKILLS_SQL: &str = "DELETE FROM character_skills WHERE playerid = ? AND skillid >= 0 AND skillid <= 9";
 
 pub async fn delete_system_skills(pool: Option<&DbPool>, player_id: u32) {
     let Some(pool) = pool else { return };
@@ -377,7 +405,7 @@ pub async fn upsert_pet(pool: Option<&DbPool>, player_id: u32, pet: &PetState) {
         pet.stt.saturating_sub(4)
     };
     let [s1, s2, s3, s4] = pet.skills;
-    let result = sqlx::query("INSERT INTO character_pets (character_id, storage_type, slot, pet_id, name, level, element, reborn, hp, hp_max, sp, sp_max, int_attr, atk, def, hpx, spx, agi, fai, thd, texp, skill_point, quest, skill1_id, skill1_level, skill2_id, skill2_level, skill3_id, skill3_level, skill4_id, skill4_level) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(character_id, storage_type, slot) DO UPDATE SET pet_id=excluded.pet_id, name=excluded.name, level=excluded.level, element=excluded.element, reborn=excluded.reborn, hp=excluded.hp, hp_max=excluded.hp_max, sp=excluded.sp, sp_max=excluded.sp_max, int_attr=excluded.int_attr, atk=excluded.atk, def=excluded.def, hpx=excluded.hpx, spx=excluded.spx, agi=excluded.agi, fai=excluded.fai, thd=excluded.thd, texp=excluded.texp, skill_point=excluded.skill_point, quest=excluded.quest, skill1_id=excluded.skill1_id, skill1_level=excluded.skill1_level, skill2_id=excluded.skill2_id, skill2_level=excluded.skill2_level, skill3_id=excluded.skill3_id, skill3_level=excluded.skill3_level, skill4_id=excluded.skill4_id, skill4_level=excluded.skill4_level")
+    let result = sqlx::query("INSERT INTO character_pets (playerid, storagetype, slot, petid, name, level, element, rebornstage, curhp, maxhp, cursp, maxsp, baseint, baseatk, basedef, basehpx, basespx, baseagi, fai, thd, texp, skillpoint, quest, skill1_id, skill1_level, skill2_id, skill2_level, skill3_id, skill3_level, skill4_id, skill4_level) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(playerid, storagetype, slot) DO UPDATE SET petid=excluded.petid, name=excluded.name, level=excluded.level, element=excluded.element, rebornstage=excluded.rebornstage, curhp=excluded.curhp, maxhp=excluded.maxhp, cursp=excluded.cursp, maxsp=excluded.maxsp, baseint=excluded.baseint, baseatk=excluded.baseatk, basedef=excluded.basedef, basehpx=excluded.basehpx, basespx=excluded.basespx, baseagi=excluded.baseagi, fai=excluded.fai, thd=excluded.thd, texp=excluded.texp, skillpoint=excluded.skillpoint, quest=excluded.quest, skill1_id=excluded.skill1_id, skill1_level=excluded.skill1_level, skill2_id=excluded.skill2_id, skill2_level=excluded.skill2_level, skill3_id=excluded.skill3_id, skill3_level=excluded.skill3_level, skill4_id=excluded.skill4_id, skill4_level=excluded.skill4_level")
         .bind(i64::from(player_id)).bind(storage).bind(i64::from(slot)).bind(i64::from(pet.id)).bind(&pet.name).bind(i64::from(pet.level)).bind(i64::from(pet.thuoctinh)).bind(i64::from(pet.reborn)).bind(i64::from(pet.hp)).bind(i64::from(pet.hp_max)).bind(i64::from(pet.sp)).bind(i64::from(pet.sp_max)).bind(i64::from(pet.int1)).bind(i64::from(pet.atk)).bind(i64::from(pet.def)).bind(i64::from(pet.hpx)).bind(i64::from(pet.spx)).bind(i64::from(pet.agi)).bind(i64::from(pet.fai)).bind(i64::from(pet.thd)).bind(i64::from(pet.texp)).bind(i64::from(pet.skill_point)).bind(i64::from(pet.quest)).bind(i64::from(s1.0)).bind(i64::from(s1.1)).bind(i64::from(s2.0)).bind(i64::from(s2.1)).bind(i64::from(s3.0)).bind(i64::from(s3.1)).bind(i64::from(s4.0)).bind(i64::from(s4.1)).execute(&pool.write).await;
     if let Err(e) = result {
         tracing::warn!("modern upsert_pet(stt {}) failed: {e}", pet.stt);

@@ -335,7 +335,7 @@ async fn handle_client_connection(
     let (mut read_half, mut write_half) = stream.into_split();
     let (tx, mut rx) = mpsc::unbounded_channel::<String>();
 
-    let mut conn = Conn::new();
+    let mut conn = Conn::with_peer_ip(peer.ip().to_string());
     let mut buf = vec![0u8; 8192];
     let mut logined_id = 0u32;
 

@@ -9,10 +9,10 @@ pub struct SqlitePetRepository<'a> {
     pub pool: &'a DbPool,
 }
 
-const SELECT_COLUMNS: &str = "slot, pet_id, name, level, element, reborn, hp, hp_max, sp, \
-     sp_max, int_attr, atk, def, hpx, spx, agi, fai, texp, skill_point, thd, \
+const SELECT_COLUMNS: &str = "slot, petid AS pet_id, name, level, element, rebornstage AS reborn, curhp AS hp, maxhp AS hp_max, cursp AS sp, \
+     maxsp AS sp_max, baseint AS int_attr, baseatk AS atk, basedef AS def, basehpx AS hpx, basespx AS spx, baseagi AS agi, fai, texp, skillpoint AS skill_point, thd, \
      skill1_id, skill1_level, skill2_id, skill2_level, skill3_id, skill3_level, \
-     skill4_id, skill4_level, quest";
+     skill4_id, skill4_level, quest, isactive AS is_active";
 
 impl PetRepository for SqlitePetRepository<'_> {
     async fn load_storage(
@@ -22,7 +22,7 @@ impl PetRepository for SqlitePetRepository<'_> {
     ) -> RepoResult<Vec<PetRecord>> {
         let sql = format!(
             "SELECT {SELECT_COLUMNS} FROM character_pets \
-             WHERE character_id = ? AND storage_type = ? AND pet_id > 0 ORDER BY slot"
+             WHERE playerid = ? AND storagetype = ? AND petid > 0 ORDER BY slot"
         );
         let rows = sqlx::query(&sql)
             .bind(character_id)
@@ -41,24 +41,24 @@ impl PetRepository for SqlitePetRepository<'_> {
         let [s1, s2, s3, s4] = pet.skills;
         sqlx::query(
             "INSERT INTO character_pets \
-             (character_id, storage_type, slot, pet_id, name, level, element, reborn, hp, hp_max, \
-              sp, sp_max, int_attr, atk, def, hpx, spx, agi, fai, texp, skill_point, thd, \
+             (playerid, storagetype, slot, petid, name, level, element, rebornstage, curhp, maxhp, \
+              cursp, maxsp, baseint, baseatk, basedef, basehpx, basespx, baseagi, fai, texp, skillpoint, thd, \
               skill1_id, skill1_level, skill2_id, skill2_level, skill3_id, skill3_level, \
-              skill4_id, skill4_level, quest) \
+              skill4_id, skill4_level, quest, isactive) \
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \
-                     ?, ?, ?, ?, ?, ?, ?, ?) \
-             ON CONFLICT(character_id, storage_type, slot) DO UPDATE SET pet_id = excluded.pet_id, \
+                     ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
+             ON CONFLICT(playerid, storagetype, slot) DO UPDATE SET petid = excluded.petid, \
              name = excluded.name, level = excluded.level, element = excluded.element, \
-             reborn = excluded.reborn, hp = excluded.hp, hp_max = excluded.hp_max, \
-             sp = excluded.sp, sp_max = excluded.sp_max, int_attr = excluded.int_attr, \
-             atk = excluded.atk, def = excluded.def, hpx = excluded.hpx, spx = excluded.spx, \
-             agi = excluded.agi, fai = excluded.fai, texp = excluded.texp, \
-             skill_point = excluded.skill_point, thd = excluded.thd, \
+             rebornstage = excluded.rebornstage, curhp = excluded.curhp, maxhp = excluded.maxhp, \
+             cursp = excluded.cursp, maxsp = excluded.maxsp, baseint = excluded.baseint, \
+             baseatk = excluded.baseatk, basedef = excluded.basedef, basehpx = excluded.basehpx, basespx = excluded.basespx, \
+             baseagi = excluded.baseagi, fai = excluded.fai, texp = excluded.texp, \
+             skillpoint = excluded.skillpoint, thd = excluded.thd, \
              skill1_id = excluded.skill1_id, skill1_level = excluded.skill1_level, \
              skill2_id = excluded.skill2_id, skill2_level = excluded.skill2_level, \
              skill3_id = excluded.skill3_id, skill3_level = excluded.skill3_level, \
              skill4_id = excluded.skill4_id, skill4_level = excluded.skill4_level, \
-             quest = excluded.quest",
+             quest = excluded.quest, isactive = excluded.isactive",
         )
         .bind(character_id)
         .bind(storage_type.value())
@@ -91,6 +91,7 @@ impl PetRepository for SqlitePetRepository<'_> {
         .bind(s4.id)
         .bind(s4.level)
         .bind(pet.quest)
+        .bind(pet.is_active as i64)
         .execute(&self.pool.write)
         .await?;
         Ok(())
@@ -103,7 +104,7 @@ impl PetRepository for SqlitePetRepository<'_> {
         slot: u16,
     ) -> RepoResult<()> {
         sqlx::query(
-            "DELETE FROM character_pets WHERE character_id = ? AND storage_type = ? AND slot = ?",
+            "DELETE FROM character_pets WHERE playerid = ? AND storagetype = ? AND slot = ?",
         )
         .bind(character_id)
         .bind(storage_type.value())
@@ -149,5 +150,6 @@ fn row_to_pet(r: &sqlx::sqlite::SqliteRow) -> Option<PetRecord> {
             skill("skill4_id", "skill4_level")?,
         ],
         quest: r.try_get("quest").ok()?,
+        is_active: r.try_get::<i64, _>("is_active").map(|v| v != 0).unwrap_or(false),
     })
 }

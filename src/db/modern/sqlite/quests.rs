@@ -14,10 +14,10 @@ pub struct SqliteQuestRepository<'a> {
 impl QuestRepository for SqliteQuestRepository<'_> {
     async fn upsert_mission(&self, character_id: i64, mission: &MissionRow) -> RepoResult<()> {
         sqlx::query(
-            "INSERT INTO character_missions (character_id, mission_id, step, state, updated_at) \
+            "INSERT INTO character_missions (playerid, missionid, step, state, updatedat) \
              VALUES (?, ?, ?, ?, ?) \
-             ON CONFLICT(character_id, mission_id) DO UPDATE SET \
-             step = excluded.step, state = excluded.state, updated_at = excluded.updated_at",
+             ON CONFLICT(playerid, missionid) DO UPDATE SET \
+             step = excluded.step, state = excluded.state, updatedat = excluded.updatedat",
         )
         .bind(character_id)
         .bind(mission.mission_id)
@@ -31,8 +31,8 @@ impl QuestRepository for SqliteQuestRepository<'_> {
 
     async fn list_missions(&self, character_id: i64) -> RepoResult<Vec<MissionRow>> {
         let rows = sqlx::query(
-            "SELECT mission_id, step, state, updated_at FROM character_missions \
-             WHERE character_id = ?",
+            "SELECT missionid AS mission_id, step, state, updatedat AS updated_at FROM character_missions \
+             WHERE playerid = ?",
         )
         .bind(character_id)
         .fetch_all(&self.pool.read)
@@ -51,7 +51,7 @@ impl QuestRepository for SqliteQuestRepository<'_> {
     async fn set_bit_flag(&self, character_id: i64, flag_index: u32, now: i64) -> RepoResult<()> {
         // INSERT OR IGNORE semantics in SQLite: once latched, a forever flag never rewrites.
         sqlx::query(
-            "INSERT OR IGNORE INTO character_bit_flags (character_id, flag_index, set_at) \
+            "INSERT OR IGNORE INTO character_bit_flags (playerid, flagindex, set_at) \
              VALUES (?, ?, ?)",
         )
         .bind(character_id)
@@ -64,7 +64,7 @@ impl QuestRepository for SqliteQuestRepository<'_> {
 
     async fn has_bit_flag(&self, character_id: i64, flag_index: u32) -> RepoResult<bool> {
         let hits: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM character_bit_flags WHERE character_id = ? AND flag_index = ?",
+            "SELECT COUNT(*) FROM character_bit_flags WHERE playerid = ? AND flagindex = ?",
         )
         .bind(character_id)
         .bind(flag_index)
@@ -80,7 +80,7 @@ impl QuestRepository for SqliteQuestRepository<'_> {
         completed_at: i64,
     ) -> RepoResult<()> {
         sqlx::query(
-            "INSERT OR IGNORE INTO character_completed_events (character_id, event_id, completed_at) \
+            "INSERT OR IGNORE INTO character_completed_events (playerid, eventid, completedat) \
              VALUES (?, ?, ?)",
         )
         .bind(character_id)
@@ -94,7 +94,7 @@ impl QuestRepository for SqliteQuestRepository<'_> {
     async fn has_completed_event(&self, character_id: i64, event_id: i64) -> RepoResult<bool> {
         let hits: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM character_completed_events \
-             WHERE character_id = ? AND event_id = ?",
+             WHERE playerid = ? AND eventid = ?",
         )
         .bind(character_id)
         .bind(event_id)
@@ -109,7 +109,7 @@ impl QuestRepository for SqliteQuestRepository<'_> {
         skills: &[SkillRow],
         tx: &mut sqlx::SqliteConnection,
     ) -> RepoResult<()> {
-        sqlx::query("DELETE FROM character_skills WHERE character_id = ?")
+        sqlx::query("DELETE FROM character_skills WHERE playerid = ?")
             .bind(character_id)
             .execute(&mut *tx)
             .await?;
@@ -119,7 +119,7 @@ impl QuestRepository for SqliteQuestRepository<'_> {
         // One multi-row INSERT so the whole set lands in a single statement.
         let placeholders = vec!["(?, ?, ?, ?, ?)"; skills.len()].join(", ");
         let sql = format!(
-            "INSERT INTO character_skills (character_id, skill_id, level, sp, save_flag) \
+            "INSERT INTO character_skills (playerid, skillid, level, sp, saveflag) \
              VALUES {placeholders}"
         );
         let mut insert = sqlx::query(&sql);

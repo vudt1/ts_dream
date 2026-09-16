@@ -162,7 +162,7 @@ async fn login_db(
     }
     conn.session.account_name = access.account_name.as_bytes().to_vec();
     conn.session.gm_level = access.gm_level.clamp(0, 99);
-    repos.accounts().touch_login(id, now_ms).await?;
+    repos.accounts().touch_login(id, now_ms, &conn.peer_ip).await?;
 
     // Xác thực tài khoản thành công. Đặt cờ authed để khi người chơi tạo nhân vật
     // và gửi gói tin xác nhận vào game (Opcode 0x03 Sub 0x01) phiên kết nối được chấp nhận.

@@ -14,8 +14,8 @@ use crate::protocol::codecs::thing_data::ThingData;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum StorageType {
     Bag = 1,
-    Secondary = 2,
-    Bank = 4,
+    Bank = 2,
+    Secondary = 4,
     Equip = 8,
     Warehouse = 16,
 }
@@ -32,8 +32,8 @@ impl StorageType {
     pub fn from_value(raw: u8) -> Option<Self> {
         match raw {
             1 => Some(Self::Bag),
-            2 => Some(Self::Secondary),
-            4 => Some(Self::Bank),
+            2 => Some(Self::Bank),
+            4 => Some(Self::Secondary),
             8 => Some(Self::Equip),
             16 => Some(Self::Warehouse),
             _ => None,
@@ -142,6 +142,7 @@ pub struct PetRecord {
     pub thd: i64,
     pub skills: [PetSkill; 4],
     pub quest: i64,
+    pub is_active: bool,
 }
 
 /// One of the four general skill slots.

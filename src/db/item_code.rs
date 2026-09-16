@@ -38,8 +38,8 @@ pub async fn redeem_and_grant(
     let mut tx = pool.write.begin().await?;
 
     let row = sqlx::query_as::<_, CodeRow>(
-        "SELECT item_id, count FROM item_code \
-         WHERE code = ? AND password = ? AND player_id = 0",
+        "SELECT itemid AS item_id, count FROM item_code \
+         WHERE code = ? AND password = ? AND playerid = 0",
     )
     .bind(code)
     .bind(password)
@@ -54,8 +54,8 @@ pub async fn redeem_and_grant(
     let used_at = chrono::Utc::now().timestamp();
     let res = sqlx::query(
         "UPDATE item_code \
-         SET player_id = ?, used_at = ? \
-         WHERE code = ? AND password = ? AND player_id = 0",
+         SET playerid = ?, usedat = ? \
+         WHERE code = ? AND password = ? AND playerid = 0",
     )
     .bind(player_id)
     .bind(used_at)
@@ -89,7 +89,7 @@ pub async fn redeem_special_gift(
     let mut tx = pool.write.begin().await?;
 
     let newbie = sqlx::query_scalar::<_, i64>(
-        "SELECT newbie FROM characters WHERE character_id = ?",
+        "SELECT newbie FROM characters WHERE playerid = ?",
     )
     .bind(player_id)
     .fetch_optional(&mut *tx)
@@ -103,8 +103,8 @@ pub async fn redeem_special_gift(
     let used_at = chrono::Utc::now().timestamp();
     let res = sqlx::query(
         "UPDATE item_code \
-         SET player_id = ?, used_at = ? \
-         WHERE code = 'TSVN123' AND password = 'TSVN456' AND player_id = 0",
+         SET playerid = ?, usedat = ? \
+         WHERE code = 'TSVN123' AND password = 'TSVN456' AND playerid = 0",
     )
     .bind(player_id)
     .bind(used_at)
@@ -114,7 +114,7 @@ pub async fn redeem_special_gift(
         return Ok(RedeemOutcome::AlreadyGifted);
     }
 
-    sqlx::query("UPDATE characters SET newbie = 1 WHERE character_id = ?")
+    sqlx::query("UPDATE characters SET newbie = 1 WHERE playerid = ?")
         .bind(player_id)
         .execute(&mut *tx)
         .await?;
@@ -137,8 +137,8 @@ pub async fn reward_for(
     password: &str,
 ) -> Result<Option<(i64, i64)>, sqlx::Error> {
     let row = sqlx::query_as::<_, (i64, i64)>(
-        "SELECT item_id, count FROM item_code \
-         WHERE code = ? AND password = ? AND player_id = 0",
+        "SELECT itemid AS item_id, count FROM item_code \
+         WHERE code = ? AND password = ? AND playerid = 0",
     )
     .bind(code)
     .bind(password)

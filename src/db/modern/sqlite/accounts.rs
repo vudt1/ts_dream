@@ -31,7 +31,7 @@ impl SqliteAccountRepository<'_> {
         let s = std::str::from_utf8(pass2).unwrap_or("");
         if !s.is_empty() {
             let now_ms = chrono::Utc::now().timestamp_millis();
-            sqlx::query("UPDATE accounts SET pass2 = ?, updated_at = ? WHERE player_id = ?")
+            sqlx::query("UPDATE accounts SET pass2 = ?, updatedat = ? WHERE playerid = ?")
                 .bind(s)
                 .bind(now_ms)
                 .bind(account_id)
@@ -46,9 +46,9 @@ impl SqliteAccountRepository<'_> {
     /// shared PK `accounts.player_id = characters.character_id`).
     pub async fn access(&self, account_id: i64) -> RepoResult<Option<AccountAccess>> {
         sqlx::query_as::<_, AccountAccess>(
-            "SELECT player_id AS account_id, CAST(player_id AS TEXT) AS account_name,
-                    is_suspended, suspended_until, gm_level
-             FROM accounts WHERE player_id = ?",
+            "SELECT playerid AS account_id, CAST(playerid AS TEXT) AS account_name,
+                    issuspended AS is_suspended, suspendeduntil AS suspended_until, gmlevel AS gm_level
+             FROM accounts WHERE playerid = ?",
         )
         .bind(account_id)
         .fetch_optional(&self.pool.read)
@@ -64,9 +64,11 @@ impl SqliteAccountRepository<'_> {
                 .unwrap_or(true)
     }
 
-    pub async fn touch_login(&self, account_id: i64, now_ms: i64) -> RepoResult<()> {
-        sqlx::query("UPDATE accounts SET last_login_at = ?, updated_at = ? WHERE player_id = ?")
+    pub async fn touch_login(&self, account_id: i64, now_ms: i64, ip: &str) -> RepoResult<()> {
+        let ip_val = if ip.is_empty() { None } else { Some(ip) };
+        sqlx::query("UPDATE accounts SET lastlogin_at = ?, lastloginip = ?, updatedat = ? WHERE playerid = ?")
             .bind(now_ms)
+            .bind(ip_val)
             .bind(now_ms)
             .bind(account_id)
             .execute(&self.pool.write)
@@ -95,8 +97,8 @@ impl SqliteAccountRepository<'_> {
         }
         let mut tx = self.pool.write.begin().await?;
         let result = sqlx::query(
-            "UPDATE accounts SET gm_level = ?, updated_at = ?
-             WHERE player_id = ? AND gm_level <= ?",
+            "UPDATE accounts SET gmlevel = ?, updatedat = ?
+             WHERE playerid = ? AND gmlevel <= ?",
         )
         .bind(target_gm_level)
         .bind(chrono::Utc::now().timestamp_millis())
@@ -169,7 +171,7 @@ impl AccountRepository for SqliteAccountRepository<'_> {
 async fn verify(pool: &SqlitePool, account_id: i64, column: &str, pass: &[u8]) -> RepoResult<bool> {
     let sql = format!(
         "SELECT COUNT(*) FROM accounts \
-         WHERE player_id = ? AND HEX({column}) = HEX(?)"
+         WHERE playerid = ? AND HEX({column}) = HEX(?)"
     );
     let hits: i64 = sqlx::query_scalar(&sql)
         .bind(account_id)

@@ -37,19 +37,19 @@ pub async fn bank_transfer(
 ) -> Result<Money, TxError> {
     let mut tx = pool.write.begin().await?;
 
-    let (debit, credit, guard_col) = if amount >= 0 {
+    let (gold_delta, bank_delta, guard_col) = if amount >= 0 {
         (-amount, amount, "gold")
     } else {
-        (amount, -amount, "bank_gold")
+        (-amount, amount, "bankgold")
     };
-    let cost = debit.abs();
+    let cost = amount.abs();
 
     let updated = sqlx::query(&format!(
-        "UPDATE character_money SET gold = gold + ?, bank_gold = bank_gold + ? \
-         WHERE character_id = ? AND {guard_col} >= ?"
+        "UPDATE character_money SET gold = gold + ?, bankgold = bankgold + ? \
+         WHERE playerid = ? AND {guard_col} >= ?"
     ))
-    .bind(debit)
-    .bind(credit)
+    .bind(gold_delta)
+    .bind(bank_delta)
     .bind(character_id)
     .bind(cost)
     .execute(&mut *tx)
@@ -75,7 +75,7 @@ pub async fn shop_buy(
     let mut tx = pool.write.begin().await?;
 
     let updated = sqlx::query(
-        "UPDATE character_money SET gold = gold - ? WHERE character_id = ? AND gold >= ?",
+        "UPDATE character_money SET gold = gold - ? WHERE playerid = ? AND gold >= ?",
     )
     .bind(price)
     .bind(character_id)
@@ -172,8 +172,8 @@ async fn lock_inventory_cell(
     slot: u16,
 ) -> Result<Option<i64>, TxError> {
     let found = sqlx::query_scalar::<_, i64>(
-        "SELECT item_id FROM inventories \
-         WHERE character_id = ? AND storage_type = ? AND slot = ?",
+        "SELECT itemid FROM inventories \
+         WHERE playerid = ? AND storagetype = ? AND slot = ?",
     )
     .bind(character_id)
     .bind(storage_type.value())

@@ -468,6 +468,7 @@ impl Session {
 pub struct Conn {
     pub decoder: Decoder,
     pub session: Session,
+    pub peer_ip: String,
 }
 
 /// Online session registry: authoritative per-player session snapshots, synced
@@ -516,6 +517,15 @@ impl Conn {
         Self {
             decoder: Decoder::new(),
             session: Session::new(),
+            peer_ip: String::new(),
+        }
+    }
+
+    pub fn with_peer_ip(peer_ip: impl Into<String>) -> Self {
+        Self {
+            decoder: Decoder::new(),
+            session: Session::new(),
+            peer_ip: peer_ip.into(),
         }
     }
 }

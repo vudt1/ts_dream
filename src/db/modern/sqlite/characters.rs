@@ -16,15 +16,15 @@ impl SqliteCharacterRepository<'_> {
         name: &[u8],
         seed: &CharacterSeed,
     ) -> RepoResult<i64> {
-        // Shared PK: characters.character_id = accounts.player_id (1:1, no account_id column)
+        // Shared PK: characters.playerid = accounts.playerid (1:1, no account_id column)
         let mut tx = self.pool.write.begin().await?;
         sqlx::query(
-            "INSERT INTO characters (character_id, name, level, sex, hair, element, map_id, map_x, map_y) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO characters (playerid, name, level, gender, hair, element, mapid, mapx, mapy) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(account_id).bind(name).bind(seed.level).bind(seed.sex).bind(seed.hair)
         .bind(seed.element).bind(seed.map_id).bind(seed.map_x).bind(seed.map_y)
         .execute(&mut *tx).await?;
-        sqlx::query("INSERT INTO character_money (character_id) VALUES (?)")
+        sqlx::query("INSERT INTO character_money (playerid) VALUES (?)")
             .bind(account_id)
             .execute(&mut *tx)
             .await?;
@@ -33,7 +33,7 @@ impl SqliteCharacterRepository<'_> {
     }
 
     pub async fn find_id_by_name(&self, name: &[u8]) -> RepoResult<Option<i64>> {
-        sqlx::query_scalar::<_, i64>("SELECT character_id FROM characters WHERE HEX(name) = HEX(?) LIMIT 1")
+        sqlx::query_scalar::<_, i64>("SELECT playerid FROM characters WHERE HEX(name) = HEX(?) LIMIT 1")
             .bind(name)
             .fetch_optional(&self.pool.read)
             .await
@@ -53,21 +53,21 @@ impl SqliteCharacterRepository<'_> {
             "character_completed_events",
             "friends",
         ] {
-            sqlx::query(&format!("DELETE FROM {table} WHERE character_id = ?"))
+            sqlx::query(&format!("DELETE FROM {table} WHERE playerid = ?"))
                 .bind(character_id)
                 .execute(&mut *tx)
                 .await?;
         }
-        sqlx::query("DELETE FROM friends WHERE friend_id = ?")
+        sqlx::query("DELETE FROM friends WHERE friendid = ?")
             .bind(character_id)
             .execute(&mut *tx)
             .await?;
-        sqlx::query("DELETE FROM mails WHERE receiver_id = ? OR sender_id = ?")
+        sqlx::query("DELETE FROM mails WHERE receiverid = ? OR senderid = ?")
             .bind(character_id)
             .bind(character_id)
             .execute(&mut *tx)
             .await?;
-        sqlx::query("DELETE FROM characters WHERE character_id = ?")
+        sqlx::query("DELETE FROM characters WHERE playerid = ?")
             .bind(character_id)
             .execute(&mut *tx)
             .await?;
@@ -82,15 +82,15 @@ where
     E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
 {
     let row = sqlx::query(
-        "SELECT gold, bank_gold, shop_point FROM character_money WHERE character_id = ?",
+        "SELECT gold, bankgold, shoppoint FROM character_money WHERE playerid = ?",
     )
     .bind(character_id)
     .fetch_one(executor)
     .await?;
     Ok(Money {
         gold: row.get("gold"),
-        bank_gold: row.get("bank_gold"),
-        shop_point: row.get("shop_point"),
+        bank_gold: row.get("bankgold"),
+        shop_point: row.get("shoppoint"),
     })
 }
 
@@ -100,7 +100,7 @@ impl CharacterRepository for SqliteCharacterRepository<'_> {
 
         sqlx::query(
             "INSERT INTO characters \
-             (character_id, name, level, sex, hair, element, map_id, map_x, map_y) \
+             (playerid, name, level, gender, hair, element, mapid, mapx, mapy) \
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(account_id)
@@ -115,7 +115,7 @@ impl CharacterRepository for SqliteCharacterRepository<'_> {
         .execute(&mut *tx)
         .await?;
 
-        sqlx::query("INSERT INTO character_money (character_id) VALUES (?)")
+        sqlx::query("INSERT INTO character_money (playerid) VALUES (?)")
             .bind(account_id)
             .execute(&mut *tx)
             .await?;
@@ -126,8 +126,8 @@ impl CharacterRepository for SqliteCharacterRepository<'_> {
 
     async fn list_by_account(&self, account_id: i64) -> RepoResult<Vec<CharacterSummary>> {
         let rows = sqlx::query(
-            "SELECT character_id AS id, name, level, sex, hair, element FROM characters \
-             WHERE character_id = ? ORDER BY character_id",
+            "SELECT playerid AS id, name, level, gender AS sex, hair, element FROM characters \
+             WHERE playerid = ? ORDER BY playerid",
         )
         .bind(account_id)
         .fetch_all(&self.pool.read)
@@ -148,7 +148,7 @@ impl CharacterRepository for SqliteCharacterRepository<'_> {
 
     async fn find_id_by_name(&self, name: &[u8]) -> RepoResult<Option<i64>> {
         let found = sqlx::query_scalar::<_, i64>(
-            "SELECT character_id FROM characters WHERE HEX(name) = HEX(?) LIMIT 1",
+            "SELECT playerid FROM characters WHERE HEX(name) = HEX(?) LIMIT 1",
         )
         .bind(name)
         .fetch_optional(&self.pool.read)
@@ -165,7 +165,7 @@ impl CharacterRepository for SqliteCharacterRepository<'_> {
 
         // Order does not matter without FKs, but every dependent table must be
         // covered — this list is the authoritative "what belongs to a
-        // character" set from the 0002 schema.
+        // character" set from the 0001 schema.
         for table in [
             "character_money",
             "inventories",
@@ -177,25 +177,25 @@ impl CharacterRepository for SqliteCharacterRepository<'_> {
             "character_bit_flags",
             "character_completed_events",
             "friends",
-            "mails",
         ] {
-            let sql = format!("DELETE FROM {table} WHERE character_id = ?");
+            let sql = format!("DELETE FROM {table} WHERE playerid = ?");
             sqlx::query(&sql)
                 .bind(character_id)
                 .execute(&mut *tx)
                 .await?;
         }
         // mails/friends key the counterpart side too.
-        sqlx::query("DELETE FROM friends WHERE friend_id = ?")
+        sqlx::query("DELETE FROM friends WHERE friendid = ?")
             .bind(character_id)
             .execute(&mut *tx)
             .await?;
-        sqlx::query("DELETE FROM mails WHERE receiver_id = ?")
+        sqlx::query("DELETE FROM mails WHERE receiverid = ? OR senderid = ?")
+            .bind(character_id)
             .bind(character_id)
             .execute(&mut *tx)
             .await?;
 
-        sqlx::query("DELETE FROM characters WHERE character_id = ?")
+        sqlx::query("DELETE FROM characters WHERE playerid = ?")
             .bind(character_id)
             .execute(&mut *tx)
             .await?;

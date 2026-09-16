@@ -13,10 +13,11 @@ pub struct SqliteInventoryRepository<'a> {
     pub pool: &'a DbPool,
 }
 
-const SELECT_COLUMNS: &str = "storage_type, slot, item_id, quantity, damage, element, \
-     element_value, proof_kind, grow_level, grow_exp, special_kind, stone_attr, stone_level, \
-     enhance_level, delete_time, damaged_item_id, is_locked, reinforced, affix1, affix2, \
-     affix3, style_level";
+const SELECT_COLUMNS: &str = "storagetype AS storage_type, slot, itemid AS item_id, quantity, damage, element, \
+     elementvalue AS element_value, proofkind AS proof_kind, growlevel AS grow_level, growexp AS grow_exp, \
+     specialkind AS special_kind, stoneattr AS stone_attr, stonelevel AS stone_level, \
+     enhancelevel AS enhance_level, deletetime AS delete_time, damageditemid AS damaged_item_id, \
+     islocked AS is_locked, reinforced, affix1, affix2, affix3, stylelevel AS style_level";
 
 impl InventoryRepository for SqliteInventoryRepository<'_> {
     async fn load_storage(
@@ -26,7 +27,7 @@ impl InventoryRepository for SqliteInventoryRepository<'_> {
     ) -> RepoResult<Vec<InventorySlot>> {
         let sql = format!(
             "SELECT {SELECT_COLUMNS} FROM inventories \
-             WHERE character_id = ? AND storage_type = ? AND item_id > 0 ORDER BY slot"
+             WHERE playerid = ? AND storagetype = ? AND itemid > 0 ORDER BY slot"
         );
         let rows = sqlx::query(&sql)
             .bind(character_id)
@@ -47,21 +48,21 @@ impl InventoryRepository for SqliteInventoryRepository<'_> {
     {
         sqlx::query(
             "INSERT INTO inventories \
-             (character_id, storage_type, slot, item_id, quantity, damage, element, \
-              element_value, proof_kind, grow_level, grow_exp, special_kind, stone_attr, \
-              stone_level, enhance_level, delete_time, damaged_item_id, is_locked, reinforced, \
-              affix1, affix2, affix3, style_level) \
+             (playerid, storagetype, slot, itemid, quantity, damage, element, \
+              elementvalue, proofkind, growlevel, growexp, specialkind, stoneattr, \
+              stonelevel, enhancelevel, deletetime, damageditemid, islocked, reinforced, \
+              affix1, affix2, affix3, stylelevel) \
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
-             ON CONFLICT(character_id, storage_type, slot) DO UPDATE SET \
-             item_id = excluded.item_id, quantity = excluded.quantity, damage = excluded.damage, \
-             element = excluded.element, element_value = excluded.element_value, \
-             proof_kind = excluded.proof_kind, grow_level = excluded.grow_level, \
-             grow_exp = excluded.grow_exp, special_kind = excluded.special_kind, \
-             stone_attr = excluded.stone_attr, stone_level = excluded.stone_level, \
-             enhance_level = excluded.enhance_level, delete_time = excluded.delete_time, \
-             damaged_item_id = excluded.damaged_item_id, is_locked = excluded.is_locked, \
+             ON CONFLICT(playerid, storagetype, slot) DO UPDATE SET \
+             itemid = excluded.itemid, quantity = excluded.quantity, damage = excluded.damage, \
+             element = excluded.element, elementvalue = excluded.elementvalue, \
+             proofkind = excluded.proofkind, growlevel = excluded.growlevel, \
+             growexp = excluded.growexp, specialkind = excluded.specialkind, \
+             stoneattr = excluded.stoneattr, stonelevel = excluded.stonelevel, \
+             enhancelevel = excluded.enhancelevel, deletetime = excluded.deletetime, \
+             damageditemid = excluded.damageditemid, islocked = excluded.islocked, \
              reinforced = excluded.reinforced, affix1 = excluded.affix1, affix2 = excluded.affix2, \
-             affix3 = excluded.affix3, style_level = excluded.style_level",
+             affix3 = excluded.affix3, stylelevel = excluded.stylelevel",
         )
         .bind(character_id)
         .bind(slot.storage_type.value())
@@ -104,12 +105,12 @@ impl InventoryRepository for SqliteInventoryRepository<'_> {
         // Keep the row (vacancy marker) but zero every item column so a later
         // upsert never resurrects stale attributes.
         sqlx::query(
-            "UPDATE inventories SET item_id = 0, quantity = 0, damage = 0, element = 0, \
-             element_value = 0, proof_kind = 0, grow_level = 0, grow_exp = 0, \
-             special_kind = 0, stone_attr = 0, stone_level = 0, enhance_level = 0, \
-             delete_time = 0, damaged_item_id = 0, is_locked = 0, reinforced = 0, \
-             affix1 = 0, affix2 = 0, affix3 = 0, style_level = 0 \
-             WHERE character_id = ? AND storage_type = ? AND slot = ?",
+            "UPDATE inventories SET itemid = 0, quantity = 0, damage = 0, element = 0, \
+             elementvalue = 0, proofkind = 0, growlevel = 0, growexp = 0, \
+             specialkind = 0, stoneattr = 0, stonelevel = 0, enhancelevel = 0, \
+             deletetime = 0, damageditemid = 0, islocked = 0, reinforced = 0, \
+             affix1 = 0, affix2 = 0, affix3 = 0, stylelevel = 0 \
+             WHERE playerid = ? AND storagetype = ? AND slot = ?",
         )
         .bind(character_id)
         .bind(storage_type.value())
@@ -127,7 +128,7 @@ impl InventoryRepository for SqliteInventoryRepository<'_> {
     ) -> RepoResult<Option<InventorySlot>> {
         let sql = format!(
             "SELECT {SELECT_COLUMNS} FROM inventories \
-             WHERE character_id = ? AND storage_type = ? AND slot = ?"
+             WHERE playerid = ? AND storagetype = ? AND slot = ?"
         );
         let row = sqlx::query(&sql)
             .bind(character_id)
