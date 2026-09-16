@@ -1,4 +1,4 @@
-//! Login & session handlers (Opcode 0x00, 0x01, 0x03).
+//! Login & session handlers (Opcode 0x01, 0x03).
 //!
 //! Live-server path (env.pool present):
 //! version gate → account exists → pass1 check → double-login guard → load the
@@ -12,14 +12,6 @@ use crate::server::dispatcher::{HandleOutcome, OpcodeCtx};
 use crate::server::session::Conn;
 use crate::server::spawn;
 use crate::web::server_control::{ClientSender, ServerControl};
-
-/// Op 0x00 — Hello: reply only to the exact `F444010000` frame (opcode 0x00,
-/// length 1, no sub byte). Anything else is silently ignored (§2.3.1).
-pub fn handle_hello(ctx: &mut OpcodeCtx) {
-    if ctx.decoded.len() == 5 && ctx.payload.is_empty() {
-        ctx.out.send(spawn::HELLO_REPLY);
-    }
-}
 
 /// Op 0x01 — Login (version check >= 186, auth & session initialization).
 pub async fn handle_login(ctx: &mut OpcodeCtx<'_>) {

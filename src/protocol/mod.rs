@@ -26,8 +26,8 @@ pub const MAX_LEVEL: i64 = 200;
 // Server Main Opcodes
 // ============================================================================
 
-/// [0x00] System warning messages 
-pub const OP_SYSTEM: u8 = 0x00;
+/// [0x00] System warning messages / alert (S -> C only)
+pub const OP_SYSTEM_ALERT: u8 = 0x00;
 /// [0x01] Auth / Login / Logout / Kick / ServerList 
 pub const OP_AUTH: u8 = 0x01;
 /// [0x02] Chat (Normal, Team, Guild, World, Whisper) 
@@ -173,7 +173,7 @@ pub const OP_RECONNECT: u8 = 0xC7;
 
 /// All main opcodes handled by the TS Online server (spec/server_main_opcode.md).
 pub const SERVER_MAIN_OPCODES: &[u8] = &[
-    OP_SYSTEM, OP_AUTH, OP_CHAT, OP_LOOK, OP_PLAYER_APPEAR, OP_PLAYER_UPDATE, OP_MOVE,
+    OP_SYSTEM_ALERT, OP_AUTH, OP_CHAT, OP_LOOK, OP_PLAYER_APPEAR, OP_PLAYER_UPDATE, OP_MOVE,
     OP_PLAYER_DETAIL, OP_STAT_UPDATE, OP_CREATE_CHAR, OP_BATTLE, OP_RELOCATE, OP_GROUP,
     OP_MAIL, OP_PET, OP_NPC_MANAGE, OP_BATTLE_PET, OP_ACTION, OP_SKILL_SC, OP_ITEM,
     OP_ITEM_INFO, OP_SCENE_MANAGE, OP_TALK, OP_TRADE, OP_SKILL_CS, OP_BANK, OP_STORAGE,
@@ -198,7 +198,7 @@ pub fn is_main_opcode(opcode: u8) -> bool {
 /// Retrieve the constant name of a main opcode.
 pub fn opcode_name(opcode: u8) -> &'static str {
     match opcode {
-        OP_SYSTEM => "OP_SYSTEM",
+        OP_SYSTEM_ALERT => "OP_SYSTEM_ALERT",
         OP_AUTH => "OP_AUTH",
         OP_CHAT => "OP_CHAT",
         OP_LOOK => "OP_LOOK",
@@ -279,6 +279,7 @@ pub mod codecs;
 pub mod encoder;
 pub mod frame;
 pub mod reader;
+pub mod system_alert;
 pub mod writer;
 
 pub use codecs::{
@@ -286,6 +287,7 @@ pub use codecs::{
     ThingData, ThingDataCodec, FRIEND_EXTRA_SIZE, THING_DATA_SIZE,
 };
 pub use reader::PacketReader;
+pub use system_alert::{SystemAlert, SystemAlertReason};
 pub use writer::PacketWriter;
 
 /// Build an outgoing frame: `F444` + LE16(len) + `code` + `body`, where `len`

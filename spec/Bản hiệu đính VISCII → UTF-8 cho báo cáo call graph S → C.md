@@ -12,7 +12,7 @@
 | Dịch máy như “bạn chơi”, “quang cảnh”, “Tạo Vật” | Chuyển sang **người chơi**, **khung cảnh**, **dữ liệu nhân vật** khi không làm đổi ý nghĩa code. |
 | Cụm mơ hồ thuộc domain game | Giữ gần literal và ghi chú cần ngữ cảnh helper/packet để khẳng định. |
 
-## 2. Opcode `0x00` — System/Login: status đã hiệu đính
+## 2. Opcode `0x00` — System Alert: status đã hiệu đính
 
 Handler thực tế `0x0078AABE` nhận status `body[0]` trong `0..56`. Các dòng sau liên kết status với basic block và literal gốc; `0x0078AF97` là đường default chung cho status 0 và 39. [1]
 

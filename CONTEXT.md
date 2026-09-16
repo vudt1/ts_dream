@@ -26,8 +26,13 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 - **Định nghĩa**: Trạng thái kết nối trực tuyến giữa ứng dụng Client của người chơi và Game Server qua mạng TCP. Mỗi Session tương ứng với một người chơi đang hoạt động thực tế.
 
 ### Opcode & Domain Packet (Gói tin Opcode)
-- **Định nghĩa**: Đơn vị thông điệp nghiệp vụ trao đổi giữa Client và Server. Mỗi Opcode đại diện cho một lệnh hoặc sự kiện nghiệp vụ (ví dụ: Đăng nhập `0x00`/`0x01`, Chat `0x02`, Di chuyển `0x05`/`0x06`, Chiến đấu `0x32`).
+- **Định nghĩa**: Đơn vị thông điệp nghiệp vụ trao đổi giữa Client và Server. Mỗi Opcode đại diện cho một lệnh hoặc sự kiện nghiệp vụ (ví dụ: Chat `0x02`, Di chuyển `0x05`/`0x06`, Chiến đấu `0x32`).
 - **Tránh dùng các từ mơ hồ**: *Data Buffer*, *Payload*, *Raw Bytes* (trừ khi xử lý ở tầng mạng hạ tầng).
+
+### System Alert / OP_SYSTEM_ALERT (Cảnh báo Hệ thống)
+- **Định nghĩa**: Gói tin thông báo lỗi hệ thống, ngắt kết nối hoặc cảnh báo người chơi từ Server gửi xuống Client (Opcode `0x00`). Đây là gói tin **đơn hướng 100% (S → C)**; Client không bao giờ gửi Opcode này lên Server. Cấu trúc gồm Header `F4 44`, độ dài 2 byte, Opcode `0x00` và Sub-opcode (status 0..57) mang thông điệp tương ứng.
+- **Ràng buộc (Invariants)**: Chiều giao tiếp duy nhất là Server đến Client (S → C). Bất kỳ frame Opcode `0x00` nào từ Client gửi lên Server đều được coi là không hợp lệ và bị loại bỏ.
+
 
 ### Dispatcher (Bộ điều phối nghiệp vụ)
 - **Định nghĩa**: Dịch vụ miền (Domain Service) có nhiệm vụ tiếp nhận Gói tin Opcode đã giải mã, phân tích mã lệnh (Opcode/Subcode) và điều phối tới các Handler xử lý logic tương ứng.

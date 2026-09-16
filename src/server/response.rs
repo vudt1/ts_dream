@@ -45,6 +45,11 @@ impl<'a> ResponseSender<'a> {
         self.out.broadcast(subject, frame);
     }
 
+    /// Send an OP_SYSTEM_ALERT (Opcode 0x00) packet to client.
+    pub fn send_system_alert(&mut self, reason: crate::protocol::SystemAlertReason) {
+        self.out.send_system_alert(reason);
+    }
+
     /// Full bag dump (`1705`).
     pub fn send_bag_items(&mut self) {
         let frame = self.conn.session.dump_homdo();

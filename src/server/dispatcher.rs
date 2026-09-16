@@ -2,7 +2,7 @@
 //!
 //! `UpdateMainGrid_Recv` switches on byte [4] and delegates business logic to
 //! specialized handlers in `crate::server::handlers`:
-//! - `login.rs`: Opcode 0x00, 0x01 (version check >= 186), 0x03
+//! - `login.rs`: Opcode 0x01 (version check >= 186), 0x03
 //! - `chat.rs`: Opcode 0x02 (chat channels, whisper, party, slash commands)
 //! - `movement.rs`: Opcode 0x05, 0x06 (movement & map position)
 //! - `character.rs`: Opcode 0x09 (character creation & name check)
@@ -148,6 +148,11 @@ impl HandleOutcome {
             frame: frame.into(),
         });
     }
+
+    /// Send an OP_SYSTEM_ALERT (Opcode 0x00) packet to client.
+    pub fn send_system_alert(&mut self, reason: crate::protocol::SystemAlertReason) {
+        self.send(reason.to_hex());
+    }
 }
 
 /// Everything an opcode handler may touch, bundled into one context so the
@@ -212,8 +217,7 @@ pub async fn dispatch(
 
 async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
     match ctx.opcode {
-        // Op 0x00, 0x01, 0x03 — Hello, Login, Enter game confirm
-        0x00 => login::handle_hello(ctx),
+        // Op 0x01, 0x03 — Login, Enter game confirm
         0x01 => login::handle_login(ctx).await,
         0x03 => login::handle_enter_game(ctx).await,
 

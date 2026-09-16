@@ -29,8 +29,6 @@ Single-context layout — one [`CONTEXT.md`](CONTEXT.md) + `docs/adr/` at the re
 
 ## Hướng Dẫn Kiểm Thử (Testing Guide)
 
-> **Trạng thái hiện tại: TẠM THỜI KHÔNG CẦN TEST.** Toàn bộ test source đã được xóa (`tests/` trống). Quy định dưới đây áp dụng khi agent cần tạo lại test trong tương lai.
-
 - **Vị trí duy nhất cho test**: Mọi unit test / integration test mới **phải** đặt trong thư mục `tests/` ở repo root. **Cấm** `#[cfg(test)]` inline trong `src/` (kể cả `mod tests` nhỏ). Nếu cần test pure-logic, tạo file `tests/<feature>_test.rs` và import qua `ts_dream::...` public API.
 - **Tách biệt DB Test và DB Production**: Tuyệt đối **không** chạy test ghi đè lên file production `DB/ts_dream.db`. Test chạm cơ sở dữ liệu có thể thực hiện theo 2 cách:
   1. **In-memory SQLite (`sqlite::memory:?cache=shared`)**: Tối ưu cho unit test / repository test vì tốc độ thực thi tức thì, 0 disk I/O, độc lập giữa các test runner và tự hủy sau khi xong.
@@ -174,3 +172,7 @@ ts_dream/
         ├── tables.rs           # Bảng tra cứu dữ liệu (Element, Job, Exp, etc.)
         └── texps.rs            # Load công thức tăng điểm kinh nghiệm (TEXP)
 ```
+
+## Lưu ý khác
+Không tự ý commit source, user sẽ tự commit source thủ công.
+---

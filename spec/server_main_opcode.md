@@ -1,4 +1,5 @@
-OP_SYSTEM           = $00; // [0x00] System (warning messages)
+```
+  OP_SYSTEM_ALERT           = $00; // [0x00] System (warning messages)
   OP_AUTH             = $01; // [0x01] Auth / Login / Logout / Kick / ServerList (共用 - Shared)
   OP_CHAT             = $02; // [0x02] Chat (Normal, Team, Guild, World, Whisper) (共用 - Shared)
   OP_LOOK             = $03; // [0x03] Look / Inspect Target Player / NPC (NTS 新增 / C->S)
@@ -70,3 +71,4 @@ OP_SYSTEM           = $00; // [0x00] System (warning messages)
   OP_ACTIVITY         = $4D; // [0x4D] Activity (Hoạt động hàng ngày: Tháp 2k, 40 NPC)
   OP_ASTROLABE        = $4E; // [0x4E] Astrolabe (Hệ thống Tinh Đồ / Chiêm Tinh Tướng Tinh)
   OP_RECONNECT        = $C7; // [0xC7] Reconnect (Tái kết nối phiên làm việc khi rớt mạng)
+```
