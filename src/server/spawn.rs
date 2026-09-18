@@ -233,7 +233,7 @@ pub fn announce_frame(msg: &str) -> String {
     text_banner("020C", msg)
 }
 
-/// Build server name packet (op 0x27 sub 0x09).
+/// Build server name packet (op 0x27/OP_RANK_ANNOUNCE sub 0x09).
 pub fn server_name_frame(id: u32, server_name: &str) -> String {
     let visc = crate::encoding::viscii_encode(server_name);
     let name_len = visc.len() as u8;
@@ -252,7 +252,7 @@ pub fn session_offline_frame(id: u32) -> String {
     format!("F44408000B00{}0000", encoder::le32(id))
 }
 
-/// God / HP store / SP store frame: op 0x23 sub 0x04 + point + 12 zero bytes
+/// God / HP store / SP store frame: op 0x23/OP_ACCOUNT sub 0x04 + point + 12 zero bytes
 /// (`F44412002304 + le32(point) + "00"×12`).
 pub fn store_frame(point: u32) -> String {
     let mut body = String::new();

@@ -247,23 +247,25 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         // Op 0x13 — Pet summon / recall
         0x13 => pet_actions::handle_pet_summon(ctx).await,
 
-        // Op 0x14 — Action / legacy PC talk
+        // Op 0x14 — NpcEvent / NPC talk / gate / scene-script
+        // (NOT sitting/standing emotions — those are 0x20).
         0x14 => talk::handle_talk(ctx).await,
 
-        // Op 0x1A — PC Talk/Eve selector family. Separate PC/aLogin payload
-        // dialect (not mobile mainKind 20).
+        // Op 0x1A — MoneySync per mobile-table/C# (S->C money sync from
+        // GoldBankHandler); the PC/aLogin payload dialect carries talk
+        // selectors instead (not mobile mainKind 20).
         0x1A => npc_event::handle_pc_talk(ctx).await,
 
         // Op 0x17 — Inventory family; Level-2 subcode routing lives in the
         // handler module (base ops, use item, player shop, storage, reborn).
         0x17 => inventory::handle_inventory(ctx).await,
 
-        // Op 0x19 — Trade in the Kotlin/mobile table; SceneManage in the PC
-        // table (handler not yet ported — see ADR 0002 follow-up).
+        // Op 0x19 — Trade P2P items/pets (mobile-table/C# TransferHandler;
+        // handler not yet ported — see ADR 0002 follow-up).
         0x19 => unimplemented::handle(ctx),
 
-        // Op 0x1B — NPC shop in the Kotlin/mobile table; Trade in the PC
-        // table (handler not yet ported — see ADR 0002 follow-up).
+        // Op 0x1B — NPC shop buy/sell (mobile-table/C# NpcShopsHandler;
+        // handler not yet ported — see ADR 0002 follow-up).
         0x1B => unimplemented::handle(ctx),
 
         // Op 0x1C — Learn / upgrade skills
@@ -275,20 +277,20 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         // Op 0x1E — Storage transfer (TienTrang)
         0x1E => trade_storage::handle_storage_transfer(ctx).await,
 
-        // Op 0x1F — Pet stable in the Kotlin/mobile table; NPC shop in the
-        // PC table (handler not yet ported — see ADR 0002 follow-up).
+        // Op 0x1F — Pet hotel (mobile-table/C# PetHotelHandler;
+        // handler not yet ported — see ADR 0002 follow-up).
         0x1F => unimplemented::handle(ctx),
 
         // Op 0x20 — Expressions
         0x20 => expressions::handle_expressions(ctx),
 
-        // Op 0x21 — PK / War mode
+        // Op 0x21 (OP_PK_SWITCH) — PK/Jam switch
         0x21 => system::handle_pk_war(ctx).await,
 
         // Op 0x22 — Game points / God panel
         0x22 => system::handle_game_points(ctx),
 
-        // Op 0x23 — Account management (change pass / delete char / gift code).
+        // Op 0x23 (OP_ACCOUNT) — Account management (change pass / delete char / gift code).
         // The "Guild" label in the PC opcode table is a misnomer; the C# server
         // uses 0x23 subs 1/2/3 for account management (see the VISCII string
         // report). handle_account_mgmt is the ported handler.

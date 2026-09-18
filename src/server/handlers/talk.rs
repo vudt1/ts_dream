@@ -1,4 +1,4 @@
-//! Action / Talk handler (Opcode 0x14): H1 start talk, H6 menus, H4 end talk, H8 warp talk, H9 select menu.
+//! NpcEvent handler (Opcode 0x14): H1 start talk, H6 menus, H4 end talk, H8 warp talk, H9 select menu.
 //!
 //! Identity rules (ticket 18 review):
 //! - **Map Object ID** (`map_object_id` = `idtalking`): the on-map instance
@@ -39,7 +39,7 @@ pub fn talk_messages(conn: &mut Conn, talk_string: &str, out: &mut HandleOutcome
     }
 }
 
-/// Dispatch Opcode 0x14 — Action / Talk.
+/// Dispatch Opcode 0x14 — NpcEvent (NPC talk / gate / scene-script).
 pub async fn handle_talk(ctx: &mut OpcodeCtx<'_>) {
     let conn = &mut ctx.conn;
     let out = &mut ctx.out;

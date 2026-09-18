@@ -16,7 +16,7 @@ fn shop_points_frame(points: u32) -> String {
     crate::protocol::frame("4202", &body)
 }
 
-/// Handle Opcode 0x21 — PK / War Mode (§2.3.22).
+/// Handle Opcode 0x21 (OP_PK_SWITCH) — PK/Jam switch (§2.3.22).
 ///
 /// Only flags `0` and `1` are accepted; anything else is silently ignored.
 /// The new value is persisted to `players.Pk` / `players.ThamChien` scoped by

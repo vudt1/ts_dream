@@ -25,9 +25,11 @@ use crate::eve::state::{EveStateBuilder, PlayerEventState, PlayerStateInputs};
 use crate::server::dispatcher::OpcodeCtx;
 use crate::server::session::Session;
 
-/// PC/aLogin 0x1A request shapes proven by static payload analysis. These are
-/// deliberately not named with mobile `mainKind` semantics: the selector
-/// meaning is still not proven by a live PC capture.
+/// PC/aLogin 0x1A (OP_MONEY_SYNC per mobile-table: S->C money sync) request
+/// shapes proven by static payload analysis. The PC dialect carries
+/// talk-selector payloads instead; these are deliberately not named with
+/// mobile `mainKind` semantics: the selector meaning is still not proven
+/// by a live PC capture.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PcTalkRequest {
     SelectorOnly(u8),
@@ -59,7 +61,7 @@ pub fn parse_pc_talk_request(payload: &[u8]) -> Option<PcTalkRequest> {
     }
 }
 
-/// PC 0x1A/Talk boundary. The selector/value parser is live and strict, while
+/// PC 0x1A (OP_MONEY_SYNC) / Talk boundary. The selector/value parser is live and strict, while
 /// Eve execution remains opt-in until a PC selector-to-trigger mapping,
 /// result serializer, and event-session persistence contract are verified.
 pub async fn handle_pc_talk(ctx: &mut OpcodeCtx<'_>) {
