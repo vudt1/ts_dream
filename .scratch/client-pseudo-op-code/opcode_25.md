@@ -1,9 +1,10 @@
 # PHÂN TÍCH — Main OP 0x25 (37) / Case 33 / `FUN_007937C6` @ `0x007937C6`
 
-Ngày: 2026-09-12 · Workspace: `/mnt/d/VUDT/GIT_PCC/test` · Feature: `op-code` · Chiều: **Server → Client (S→C) một chiều**
+Ngày: 2026-09-12 · Cập nhật: 2026-09-18 · Workspace: `/mnt/d/VUDT/GIT_PCC/test` · Feature: `op-code` · Chiều: **Hai chiều (S→C đồng bộ trạng thái / chat-log; C→S [0x25, 0x01] LoginComplete / MapLoaded)**
 Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (`ts_decompile/` only). **Cả 5 helper `func_0x0072xxxx` của SubOp 0x02–0x06 đã có body trong bản dump mới** (`index.csv:6418-6419,6425-6427`); literal `DAT_00729d0c` đã decode từ `redump/lit_729d0c.hex`. OP 0x25 giờ đạt wire+logic 100% cho 5/6 SubOp (riêng 0x04 = hàm rỗng).
 
 > Cập nhật 2026-09-14: bổ sung phân tích từ các body/hex dump mới (theo `missing_opcode_sources.md`).
+> Cập nhật 2026-09-18: **Đính chính phát hiện mâu thuẫn decompile chiều C→S (Ghidra artifact)**. Xác minh từ Assembly x86 và bảng Hex nhị phân: Client THỰC SỰ GỬI gói tin C→S `[0x25, 0x01]` báo Login Complete / Map Loaded sau khi nạp xong bản đồ (chi tiết tại §6).
 
 ---
 
@@ -16,7 +17,7 @@ Trạng thái: **Đã xác minh từ mã nguồn sơ cấp** (`ts_decompile/` on
 - SubOp `0x04` (`FUN_007281a8`, **đã xác minh**): body 56B **hoàn toàn rỗng** (chỉ AddRef/frame/LStrClr/ret, `007281a8_FUN_007281a8.c:16-37` + asm không có call nghiệp vụ) → **no-op được lập trình sẵn** (kênh để trống/gảy code).
 - SubOp `0x05` (`FUN_00727f4c`, **đã xác minh**): **chat-log danh sách id theo 3 nhóm**: `[n0:4B][n0 id:4B...] [n1:4B][...] [n2:4B][...]`, mỗi nhóm nối `IntToStr(id)` bằng `_LStrCatN(5)`, nhóm có `n>0` in 1 dòng log (id=self, prefix `IntToStr(1..3)`).
 - SubOp `0x06` (`FUN_00729964`, **đã xác minh**): mirror 0x02 ở offset kế — `player+0x465` / A `+0x3B` / B `+0x465`.
-- Chiều C→S `case 0x25: break;` rỗng → client không bao giờ gửi OP này.
+- Chiều C→S (**ĐÍNH CHÍNH 2026-09-18**): Client THỰC SỰ GỬI gói tin `[0x25, 0x01]` (2 byte: Opcode 0x25, SubOp 0x01) — tín hiệu "Login Complete / Map Loaded" báo đã load xong map (kích hoạt từ `FUN_00509e84` sau khi nhận S→C 0x03). Kết luận trước đây coi chiều C→S rỗng là do artifact decompile của Ghidra (xem chi tiết §6).
 
 ---
 
@@ -133,10 +134,66 @@ switch(SubOp){ case 1: ... case 6: ... }
 
 ---
 
-## 6. Chiều Client → Server
+## 6. Chiều Client → Server — Đính chính mâu thuẫn Decompile & Bằng chứng Assembly sơ cấp
 
-- `ts_decompile/functions/0077f414_FUN_0077F414.c:970-971`: `case 0x25: break;` — rỗng hoàn toàn.
-- Kết luận: OP 0x25 S→C thuần. Không format C→S để mock.
+### 6.1. Mâu thuẫn Decompile (Ghidra Artifact)
+
+Trong phiên bản phân tích trước đây có kết luận:
+> *"Chiều Client → Server: `ts_decompile/functions/0077f414_FUN_0077F414.c:970-971`: `case 0x25: break;` — rỗng hoàn toàn. Kết luận: OP 0x25 S→C thuần. Không format C→S để mock."*
+
+**Đính chính:** Kết luận trên là **chưa chính xác do artifact decompile của Ghidra** (tương tự như lỗi Ghidra từng gộp rỗng nhầm `case 0x3c` và `case 0x3d` đã được đính chính trong `opcode_3c.md` và `opcode_3d.md`). Cấu trúc dispatch qua jumptable gián tiếp khiến decompiler hiển thị `break;` rỗng tại tầng C pseudo-code, trong khi mã máy x86 thực thi tại địa chỉ đích của jumptable lại có nhánh xử lý hoàn chỉnh.
+
+---
+
+### 6.2. Bằng chứng đối soát trực tiếp từ Assembly x86 & Hex Tables
+
+1. **Bảng dispatch C→S**:
+   - `redump/table_0x77F474_200B.hex` tại vị trí `0x25` có giá trị `0x23` (35 decimal).
+   - `redump/table_0x77F53C_dword200.hex` tại index 35 trỏ tới địa chỉ **`0x007872D7`** (hoàn toàn không phải địa chỉ epilogue `0x0078A4F2`).
+
+2. **Hàm dựng gói tin tại `0x007872D7` (`0077f414_FUN_0077f414.asm.txt:2567-2587`)**:
+   ```asm
+   007872d7: MOV AL, byte ptr [EBP - 0x6]   ; [EBP - 0x6] là CL (SubSel)
+   007872da: DEC AL                         ; Kiểm tra CL == 1 (SubOp 0x01)
+   007872dc: JNZ 0x0078a4f2                 ; Nếu CL != 1 -> thoát (epilogue)
+   007872e2: LEA EAX, [EBP - 0x34]
+   007872e5: MOV DL, byte ptr [EBP - 0x5]   ; DL = 0x25 (Opcode)
+   007872e8: MOV byte ptr [EAX + 0x1], DL   ; byte[1] = 0x25
+   007872eb: MOV byte ptr [EAX], 0x1        ; len = 1
+   ...
+   007872f9: LEA EAX, [EBP - 0x3c]
+   007872fc: MOV DL, byte ptr [EBP - 0x6]   ; DL = CL = 0x01 (SubOp)
+   007872ff: MOV byte ptr [EAX + 0x1], DL   ; byte[1] = 0x01
+   00787302: MOV byte ptr [EAX], 0x1        ; len = 1
+   0078730b: MOV CL, 0x2                    ; Tổng độ dài 2 byte
+   0078730d: CALL 0x00402b60                ; Ghép chuỗi -> buffer [0x25, 0x01]
+   0078732a: CALL 0x0051633c                ; CY_AddSedQueue -> gửi TCP ra wire!
+   ```
+
+3. **Nơi kích hoạt gửi `[0x25, 0x01]`**:
+   - Nằm trong `client_pseudo_c/00509e84_FUN_00509e84.asm.txt:127-130`:
+     ```asm
+     MOV CL, 0x1; MOV DL, 0x25; MOV EAX, [0x009264a0]; CALL 0x0077f414;
+     ```
+   - Hàm `FUN_00509e84` là hàm **"Khởi tạo tài nguyên theo Map"** (nạp `data\<MapID>`, reset camera, clear 50 DWORD gates).
+   - Hàm `FUN_00509e84` được gọi duy nhất tại dòng 386 của `client_pseudo_c/case_004_0078BC95_FUN_0078bc95.c` — tức **sau khi client nhận gói S→C `0x03` (SELF) và nạp xong Map**.
+
+---
+
+### 6.3. Ý nghĩa nghiệp vụ: Luồng Enter-Game & Map Loaded
+
+- **Định dạng wire C→S**: `[25][01]` (đúng 2 byte: Opcode `0x25`, SubOp `0x01`).
+- **Nghiệp vụ luồng**:
+  1. Server gửi hồ sơ nhân vật và gói tin **S→C `0x03`** (`sendLook` mang MapID, X, Y, ngoại hình, trang bị, tên).
+  2. Client nhận S→C `0x03`, tiến hành tải file tài nguyên bản đồ `data\<MapID>`, khởi tạo camera và cổng dịch chuyển.
+  3. Khi nạp xong bản đồ, Client chủ động gửi gói tin **C→S `[0x25, 0x01]`** lên Server ("Tôi đã nạp xong Map!").
+  4. Phía Server (đối chứng Bear C# Server qua `LoginCompleteHandler.cs`):
+     ```csharp
+     if (data[1] == 1 && client.map != null) {
+         client.map.announceAppear(client);
+     }
+     ```
+     -> Gọi `announceAppear` kích hoạt xuất hiện trên bản đồ, đồng bộ entities xung quanh (NPCs, người chơi khác) và broadcast sự hiện diện của người chơi mới vào map.
 
 ---
 
@@ -149,13 +206,14 @@ S→C [25][03][K 01..0A]             ; 1/10 thông báo chat-log tĩnh (id=0, ta
 S→C [25][04][...]                  ; no-op (hàm rỗng — an toàn tuyệt đối)
 S→C [25][05]([n u32][id u32]×n)×3  ; 3 dòng chat-log danh sách id
 S→C [25][06][id u32LE][v u8]       ; ghi BYTE +0x465/+0x3B   (đủ 7B payload)
-C→S [25]: KHÔNG TỒN TẠI
+C→S [25][01]                       ; LoginComplete / MapLoaded (gửi sau khi nạp xong Map từ S→C 0x03)
 ```
 
 1. Frame `[F4 44][L:u16LE][payload]`, XOR `0xAD`. SubOp 01 cần đủ 8B; 02/06 cần đủ 7B payload (`len(RP)>=6`); 03/05 guard `len(RP)>=2`; `L=1` → RangeError; `SubOp 0/≥7` no-op.
 2. `id` là entity id toàn cục (không có trong bảng → nhánh remote im lặng; vượt trần 2100/800 → RangeError có thể crash client test). Test self dùng đúng player id.
 3. SubOp 01/02/06 yên lặng — dùng test số liệu không ồn; SubOp 03/05 **in ra chat-log** (thấy được bằng mắt, là kênh kiểm chứng dễ nhất).
 4. **Đóng 100% wire**: 5 helper `00729D24/00729430/007281A8/00727F4C/00729964` + `0x00729D0C` đã xong ở bản dump mới. Còn thiếu: **dịch 10 nhãn SubOp 03** (dump `lit_729590/5F4/660/6E0/734/788/7D8/82C/880/914.hex`, cùng dải `0x0072818C`).
+5. **Chiều C→S `[25][01]`**: Là gói tin xác nhận quan trọng trong chuỗi Login / Enter Game Handshake. Mock server cần đón nhận gói `[25][01]` này để hoàn tất chu trình cho client xuất hiện trong bản đồ (`announceAppear`).
 
 ---
 
@@ -169,7 +227,7 @@ C→S [25]: KHÔNG TỒN TẠI
 | 4 | `functions/00729e48_FUN_00729e48.c` | Toàn bộ wire+logic SubOp 01 |
 | 5 | `functions/0077eb9c / 0077ef7c` | Codec Word/DWORD LE |
 | 6 | `functions/00729a88 / 007281ec / 00728a6c` | Đối chứng cụm setter/chat-log |
-| 7 | `functions/0077f414_FUN_0077F414.c:970-971` | C→S rỗng |
+| 7 | `functions/0077f414_FUN_0077F414.c:970-971` (Ghidra decompile sai) → đối soát `0077f414_FUN_0077f414.asm.txt:2567-2587` (@ `0x007872D7`) + `FUN_00509e84` (@ `0x00509e84`) | **Đính chính 2026-09-18**: C→S `[0x25, 0x01]` LoginComplete/MapLoaded |
 | 8 | ~~grep 5 helper (chưa body)~~ → `functions/00729d24 / 00729430 / 007281a8 / 00727f4c / 00729964` + `index.csv:6418-6419,6425-6427` | **Mới**: body đủ 5 helper SubOp 02–06 |
 | 9 | `redump/lit_729d0c.hex` | **Mới**: decode banner `FUN_00729a88` → "Thần xui đã rời xa bạn!" |
 
