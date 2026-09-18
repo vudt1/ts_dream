@@ -14,7 +14,7 @@ use crate::error::Result;
 use crate::protocol::encoder;
 use crate::server::handlers::{
     battle, character, chat, expressions, inventory, login, movement, npc_event, party,
-    pet_actions, skills, stats, system, talk, trade_storage, unimplemented,
+    pet_actions, shops, skills, stats, system, talk, trade_storage, unimplemented,
 };
 use crate::db::pool::DbPool;
 use crate::server::session::Conn;
@@ -225,8 +225,8 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         // Op 0x02 — Chat & slash commands
         0x02 => chat::handle_chat(ctx).await,
 
-        // Op 0x06 — Move
-        0x06 => movement::handle_move(ctx),
+        // Op 0x05, 0x06 — Move
+        0x05 | 0x06 => movement::handle_move(ctx),
 
         // Op 0x08 — Stat allocation
         0x08 => stats::handle_stat_allocation(ctx).await,
@@ -260,13 +260,20 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         // handler module (base ops, use item, player shop, storage, reborn).
         0x17 => inventory::handle_inventory(ctx).await,
 
-        // Op 0x19 — Trade P2P items/pets (mobile-table/C# TransferHandler;
-        // handler not yet ported — see ADR 0002 follow-up).
-        0x19 => unimplemented::handle(ctx),
+        // Op 0x19 — Trade P2P items/pets (Bear TransferHandler/TradeItems /
+        // TradePet dialect). aLogin never initiates trade on 0x19 (its only
+        // C→S 0x19 is the ACK after S→C 0x19/0x29, which falls into the
+        // handler's guarded `_` arm), so this path serves Bear-dialect
+        // clients; S→C trade frames are Bear-dialect (aLogin would read them
+        // as its 0x19 toast/gift bus — see opcode_19.md).
+        0x19 => trade_storage::handle_trade(ctx).await,
 
-        // Op 0x1B — NPC shop buy/sell (mobile-table/C# NpcShopsHandler;
-        // handler not yet ported — see ADR 0002 follow-up).
-        0x1B => unimplemented::handle(ctx),
+        // Op 0x1B — NPC shop buy/sell (Bear NpcShopsHandler dialect).
+        // aLogin never sends 0x1B (SendCommand case 0x1b is empty —
+        // opcode_1b.md §6: 0x1B is S→C toast bus on aLogin), so this path is
+        // Bear-dialect only. S→C replies here are client-safe (020B banner,
+        // 1A04 money sync).
+        0x1B => shops::handle_npc_shop(ctx).await,
 
         // Op 0x1C — Learn / upgrade skills
         0x1C => skills::handle_skills(ctx).await,
@@ -277,9 +284,11 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         // Op 0x1E — Storage transfer (TienTrang)
         0x1E => trade_storage::handle_storage_transfer(ctx).await,
 
-        // Op 0x1F — Pet hotel (mobile-table/C# PetHotelHandler;
-        // handler not yet ported — see ADR 0002 follow-up).
-        0x1F => unimplemented::handle(ctx),
+        // Op 0x1F — Pet stable menu (subs 2/3/4 remap to the 0x0F sub 3/7/8
+        // flows in handle_pet_stable). aLogin never sends 0x1F (SendCommand
+        // case 0x1f is empty — opcode_1f.md §6), so C→S is Bear-dialect only;
+        // S→C stable frames (1F09/1F0C/1F06) are already client-aligned.
+        0x1F => pet_actions::handle_pet_stable(ctx).await,
 
         // Op 0x20 — Expressions
         0x20 => expressions::handle_expressions(ctx),
@@ -295,6 +304,9 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         // uses 0x23 subs 1/2/3 for account management (see the VISCII string
         // report). handle_account_mgmt is the ported handler.
         0x23 => system::handle_account_mgmt(ctx).await,
+
+        // Op 0x25 — Login Complete / Map Loaded
+        0x25 => login::handle_login_complete(ctx).await,
 
         // Op 0x28 — Hotkey / skill bar
         0x28 => stats::handle_hotkey(ctx).await,
@@ -314,7 +326,7 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         // Documented client opcodes whose full semantics are being ported from
         // the Kotlin/mobile reference. They are deliberately routed through a
         // bounded unimplemented boundary rather than silently discarded.
-        0x05 | 0x0A | 0x0E | 0x10 | 0x12 | 0x16 | 0x18 | 0x24 | 0x25 | 0x26 | 0x27 | 0x29
+        0x0A | 0x0E | 0x10 | 0x12 | 0x16 | 0x18 | 0x24 | 0x26 | 0x27 | 0x29
         | 0x2A | 0x2B | 0x2D | 0x2E | 0x36 | 0x37 | 0x39 | 0x3A | 0x3B | 0x3C | 0x3D | 0x3F
         | 0x40 | 0x43 | 0x44 | 0x45 | 0x46 | 0x47 | 0x48 | 0xC7 => unimplemented::handle(ctx),
 

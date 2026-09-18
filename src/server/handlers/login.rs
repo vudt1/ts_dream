@@ -233,3 +233,86 @@ async fn login_db(
     // db::persist::delete_system_skills(Some(pool), conn.session.id).await;
     Ok(())
 }
+
+/// Op 0x25 — Login Complete / Map Loaded (client finished loading map assets).
+pub async fn handle_login_complete(ctx: &mut OpcodeCtx<'_>) {
+    let conn = &mut ctx.conn;
+    let out = &mut ctx.out;
+    let sub = ctx.sub;
+    if sub != 1 || conn.session.id == 0 {
+        return;
+    }
+    conn.session.in_world = true;
+    let my_id = conn.session.id;
+    let map_id = conn.session.map_id;
+
+    // 1. Announce appearance to nearby players on the map
+    let color = if conn.session.color.is_empty() {
+        "0000000000000000"
+    } else {
+        &conn.session.color
+    };
+    let my_appear = spawn::player_appear(
+        conn.session.id,
+        conn.session.sex,
+        0,
+        0,
+        conn.session.map_id,
+        conn.session.map_x,
+        conn.session.map_y,
+        conn.session.gocnhin,
+        conn.session.hair,
+        color,
+        &conn.session.equipped_ids(),
+        conn.session.reborn,
+        conn.session.job,
+        &conn.session.name,
+    );
+    out.broadcast(my_id, my_appear);
+
+    // 2. Announce server name to this client
+    out.send(spawn::server_name_frame(my_id, "TS Online"));
+
+    // 3. Synchronize existing in-world players on this map to this client
+    let others: Vec<crate::server::session::Session> = {
+        let sessions = crate::server::session::online_sessions().lock().unwrap();
+        sessions
+            .values()
+            .filter(|s| s.id != my_id && s.map_id == map_id && s.in_world)
+            .cloned()
+            .collect()
+    };
+    for other in others {
+        let o_color = if other.color.is_empty() {
+            "0000000000000000"
+        } else {
+            &other.color
+        };
+        let o_appear = spawn::player_appear(
+            other.id,
+            other.sex,
+            0,
+            0,
+            other.map_id,
+            other.map_x,
+            other.map_y,
+            other.gocnhin,
+            other.hair,
+            o_color,
+            &other.equipped_ids(),
+            other.reborn,
+            other.job,
+            &other.name,
+        );
+        out.send(o_appear);
+    }
+
+    // 4. Synchronize NPCs on this map to this client
+    for npc in &ctx.data.npc_on_map {
+        if npc.map_id == i64::from(map_id) {
+            let npc_frame = format!("F44405001601{:02X}0000", (npc.id & 0xFF) as u8);
+            out.send(npc_frame);
+        }
+    }
+}
+

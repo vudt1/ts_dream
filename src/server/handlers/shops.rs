@@ -431,6 +431,7 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
                 return;
             }
             let name_bytes = payload[1..1 + name_len].to_vec();
+            let image = payload[name_len + 1];
             let mut listings = Vec::new();
             let mut seen_slots = std::collections::HashSet::new();
             let mut items_hex = String::new();
@@ -465,24 +466,27 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
                 cursor += 5;
             }
             conn.session.shop.active = true;
+            conn.session.shop.image = image;
             conn.session.shop.name = name_bytes.clone();
             conn.session.shop.items = listings;
 
             // Self catalog (171E) + broadcast open (171F) to other map clients.
             let body = format!(
-                "{:02X}{}{}",
+                "{:02X}{}{:02X}{}",
                 name_len,
                 encoder::strhex(&name_bytes),
+                image,
                 items_hex
             );
             out.send(crate::protocol::frame("171E", &body));
             let bcast = crate::protocol::frame(
                 "171F",
                 &format!(
-                    "{}{:02X}{}",
+                    "{}{:02X}{}{:02X}",
                     encoder::le32(id),
                     name_len,
-                    encoder::strhex(&name_bytes)
+                    encoder::strhex(&name_bytes),
+                    image
                 ),
             );
             out.broadcast(id, bcast);

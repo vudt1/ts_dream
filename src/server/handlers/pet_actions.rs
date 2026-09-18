@@ -240,12 +240,12 @@ pub async fn handle_pet_actions(ctx: &mut OpcodeCtx<'_>) {
             ctx.out.send("F44402001F09F44402001F0C");
             persist_pet_state(ctx.env.pool, ctx.conn).await;
         }
-        // Sub 4 (mount horse): `packet[6..9]` LE32 pet id, 18000 < id < 19000.
+        // Sub 4 (mount horse): LE16 pet id, 18000 < id < 19000.
         4 => {
-            if payload.len() < 4 {
+            if payload.len() < 2 {
                 return;
             }
-            let pet_id = encoder::u32_le(payload[0], payload[1], payload[2], payload[3]) as u16;
+            let pet_id = encoder::u16_le(payload[0], payload[1]);
             if !(18000..19000).contains(&pet_id) {
                 return;
             }
@@ -328,14 +328,13 @@ pub async fn handle_pet_summon(ctx: &mut OpcodeCtx<'_>) {
     let (sub, payload) = (ctx.sub, ctx.payload);
     match sub {
         1 => {
-            if payload.len() < 4 {
+            if payload.len() < 2 {
                 return;
             }
-            let pet_id = encoder::u32_le(payload[0], payload[1], payload[2], payload[3]);
-            if ctx.conn.session.horse_pet_id == pet_id as u16 {
+            let pet_id = encoder::u16_le(payload[0], payload[1]);
+            if ctx.conn.session.horse_pet_id == pet_id {
                 return;
             }
-            let pet_id = pet_id as u16;
             let Some(pet) = ctx.conn.session.pets.iter().find(|p| p.id == pet_id) else {
                 return;
             };

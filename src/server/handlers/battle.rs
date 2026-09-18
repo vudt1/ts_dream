@@ -20,21 +20,23 @@ pub fn handle_battle(ctx: &mut OpcodeCtx) {
     match sub {
         1 => handle_leave_battle(conn, payload, service, out),
         2 => handle_pk_or_attack(conn, payload, service, out),
-        4 => {
-            if payload.len() >= 4 {
-                let leader = encoder::u32_le_slice(&payload[0..4]) as i32;
-                service.join_battle(&mut conn.session, leader);
-            }
-        }
-        5 => {
-            // JamPlayerToBattle — no-op stub.
-        }
         6 => {
             // Broadcast `F44406000B06` + id4 to the map.
             service.send_map(
                 i64::from(conn.session.id),
                 format!("F44406000B06{}", encoder::le32(conn.session.id)),
             );
+        }
+        8 => {
+            // Direct PvP by player ID (ground = 65000)
+            if payload.len() >= 4 {
+                let target_id = if payload.len() >= 5 {
+                    encoder::u32_le_slice(&payload[1..5])
+                } else {
+                    encoder::u32_le_slice(&payload[0..4])
+                };
+                service.start_pk_battle(&mut conn.session, i64::from(target_id), 65000);
+            }
         }
         _ => {
             let _ = (ctx.data, out);
@@ -60,7 +62,7 @@ fn handle_leave_battle(
     ));
 }
 
-/// Sub 2 — inner sub 2 (PK challenge) / inner sub 3 (attack NPC).
+/// Sub 2 — inner sub 2 (PK challenge) / inner sub 3 (attack NPC) / inner sub 4 (spectate) / inner sub 5 (jam).
 fn handle_pk_or_attack(
     conn: &mut Conn,
     payload: &[u8],
@@ -71,13 +73,25 @@ fn handle_pk_or_attack(
     match inner {
         2 => handle_pk_challenge(conn, payload, service, out),
         3 => handle_attack_npc(conn, payload, service),
+        4 => {
+            if payload.len() >= 5 {
+                let leader = encoder::u32_le_slice(&payload[1..5]) as i32;
+                service.join_battle(&mut conn.session, leader);
+            }
+        }
+        5 => {
+            // JamPlayerToBattle
+            if payload.len() >= 5 {
+                let _target = encoder::u32_le_slice(&payload[1..5]);
+            }
+        }
         _ => {}
     }
 }
 
 /// Sub 2 sub 2 — PK challenge. Gates: not in battle, `_My_Pk == 1`, target
 /// online + not in battle. Target `Pk == 0` → `F4440300210101`; `Pk == 1` →
-/// start a PK battle (DiaHinh 112).
+/// start a PK battle (DiaHinh from data[7..9] / payload[5..7], default 112).
 fn handle_pk_challenge(
     conn: &mut Conn,
     payload: &[u8],
@@ -95,15 +109,20 @@ fn handle_pk_challenge(
     if conn.session.battle_id != 0 || conn.session.pk != 1 || target_in_battle {
         return;
     }
+    let ground = if payload.len() >= 7 {
+        encoder::u16_le(payload[5], payload[6]) as i64
+    } else {
+        112
+    };
     if !target_pk {
         out.send("F4440300210101");
     } else {
-        service.start_pk_battle(&mut conn.session, i64::from(target_id));
+        service.start_pk_battle(&mut conn.session, i64::from(target_id), ground);
     }
 }
 
 /// Sub 2 sub 3 — attack NPC. Gates: not in battle; blocked for quest-flag/doll
-/// NPC ranges; else start an NPC battle (DiaHinh 112, idNpcOnMap bytes 5-6).
+/// NPC ranges; else start an NPC battle (DiaHinh from data[7..9] / payload[5..7], default 112).
 fn handle_attack_npc(conn: &mut Conn, payload: &[u8], service: &BattleService) {
     if conn.session.battle_id != 0 || payload.len() < 5 {
         return;
@@ -115,12 +134,12 @@ fn handle_attack_npc(conn: &mut Conn, payload: &[u8], service: &BattleService) {
     {
         return;
     }
-    let npc_on_map = if payload.len() >= 7 {
+    let ground = if payload.len() >= 7 {
         encoder::u16_le(payload[5], payload[6]) as i64
     } else {
-        0
+        112
     };
-    service.start_npc_battle(&mut conn.session, i64::from(npc_id), npc_on_map);
+    service.start_npc_battle(&mut conn.session, i64::from(npc_id), 0, ground);
 }
 
 /// Dispatch Opcode 0x32 — Battle commands (Ch2 §2.3.27).

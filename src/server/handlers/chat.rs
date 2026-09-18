@@ -42,6 +42,18 @@ pub async fn handle_chat(ctx: &mut OpcodeCtx<'_>) {
     let pool = ctx.env.pool;
     let (sub, payload) = (ctx.sub, ctx.payload);
     match sub {
+        // Sub 1: World / All chat
+        1 => {
+            let text = crate::encoding::viscii_decode(payload);
+            if text.chars().count() > 60 {
+                return;
+            }
+            let frame = spawn::chat_frame(1, conn.session.id, payload);
+            out.send(&frame);
+            if let Some(hub) = hub {
+                hub.broadcast_except(conn.session.id, &frame).await;
+            }
+        }
         // Sub 2: Global / Map chat (+ slash commands)
         2 => {
             let text = crate::encoding::viscii_decode(payload);
@@ -101,8 +113,14 @@ pub async fn handle_chat(ctx: &mut OpcodeCtx<'_>) {
                 hub.send_to(target_id, &frame).await; // recipient's copy
             }
         }
-        // Sub 4: No-op
-        4 => {}
+        // Sub 4: GM broadcast / system reply to all
+        4 => {
+            let frame = spawn::chat_frame(4, conn.session.id, payload);
+            out.send(&frame);
+            if let Some(hub) = hub {
+                hub.broadcast_except(conn.session.id, &frame).await;
+            }
+        }
         // Sub 5: Party chat: leader + all members receive the frame.
         5 => {
             let frame = spawn::chat_frame(5, conn.session.id, payload);
@@ -118,6 +136,14 @@ pub async fn handle_chat(ctx: &mut OpcodeCtx<'_>) {
                         hub.send_to(member, &frame).await;
                     }
                 }
+            }
+        }
+        // Sub 6: Army / Guild chat
+        6 => {
+            let frame = spawn::chat_frame(6, conn.session.id, payload);
+            out.send(&frame);
+            if let Some(hub) = hub {
+                hub.broadcast_except(conn.session.id, &frame).await;
             }
         }
         _ => {}

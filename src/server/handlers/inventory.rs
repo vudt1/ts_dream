@@ -44,8 +44,22 @@ pub async fn handle_inventory(ctx: &mut OpcodeCtx<'_>) {
         11 => handle_equip(conn, payload, out, pool, hub).await,
         // Sub 12: Unequip player item
         12 => handle_unequip(conn, payload, out, pool, hub).await,
+        // Sub 14: Craft item
+        14 => handle_craft(conn, payload, out).await,
         // Sub 15: Use item
         15 => handle_use_item(conn, payload, out, pool, ctx.data).await,
+        // Sub 17: Equip pet item
+        17 => handle_pet_equip(conn, payload, out, pool).await,
+        // Sub 18: Unequip pet item
+        18 => handle_pet_unequip(conn, payload, out, pool).await,
+        // Sub 20: Battle item/skill
+        20 => handle_battle_item(conn, payload, out).await,
+        // Sub 36: Auxiliary bag (Tuideo) query
+        36 => handle_auxiliary_bag(conn, payload, out).await,
+        // Sub 37: Auxiliary bag move
+        37 => handle_auxiliary_bag_move(conn, payload, out).await,
+        // Sub 45: Warp item
+        45 => handle_warp_jail(conn, payload, out).await,
         // Sub 46: Player reborn
         46 => handle_reborn(conn, payload, out, ctx.data, pool).await,
         _ => {}
@@ -83,7 +97,10 @@ async fn handle_pickup(
     let map_id = conn.session.map_id;
     let slot = payload[0];
     let Some(drop) = map_drops::get(map_id, slot) else {
-        return; // nothing on that map slot
+        // Nothing on that map slot — client-verified toast (opcode_17.md §4:
+        // `[17][19]` shows "Vật phẩm này tạm thời không thể nhặt lên").
+        out.send(crate::server::spawn::ITEM_PICKUP_FAIL);
+        return;
     };
     // Distance gate: within ±150 map units of the player.
     let dx = i32::from(drop.map_x) - i32::from(conn.session.map_x);
@@ -91,12 +108,14 @@ async fn handle_pickup(
     if !(-PICKUP_RANGE..=PICKUP_RANGE).contains(&dx)
         || !(-PICKUP_RANGE..=PICKUP_RANGE).contains(&dy)
     {
+        out.send(crate::server::spawn::ITEM_PICKUP_FAIL);
         return; // out of range: the drop stays on the map
     }
-    // A full bag must leave the drop untouched and reply with nothing —
-    // probe on a copy first.
+    // A full bag must leave the drop untouched and reply with the pickup-fail
+    // toast — probe on a copy first.
     let mut probe = conn.session.homdo.clone();
     if crate::server::inventory::add_item(&mut probe, drop.item.clone()).is_empty() {
+        out.send(crate::server::spawn::ITEM_PICKUP_FAIL);
         return;
     }
     let Some(drop) = map_drops::take(map_id, slot) else {
@@ -422,7 +441,9 @@ async fn handle_reborn(
         conn.session.hair = u16::from(payload[0]);
     }
     if payload.len() >= 9 {
-        conn.session.color = crate::server::dispatcher::hex_of(&payload[1..9]);
+        let col1 = encoder::u32_le(payload[1], payload[2], payload[3], payload[4]);
+        let col2 = encoder::u32_le(payload[5], payload[6], payload[7], payload[8]);
+        conn.session.color = format!("{}{}", encoder::le32(col1), encoder::le32(col2));
     }
 
     let (point_base, skill_point_base, new_reborn, new_job) = if conn.session.reborn == 0 {
@@ -517,3 +538,123 @@ async fn handle_reborn(
     out.send("F4441100140100000001010302000000000000F476");
     out.shutdown = true;
 }
+
+async fn handle_craft(
+    _conn: &mut Conn,
+    payload: &[u8],
+    out: &mut HandleOutcome,
+) {
+    if payload.is_empty() {
+        return;
+    }
+    // Craft ack / failure stub
+    out.send("F4440200170E");
+}
+
+async fn handle_pet_equip(
+    conn: &mut Conn,
+    payload: &[u8],
+    out: &mut HandleOutcome,
+    pool: Option<&crate::db::pool::DbPool>,
+) {
+    if payload.len() < 2 {
+        return;
+    }
+    let pet_stt = payload[0];
+    let item_slot = payload[1];
+    let Some(item_pos) = conn.session.homdo.iter().position(|i| i.slot == item_slot && i.id > 0) else {
+        return;
+    };
+    let item = conn.session.homdo[item_pos].clone();
+    let Some(pet) = conn.session.pets.iter_mut().find(|p| p.stt == pet_stt) else {
+        return;
+    };
+    if item.count > 1 {
+        conn.session.homdo[item_pos].count -= 1;
+    } else {
+        conn.session.homdo.remove(item_pos);
+    }
+    persist::upsert_item(pool, conn.session.id, "homdo", &item).await;
+    persist::upsert_pet(pool, conn.session.id, pet).await;
+    out.send(format!("F44404001711{:02X}{:02X}", pet_stt, item_slot));
+}
+
+async fn handle_pet_unequip(
+    conn: &mut Conn,
+    payload: &[u8],
+    out: &mut HandleOutcome,
+    pool: Option<&crate::db::pool::DbPool>,
+) {
+    if payload.len() < 3 {
+        return;
+    }
+    let pet_stt = payload[0];
+    let equip_slot = payload[1];
+    let homdo_slot = payload[2];
+    let Some(pet) = conn.session.pets.iter_mut().find(|p| p.stt == pet_stt) else {
+        return;
+    };
+    persist::upsert_pet(pool, conn.session.id, pet).await;
+    out.send(format!("F44405001712{:02X}{:02X}{:02X}", pet_stt, equip_slot, homdo_slot));
+}
+
+async fn handle_battle_item(
+    _conn: &mut Conn,
+    payload: &[u8],
+    out: &mut HandleOutcome,
+) {
+    if payload.len() < 3 {
+        return;
+    }
+    out.send("F44402001714");
+}
+
+async fn handle_auxiliary_bag(
+    conn: &mut Conn,
+    _payload: &[u8],
+    out: &mut HandleOutcome,
+) {
+    for item in &conn.session.tuideo {
+        if item.id > 0 {
+            out.send(item_added_frame(item));
+        }
+    }
+}
+
+async fn handle_auxiliary_bag_move(
+    _conn: &mut Conn,
+    payload: &[u8],
+    out: &mut HandleOutcome,
+) {
+    if payload.len() < 3 {
+        return;
+    }
+    let from_slot = payload[0];
+    let to_slot = payload[1];
+    let count = payload[2];
+    out.send(format!("F44405001725{:02X}{:02X}{:02X}", from_slot, to_slot, count));
+}
+
+async fn handle_warp_jail(
+    conn: &mut Conn,
+    _payload: &[u8],
+    out: &mut HandleOutcome,
+) {
+    let map = 59401u16;
+    let x = 402u16;
+    let y = 775u16;
+    conn.session.map_id = map;
+    conn.session.map_x = x;
+    conn.session.map_y = y;
+    let id = conn.session.id;
+    out.send("F44402001407");
+    out.send(format!(
+        "F4440D000C{}{}{}{}0000",
+        encoder::le32(id),
+        encoder::le16(map),
+        encoder::le16(x),
+        encoder::le16(y)
+    ));
+    out.send("F44402000504");
+}
+

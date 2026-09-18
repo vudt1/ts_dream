@@ -120,6 +120,7 @@ pub struct ShopItem {
 #[derive(Debug, Clone, Default)]
 pub struct PlayerShopState {
     pub active: bool,
+    pub image: u8,
     /// Raw VISCII bytes used by the wire protocol.
     pub name: Vec<u8>,
     pub items: Vec<ShopItem>,
@@ -137,6 +138,7 @@ pub struct Session {
     /// Modern `characters.id`; distinct from `id` after the 0002 cutover.
     pub db_character_id: i64,
     pub logined: bool,
+    pub in_world: bool,
     pub authed: bool,
     pub idtalking: i32,
     /// Real NPC database id resolved from the on-map index (`idnpctalking`).
@@ -263,6 +265,7 @@ impl Default for Session {
             gm_level: 0,
             db_character_id: 0,
             logined: false,
+            in_world: false,
             authed: false,
             idtalking: 0,
             idnpctalking: 0,

@@ -94,6 +94,8 @@ pub async fn handle_skills(ctx: &mut OpcodeCtx<'_>) {
         1 => handle_player_skill_learn(conn, payload, out, data, pool).await,
         // Sub 2: Pet skill upgrade
         2 => handle_pet_skill_upgrade(conn, payload, out, data, pool).await,
+        // Sub 5: Skill Reborn 2
+        5 => handle_skill_reborn_2(conn, payload, out, data, pool).await,
         _ => {}
     }
 }
@@ -237,18 +239,26 @@ async fn handle_pet_skill_upgrade(
         return;
     }
     let stt = payload[0];
-    let skill_id = encoder::u16_le(payload[1], payload[2]);
-    let target_lv = payload[3];
-
-    let Some(skill_def) = data.skills.get(&i64::from(skill_id)) else {
+    let Some(pet_pos) = conn.session.pets.iter().position(|p| p.stt == stt) else {
         return;
     };
 
-    if target_lv > skill_def.lv_max as u8 {
-        return;
-    }
+    let mut cursor = 1;
+    let mut updated = false;
+    while cursor + 3 <= payload.len() {
+        let skill_id = encoder::u16_le(payload[cursor], payload[cursor + 1]);
+        let target_lv = payload[cursor + 2];
+        cursor += 3;
 
-    if let Some(pet) = conn.session.pets.iter_mut().find(|p| p.stt == stt) {
+        let Some(skill_def) = data.skills.get(&i64::from(skill_id)) else {
+            continue;
+        };
+
+        if target_lv > skill_def.lv_max as u8 {
+            continue;
+        }
+
+        let pet = &mut conn.session.pets[pet_pos];
         // Upgrade ONLY an existing skill slot
         if let Some(sk) = pet.skills.iter_mut().find(|s| s.0 == skill_id && s.0 != 0) {
             if target_lv > sk.1 {
@@ -256,6 +266,7 @@ async fn handle_pet_skill_upgrade(
                 if pet.skill_point >= cost {
                     pet.skill_point -= cost;
                     sk.1 = target_lv;
+                    updated = true;
 
                     // Reply with LE16 hex for stt (4 hex chars)
                     out.send(format!(
@@ -264,15 +275,110 @@ async fn handle_pet_skill_upgrade(
                         encoder::le32(target_lv as u32),
                         encoder::le32(skill_id as u32)
                     ));
-                    persist::upsert_pet(pool, conn.session.id, pet).await;
                 }
             }
         }
+    }
+    if updated {
+        let pet = &conn.session.pets[pet_pos];
+        persist::upsert_pet(pool, conn.session.id, pet).await;
+    }
+}
+
+async fn handle_skill_reborn_2(
+    conn: &mut Conn,
+    payload: &[u8],
+    out: &mut HandleOutcome,
+    data: &crate::data::loader::GameData,
+    pool: Option<&crate::db::pool::DbPool>,
+) {
+    if payload.len() < 4 {
+        return;
+    }
+    let mut cursor = 0;
+    let ball_count = encoder::u32_le(payload[cursor], payload[cursor + 1], payload[cursor + 2], payload[cursor + 3]) as usize;
+    cursor += 4;
+    if cursor + ball_count > payload.len() {
+        return;
+    }
+    cursor += ball_count;
+
+    if cursor + 4 > payload.len() {
+        return;
+    }
+    let skill_count = encoder::u32_le(payload[cursor], payload[cursor + 1], payload[cursor + 2], payload[cursor + 3]) as usize;
+    cursor += 4;
+
+    let mut learned = 0;
+    for _ in 0..skill_count {
+        if cursor + 3 > payload.len() {
+            break;
+        }
+        let skill_id = encoder::u16_le(payload[cursor], payload[cursor + 1]);
+        let target_lv = payload[cursor + 2];
+        cursor += 3;
+
+        if let Some(skill_def) = data.skills.get(&i64::from(skill_id)) {
+            let sp = skill_def.sp as u8;
+            if let Some(existing) = conn.session.skills.iter_mut().find(|s| s.0 == skill_id) {
+                existing.1 = target_lv;
+            } else {
+                conn.session.skills.push((skill_id, target_lv));
+            }
+            persist::upsert_skill(pool, conn.session.id, skill_id, target_lv, sp, 0).await;
+            out.send(format!(
+                "F4440C0008016E01{}{}",
+                encoder::le32(u32::from(target_lv)),
+                encoder::le32(u32::from(skill_id))
+            ));
+            learned += 1;
+        }
+    }
+    if learned > 0 {
+        persist::update_player(pool, conn.session.id, "SkillPoint", i64::from(conn.session.skill_point)).await;
     }
 }
 
 /// Handle Opcode 0x2C — Pet Reborn.
 pub async fn handle_pet_reborn(ctx: &mut OpcodeCtx<'_>) {
+    match ctx.sub {
+        2 => handle_pet_add_skill_4(ctx).await,
+        1 | 3..=7 => handle_pet_reborn_flow(ctx).await,
+        _ => {}
+    }
+}
+
+async fn handle_pet_add_skill_4(ctx: &mut OpcodeCtx<'_>) {
+    let pool = ctx.env.pool;
+    let data = ctx.data;
+    let conn = &mut ctx.conn;
+    let out = &mut ctx.out;
+    let payload = ctx.payload;
+    if payload.is_empty() {
+        return;
+    }
+    let stt = payload[0];
+    let Some(pet_pos) = conn.session.pets.iter().position(|p| p.stt == stt) else {
+        return;
+    };
+    let pet_id = conn.session.pets[pet_pos].id;
+    let Some(npc_def) = data.npcs.get(&i64::from(pet_id)) else {
+        return;
+    };
+    let skill_4 = npc_def.skill[3];
+    if skill_4 > 0 {
+        let skill_4_id = skill_4 as u16;
+        let pet = &mut conn.session.pets[pet_pos];
+        pet.skills[3] = (skill_4_id, 1);
+        persist::upsert_pet(pool, conn.session.id, pet).await;
+        out.send("F44402002C01");
+        for f in crate::server::spawn::pet_status_single(&conn.session, stt) {
+            out.send(f);
+        }
+    }
+}
+
+async fn handle_pet_reborn_flow(ctx: &mut OpcodeCtx<'_>) {
     let pool = ctx.env.pool;
     let hub = ctx.env.hub;
     let data = ctx.data;
@@ -292,7 +398,8 @@ pub async fn handle_pet_reborn(ctx: &mut OpcodeCtx<'_>) {
     let pet_lv = conn.session.pets[pet_pos].level;
     let pet_reborn = conn.session.pets[pet_pos].reborn;
 
-    let threshold = if pet_reborn == 0 { 30u8 } else { 60u8 };
+    let rank = if ctx.sub == 0 || ctx.sub == 1 { 1 } else { ctx.sub.saturating_sub(1) };
+    let threshold = if rank == 1 && pet_reborn == 0 { 30u8 } else { 60u8 };
 
     // Scan homdo slots 1..25 for reborn item
     let mut match_slot = None;

@@ -269,6 +269,38 @@ pub fn store_frame(point: u32) -> String {
     crate::protocol::frame("2304", &body)
 }
 
+/// Client-verified S→C notice frames (aLogin bus semantics, see
+/// `.scratch/client-pseudo-op-code/opcode_17.md` §3–§4 and `opcode_0b.md`
+/// §2–§3). These carry only static client-side text/effects, so they are
+/// safe for aLogin; Bear-dialect clients simply ignore unknown subs.
+
+/// Item pickup failure toast (`[17][19]` — client shows
+/// "Vật phẩm này tạm thời không thể nhặt lên", 1200ms).
+pub const ITEM_PICKUP_FAIL: &str = "F44402001719";
+/// Trade-cancelled toast (`[17][3B]` — client shows "Hủy bỏ giao dịch",
+/// 2000ms).
+pub const TRADE_CANCELLED: &str = "F4440200173B";
+
+/// Battle flag write (`[0B][09][A][B]`): client stores `A` at
+/// `PlayerRec+0x1308`; when `B == 1` it also toasts the number 2000ms.
+/// Minimum 4B payload — never send short.
+pub fn battle_flag_frame(a: u8, b: u8) -> String {
+    format!("F44404000B09{a:02X}{b:02X}")
+}
+
+/// Battle toast (`[0B][03][code]`, code 1..4 → 1000ms toast; other codes
+/// no-op on the client).
+pub fn battle_toast_frame(code: u8) -> String {
+    format!("F44403000B03{code:02X}")
+}
+
+/// Battle mode flag + saturating counter (`[0B][07][B1][B2]`): client sets
+/// `self+0x1305 = B1`, adds B2 to `self+0x1306` (saturates at 0xFF), and
+/// toasts when B1 is 1/2. Minimum 4B payload — never send short.
+pub fn battle_counter_frame(b1: u8, b2: u8) -> String {
+    format!("F44405000B07{b1:02X}{b2:02X}")
+}
+
 /// Pet summary frames (Logined1 step 5).
 ///
 /// Emits **nothing** when the player owns no active pet (guards on an empty

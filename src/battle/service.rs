@@ -489,13 +489,14 @@ impl BattleService {
     /// Start an NPC battle.
     ///
     /// Returns the new battle id, or 0 if the NPC template is missing.
-    pub fn start_npc_battle(&self, session: &mut Session, npc_id: i64, npc_on_map_id: i64) -> i32 {
+    pub fn start_npc_battle(&self, session: &mut Session, npc_id: i64, npc_on_map_id: i64, ground: i64) -> i32 {
         let Some(npc) = self.data.npcs.get(&npc_id).cloned() else {
             return 0;
         };
         let id = self.next_battle_id();
+        let terrain = if ground > 0 { ground as i32 } else { 112 };
         let battle =
-            Battle::npc_battle(id, session, i64::from(session.id), &npc, npc_on_map_id, 112);
+            Battle::npc_battle(id, session, i64::from(session.id), &npc, npc_on_map_id, terrain);
         let (extra_players, extra_pets) = self.party_snapshots(session);
         self.spawn_battle(
             battle,
@@ -537,7 +538,7 @@ impl BattleService {
     }
 
     /// Start a PK battle.
-    pub fn start_pk_battle(&self, session: &mut Session, opponent: i64) -> i32 {
+    pub fn start_pk_battle(&self, session: &mut Session, opponent: i64, ground: i64) -> i32 {
         let opp = {
             let online = match self.online.try_read() {
                 Ok(o) => o,
@@ -549,7 +550,8 @@ impl BattleService {
             }
         };
         let id = self.next_battle_id();
-        let mut battle = Battle::new(id, 112);
+        let terrain = if ground > 0 { ground as i32 } else { 112 };
+        let mut battle = Battle::new(id, terrain);
         battle.add_player(session, i64::from(session.id), 3, 2);
         battle.load_leader_pets(session, i64::from(session.id), 3);
         let opp_guard = match opp.try_read() {
@@ -557,7 +559,7 @@ impl BattleService {
             Err(_) => return 0,
         };
         battle.add_player(&opp_guard, opponent, 0, 2);
-        let opponent_start = battle.member_battle_frame(112, opponent);
+        let opponent_start = battle.member_battle_frame(terrain, opponent);
         let mut extra_players = HashMap::new();
         let mut extra_pets = HashMap::new();
         extra_players.insert(opponent, self.snapshot(&opp_guard));
