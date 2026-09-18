@@ -210,7 +210,7 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 - **Định nghĩa**: PC server chỉ phục vụ một dialect duy nhất — PC `aLogin.exe` port 6414. Không còn enum `ProtocolProfile` (`PcALogin` / `KotlinMobile`) — đã xóa theo ADR 0002. Mọi opcode đều dùng PC table semantic; opcode nào chưa implement thì rơi vào `unimplemented::handle` (chỉ log, không phản hồi).
 - **Ràng buộc (Invariants)**:
   - `FROZEN_PC_COLLISIONS` const đã xóa — khái niệm "collision" chỉ có nghĩa khi có 2 dialect, không áp dụng cho PC-only.
-  - 3 opcode (`0x19/0x1B/0x1F`) hiện rơi vào `unimplemented::handle` vì chưa port PC handler — không phải "compat", mà là "chưa viết". `0x23` **không** còn ở đây: nó là account-management (đổi mật khẩu / xóa nhân vật / gift code), "Guild" trong bảng opcode PC chỉ là nhãn đặt sai.
+  - 3 opcode (`0x19/0x1B/0x1F`) hiện rơi vào `unimplemented::handle` vì chưa port PC handler — không phải "compat", mà là "chưa viết". `0x23` **không** còn ở đây: nó là account-management (`OP_ACCOUNT`: đổi mật khẩu / xóa nhân vật / gift code), "Guild" trong bảng opcode PC chỉ là nhãn đặt sai. Cùng họ nhãn sai đã chốt rename: `0x24 OP_JOB_CHANGE`, `0x25 OP_LOGIN_COMPLETE`, `0x26 OP_EXP_LEVEL`, `0x27 OP_RANK_ANNOUNCE`, `0x2A OP_RESET` (xem `.scratch/opcode-rename/spec.md`).
 - **Tránh dùng các từ mơ hồ**: *Protocol Profile*, *Kotlin dialect*, *PC dialect* (sau refactor không còn khái niệm này).
 - **Phạm vi hiện tại**: Kotlin `ts_mobile_server/` chỉ là source tham chiếu để port logic, không bao giờ được dịch ra wire từ Rust server.
 

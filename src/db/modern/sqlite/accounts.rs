@@ -27,17 +27,36 @@ impl SqliteAccountRepository<'_> {
         verify(&self.pool.read, account_id, "pass2", pass).await
     }
 
+    /// BLOB-safe overwrite: binds raw wire bytes (VISCII-safe, no UTF-8
+    /// transcode). No-op when empty so a password-less packet never wipes the
+    /// dashboard password.
     pub async fn update_pass2(&self, account_id: i64, pass2: &[u8]) -> RepoResult<()> {
-        let s = std::str::from_utf8(pass2).unwrap_or("");
-        if !s.is_empty() {
-            let now_ms = chrono::Utc::now().timestamp_millis();
-            sqlx::query("UPDATE accounts SET pass2 = ?, updatedat = ? WHERE playerid = ?")
-                .bind(s)
-                .bind(now_ms)
-                .bind(account_id)
-                .execute(&self.pool.write)
-                .await?;
+        if pass2.is_empty() {
+            return Ok(());
         }
+        let now_ms = chrono::Utc::now().timestamp_millis();
+        sqlx::query("UPDATE accounts SET pass2 = ?, updatedat = ? WHERE playerid = ?")
+            .bind(pass2)
+            .bind(now_ms)
+            .bind(account_id)
+            .execute(&self.pool.write)
+            .await?;
+        Ok(())
+    }
+
+    /// BLOB-safe primary-password overwrite (Bear `initChar` parity).
+    /// No-op when empty.
+    pub async fn update_pass1(&self, account_id: i64, pass1: &[u8]) -> RepoResult<()> {
+        if pass1.is_empty() {
+            return Ok(());
+        }
+        let now_ms = chrono::Utc::now().timestamp_millis();
+        sqlx::query("UPDATE accounts SET pass1 = ?, updatedat = ? WHERE playerid = ?")
+            .bind(pass1)
+            .bind(now_ms)
+            .bind(account_id)
+            .execute(&self.pool.write)
+            .await?;
         Ok(())
     }
 
@@ -163,6 +182,10 @@ impl AccountRepository for SqliteAccountRepository<'_> {
 
     async fn update_pass2(&self, account_id: i64, pass2: &[u8]) -> RepoResult<()> {
         self.update_pass2(account_id, pass2).await
+    }
+
+    async fn update_pass1(&self, account_id: i64, pass1: &[u8]) -> RepoResult<()> {
+        self.update_pass1(account_id, pass1).await
     }
 }
 

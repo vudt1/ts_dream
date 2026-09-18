@@ -101,6 +101,39 @@ pub async fn handle_enter_game(ctx: &mut OpcodeCtx<'_>) {
     }
     match ctx.env.pool {
         Some(_) => {
+            // Short-circuit: this session already passed verification at login
+            // (`authed`), so a blind re-verify would double `touch_login`.
+            // Probe the character row first: charless → create-char screen
+            // with no extra DB write; present → register + Logined1.
+            if let Some(repos) = ctx.env.repos {
+                let id = i64::from(conn.session.id);
+                match repos.sessions().load(id, &mut conn.session).await {
+                    Ok(false) => {
+                        out.send(spawn::ENTER_GAME_CREATE);
+                        return;
+                    }
+                    Ok(true) => {
+                        if let (Some(hub), Some(sender)) = (ctx.env.hub, ctx.env.sender) {
+                            if !hub.login_register(conn.session.id, sender).await {
+                                out.send(spawn::DOUBLE_LOGIN);
+                                out.shutdown = true;
+                                return;
+                            }
+                        }
+                        conn.session.logined = true;
+                        let seq = spawn::build_logined_sequence_session(&conn.session);
+                        out.outgoing.extend(
+                            seq.into_iter()
+                                .map(crate::server::dispatcher::OutFrame::new),
+                        );
+                        return;
+                    }
+                    Err(_) => {
+                        out.shutdown = true;
+                        return;
+                    }
+                }
+            }
             let pass = conn.session.pending_pass.clone();
             if let Some(repos) = ctx.env.repos {
                 if login_db(conn, out, repos, ctx.env.hub, ctx.env.sender, &pass)
@@ -177,9 +210,11 @@ async fn login_db(
     }
 
     // Double-login guard: the check+register is one atomic lock so concurrent
-    // logins cannot race.
+    // logins cannot race. The Bear `[00][19]` frame goes first so the client
+    // shows the "logged in elsewhere" dialog instead of hanging.
     if let (Some(hub), Some(sender)) = (hub, sender) {
         if !hub.login_register(conn.session.id, sender).await {
+            out.send(spawn::DOUBLE_LOGIN);
             out.shutdown = true; // Already online elsewhere -> disconnect
             return Ok(());
         }

@@ -40,13 +40,21 @@ fn now_banner() -> String {
 
 /// Login failure responses (op 0x01).
 pub const LOGIN_WRONG_PASS: &str = "F44402000106";
+/// No character on this account → create-char screen (Bear `Authentication`
+/// case 3: `[01][03][00]`).
 pub const LOGIN_CREATE_CHAR: &str = "F4440300010300";
+/// Alias of [`LOGIN_CREATE_CHAR`] for the op-0x03 enter-game path (same wire
+/// bytes; kept as a separate name so call sites read correctly).
+pub const ENTER_GAME_CREATE: &str = LOGIN_CREATE_CHAR;
+/// Double login: account already online elsewhere (Bear `Authentication`
+/// case 2: `[00][19]`). Identical to `SystemAlertReason::DuplicateLoginOtherLocation`
+/// (`F44402000013`); sent before disconnecting so the client shows the dialog
+/// instead of hanging.
+pub const DOUBLE_LOGIN: &str = "F44402000013";
 /// Server Greeting Packet gửi ngay khi Client kết nối TCP thành công.
 /// Op: 0x01 (OP_AUTH), Sub: 0x09 (Scene Switch), SceneMode: 0x5A (90 - Login Scene).
 /// Payload 3 bytes: 01 09 5A -> Frame: F444030001095A.
 pub const LOGIN_SCENE_GREETING: &str = "F444030001095A";
-/// Op 0x03 enter-game when not authed → create char screen.
-pub const ENTER_GAME_CREATE: &str = "F4440300010300";
 
 /// Character creation responses (op 0x09).
 /// Op 0x09 Sub 0x03 ss 0x00 — Tên nhân vật hợp lệ và khả dụng (kích hoạt state-machine client).

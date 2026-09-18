@@ -285,17 +285,94 @@ impl SqliteSessionRepository<'_> {
         tx.commit().await
     }
 
+    /// Create a character and seed its starter state in **one atomic
+    /// transaction** (E3): the full `characters` row (stats from the aLogin
+    /// packet; `hair` covers style/hair/face/color per the 0001 schema), the
+    /// `character_money` ledger, the `accounts` password overwrite (Bear
+    /// `initChar` parity: non-empty `pass1`/`pass2` from the packet replace
+    /// the dashboard passwords), and the starter `inventories` rows — all
+    /// commit or roll back together. A crash between the old two-transaction
+    /// steps can no longer leave a half-created row. UNIQUE(name) violation
+    /// rolls back the whole batch so the handler can toast `09 03 01`.
+    ///
+    /// `session` must already reflect the new character (via
+    /// `apply_to_session`); on success `session.db_character_id` is set.
+    /// The 8-byte appearance color (`session.color`, Bear `color1`/`color2`)
+    /// travels in `session` RAM for `player_appear` and is covered by the
+    /// `hair` column — no separate DB columns.
     pub async fn create_and_seed(
         &self,
         account_id: i64,
         name: &[u8],
         seed: &crate::db::modern::traits::CharacterSeed,
         session: &mut Session,
+        pass1: &[u8],
+        pass2: &[u8],
     ) -> Result<(), sqlx::Error> {
-        let repos = crate::db::modern::sqlite::SqliteRepositories::new((*self.pool).clone());
-        let id = repos.characters().create(account_id, name, seed).await?;
-        session.db_character_id = id;
-        self.save(session).await
+        let mut tx = self.pool.write.begin().await?;
+        let now_ms = chrono::Utc::now().timestamp_millis();
+        // 1. Full character row (mirrors `save()` columns so the row is never
+        //    half-initialised, even if the process dies right after commit).
+        sqlx::query(
+            "INSERT INTO characters (playerid, name, level, gender, hair, element,
+             rebornstage, curhp, maxhp, cursp, maxsp, curexp, nextexp, freepoints, skillpoint,
+             baseint, baseatk, basedef, basehpx, basespx, baseagi,
+             fai, pk, mapid, mapx, mapy, jobtype, newbie)
+             VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, 0, 0)",
+        )
+        .bind(account_id).bind(name)
+        .bind(seed.level).bind(seed.sex).bind(seed.hair)
+        .bind(seed.element)
+        .bind(i64::from(session.hp)).bind(i64::from(session.hp_max))
+        .bind(i64::from(session.sp)).bind(i64::from(session.sp_max))
+        .bind(i64::from(session.texp))
+        .bind(i64::from(session.int1)).bind(i64::from(session.atk)).bind(i64::from(session.def))
+        .bind(i64::from(session.hpx)).bind(i64::from(session.spx)).bind(i64::from(session.agi))
+        .bind(i64::from(session.map_id)).bind(i64::from(session.map_x)).bind(i64::from(session.map_y))
+        .execute(&mut *tx).await?;
+        // 2. Money ledger.
+        sqlx::query("INSERT INTO character_money (playerid, gold, bankgold, shoppoint) VALUES (?, ?, ?, ?)")
+            .bind(account_id)
+            .bind(i64::from(session.gold))
+            .bind(i64::from(session.bank_gold))
+            .bind(i64::from(session.shop_point))
+            .execute(&mut *tx).await?;
+        // 3. Password overwrite (Bear parity). Empty passwords are skipped so a
+        //    password-less packet never wipes the dashboard credentials.
+        //    BLOB-bound: VISCII-safe, no UTF-8 transcode.
+        if !pass1.is_empty() {
+            sqlx::query("UPDATE accounts SET pass1 = ?, updatedat = ? WHERE playerid = ?")
+                .bind(pass1)
+                .bind(now_ms)
+                .bind(account_id)
+                .execute(&mut *tx)
+                .await?;
+        }
+        if !pass2.is_empty() {
+            sqlx::query("UPDATE accounts SET pass2 = ?, updatedat = ? WHERE playerid = ?")
+                .bind(pass2)
+                .bind(now_ms)
+                .bind(account_id)
+                .execute(&mut *tx)
+                .await?;
+        }
+        // 4. Starter inventories (type 1 Homdo/bag: 32012×4; type 8 Trangbi:
+        //    19737) — taken from `session`, committed in the same Tx.
+        for (storage, items) in [
+            (1u8, &session.homdo),
+            (2, &session.tientrang),
+            (4, &session.tuideo),
+            (8, &session.trangbi),
+            (16, &session.luulang),
+        ] {
+            for item in items.iter().filter(|i| i.id > 0) {
+                sqlx::query("INSERT INTO inventories (playerid, storagetype, slot, itemid, quantity, damage) VALUES (?, ?, ?, ?, ?, ?)")
+                    .bind(account_id).bind(storage).bind(i64::from(item.slot)).bind(i64::from(item.id)).bind(i64::from(item.count)).bind(i64::from(item.doben)).execute(&mut *tx).await?;
+            }
+        }
+        tx.commit().await?;
+        session.db_character_id = account_id;
+        Ok(())
     }
 }
 

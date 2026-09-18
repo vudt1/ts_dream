@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS characters (
     name        BLOB NOT NULL UNIQUE,           -- Tên nhân vật (dữ liệu byte mã VISCII 1.1 nguyên bản, tối đa 16 bytes)
     level       INTEGER DEFAULT 1,              -- Đẳng cấp nhân vật (1..200)
     gender      INTEGER DEFAULT 0,              -- Giới tính nhân vật: 0 = Nữ, 1 = Nam
-    hair        INTEGER DEFAULT 0,              -- Kiểu và màu sắc tóc của nhân vật
+    hair        INTEGER DEFAULT 0,              -- Kiểu và màu sắc tóc của nhân vật (bao gồm color1/color2 từ packet tạo nhân vật)
     element     INTEGER DEFAULT 0,              -- Hệ nguyên tố: 1=Địa, 2=Thủy, 3=Hỏa, 4=Phong, 5=Quang, 6=Ám, 7=Tâm
     rebornstage INTEGER DEFAULT 0,              -- Giai đoạn chuyển sinh: 0=Chưa, 1=Chuyển sinh (CS), 2=Tái sinh (TS)
     curhp       INTEGER DEFAULT 0,              -- Sinh lực (Máu / HP) hiện tại của nhân vật

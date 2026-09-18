@@ -1,12 +1,13 @@
 //! Character creation & name check handler (Opcode 0x09).
 //!
 //! Sub 1 (create): parse the client layout, then in **one atomic transaction**
-//! INSERT the `characters` row (stats computed via the TEXP/HP formula) and
-//! seed the starter Homdo/Trangbi through the modern repository. It does **not**
-//! write `accounts.pass1/pass2` — the PC create-char packet carries an empty
-//! `pass1` (`golden/06`), and the password is set only via the web dashboard
-//! (create) or op `0x23` sub 1 (change). Any failure → `shutdown()`. Sub 2
-//! checks the candidate name against `characters.name`. Without a pool (golden
+//! INSERT the full `characters` row (stats computed via the TEXP/HP formula,
+//! `hair` covers style/hair/face/color) + the money ledger + the `accounts`
+//! password overwrite (Bear `initChar` parity: non-empty `pass1`/`pass2` from
+//! the packet replace the dashboard passwords) + the starter `inventories`
+//! rows (Homdo/bag type 1: item 32012×4; Trangbi type 8 slot 2: 19737).
+//! Any failure → `09 03 01` toast (e.g. name race duplicate). Sub 2 checks
+//! the candidate name against `characters.name`. Without a pool (golden
 //! replay) it degrades to the in-memory stub.
 
 use crate::db::modern::traits::CharacterSeed;
@@ -183,7 +184,8 @@ pub async fn handle_character(ctx: &mut OpcodeCtx<'_>) {
 }
 
 /// Build the modern character seed for the pending name, then run the one
-/// atomic transaction through the modern repository. On success the session is
+/// atomic transaction through the modern repository (character row + money +
+/// password overwrite + starter inventories). On success the session is
 /// updated in-memory to match what the DB now holds.
 async fn create_char_db(
     repos: &crate::db::modern::sqlite::SqliteRepositories,
@@ -216,24 +218,18 @@ async fn create_char_db(
     let character_name = session.name.clone();
     repos
         .sessions()
-        .create_and_seed(account_id, &character_name, &seed, session)
-        .await?;
-
-    // If a secondary password (pass2 / mã cá nhân) was specified during creation, persist it
-    if !data.pass2.is_empty() {
-        let _ = repos.accounts().update_pass2(account_id, &data.pass2).await;
-    }
-
-    Ok(())
+        .create_and_seed(account_id, &character_name, &seed, session, &data.pass1, &data.pass2)
+        .await
 }
 
 pub fn apply_to_session(session: &mut Session, data: &CreateCharData) {
     // Mirror every column the modern character creation transaction writes (reborn 0 /
     // job 0 / lv 1, computed HP/SP via `starting_hp_sp`, map 10817/442/758,
-    // Tiengtam/ThamChien = 1) plus the seeded starter Homdo/Trangbi rows, so a
+    // Tiengtam/ThamChien = 1) plus the starter Trangbi row, so a
     // create → login in the golden stub yields the same Logined1 sequence as
-    // the live path. On the live path the next login also reloads everything
-    // from MySQL.
+    // the live path. Starter bag (inventories type 1 = Homdo): item 32012×4;
+    // starter Trangbi (type 8): 19737 at slot 2. On the live path the next
+    // login also reloads everything from the DB.
     let hp = crate::battle::engine::get_hp_max(0, 0, 1, i64::from(data.hpx));
     let sp = crate::battle::engine::get_sp_max(0, 0, 1, i64::from(data.spx));
     session.level = 1;
