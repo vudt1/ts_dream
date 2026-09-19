@@ -32,6 +32,42 @@ pub const OP_SYSTEM_ALERT: u8 = 0x00;
 pub const OP_AUTH: u8 = 0x01;
 /// [0x02] Chat (Normal, Team, Guild, World, Whisper) 
 pub const OP_CHAT: u8 = 0x02;
+
+/// Chat channel sub-opcodes (opcode `0x02`).
+///
+/// Wire layout per channel: `[02][sub][id:4B LE][msg]` (except `CHAT_SUB_SYSTEM`,
+/// which carries no id). Vietnamese labels are the exact client render tags
+/// verified in `.scratch/client-pseudo-op-code/opcode_02.md` §3-§5, so server
+/// code must reference these names — never hardcode the byte value.
+/// Channels `0x01`, `0x02`, `0x03`, `0x05`, `0x06`, `0x07` are filtered by the
+/// client's per-channel flags (`TFT_ChannelForm +0x168..+0x16D`); subs `9` and
+/// `0x0A` have no client branch and must never be emitted.
+/// (Công bố hệ thống) — system broadcast, no channel gate.
+pub const CHAT_SUB_BROADCAST: u8 = 0x00;
+/// (Thần)Thiên thần — angel/GM broadcast; heavily gated client-side
+/// (receiver class in [5..8] + flag `+0x16D` or magic `0xB3B6`).
+pub const CHAT_SUB_ANGEL: u8 = 0x01;
+/// (Gần) — near/map chat; gated by channel flag `+0x168`.
+pub const CHAT_SUB_NEAR: u8 = 0x02;
+/// (Thì Thầm) — whisper; gated by channel flag `+0x169`.
+/// Frame id must be the *sender* id; ids 100..400 take NPC branches.
+pub const CHAT_SUB_WHISPER: u8 = 0x03;
+/// (GM) — GM label, no channel gate (server must gate the sender instead).
+pub const CHAT_SUB_GM: u8 = 0x04;
+/// (Đài) — loudspeaker/megaphone; gated by `+0x16A` and only displayed when
+/// the receiver resolves the sender name.
+pub const CHAT_SUB_LOUDSPEAKER: u8 = 0x05;
+/// (Đoàn) — guild/party channel; gated by channel flag `+0x16B`.
+pub const CHAT_SUB_GUILD: u8 = 0x06;
+/// (Minh) — local/self-talk; gated by channel flag `+0x16C`.
+pub const CHAT_SUB_LOCAL: u8 = 0x07;
+/// Input-bar flag (not a message): empty payload, sets the client's input
+/// cooldown/typing flag. Send only after verifying on a real client.
+pub const CHAT_SUB_INPUT_FLAG: u8 = 0x08;
+/// (Tổng Cũ) — long memo accumulated until the `"#end"` sentinel.
+pub const CHAT_SUB_MEMO: u8 = 0x0B;
+/// (Công bố hệ thống) — pure system line, fixed id `0`, no channel gate.
+pub const CHAT_SUB_SYSTEM: u8 = 0x0C;
 /// [0x03] Look / Inspect Target Player / NPC 
 pub const OP_LOOK: u8 = 0x03;
 /// [0x04] PlayerAppear in FOV 

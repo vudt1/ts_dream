@@ -298,6 +298,7 @@ async fn test_session_load_and_save() {
         encounter_steps: 0,
         encounter_threshold: 20,
         last_battle_end_ms: 0,
+        last_chat_ms: 0,
     };
 
     // Save session
@@ -388,6 +389,7 @@ async fn test_session_load_and_save() {
         encounter_steps: 0,
         encounter_threshold: 20,
         last_battle_end_ms: 0,
+        last_chat_ms: 0,
     };
 
     let loaded = repos
@@ -746,6 +748,7 @@ async fn test_nonexistent_and_edge_cases() {
         encounter_steps: 0,
         encounter_threshold: 20,
         last_battle_end_ms: 0,
+        last_chat_ms: 0,
     };
     let found = repos
         .sessions()

@@ -4,6 +4,9 @@
 //! The 22-step `Logined1` sequence and the login gate responses live here.
 
 use crate::protocol::encoder;
+use crate::protocol::{
+    CHAT_SUB_BROADCAST, CHAT_SUB_INPUT_FLAG, CHAT_SUB_LOCAL, CHAT_SUB_MEMO, CHAT_SUB_SYSTEM,
+};
 use crate::server::dispatcher::HandleOutcome;
 use crate::server::session::Session;
 use std::sync::atomic::{AtomicI64, Ordering};
@@ -233,25 +236,69 @@ pub fn chat_frame(sub: u8, id: u32, chat_raw: &[u8]) -> String {
     crate::protocol::frame(&format!("02{:02X}", sub), &body)
 }
 
+/// Build system broadcast frame (op 0x02 sub 0x00).
+/// Same wire layout as [`chat_frame`]: `le32(id)` + raw bytes echoed verbatim.
+pub fn system_broadcast_frame(id: u32, chat_raw: &[u8]) -> String {
+    chat_frame(CHAT_SUB_BROADCAST, id, chat_raw)
+}
+
+/// Build self-talk frame (op 0x02 sub 0x07, `(Minh)`).
+/// Same wire layout as [`chat_frame`]: `le32(id)` + raw bytes echoed verbatim.
+pub fn self_talk_frame(id: u32, chat_raw: &[u8]) -> String {
+    chat_frame(CHAT_SUB_LOCAL, id, chat_raw)
+}
+
+/// Build input-bar flag frame (op 0x02 sub 0x08, empty payload).
+/// Helper only — not sent by default until verified on a real client.
+pub fn input_flag_frame() -> String {
+    crate::protocol::frame(&format!("02{:02X}", CHAT_SUB_INPUT_FLAG), "")
+}
+
+/// Split a long memo into `0x0B` chunks (`opcode_02.md` §4: client accumulates
+/// into `form+0x16C` until it sees `"#end"`).
+/// Cuts at byte boundaries with `chunk` bytes per piece (`0` = default 200);
+/// the last piece has `"#end"` (`23 65 6E 64`) appended. Empty input → empty vec.
+pub fn long_memo_frames(id: u32, chat_raw: &[u8], chunk: usize) -> Vec<String> {
+    if chat_raw.is_empty() {
+        return Vec::new();
+    }
+    let chunk = if chunk == 0 { 200 } else { chunk };
+    let pieces: Vec<&[u8]> = chat_raw.chunks(chunk).collect();
+    let last = pieces.len() - 1;
+    pieces
+        .into_iter()
+        .enumerate()
+        .map(|(i, p)| {
+            if i == last {
+                let mut tail = p.to_vec();
+                tail.extend_from_slice(b"#end");
+                chat_frame(CHAT_SUB_MEMO, id, &tail)
+            } else {
+                chat_frame(CHAT_SUB_MEMO, id, p)
+            }
+        })
+        .collect()
+}
+
 /// Shared banner builder for server-authored text (op 0x02 sub 0x0B/0x0C).
 ///
 /// Encodes proper-Unicode Vietnamese as single-byte VISCII on the wire
 /// (Đ→0xD0, not `'?'`) — the same treatment banners and `/where` replies get.
-fn text_banner(op: &str, msg: &str) -> String {
+fn text_banner(sub: u8, msg: &str) -> String {
     let visc = crate::encoding::viscii_encode(msg);
     let mut body = String::from("00000000");
     body.push_str(&encoder::strhex(&visc));
-    crate::protocol::frame(op, &body)
+    crate::protocol::frame(&format!("02{:02X}", sub), &body)
 }
 
 /// Build system message banner packet (op 0x02 sub 0x0B).
 pub fn sys_msg_frame(msg: &str) -> String {
-    text_banner("020B", msg)
+    text_banner(CHAT_SUB_MEMO, msg)
 }
 
 /// Build announcement packet (op 0x02 sub 0x0C).
 pub fn announce_frame(msg: &str) -> String {
-    text_banner("020C", msg)
+    text_banner(CHAT_SUB_SYSTEM, msg)
 }
 
 /// Build server name packet (op 0x27/OP_RANK_ANNOUNCE sub 0x09).

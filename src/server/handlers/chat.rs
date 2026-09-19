@@ -1,18 +1,58 @@
 //! Chat & slash commands handler (Opcode 0x02).
 //!
-//! Sub 2 (global/map chat + slash commands), sub 3 (whisper), sub 4 (no-op),
-//! sub 5 (party chat). Cross-session routing (whisper targets, party members,
-//! global broadcast) goes through `ServerControl` when the live hub is present;
-//! golden replay (hub = None) degrades to self-echo only.
+//! Channel sub-opcodes come from `crate::protocol::CHAT_SUB_*` (labels verified
+//! against the aLogin client in `opcode_02.md`); slash commands are intercepted
+//! on [`CHAT_SUB_NEAR`](crate::protocol::CHAT_SUB_NEAR). Cross-session routing
+//! (whisper targets, party members, global broadcast) goes through
+//! `ServerControl` when the live hub is present; golden replay (hub = None)
+//! degrades to self-echo only.
 
 use crate::db::persist;
 use crate::protocol::encoder;
+use crate::protocol::{
+    CHAT_SUB_ANGEL, CHAT_SUB_GM, CHAT_SUB_GUILD, CHAT_SUB_LOUDSPEAKER, CHAT_SUB_NEAR,
+    CHAT_SUB_WHISPER,
+};
 use crate::server::dispatcher::{HandleOutcome, MapBroadcast, OpcodeCtx};
 use crate::server::gm;
 use crate::server::handlers::stats;
 use crate::server::session::{lock_online_sessions, Conn};
 use crate::server::spawn;
 use crate::web::server_control::ServerControl;
+
+/// Maximum chat message length in characters (T4.1). Applies to sub 2
+/// (map chat) and sub 3 (whisper), counted by `chars()` after
+/// `viscii_decode`. Sub 5/6 have no length check.
+const MAX_CHAT_CHARS: usize = 120;
+
+/// Anti-spam cooldown between accepted chat messages: 5 seconds per message.
+/// Applies to user chat subs (near/whisper/party/guild); slash commands and
+/// GM broadcasts are exempt. Stamped on `Session::last_chat_ms`, runtime-only.
+pub const CHAT_COOLDOWN_MS: u64 = 5_000;
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// Enforce the 5s anti-spam cooldown. Returns false (after sending a `020B`
+/// wait notice) when the sender must wait; on success stamps `last_chat_ms`
+/// and returns true.
+fn chat_cooldown_ok(conn: &mut Conn, out: &mut HandleOutcome) -> bool {
+    let now = now_ms();
+    let elapsed = now.saturating_sub(conn.session.last_chat_ms);
+    if elapsed < CHAT_COOLDOWN_MS {
+        let wait = CHAT_COOLDOWN_MS.saturating_sub(elapsed).div_ceil(1000);
+        out.send(spawn::sys_msg_frame(&format!(
+            "Ban chat qua nhanh, vui long doi {wait} giay."
+        )));
+        return false;
+    }
+    conn.session.last_chat_ms = now;
+    true
+}
 
 /// Pet stat update frame: `F4440F00080204` + `le16(stt)`
 /// + type (`19` Hp / `1A` Sp, Type_Status) + sign `01` + `le32(value)` + `00000000`.
@@ -25,15 +65,6 @@ fn pet_stat_frame(stt: u8, ty: u8, value: u16) -> String {
     )
 }
 
-/// True when the player wears the global-chat item in Trangbi slot 6
-/// (id 23100 → broadcast to every client, else map-only).
-fn wears_global_chat_item(conn: &Conn) -> bool {
-    conn.session
-        .trangbi
-        .iter()
-        .any(|i| i.slot == 6 && i.id == 23100)
-}
-
 /// Op 0x02 — Chat & slash commands.
 pub async fn handle_chat(ctx: &mut OpcodeCtx<'_>) {
     let conn = &mut ctx.conn;
@@ -42,23 +73,37 @@ pub async fn handle_chat(ctx: &mut OpcodeCtx<'_>) {
     let pool = ctx.env.pool;
     let (sub, payload) = (ctx.sub, ctx.payload);
     match sub {
-        // Sub 1: World / All chat
-        1 => {
-            let text = crate::encoding::viscii_decode(payload);
-            if text.chars().count() > 60 {
-                return;
-            }
-            let frame = spawn::chat_frame(1, conn.session.id, payload);
-            out.send(&frame);
-            if let Some(hub) = hub {
-                hub.broadcast_except(conn.session.id, &frame).await;
-            }
+        // Sub 1: World / All chat — DISABLED (T2.5). The client gates sub 1
+        // (class in [5..8] + flag +0x16D / magic 0xB3B6), so ordinary players
+        // never see these messages. C->S sub 1 is dropped + logged until a
+        // verified world channel exists. Code below kept for reference only.
+        CHAT_SUB_ANGEL => {
+            tracing::debug!(
+                sender_id = conn.session.id,
+                payload_len = payload.len(),
+                "dropped C->S sub 1 world chat: client gate sub 1, waiting for verified world channel"
+            );
+            // let text = crate::encoding::viscii_decode(payload);
+            // if text.chars().count() > 60 {
+            //     return;
+            // }
+            // let frame = spawn::chat_frame(1, conn.session.id, payload);
+            // out.send(&frame);
+            // if let Some(hub) = hub {
+            //     hub.broadcast_except(conn.session.id, &frame).await;
+            // }
         }
-        // Sub 2: Global / Map chat (+ slash commands)
-        2 => {
+        // Sub 2 (Gần): map chat (+ slash commands, exempt from cooldown).
+        CHAT_SUB_NEAR => {
             let text = crate::encoding::viscii_decode(payload);
-            if text.chars().count() > 60 {
-                return; // Dropped when longer than 60 chars
+            if text.chars().count() > MAX_CHAT_CHARS {
+                tracing::warn!(
+                    sender_id = conn.session.id,
+                    len_chars = text.chars().count(),
+                    "dropped sub 2 chat: message too long"
+                );
+                out.send(spawn::sys_msg_frame("Tin nhan qua dai."));
+                return;
             }
             if text.starts_with('/') {
                 let msg = text.trim();
@@ -68,63 +113,96 @@ pub async fn handle_chat(ctx: &mut OpcodeCtx<'_>) {
                 handle_slash(conn, out, pool, hub, msg).await;
                 return;
             }
-            // Channel selection: global item → op 0x02 sub
-            // 0x01 to every client; otherwise map chat → sub 0x02.
-            if wears_global_chat_item(conn) {
-                let frame = spawn::chat_frame(1, conn.session.id, payload);
-                out.send(&frame);
-                if let Some(hub) = hub {
-                    // Fan out to every client *except* the sender (the sender's
-                    // own copy is echoed via `out` above).
-                    hub.broadcast_except(conn.session.id, &frame).await;
-                }
-            } else {
-                let frame = spawn::chat_frame(2, conn.session.id, payload);
-                out.send(&frame);
-                if let Some(hub) = hub {
-                    // Map-scoped fan-out: every same-map peer except the sender.
-                    // Scope resolves through the `online_sessions()` snapshot
-                    // (P3 — other maps get nothing).
-                    hub.broadcast_map(
-                        conn.session.id,
-                        &[MapBroadcast {
-                            subject: conn.session.id,
-                            map_id: None,
-                            frame,
-                        }],
-                    )
-                    .await;
-                }
+            // Map-only chat (T1.4: promotion 2→1 via item 23100 removed;
+            // sub 1 gate on the client would hide such messages anyway).
+            // 5s anti-spam cooldown (slash commands above are exempt).
+            if !chat_cooldown_ok(conn, out) {
+                return;
+            }
+            let frame = spawn::chat_frame(CHAT_SUB_NEAR, conn.session.id, payload);
+            out.send(&frame);
+            if let Some(hub) = hub {
+                // Map-scoped fan-out: every same-map peer except the sender.
+                // Scope resolves through the `online_sessions()` snapshot
+                // (P3 — other maps get nothing).
+                hub.broadcast_map(
+                    conn.session.id,
+                    &[MapBroadcast {
+                        subject: conn.session.id,
+                        map_id: None,
+                        frame,
+                    }],
+                )
+                .await;
             }
         }
-        // Sub 3: Whisper: both the sender and the recipient
-        // receive op 0x02 sub 0x03 carrying the *recipient* id.
-        3 => {
+        // Sub 3 (Thì Thầm): both the sender and the recipient
+        // receive op 0x02 sub 0x03 carrying the *sender* id (T1.1).
+        CHAT_SUB_WHISPER => {
             if payload.len() < 4 {
                 return;
             }
             let target_id = encoder::u32_le(payload[0], payload[1], payload[2], payload[3]);
             let chat_raw = &payload[4..];
-            if chat_raw.len() > 60 {
+            let text = crate::encoding::viscii_decode(chat_raw);
+            if text.chars().count() > MAX_CHAT_CHARS {
+                tracing::warn!(
+                    sender_id = conn.session.id,
+                    len_chars = text.chars().count(),
+                    "dropped sub 3 whisper: message too long"
+                );
+                out.send(spawn::sys_msg_frame("Tin nhan qua dai."));
                 return;
             }
-            let frame = spawn::chat_frame(3, target_id, chat_raw);
+            // T2.2: recipient offline -> 020B notice to sender, no chat frame.
+            let online = lock_online_sessions().contains_key(&target_id);
+            if !online {
+                out.send(spawn::sys_msg_frame("Nguoi choi khong online."));
+                return;
+            }
+            // 5s anti-spam cooldown.
+            if !chat_cooldown_ok(conn, out) {
+                return;
+            }
+            let frame = spawn::chat_frame(CHAT_SUB_WHISPER, conn.session.id, chat_raw);
             out.send(&frame); // sender's copy
             if let Some(hub) = hub {
                 hub.send_to(target_id, &frame).await; // recipient's copy
             }
         }
-        // Sub 4: GM broadcast / system reply to all
-        4 => {
-            let frame = spawn::chat_frame(4, conn.session.id, payload);
+        // Sub 4 (GM): GM-only broadcast (T1.2). Non-GM senders are dropped
+        // silently (no client hint) to avoid revealing the privilege boundary.
+        // GM traffic is exempt from the anti-spam cooldown.
+        CHAT_SUB_GM => {
+            if conn.session.gm_level <= 0 {
+                tracing::warn!(
+                    sender_id = conn.session.id,
+                    gm_level = conn.session.gm_level,
+                    "dropped sub 4 chat from non-GM sender"
+                );
+                return;
+            }
+            let frame = spawn::chat_frame(CHAT_SUB_GM, conn.session.id, payload);
             out.send(&frame);
             if let Some(hub) = hub {
                 hub.broadcast_except(conn.session.id, &frame).await;
             }
         }
-        // Sub 5: Party chat: leader + all members receive the frame.
-        5 => {
-            let frame = spawn::chat_frame(5, conn.session.id, payload);
+        // Sub 5 (Đài): leader + all members receive the frame.
+        // T2.3 (partial): sender with no party -> 020B error instead of a
+        // silent self-echo. Live-registry resolution is a future ticket.
+        CHAT_SUB_LOUDSPEAKER => {
+            let in_party =
+                conn.session.id_leader != 0 || conn.session.id_mem.iter().any(|&m| m != 0);
+            if !in_party {
+                out.send(spawn::sys_msg_frame("Ban chua tham gia doi."));
+                return;
+            }
+            // 5s anti-spam cooldown.
+            if !chat_cooldown_ok(conn, out) {
+                return;
+            }
+            let frame = spawn::chat_frame(CHAT_SUB_LOUDSPEAKER, conn.session.id, payload);
             out.send(&frame);
             if let Some(hub) = hub {
                 let id = conn.session.id;
@@ -139,13 +217,19 @@ pub async fn handle_chat(ctx: &mut OpcodeCtx<'_>) {
                 }
             }
         }
-        // Sub 6: Army / Guild chat
-        6 => {
-            let frame = spawn::chat_frame(6, conn.session.id, payload);
-            out.send(&frame);
-            if let Some(hub) = hub {
-                hub.broadcast_except(conn.session.id, &frame).await;
+        // Sub 6 (Đoàn): echo-only until guild/army
+        // membership exists (T1.3). No server-wide broadcast.
+        CHAT_SUB_GUILD => {
+            // 5s anti-spam cooldown (echo-only traffic still counts).
+            if !chat_cooldown_ok(conn, out) {
+                return;
             }
+            let frame = spawn::chat_frame(CHAT_SUB_GUILD, conn.session.id, payload);
+            out.send(&frame);
+            tracing::debug!(
+                sender_id = conn.session.id,
+                "sub 6 army/guild chat unimplemented; echo-only"
+            );
         }
         _ => {}
     }
@@ -186,10 +270,15 @@ async fn handle_slash(
             );
             out.send(spawn::sys_msg_frame(&info));
         }
-        "/endtalk" => {
+        "/endtalk" | "/offq" => {
             conn.session.idtalking = 0;
             conn.session.select_menu = 0;
             out.send("F44402001408".to_string());
+        }
+        "/help" => {
+            out.send(spawn::sys_msg_frame(
+                "/where /endtalk /offq /sleep /openhotel /openbank /openstore",
+            ));
         }
         "/sleep" => {
             if conn.session.battle_id > 0 {
@@ -223,6 +312,10 @@ async fn handle_slash(
                 persist::upsert_pet(pool, player_id, pet).await;
             }
             out.send("F44403001F0100".to_string());
+            // T3.3: Bear-parity confirmation announce after a successful
+            // self-heal, before party-leader propagation. The battle_id>0
+            // guard above and leader-only propagation below are unchanged.
+            out.send(spawn::sys_msg_frame("Sleep command executed."));
             // Party-leader propagation: each online member gets the same
             // treatment through its own session snapshot in
             // `online_sessions()` and its client sender.
@@ -326,6 +419,11 @@ async fn handle_slash(
         "/openstore" => {
             out.send("F44402001D06".to_string());
             out.send("F44402001409".to_string());
+        }
+        // Bot/auto group stubs (T3.2): reply 020B "not supported"
+        // instead of a silent drop so players know the command is dead.
+        "/bot" | "/autoboom" | "/autosell" | "/ai" | "/hpsp" | "/potion" | "/combo" => {
+            out.send(spawn::sys_msg_frame("Lenh nay chua duoc ho tro."));
         }
         // Unknown `/cmd` — silently dropped.
         _ => {}

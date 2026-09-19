@@ -293,18 +293,25 @@ async fn test_p2_chat_subcodes() {
     let data = GameData::default();
     let service = ts_dream::battle::service::BattleService::default();
 
-    // Sub 1: All chat
+    // Sub 1: All chat — DISABLED (T2.5: client gates sub 1, C->S dropped)
     let mut out1 = HandleOutcome::default();
     let mut ctx1 = test_ctx(&mut conn, &data, &service, &mut out1, 0x02, 1, b"Hello World");
     chat::handle_chat(&mut ctx1).await;
-    assert_eq!(out1.outgoing.len(), 1);
-    assert!(out1.outgoing[0].frame.starts_with("F444"));
+    assert_eq!(out1.outgoing.len(), 0);
 
-    // Sub 4: GM broadcast
+    // Sub 4: GM broadcast — non-GM (gm_level 0) is dropped (T1.2)
     let mut out4 = HandleOutcome::default();
     let mut ctx4 = test_ctx(&mut conn, &data, &service, &mut out4, 0x02, 4, b"GM Announcement");
     chat::handle_chat(&mut ctx4).await;
-    assert_eq!(out4.outgoing.len(), 1);
+    assert_eq!(out4.outgoing.len(), 0);
+
+    // Sub 4: GM broadcast — GM sender gets the echo (hub None: no fan-out here)
+    conn.session.gm_level = 10;
+    let mut out4g = HandleOutcome::default();
+    let mut ctx4g = test_ctx(&mut conn, &data, &service, &mut out4g, 0x02, 4, b"GM Announcement");
+    chat::handle_chat(&mut ctx4g).await;
+    assert_eq!(out4g.outgoing.len(), 1);
+    conn.session.gm_level = 0;
 
     // Sub 6: Army chat
     let mut out6 = HandleOutcome::default();

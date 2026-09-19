@@ -249,6 +249,10 @@ pub struct Session {
     pub encounter_threshold: u32,
     /// Timestamp (ms) when last battle ended, used for encounter cooldown.
     pub last_battle_end_ms: u64,
+    /// Timestamp (ms) of the last accepted chat message, used for the
+    /// 5-second anti-spam cooldown (`CHAT_COOLDOWN_MS` in `handlers::chat`).
+    /// Runtime-only; never persisted.
+    pub last_chat_ms: u64,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -357,6 +361,7 @@ impl Default for Session {
             encounter_steps: 0,
             encounter_threshold: 20,
             last_battle_end_ms: 0,
+            last_chat_ms: 0,
         }
     }
 }
