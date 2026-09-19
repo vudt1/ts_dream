@@ -7,12 +7,20 @@ Trạng thái: **Đã xác minh 100% ở tầng handler** (file case + dispatche
 
 ---
 
+> [!WARNING] **CẢNH BÁO ĐẶC BIỆT DÀNH CHO DEVELOPER EMULATOR: KHÔNG PHẢI GÓI DI CHUYỂN (NON-MOVEMENT)**  
+> **Tuyệt đối không nhầm lẫn Opcode 0x05 là gói tin di chuyển.** Chiều C→S của Opcode 0x05 hoàn toàn **không mang tọa độ X/Y** và không dùng để điều khiển bước đi.  
+> - Di chuyển bước ngắn trong bản đồ thuộc độc quyền về **Opcode 0x06**.  
+> - Dịch chuyển tức thời / chuyển map thuộc về **Opcode 0x0C** (kết hợp Opcode 0x14).  
+> - Opcode 0x05 là kênh **Đồng bộ trạng thái / sự kiện thế giới & Actor** (World & Actor State Sync).
+
+---
+
 ## 0. Đính chính giả định nghiệp vụ
 
 1. **Không có giả định cũ cần bác bỏ**: `handoff-opcode-exploration-guide.md` KHÔNG gán nghiệp vụ cho OP 0x05 (mục 3 ưu tiên chỉ liệt kê 0x02/0x08/0x14/0x17/0x1A/0xC7). → Đây là phân tích gốc đầu tiên.
 2. **Đính chính hình dung "handler lớn"**: `FUN_0078ca56` là một **thuần dispatcher** (~60 dòng lệnh): đọc 1 byte SubOp, `switch`, mỗi nhánh **chuyển nguyên con RestPayload cho một procedure cấp phát sẵn** theo khuôn `helper(đối_tượng_toàn_cục, &RestPayload)`. Toàn bộ logic giải mã field nằm **bên trong helper**, không nằm trong handler.
 3. **Giới hạn nguồn (cập nhật 2026-09-14)**: cả 6 helper `func_0x00731534`, `func_0x00727164`, `func_0x0072e9a0`, `func_0x00732368`, `func_0x007289b8`, `func_0x0074f9f8` **đã có body** trong `ts_decompile/functions/` (`00727164_FUN_00727164.c` … `0074f9f8_FUN_0074f9f8.c`, đều có dòng trong `index.csv`). **DUY NHẤT `func_0x005763c8` (SubOp 0x06) vẫn thiếu body** → wire layout của sub-op đó vẫn *không xác định*. Với 6 helper đã có body, các §4 tương ứng dưới đây **chuyển từ loại suy sang đặc tả byte-exact**; các nhãn "loại suy unit / chưa kết luận" cũ được thay bằng bằng chứng trực tiếp (hoặc được đính chính khi code nói khác).
-4. **Cảnh báo tiền lệ C→S**: doc `opcode_14.md` §5.1 đã chứng minh `case N: break;` trong `0077f414.c` **có thể là artifact jump-table bị gộp** (OP 0x14 hiển thị `break` nhưng thực tế client vẫn gửi). Với OP 0x05, đúng tình huống này xảy ra: `.c` nói "rỗng" nhưng **có 2 call-site asm thật** gửi `DL=0x05` (xem mục 5).
+4. **Cảnh báo tiền lệ C→S**: doc `opcode_14.md` §5.1 đã chứng minh `case N: break;` trong `0077f414.c` **có thể là artifact jump-table bị gộp** (OP 0x14 hiển thị `break` nhưng thực tế client vẫn gửi). Với OP 0x05, đúng tình huống này xảy ra: `.c` nói "rỗng" nhưng **có 2 call-site asm thật** gửi `DL=0x05` (xem mục 5): `(05, sub=6)` khi chốt chọn mục form (chết/hồi sinh) và `(05, sub=7)` khi đổi tab panel. Cả hai trường hợp này **hoàn toàn không mang tọa độ di chuyển**.
 
 ---
 
@@ -95,6 +103,10 @@ Quy ước: `p[k]` = byte payload gốc 0-based (`p[0]=0x05`, `p[1]=SubOp`); `RP
   1. `*(*(int*)gvar_007D9D34 + 0x53fc) = 1` — bật gate cảnh. Chuỗi bằng chứng gate: `TForm1.KeyboardWalk` chỉ cho đi bộ khi `*(DAT_0092322c + 0x53fc) != 0` (DAT_0092322c alias của scene object trong FormCreate); `DXDraw1MouseDown` d.130 cùng kiểm tra; `FUN_00717e78`/`FUN_00719170`/`FUN_0073ce00` (vòng tick actor 1..800) chỉ xử lý khi `+0x53fc != 0`; và `FUN_00603f20` (luồng rời/reset map, tạo `TMap_Create`) **set lại 0** (d.234). ⇒ semantics: **"thế giới đã nạp xong, được tương tác"**.
   2. `*(*(int*)gvar_007DA7BC + 0x348) = kernel32.GetTickCount()` — stamp thời gian lên player. Vùng `+0x348` là họ "tick mốc/ready-at" (`FUN_006a96d0` **đọc** so tick) — *suy luận: mốc "được hành động tiếp"*; **độ tin cậy TB** cho tên gọi, CAO cho thao tác ghi.
   3. `FUN_0079b620(*(int*)gvar_007DA0B4, 0)` — `gvar_007DA0B4 = TMouseInfo_Create(VMT_79B548_TMouseInfo)` (`0050a4a0_TForm1.FormCreate.c` d.472-473); thân `FUN_0079b620`: `if (param_2 != -1) obj+0x24 = param_2; obj+0x2c = 0` → **xóa mode lệnh chuột (`+0x24=0`) và cờ pending (`+0x2c=0`)**. (Các hàm UI gọi cùng hàm này với 3 = bật mode; `DXDraw1MouseMove` ghi `TMouseInfo+4/+8` = tọa độ.)
+- **Tầm quan trọng sống còn & Hai thời điểm bắt buộc gửi `[05 04]`:**
+  `[05 04]` là **World-Ready gate**. Nếu không nhận được gói này, client hoàn toàn bị tê liệt điều khiển chuột và phím (`scene+0x53fc == 0`). Server emulator bắt buộc phải gửi `[05 04]` tại **2 thời điểm chính**:
+  1. **Ngay sau chuỗi spawn đăng nhập** (`Logined1` / Opcode 0x03 bước cuối cùng): mở khóa cho người chơi bắt đầu hành động trong map tân thủ.
+  2. **Ngay sau khi hoàn tất nạp bản đồ mới** (`handle_teleport_confirm` / Opcode 0x0C Sub 1): mở khóa điều khiển chuột và giải phóng khóa bước đi sau quá trình chuyển cảnh warp map.
 - Trình bày/hiệu ứng: không có.
 
 ### 4.2. SubOp `0x0A` — **LevelUP (lên cấp)** — `FUN_0072f970` @ `0x0072F970` — **độ tin cậy CAO (byte-exact)**

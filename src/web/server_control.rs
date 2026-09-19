@@ -253,30 +253,30 @@ impl ServerControl {
     /// follow flow members are co-located with the leader, so the two sets are
     /// identical; a member warped to another map leaves the party.
     pub async fn broadcast_map(&self, from_id: u32, frames: &[dispatcher::MapBroadcast]) {
-        let same_map_ids: Vec<u32> = {
+        let targets: Vec<(u32, String)> = {
             let sessions = online_sessions().lock().unwrap();
             let Some(from) = sessions.get(&from_id) else {
                 return; // no map scope → nothing to fan out
             };
-            sessions
-                .iter()
-                .filter(|(pid, s)| **pid != from_id && s.map_id == from.map_id)
-                .map(|(pid, _)| *pid)
-                .collect()
+            let mut result = Vec::new();
+            for b in frames {
+                let target_map = b.map_id.unwrap_or(from.map_id);
+                for (pid, s) in sessions.iter() {
+                    if *pid != from_id && *pid != b.subject && s.map_id == target_map {
+                        result.push((*pid, b.frame.clone()));
+                    }
+                }
+            }
+            result
         };
-        if same_map_ids.is_empty() {
+        if targets.is_empty() {
             return;
         }
         let clients = self.clients.lock().await;
-        for b in frames {
-            for pid in &same_map_ids {
-                if *pid == b.subject {
-                    continue;
-                }
-                if let Some(tx) = clients.get(pid) {
-                    if tx.send(b.frame.clone()).is_err() {
-                        tracing::debug!("Failed to send map broadcast to player {pid}");
-                    }
+        for (pid, frame) in targets {
+            if let Some(tx) = clients.get(&pid) {
+                if tx.send(frame).is_err() {
+                    tracing::debug!("Failed to send map broadcast to player {pid}");
                 }
             }
         }
@@ -294,13 +294,23 @@ impl ServerControl {
     }
 
     /// Disconnect teardown for a logged-in session (Ch2 §2.1): broadcast the
-    /// leave-battle / offline hide frame to peers, then drop the client
-    /// registration and the online-session snapshot.
+    /// leave-battle / offline hide frame to peers, persist state to database,
+    /// then drop the client registration and the online-session snapshot.
     pub async fn disconnect_player(&self, player_id: u32) {
         let hide = crate::server::spawn::session_offline_frame(player_id);
         self.broadcast_except(player_id, &hide).await;
         self.unregister_client(player_id).await;
-        online_sessions().lock().unwrap().remove(&player_id);
+        let session_opt = online_sessions().lock().unwrap().remove(&player_id);
+        if let Some(session) = session_opt {
+            if session.authed && session.id > 0 {
+                let _ = crate::db::persist::persist_sessions_transaction(
+                    self.pool.as_ref(),
+                    &[&session],
+                    &["stats", "homdo", "trangbi", "quest", "pet"],
+                )
+                .await;
+            }
+        }
     }
 }
 

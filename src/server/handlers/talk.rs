@@ -50,7 +50,7 @@ pub async fn handle_talk(ctx: &mut OpcodeCtx<'_>) {
         1 => handle_talk_start(conn, payload, data, out),
         4 => end_talk(conn, out),
         6 => handle_talk_continue(conn, payload, data, pool, out).await,
-        8 => handle_talk_warp(conn, payload, data, out),
+        8 => handle_talk_warp(conn, payload, data, &ctx.env, out).await,
         9 => handle_talk_select_menu(conn, payload),
         _ => end_talk(conn, out),
     }
@@ -261,11 +261,17 @@ async fn handle_talk_continue(
     }
 }
 
-fn handle_talk_warp(conn: &mut Conn, payload: &[u8], data: &GameData, out: &mut HandleOutcome) {
+async fn handle_talk_warp(
+    conn: &mut Conn,
+    payload: &[u8],
+    data: &GameData,
+    env: &crate::server::dispatcher::ServerEnv<'_>,
+    out: &mut HandleOutcome,
+) {
     if payload.len() >= 2 {
         conn.session.idtalking = encoder::u16_le(payload[0], payload[1]) as i32;
     }
-    crate::server::handlers::quest::handle_warp_confirm(conn, data, out);
+    crate::server::handlers::quest::handle_warp_confirm(conn, data, env, out).await;
 }
 
 fn handle_talk_select_menu(conn: &mut Conn, payload: &[u8]) {

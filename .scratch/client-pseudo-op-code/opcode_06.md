@@ -13,7 +13,7 @@ Trạng thái: **Xác minh từ mã nguồn sơ cấp** (case function + dispatc
 | :--- | :--- | :--- |
 | 0.1 | `handoff-opcode-exploration-guide.md` (mục 3) **không gán giả định nào** cho OP 0x06 (không nằm trong lộ trình ưu tiên). | Khoảng trống này nay được lấp: **OP 0x06 = KÊNH ĐỒNG BỘ DI CHUYỂN / VỊ TRÍ ACTOR hai chiều** (S→C: lệnh di chuyển actor từ xa; C→S: báo cáo bước đi của chính mình). Độ tin cậy: **CAO**. |
 | 0.2 | `opcode_14.md` (dòng 20 & kết luận) phỏng đoán: *"movement realtime nằm ở C→S OP 0x06/0x07, `case 6` gửi `[0x06][X:Word LE][Y:Word LE]...` (tọa độ tại `gvar_007DA7BC + 0x4C/0x50`)"*. | **ĐÚNG**, và được bổ sung chi tiết: phía sau X/Y còn **2 byte chữ ký/nonce**; byte thứ 2 của payload là **sub-code C→S** (`MOV CL,0x1` / `MOV CL,0x2` trong ASM — xem mục 5). Xác minh trực tiếp tại `0077f414_FUN_0077F414.c` dòng 830–883 + asm call-site. Độ tin cậy: **CAO**. |
-| 0.3 | Có thể nhầm "đối xứng 1-1": gói S→C và C→S cùng opcode 0x06 **KHÔNG** phải cùng cấu trúc. | **Bất đối xứng hoàn toàn**: S→C SubOp 1 = `[06][01][actorID:4B][dir:1B][X:2B][Y:2B]` (11 B, điều khiển actor **khác**); C→S = `[06][sub][X:2B][Y:2B][sigA][sigB]` (8 B, báo cáo vị trí **của chính mình**, không có ID). Độ tin cậy: **CAO**. |
+| 0.3 | Có thể nhầm "đối xứng 1-1": gói S→C và C→S cùng opcode 0x06 **KHÔNG** phải cùng cấu trúc. | **Bất đối xứng hoàn toàn**: S→C SubOp 1 = `[06][01][actorID:4B][dir:1B][X:2B][Y:2B]` (11 B, điều khiển actor **khác**); C→S = `[06][sub:1B][orient:1B][X:2B][Y:2B][sigA][sigB]` (đúng 9 B, báo cáo vị trí và hướng nhìn **của chính mình**, không có ID). Độ tin cậy: **CAO**. |
 | 0.4 | Nhãn trường "`+0x35f` TeamStatus": giá trị **1** dễ bị đoán là "thành viên". | Ngược lại. Trong `FUN_007a273c` (kết lập đội): **Leader** được set `+0x35f = 1` (dòng 140), **mỗi thành viên** được set `+0x35f = 2` (dòng 199); giải tán (`FUN_007a2604`) set `0`. Tức **1 = TRƯỞNG NHÓM (leader), 2 = THÀNH VIÊN (follower), 0 = vô đội**. Độ tin cậy: **CAO** (đọc trực tiếp code ghi). |
 | 0.5 | Không có chuỗi constant nào được tham chiếu trong handler | Đúng — `FUN_0078cb99` **không push literal nào**; các giá trị `0x7963xx` ở epilogue là **con trỏ frame dọn dẹp SEH/`_LStrClr`**, không phải dữ liệu nghiệp vụ (tránh nhầm như các phân tích cũ dễ vấp). Bằng chứng nghiệp vụ thay vào đó đến từ **chuỗi literal trong debug HUD** `FUN_0050debc` (mục 4.1.3). |
 
@@ -111,7 +111,7 @@ if (gself[0x145c] != 2 && gself[0x35f] == 1 && gself[0x578] != 0) {
 | `+0x145c` | (không nhãn) | chỉ `case_004` OP 0x03 dòng 115, nhận từ `func_0x0054a384(MapID)` — **body ĐÃ export** (`0054a384_FUN_0054a384.c:44-152`, xác minh được từ body mới): hàm tra **bảng tĩnh tại `DAT_00948DF8`** (5 dòng, stride 54 byte): MapID khớp word `+0x07` → trả **1**; khớp word `+0x0D+6·k` (k=1..5) → trả **2**; khớp word `+0x31+6` → trả **3**; không khớp → 0 (param_1 không dùng — EAX-artifact) | "scene-class đặc biệt"; giá trị **2** (= MapID nằm ở cột thứ hai của bảng) vô hiệu hóa bộ lọc partner. Độ tin cậy cơ chế: **CAO** (lookup bảng, không phải tính toán); **nội dung bảng chưa dump** (`DAT_00948DF8` thuộc `.data` runtime) → vẫn chưa liệt kê được map nào class 2, và **ý nghĩa nghiệp vụ của class 2: chưa kết luận được** |
 | `+0x466` | (không nhãn) | `FUN_0072b390`:73 set **1** (mỗi lần client thi hành 1 action qua `VMT+0x18(code)` rồi `SendCommand(0x20)`); `FUN_0072b4b8`:38 clear **0**; `DXDraw1MouseDown`:74 yêu cầu `!=0` mới cho click-walk | Cờ "đang ở trạng thái hành-động/hoạt-động-world". Ý nghĩa chính xác: **TRUNG BÌNH**; cơ chế set/clear: **CAO**. |
 
-**Hiệu ứng:** tôi là **trưởng nhóm** → mọi gói đi-broadcast cho **chính 4 thành viên của tôi** bị **nuốt** (bỏ cả phần đặt đích). Giải thích hợp lý: client leader đang tự quản lý đội (panel `FUN_005a3018` đọc đúng bảng `0x550/0x578` này) nên không để server xen vào bước đi member. Độ tin cậy cơ chế: **CAO**.
+**Hiệu ứng:** tôi là **trưởng nhóm** (`+0x35f == 1`) → mọi gói đi-broadcast `[06 01]` cho **chính 4 thành viên của tôi** (`+0x550[1..4]`) bị **nuốt (discard)** hoàn toàn (bỏ cả phần đặt đích). Giải thích hợp lý: client leader đang tự quản lý đội và tự tính toán kéo các thành viên cục bộ trên máy mình (panel `FUN_005a3018` đọc đúng bảng `0x550/0x578` này) nên chủ động không để server can thiệp vào bước đi của member trên màn hình leader. Độ tin cậy cơ chế: **CAO**.
 
 #### 4.1.4. Cổng #2 — "Leader của tôi vừa đi" (dòng 56–59)
 ```c
@@ -163,7 +163,12 @@ if (player[0x653] != 1) {                 // chưa khóa
 }
 ```
 - **Cờ khóa `+0x653`** ("server-driven walk lock"): các **reader** đã xác minh — `TForm1.KeyboardWalk`:62 (chặn gõ phím), `TForm1.DXDraw1MouseDown`:127 và `FUN_00712d7c`:72 (chặn click-walk). Các **writer**: `case_006/OP 0x06 SubOp 2` set 1; `FUN_0072b390`:76 → `fdf8(player, 0)` clear 0; dispatcher inline `0078a89c:3111` (bên **OP 0x14 SubOp 0x08 TRANSITION-END** — khớp dòng "xóa LocalActor+0x653" của `opcode_14.md`); `0061ba70` khởi tạo 0. → **Vòng đời khóa**: server khóa bằng `[06][02]`, mở bằng `[14][08]` hoặc action-complete. Độ tin cậy: **CAO**.
-- Hiệu ứng nghiệp vụ kép: **dừng người chơi tại chỗ + xác nhận lại vị trí** — mẫu "position reconciliation" kinh điển: server nghi lệch tọa độ (hoặc vừa chuyển trạng thái) → ra lệnh client chốt lại vị trí thực và báo về. Độ tin cậy diễn giải: **TRUNG BÌNH–CAO** (cơ chế CAO, động cơ server-side không quan sát được từ client).
+- **Chuỗi tương tác đóng (Closed-loop position reconciliation):**
+  1. Server gửi lệnh khóa S→C: `[06][02]`.
+  2. Client nhận gói, kích hoạt `FUN_0071fdf8(player, 1)`: đặt `player+0x653 = 1` (khóa phím/chuột).
+  3. Nếu client đang dở bước đi (`player+0xE5 == 0`), dừng tại chỗ: xóa path/waypoint, snap đích về vị trí hiện tại (`player+0x4C := player+0x1C`, `player+0x50 := player+0x20`).
+  4. Client tự động gửi ngay gói C→S `[06][02][orient][X][Y][sigA][sigB]` qua `SendCommand(6, CL=2)`.
+  5. Server ghi nhận tọa độ reconciled và phát `[14 08]` để giải phóng khóa di chuyển cho client.
 
 ---
 
@@ -173,30 +178,35 @@ if (player[0x653] != 1) {                 // chưa khóa
 `functions/0077f414_FUN_0077F414.c` dòng 830–883 (`case 6:` của `switch(param_2 & 0xff)`):
 
 ```
-payload = [0x06] [sub:1B] [X:Word LE] [Y:Word LE] [sigA:1B] [sigB:1B]   (8 byte)
+payload = [0x06] [sub:1B] [orient:1B] [X:Word LE] [Y:Word LE] [sigA:1B] [sigB:1B]   (đúng 9 byte)
 ```
+- **Bổ sung byte `orient` (Hướng nhân vật):** Kiểm tra chi tiết ASM tại `0x0077FD79`: `MOV DL, [EDX + 0xe4]` (lấy hướng nhìn hiện tại từ `player + 0xE4`) kết hợp `_PStrNCat(buf, ..., 3)` ghép 3 byte đầu vào header `[0x06][sub][orient]`. Payload C→S thực tế là **đúng 9 byte**, hoàn toàn khớp với cách Bear C# bóc tách (`orient = data[2]`, `x = read16(data, 3)`, `y = read16(data, 5)`).
 - **Gate gửi (dòng 831–832):** chỉ gửi khi `player[0x5C] != player[0x4C] || player[0x60] != player[0x50]` — tức **đích hiện tại khác "lần báo gần nhất"**; sau khi gửi client cập nhật mirror `0x5C/0x60 := 0x4C/0x50` (dòng 878–880). Đây là lý do `FUN_0071fdf8` SubOp 2 tất bật snap `0x4C:=0x1C` trước khi gọi case 6 — tạo "sự thay đổi" để gói echo lọt gate.
-- **Thứ tự field:** đã hiệu chuẩn bằng `case 1` (wire chuẩn `[01][len][charID][BC][pw]` của `opcode_00_01.md`) — các nguồn của `_LStrCatN(&dst,5,a,b,c,d,e,f)` nối vào wire **theo thứ tự NGƯỢC chiều liệt kê**. Với `case 6`, bộ nguồn cho ra: `local_88` (header 2 byte `[06][sub]` — `_PStrNCat(buf, ..., 2)` ghép đúng `[DL][CL]`) → `local_8c` = `FUN_0077eb1c(player[0x4C])` = **X** → `local_90` = **Y** → `local_94` = **sigA** → `local_98` = **sigB**.
+- **Thứ tự field:** `local_88` (header 3 byte `[06][sub][orient]`) → `local_8c` = `FUN_0077eb1c(player[0x4C])` = **X (Word LE)** → `local_90` = **Y (Word LE)** → `local_94` = **sigA** → `local_98` = **sigB**.
 - **sub (byte [1] = thanh ghi CL của call-site — đọc từ ASM `.asm.txt`, không phải artifact):**
   - `MOV CL,0x1` — **báo cáo bước đi tự nguyện**: `FUN_00731ffc` asm cuối hàm (KeyboardWalk step), `FUN_00712d7c` asm dòng ~329 (click-walk), `FUN_0074b330` asm 130 & 192 (di chuyển theo mount/vehicle).
   - `MOV CL,0x2` — **echo bị server ép**: `FUN_0071fdf8` asm dòng 40 trước `CALL` (chính là hệ quả S→C SubOp 2), và `FUN_0074b330` asm 168.
 - **sigA (dòng 862):** `_LStrFromChar(player[4] % 0xD + byte[player + 0x3FA])` = `(charID mod 13 + byte 0x3FA) and 0xFF`. `0x3FA` là **byte cờ job-state** (attrCode `0x23` của stat-setter `FUN_00710ab0` — `opcode_08.md` §4.2) → chữ ký ràng buộc gói với danh tính + trạng thái nhân vật (chống replay/giả mạo thô). Độ tin cậy công thức: **CAO**.
 - **sigB (dòng 834–852):** `FUN_00402cf0` **không phải GetAsyncKeyState** mà là **PRNG LCG**: `seed = seed*0x8088405+1; return (uint)(x*seed)>>32` (đọc nguyên văn `00402cf0_FUN_00402cf0.c`). Giá trị gửi = `rand(0xDC) ∈ [0..219]` — một **nonce**; nhánh `==0xff` cộng `rand(0x38)+200` **không bao giờ xảy ra** (rand(220) < 255) → dead code. Độ tin cậy: **CAO**.
-- `_LStrCmp(gvar_007DA37C+0x24, +0x28)` trong nhánh: kết quả không dùng (gắn với dead-branch) → bỏ qua.
 
 ### 5.2. Tính đối xứng S↔C của OP 0x06 (trả lời đúng yêu cầu "kiểm tra tính đối xứng case 6")
 | Khía cạnh | S→C SubOp 1 | C→S case 6 |
 |---|---|---|
 | Mục tiêu | actor **từ xa** (theo `actorID`) | **chính mình** (không cần ID — server đã biết ai) |
 | Tọa độ | đích mới `X,Y` (px) | `X,Y` = **`+0x4C/0x50`** (đích/vị-trí-báo-cáo của self) — **KHÔNG phải `+0x1C/0x20`** |
-| Hướng | `dir` 0..7 (bias −8) gửi tường minh | **không có field hướng** |
+| Hướng | `dir` 0..7 (bias −8) gửi tường minh | `orient` (byte 2, lấy từ `player + 0xE4`) |
 | id | 4B LE | không có |
 | Chữ ký | không có | `sigA` + `sigB` |
-| Kết luận | **Không đối xứng byte-to-byte.** Đây là **hai message khác vai trò dùng chung một kênh số 6**: server→client là *command*, client→server là *report + nonce*. Vòng đóng điển hình: server gửi `[06][02]` → client snap + gửi `[06][02][X][Y][sigA][nonce]` → server xác nhận biên độ lệch (server logic không quan sát được từ client — đánh giá: hợp lý, tin cậy **TRUNG BÌNH**). | |
+| Kết luận | **Không đối xứng byte-to-byte.** Đây là **hai message khác vai trò dùng chung một kênh số 6**: server→client là *command*, client→server là *report + nonce*. |
 
-### 5.3. Kênh liên đới đã phát hiện (để mock server không bất ngờ)
-- `FUN_0072b390` / `FUN_0072b4b8` mỗi lần play/stop action trên `TPlayer` gửi **`SendCommand(0x20)`** — OP 0x20 là kênh **action/pose report** song sinh với 0x06 (flag `+0x466` là cầu nối). Không thuộc phạm vi tài liệu này nhưng cần ghi vào spec chung.
-- `case 7:` của `SendCommand` (OP 0x07 C→S, nguồn `gvar_007DA5B0 + 0x138/0x130/0x134`) như `opcode_14.md` đã dẫn — đối tượng **khác** (phương tiện), không phải actor; không đổi kết luận.
+### 5.3. Mối quan hệ giữa Di chuyển liên tục (OP 0x06) và Dịch chuyển tức thời / Warp Map (OP 0x0C)
+- **Opcode 0x06**: Dùng cho di chuyển bước ngắn, liên tục trong nội bộ cùng một bản đồ (`map_id`). Vị trí được nội suy từng bước (walk interpolation, pathfinding 20px grid).
+- **Opcode 0x0C (Relocate Map)**: Dùng khi chuyển sang bản đồ khác hoặc dịch chuyển tức thời qua cổng warp (`Warp.Dat`), phù vân hoặc lệnh GM.
+  - Chu trình Warp: Client chạm cổng `[14 08 idGate]` → Server fade màn hình `[14 07]` → Server gửi `0x0C` (13 bytes) → Client nạp map mới xong gửi `[0C 01]` → Server mở khóa `[05 04]` và `[14 08]`, đồng bộ thực thể và drop trên map mới.
+
+### 5.4. Kênh liên đới đã phát hiện (để mock server không bất ngờ)
+- `FUN_0072b390` / `FUN_0072b4b8` mỗi lần play/stop action trên `TPlayer` gửi **`SendCommand(0x20)`** — OP 0x20 là kênh **action/pose report** song sinh với 0x06 (flag `+0x466` là cầu nối).
+- `case 7:` của `SendCommand` (OP 0x07 C→S, nguồn `gvar_007DA5B0 + 0x138/0x130/0x134`) như `opcode_14.md` đã dẫn — đối tượng **khác** (phương tiện), không phải actor.
 
 ---
 

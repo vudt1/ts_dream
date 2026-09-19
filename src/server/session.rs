@@ -243,6 +243,12 @@ pub struct Session {
     pub quest_steps: Vec<(i64, i64)>,
     /// Warp-step updates recorded by `BattleQuestWin` (`npcId, warpVal`).
     pub warp_steps: Vec<(i64, i64)>,
+    /// Accumulated steps taken since last random encounter roll.
+    pub encounter_steps: u32,
+    /// Randomized step threshold for triggering wild encounter (default 20).
+    pub encounter_threshold: u32,
+    /// Timestamp (ms) when last battle ended, used for encounter cooldown.
+    pub last_battle_end_ms: u64,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -348,6 +354,9 @@ impl Default for Session {
             id_qs: 0,
             quest_steps: Vec::new(),
             warp_steps: Vec::new(),
+            encounter_steps: 0,
+            encounter_threshold: 20,
+            last_battle_end_ms: 0,
         }
     }
 }

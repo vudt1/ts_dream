@@ -31,8 +31,9 @@ pub use compound::{CompoundDatLoader, CompoundDef};
 pub use dispatch::DispatchDatLoader;
 pub use eve::{
     EveCondition, EveConditionClass, EveConditionOps, EveDataLoader, EveDoorPlacement,
-    EveFightData, EveFightEnemy, EveGroupData, EveNpcPlacement, EveResult, EveResultClass,
-    EveResultType, EveSceneInfo, EveSentence, EveSurfaceData, NpcEventData, SceneEveData,
+    EveEncounterPlacement, EveFightData, EveFightEnemy, EveGroupData, EveNpcPlacement, EveResult,
+    EveResultClass, EveResultType, EveSceneInfo, EveSentence, EveSurfaceData, NpcEventData,
+    SceneEveData,
 };
 pub use evo_status::{EVOStatusDatLoader, EVOStatusDef};
 pub use formula::{FormulaDatLoader, FormulaParams};

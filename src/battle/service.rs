@@ -126,6 +126,10 @@ impl BattleSink for BattleSinkImpl {
             if let Some(p) = online.get(&player) {
                 if let Ok(mut s) = p.session.try_write() {
                     s.battle_id = 0;
+                    s.last_battle_end_ms = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|d| d.as_millis() as u64)
+                        .unwrap_or(0);
                 }
             }
         }
@@ -174,6 +178,10 @@ impl BattleSink for BattleSinkImpl {
     fn battle_ended(&self, _id: i32, outcome: Outcome) {
         // Clear battle state for every participant (battle is over) and
         // snapshot their sessions for post-battle persistence.
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
         let mut ended_sessions: Vec<Session> = Vec::new();
         if let Ok(mut members) = self.members.lock() {
             let ids: Vec<i64> = members.iter().copied().collect();
@@ -182,6 +190,7 @@ impl BattleSink for BattleSinkImpl {
                     if let Some(p) = online.get(&id) {
                         if let Ok(mut s) = p.session.try_write() {
                             s.battle_id = 0;
+                            s.last_battle_end_ms = now_ms;
                             ended_sessions.push(s.clone());
                         }
                     }
@@ -655,6 +664,82 @@ impl BattleService {
             extra_pets,
             Vec::new(),
             Vec::new(),
+        )
+    }
+
+    /// Start a wild random encounter battle from an Eve FightData record.
+    ///
+    /// Populates the leader, leader's pets, online party members (cols 1, 3, 0, 4)
+    /// and their pets, and up to 10 enemies defined in `fight_data.left_enemies`.
+    pub fn start_encounter_battle(
+        &self,
+        leader_session: &mut Session,
+        fight_data: &crate::data::loaders::EveFightData,
+        diahinh: i32,
+    ) -> i32 {
+        let id = self.next_battle_id();
+        let terrain = if diahinh > 0 { diahinh } else { 112 };
+        let mut battle = Battle::new(id, terrain);
+        let lid = i64::from(leader_session.id);
+
+        // 1. Leader & Leader Pet
+        battle.add_player(leader_session, lid, 3, 2);
+        battle.load_leader_pets(leader_session, lid, 3);
+
+        // 2. Party Members & Member Pets (Columns: 1, 3, 0, 4)
+        let member_cols = [1u8, 3, 0, 4];
+        let mut extra_members = Vec::new();
+        let mut extra_start = Vec::new();
+        let mut extra_players = HashMap::new();
+        let mut extra_pets = HashMap::new();
+
+        let online_lock = self.online.try_read();
+        for (i, &mem_id) in leader_session
+            .id_mem
+            .iter()
+            .filter(|&&m| m > 0)
+            .enumerate()
+            .take(4)
+        {
+            let mid = i64::from(mem_id);
+            if let Ok(ref online) = online_lock {
+                if let Some(p) = online.get(&mid) {
+                    if let Ok(mut mem_sess) = p.session.try_write() {
+                        let col = member_cols[i];
+                        battle.add_player(&mem_sess, lid, 3, col);
+                        battle.load_member_pet(&mem_sess, lid, 3, col);
+
+                        mem_sess.battle_id = id;
+                        extra_members.push(mid);
+                        extra_players.insert(mid, self.snapshot(&mem_sess));
+                        extra_pets.insert(mid, self.pet_slots(&mem_sess));
+
+                        // Generate open frames for member (0x0B Sub FA)
+                        let frames = battle.member_battle_frame(terrain, mid);
+                        extra_start.extend(frames);
+                    }
+                }
+            }
+        }
+        drop(online_lock);
+
+        // 3. Enemy Formation
+        for (idx, enemy) in fight_data.left_enemies.iter().enumerate().take(10) {
+            if let Some(npc) = self.data.npcs.get(&i64::from(enemy.npc_id)) {
+                let row = enemy.row();
+                let col = enemy.col();
+                battle.add_npc(npc, (idx + 1) as i64, row, col, 3);
+            }
+        }
+
+        // 4. Activate Battle Task & Notify
+        self.spawn_battle(
+            battle,
+            leader_session,
+            extra_players,
+            extra_pets,
+            extra_members,
+            extra_start,
         )
     }
 

@@ -62,6 +62,8 @@ pub struct MapBroadcast {
     /// The entity the frame is about (used to exclude the owner from its own
     /// broadcast and, in the follow flow, co-locates on the origin's map).
     pub subject: u32,
+    /// Explicit target map ID. If `None`, defaults to the origin player's current map.
+    pub map_id: Option<u16>,
     pub frame: String,
 }
 
@@ -157,6 +159,16 @@ impl HandleOutcome {
     pub fn broadcast(&mut self, subject: u32, frame: impl Into<String>) {
         self.map_broadcast.push(MapBroadcast {
             subject,
+            map_id: None,
+            frame: frame.into(),
+        });
+    }
+
+    /// Queue a map-scoped broadcast frame for `subject` explicitly targeted to `map_id`.
+    pub fn broadcast_to_map(&mut self, subject: u32, map_id: u16, frame: impl Into<String>) {
+        self.map_broadcast.push(MapBroadcast {
+            subject,
+            map_id: Some(map_id),
             frame: frame.into(),
         });
     }
@@ -236,8 +248,11 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         // OP_CHAT (0x02) — Chat & slash commands
         OP_CHAT => chat::handle_chat(ctx).await,
 
-        // OP_PLAYER_UPDATE (0x05), OP_MOVE (0x06) — Move
-        OP_PLAYER_UPDATE | OP_MOVE => movement::handle_move(ctx),
+        // OP_PLAYER_UPDATE (0x05) — Player / state sync (non-movement)
+        OP_PLAYER_UPDATE => movement::handle_player_update(ctx),
+
+        // OP_MOVE (0x06) — Move
+        OP_MOVE => movement::handle_move(ctx),
 
         // OP_STAT_UPDATE (0x08) — Stat allocation
         OP_STAT_UPDATE => stats::handle_stat_allocation(ctx).await,

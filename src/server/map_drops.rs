@@ -63,6 +63,17 @@ pub fn get(map_id: u16, slot: u8) -> Option<DropItem> {
     registry().lock().unwrap().get(&(map_id, slot)).cloned()
 }
 
+/// Query all drop items on a map.
+pub fn drops_on_map(map_id: u16) -> Vec<DropItem> {
+    registry()
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|((m, _), _)| *m == map_id)
+        .map(|(_, d)| d.clone())
+        .collect()
+}
+
 /// Remove and return a drop slot on a map.
 pub fn take(map_id: u16, slot: u8) -> Option<DropItem> {
     registry().lock().unwrap().remove(&(map_id, slot))

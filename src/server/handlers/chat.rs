@@ -89,6 +89,7 @@ pub async fn handle_chat(ctx: &mut OpcodeCtx<'_>) {
                         conn.session.id,
                         &[MapBroadcast {
                             subject: conn.session.id,
+                            map_id: None,
                             frame,
                         }],
                     )

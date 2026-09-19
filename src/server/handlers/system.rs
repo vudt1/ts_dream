@@ -172,23 +172,113 @@ pub async fn handle_gm_shop(ctx: &mut OpcodeCtx<'_>) {
 
 /// Handle Opcode 0x0C — Teleport confirm (§2.3.9).
 ///
-/// Sub 1 only. When a party leader exists and is not self, the two confirmation
-/// frames are sent and the handler returns (member branch). Otherwise
-/// `warp_finish=false`, the two frames are sent, and the talk counters are
-/// reset (`talkcount`/`idtalking`).
+/// Sub 1 only: Relocate Loaded / Teleport Confirm (Opcode 0x0C Sub 1).
+/// Sent by client after completing the map loading phase.
 pub fn handle_teleport_confirm(ctx: &mut OpcodeCtx) {
     let conn = &mut ctx.conn;
     let out = &mut ctx.out;
     if ctx.sub != 1 {
         return;
     }
+    // 1. World-Ready ([05 04]) & Clear Walk Lock ([14 08])
     out.send("F44402000504F44402001408");
-    if conn.session.id_leader > 0 && conn.session.id_leader != conn.session.id {
-        return;
-    }
+
     conn.session.warp_finish = false;
     conn.session.talk_count = 0;
     conn.session.idtalking = 0;
+
+    let my_id = conn.session.id;
+    let map_id = conn.session.map_id;
+
+    // 2. Synchronize current player coords in the shared online registry
+    if let Some(s) = crate::server::session::online_sessions()
+        .lock()
+        .unwrap()
+        .get_mut(&my_id)
+    {
+        s.map_id = map_id;
+        s.map_x = conn.session.map_x;
+        s.map_y = conn.session.map_y;
+        s.gocnhin = conn.session.gocnhin;
+    }
+
+    // 3. Broadcast self to other players on the new map
+    let color = if conn.session.color.is_empty() {
+        "0000000000000000"
+    } else {
+        &conn.session.color
+    };
+    let my_appear = crate::server::spawn::player_appear(
+        conn.session.id,
+        conn.session.sex,
+        0,
+        0,
+        conn.session.map_id,
+        conn.session.map_x,
+        conn.session.map_y,
+        conn.session.gocnhin,
+        conn.session.hair,
+        color,
+        &conn.session.equipped_ids(),
+        conn.session.reborn,
+        conn.session.job,
+        &conn.session.name,
+    );
+    out.broadcast(my_id, my_appear);
+
+    // 4. Synchronize existing in-world players on this map to this client
+    let others: Vec<crate::server::session::Session> = {
+        let sessions = crate::server::session::online_sessions().lock().unwrap();
+        sessions
+            .values()
+            .filter(|s| s.id != my_id && s.map_id == map_id && s.in_world)
+            .cloned()
+            .collect()
+    };
+    for other in others {
+        let o_color = if other.color.is_empty() {
+            "0000000000000000"
+        } else {
+            &other.color
+        };
+        let o_appear = crate::server::spawn::player_appear(
+            other.id,
+            other.sex,
+            0,
+            0,
+            other.map_id,
+            other.map_x,
+            other.map_y,
+            other.gocnhin,
+            other.hair,
+            o_color,
+            &other.equipped_ids(),
+            other.reborn,
+            other.job,
+            &other.name,
+        );
+        out.send(o_appear);
+    }
+
+    // 5. Synchronize NPCs on this map to this client
+    for npc in &ctx.data.npc_on_map {
+        if npc.map_id == i64::from(map_id) {
+            let npc_frame = format!("F44405001601{:02X}0000", (npc.id & 0xFF) as u8);
+            out.send(npc_frame);
+        }
+    }
+
+    // 6. Synchronize map item drops on this map to this client
+    for drop in crate::server::map_drops::drops_on_map(map_id) {
+        if drop.item.id > 0 {
+            out.send(format!(
+                "F44409001703{}{}{}01",
+                encoder::le16(drop.item.id),
+                encoder::le16(drop.map_x),
+                encoder::le16(drop.map_y),
+            ));
+        }
+    }
 }
 
 /// Handle Opcode 0x23 — Account Management (change pass, delete char, gift code).

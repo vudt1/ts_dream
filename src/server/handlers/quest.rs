@@ -832,7 +832,12 @@ pub struct BattleTrigger {
 }
 
 /// Handle warp-talk (H8) completion: confirm warp into 0x0C flow.
-pub fn handle_warp_confirm(conn: &mut Conn, data: &GameData, out: &mut HandleOutcome) {
+pub async fn handle_warp_confirm(
+    conn: &mut Conn,
+    data: &GameData,
+    env: &crate::server::dispatcher::ServerEnv<'_>,
+    out: &mut HandleOutcome,
+) {
     let map_id = conn.session.map_id;
     let idtalking = conn.session.idtalking;
 
@@ -917,12 +922,74 @@ pub fn handle_warp_confirm(conn: &mut Conn, data: &GameData, out: &mut HandleOut
             }
         }
 
-        // Normal warp
-        conn.session.map_id = warp.map2 as u16;
-        conn.session.map_x = warp.x as u16;
-        conn.session.map_y = warp.y as u16;
-        out.send("F44402000504");
-        end_talk(conn, out);
+        let id = conn.session.id;
+        let id_leader = conn.session.id_leader;
+        if id_leader > 0 && id_leader != id {
+            end_talk(conn, out);
+            return; // Member cannot warp independently while following leader
+        }
+
+        let old_map = conn.session.map_id;
+        let dest_map = warp.map2 as u16;
+        let dest_x = warp.x as u16;
+        let dest_y = warp.y as u16;
+        let warp_id = (warp.warpid & 0xFF) as u8;
+
+        conn.session.map_id = dest_map;
+        conn.session.map_x = dest_x;
+        conn.session.map_y = dest_y;
+
+        if let Some(s) = crate::server::session::online_sessions()
+            .lock()
+            .unwrap()
+            .get_mut(&id)
+        {
+            s.map_id = dest_map;
+            s.map_x = dest_x;
+            s.map_y = dest_y;
+        }
+
+        // 1. Fade screen
+        out.send("F44402001407");
+
+        // 2. Relocate packet Opcode 0x0C (13 bytes payload)
+        out.send(crate::server::spawn::build_relocate_packet(
+            id, dest_map, dest_x, dest_y, warp_id,
+        ));
+
+        // 3. Hide from old map peers
+        out.broadcast_to_map(id, old_map, crate::battle::packets::hide_from_map(id));
+
+        // 4. Party warp: if leader, warp all party members too
+        if id_leader == id {
+            for member in conn.session.id_mem {
+                if member > 0 {
+                    if let Some(mem) = crate::server::session::online_sessions()
+                        .lock()
+                        .unwrap()
+                        .get_mut(&member)
+                    {
+                        mem.map_id = dest_map;
+                        mem.map_x = dest_x;
+                        mem.map_y = dest_y;
+                    }
+                    let member_pkt = crate::server::spawn::build_relocate_packet(
+                        member, dest_map, dest_x, dest_y, warp_id,
+                    );
+                    if let Some(hub) = env.hub {
+                        hub.send_to(member, "F44402001407").await;
+                        hub.send_to(member, &member_pkt).await;
+                    }
+                    out.broadcast_to_map(member, old_map, crate::battle::packets::hide_from_map(member));
+                }
+            }
+        }
+
+        // Reset talk state without 1408 (1408 is sent upon teleport confirm 0x0C 0x01)
+        conn.session.idtalking = 0;
+        conn.session.select_menu = 0;
+        conn.session.talk_count = 0;
+        conn.session.warp_finish = false;
     } else {
         end_talk(conn, out);
     }

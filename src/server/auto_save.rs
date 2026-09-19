@@ -38,6 +38,9 @@ fn mix_i64(h: &mut u64, value: i64) {
 pub fn fingerprint(s: &Session) -> u64 {
     let mut h = FNV_OFFSET;
     mix(&mut h, u64::from(s.id));
+    mix_i64(&mut h, i64::from(s.map_id));
+    mix_i64(&mut h, i64::from(s.map_x));
+    mix_i64(&mut h, i64::from(s.map_y));
     mix(&mut h, u64::from(s.gold));
     mix(&mut h, u64::from(s.bank_gold));
     mix(&mut h, u64::from(s.hp));

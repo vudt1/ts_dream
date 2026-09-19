@@ -210,14 +210,14 @@ pub struct EveFightEnemy {
 }
 
 impl EveFightEnemy {
-    /// Enemy column on board (0: front row, 1: back row).
+    /// Enemy column on board (0..4).
     pub fn col(&self) -> u8 {
-        self.location_pos / 5
+        self.location_pos % 5
     }
 
-    /// Enemy row on board (0..4).
+    /// Enemy row on board (0: front row, 1: back row).
     pub fn row(&self) -> u8 {
-        self.location_pos % 5
+        self.location_pos / 5
     }
 }
 
@@ -230,6 +230,26 @@ pub struct EveFightData {
     pub left_enemies: Vec<EveFightEnemy>,
     pub right_enemies: Vec<EveFightEnemy>,
     pub fight_limit: u32,
+}
+
+/// Wild encounter zone placement on scene map (Section 4 — Encounter/Mine Data).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct EveEncounterPlacement {
+    pub id: u16,
+    pub events: Vec<u8>,
+    pub start_x: u16,
+    pub start_y: u16,
+    pub end_x: u16,
+    pub end_y: u16,
+    pub full_map: bool,
+}
+
+impl EveEncounterPlacement {
+    /// Check whether a pixel coordinate `(x, y)` lies within this encounter zone.
+    pub fn contains(&self, x: u16, y: u16) -> bool {
+        self.full_map
+            || (x >= self.start_x && x <= self.end_x && y >= self.start_y && y <= self.end_y)
+    }
 }
 
 /// Sentence in Surface dialogue UI (`Eve_SurfaceData.lua`).
@@ -274,6 +294,7 @@ pub struct SceneEveData {
     pub fight_datas: HashMap<u16, EveFightData>,
     pub surface_datas: HashMap<u16, EveSurfaceData>,
     pub group_datas: HashMap<u16, EveGroupData>,
+    pub encounters: Vec<EveEncounterPlacement>,
 }
 
 /// Directory entry header inside `eve.emg` container.
@@ -350,7 +371,7 @@ impl EveDataLoader {
         let npcs = Self::parse_npc_data_section(reader)?;
         Self::skip_goods_section(reader)?;
         let doors = Self::parse_door_section(reader)?;
-        Self::skip_mine_section(reader)?;
+        let encounters = Self::parse_encounter_section(reader)?;
         let surface_datas = Self::parse_surface_section(reader)?;
         let scene_infos = Self::parse_scene_info_section(reader)?;
         let group_datas = Self::parse_group_section(reader)?;
@@ -365,6 +386,7 @@ impl EveDataLoader {
             fight_datas,
             surface_datas,
             group_datas,
+            encounters,
         })
     }
 
@@ -430,7 +452,6 @@ impl EveDataLoader {
             // innerNode (16B) + outerNode (16B)
             reader.skip(32);
 
-            reader.skip(1); // traceSpeedLv
             let trace_radius = reader.read_u16();
             let close = reader.read_u8() != 0;
 
@@ -505,7 +526,6 @@ impl EveDataLoader {
 
             let door_x = grid_x.wrapping_add(grid_w / 2).wrapping_mul(20);
             let door_y = grid_y.wrapping_add(grid_h / 2).wrapping_mul(20);
-            reader.skip(1); // close
 
             if id > 0 {
                 result.insert(
@@ -523,23 +543,57 @@ impl EveDataLoader {
         Ok(result)
     }
 
-    /// Section 4: MineData (Skip)
-    fn skip_mine_section(reader: &mut DatReader) -> Result<()> {
+    /// Section 4: Encounter / MineData (Section 4 — Encounter/Mine Data)
+    fn parse_encounter_section(reader: &mut DatReader) -> Result<Vec<EveEncounterPlacement>> {
         let count = reader.read_u16() as usize;
-        if count * 10 > reader.remaining() {
-            return Err(TsError::Data("invalid mine count in scene".into()));
+        if count == 0 {
+            return Ok(Vec::new());
         }
+        if count * 10 > reader.remaining() {
+            return Err(TsError::Data("invalid encounter count in scene".into()));
+        }
+
+        let mut result = Vec::with_capacity(count);
         for _ in 0..count {
-            reader.skip(2); // id
+            let id = reader.read_u16();
             let event_count = reader.read_u16() as usize;
             if event_count > reader.remaining() {
-                return Err(TsError::Data("invalid event_count in mine".into()));
+                return Err(TsError::Data("invalid event_count in encounter".into()));
             }
-            reader.skip(event_count); // events[n]
-            reader.skip(16); // grid: 4 * i32
-            reader.skip(1); // sizeKind
+            let mut events = Vec::with_capacity(event_count);
+            for _ in 0..event_count {
+                events.push(reader.read_u8());
+            }
+
+            let grid_x = reader.read_i32();
+            let grid_y = reader.read_i32();
+            let grid_w = reader.read_i32();
+            let grid_h = reader.read_i32();
+            let size_kind = reader.read_u8();
+
+            let full_map = size_kind > 0;
+            let (start_x, start_y, end_x, end_y) = if full_map {
+                (0, 0, 65000, 65000)
+            } else {
+                let sx = (grid_x * 20 - 10).max(0) as u16;
+                let sy = (grid_y * 20 - 10).max(0) as u16;
+                let ex = sx.saturating_add((grid_w * 20).max(0) as u16);
+                let ey = sy.saturating_add((grid_h * 20).max(0) as u16);
+                (sx, sy, ex, ey)
+            };
+
+            result.push(EveEncounterPlacement {
+                id,
+                events,
+                start_x,
+                start_y,
+                end_x,
+                end_y,
+                full_map,
+            });
         }
-        Ok(())
+
+        Ok(result)
     }
 
     /// Section 5: SurfaceData (Eve_SurfaceData.lua)

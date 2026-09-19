@@ -203,6 +203,19 @@ pub fn move_broadcast(id: u32, dir: u8, x: u16, y: u16) -> String {
     crate::protocol::frame("0601", &body)
 }
 
+/// Build relocate map frame (Opcode 0x0C — 13 bytes payload).
+/// Wire format: F4 44 0D 00 0C [id: 4B LE] [map_id: 2B LE] [x: 2B LE] [y: 2B LE] [warp_id: 1B] [00]
+pub fn build_relocate_packet(id: u32, map_id: u16, x: u16, y: u16, warp_id: u8) -> String {
+    format!(
+        "F4440D000C{}{}{}{}{:02X}00",
+        encoder::le32(id),
+        encoder::le16(map_id),
+        encoder::le16(x),
+        encoder::le16(y),
+        warp_id
+    )
+}
+
 /// Build expression/action frame (op 0x20 sub 0x01 / 0x02).
 pub fn expression_frame(id: u32, sub: u8, action: u8) -> String {
     let mut body = String::new();
