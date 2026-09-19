@@ -10,7 +10,7 @@ use crate::db::pool::DbPool;
 use crate::protocol::encoder;
 use crate::protocol::frame;
 use crate::server::dispatcher::{self, ServerEnv};
-use crate::server::session::{online_sessions, Conn};
+use crate::server::session::{lock_online_sessions, Conn};
 use crate::server::spawn::announce_frame;
 use crate::state::AppState;
 use axum::http::StatusCode;
@@ -31,6 +31,7 @@ pub struct ServerControl {
     pub data: Option<Arc<GameData>>,
     pub pool: Option<DbPool>,
     pub clients: Arc<Mutex<HashMap<u32, ClientSender>>>,
+    pub battle_service: Arc<BattleService>,
     /// Shutdown signal for the accept loop (`Some` while listening). Exposed
     /// so lifecycle owners (and tests) can halt the listener without the 5s
     /// countdown performed by [`ServerControl::stop`].
@@ -44,12 +45,19 @@ impl ServerControl {
         data: Option<Arc<GameData>>,
         pool: Option<DbPool>,
     ) -> Self {
+        let gd = data.clone().unwrap_or_else(|| Arc::new(GameData::default()));
+        let mut svc = BattleService::new(gd);
+        if let Some(p) = pool.as_ref() {
+            svc = svc.with_pool(p.clone());
+        }
+        let battle_service = Arc::new(svc);
         Self {
             game_port,
             app,
             data,
             pool,
             clients: Arc::new(Mutex::new(HashMap::new())),
+            battle_service,
             shutdown_tx: Arc::new(Mutex::new(None)),
         }
     }
@@ -66,6 +74,7 @@ impl ServerControl {
     /// Unregister a client sender.
     pub async fn unregister_client(&self, player_id: u32) {
         self.clients.lock().await.remove(&player_id);
+        self.battle_service.unregister(i64::from(player_id));
     }
 
     /// Start the game server listener on `game_port`.
@@ -227,6 +236,18 @@ impl ServerControl {
             return false;
         }
         clients.insert(player_id, sender.clone());
+        let sess = lock_online_sessions()
+            .get(&player_id)
+            .cloned()
+            .unwrap_or_else(|| crate::server::session::Session {
+                id: player_id,
+                ..Default::default()
+            });
+        self.battle_service.register_sender(
+            i64::from(player_id),
+            Arc::new(tokio::sync::RwLock::new(sess)),
+            sender.clone(),
+        );
         true
     }
 
@@ -254,7 +275,7 @@ impl ServerControl {
     /// identical; a member warped to another map leaves the party.
     pub async fn broadcast_map(&self, from_id: u32, frames: &[dispatcher::MapBroadcast]) {
         let targets: Vec<(u32, String)> = {
-            let sessions = online_sessions().lock().unwrap();
+            let sessions = lock_online_sessions();
             let Some(from) = sessions.get(&from_id) else {
                 return; // no map scope → nothing to fan out
             };
@@ -300,7 +321,7 @@ impl ServerControl {
         let hide = crate::server::spawn::session_offline_frame(player_id);
         self.broadcast_except(player_id, &hide).await;
         self.unregister_client(player_id).await;
-        let session_opt = online_sessions().lock().unwrap().remove(&player_id);
+        let session_opt = lock_online_sessions().remove(&player_id);
         if let Some(session) = session_opt {
             if session.authed && session.id > 0 {
                 let _ = crate::db::persist::persist_sessions_transaction(
@@ -334,13 +355,7 @@ async fn handle_client_connection(
     let repos = pool
         .as_ref()
         .map(|pool| SqliteRepositories::new(pool.clone()));
-    let service = {
-        let mut svc = BattleService::new(Arc::clone(&data));
-        if let Some(pool) = pool.as_ref() {
-            svc = svc.with_pool(pool.clone());
-        }
-        svc
-    };
+    let service = Arc::clone(&control.battle_service);
 
     let (mut read_half, mut write_half) = stream.into_split();
     let (tx, mut rx) = mpsc::unbounded_channel::<String>();
@@ -397,7 +412,7 @@ async fn handle_client_connection(
                             // mutated us through the player shop registry).
                             if logined_id > 0 {
                                 if let Some(snapshot) =
-                                    online_sessions().lock().unwrap().get(&logined_id).cloned()
+                                    lock_online_sessions().get(&logined_id).cloned()
                                 {
                                     conn.session = snapshot;
                                 }
@@ -405,9 +420,7 @@ async fn handle_client_connection(
                             let out = dispatcher::dispatch(&mut conn, &decoded, &data, &service, &env).await;
                             let id = conn.session.id;
                             if logined_id > 0 {
-                                online_sessions()
-                                    .lock()
-                                    .unwrap()
+                                lock_online_sessions()
                                     .insert(logined_id, conn.session.clone());
                             }
                             for frame in &out.outgoing {

@@ -8,7 +8,7 @@ use crate::db::persist;
 use crate::protocol::{encoder, frame};
 use crate::server::dispatcher::OpcodeCtx;
 use crate::server::inventory;
-use crate::server::session::{online_sessions, InventoryItem, PetState, Session, TradeState};
+use crate::server::session::{lock_online_sessions, InventoryItem, PetState, Session, TradeState};
 
 pub(crate) const GOLD_CAP: u32 = 9_999_999;
 
@@ -191,10 +191,10 @@ fn add_storage_to_homdo(
 }
 
 fn registry_get(id: u32) -> Option<Session> {
-    online_sessions().lock().unwrap().get(&id).cloned()
+    lock_online_sessions().get(&id).cloned()
 }
 fn registry_put(s: Session) {
-    online_sessions().lock().unwrap().insert(s.id, s);
+    lock_online_sessions().insert(s.id, s);
 }
 
 /// Op 0x19.

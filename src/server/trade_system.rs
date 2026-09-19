@@ -11,7 +11,7 @@
 
 use crate::server::inventory;
 use crate::server::session::{
-    lock_player_operations, online_sessions, InventoryItem, PetState, Session, TradeState,
+    lock_online_sessions, lock_player_operations, InventoryItem, PetState, Session, TradeState,
 };
 
 /// Maximum gold either side may hold after a trade settles.
@@ -170,7 +170,7 @@ impl TradeSystem {
             return TradeOutcome::Rejected;
         }
         let _locks = lock_player_operations([initiator, partner]).await;
-        let mut sessions = online_sessions().lock().unwrap();
+        let mut sessions = lock_online_sessions();
         let partner_free = sessions.get(&partner).map(|p| !p.trade.active);
         let initiator_free = sessions.get(&initiator).map(|a| !a.trade.active);
         let Some(partner_free) = partner_free else {
@@ -204,7 +204,7 @@ impl TradeSystem {
     pub async fn cancel(player: u32) -> TradeOutcome {
         let _locks = lock_player_operations([player]).await;
         let (partner_id, snapshot) = {
-            let mut sessions = online_sessions().lock().unwrap();
+            let mut sessions = lock_online_sessions();
             let Some(s) = sessions.get_mut(&player) else {
                 return TradeOutcome::Offline;
             };
@@ -215,7 +215,7 @@ impl TradeSystem {
             s.trade = TradeState::default();
             (pid, s.clone())
         };
-        let mut sessions = online_sessions().lock().unwrap();
+        let mut sessions = lock_online_sessions();
         if let Some(p) = sessions.get_mut(&partner_id) {
             if p.trade.partner_id == player && p.trade.active {
                 p.trade = TradeState::default();
@@ -235,7 +235,7 @@ impl TradeSystem {
     pub async fn accept(player: u32) -> (TradeOutcome, Option<Session>, Option<Session>) {
         let _locks = lock_player_operations([player]).await;
         let (partner_id, a_snapshot, b_accepted, b_snapshot) = {
-            let mut sessions = online_sessions().lock().unwrap();
+            let mut sessions = lock_online_sessions();
             let Some(a) = sessions.get_mut(&player) else {
                 return (TradeOutcome::Offline, None, None);
             };
@@ -269,7 +269,7 @@ impl TradeSystem {
         let mut b = b_snapshot.clone();
         if settle_trade(&mut a, &mut b) {
             {
-                let mut sessions = online_sessions().lock().unwrap();
+                let mut sessions = lock_online_sessions();
                 sessions.insert(a.id, a.clone());
                 sessions.insert(b.id, b.clone());
             }
@@ -277,7 +277,7 @@ impl TradeSystem {
         }
         // Rejected: tear down the trade state on both sides but keep bags/gold.
         {
-            let mut sessions = online_sessions().lock().unwrap();
+            let mut sessions = lock_online_sessions();
             if let Some(a) = sessions.get_mut(&player) {
                 a.trade = TradeState::default();
             }
@@ -290,9 +290,7 @@ impl TradeSystem {
 
     /// Whether `player` currently has an active trade session.
     pub fn is_trading(player: u32) -> bool {
-        online_sessions()
-            .lock()
-            .unwrap()
+        lock_online_sessions()
             .get(&player)
             .is_some_and(|s| s.trade.active)
     }

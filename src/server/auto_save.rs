@@ -14,7 +14,7 @@ use std::time::Duration;
 
 use crate::db::persist;
 use crate::db::pool::DbPool;
-use crate::server::session::{online_sessions, Session};
+use crate::server::session::{lock_online_sessions, Session};
 
 /// Save cadence: 3 minutes (spec §3 AutoSaveService).
 pub const AUTO_SAVE_INTERVAL: Duration = Duration::from_secs(180);
@@ -101,7 +101,7 @@ pub async fn run_cycle(pool: Option<&DbPool>, ledger: &SaveLedger) -> usize {
     let mut fingerprints: Vec<u64> = Vec::new();
     {
         let last = ledger.lock().unwrap();
-        let sessions = online_sessions().lock().unwrap();
+        let sessions = lock_online_sessions();
         for s in sessions.values() {
             if !s.authed || s.id == 0 {
                 continue;
@@ -135,7 +135,7 @@ pub async fn run_cycle(pool: Option<&DbPool>, ledger: &SaveLedger) -> usize {
 pub async fn save_all_dirty(pool: &DbPool) -> usize {
     let mut candidates: Vec<Session> = Vec::new();
     {
-        let sessions = online_sessions().lock().unwrap();
+        let sessions = lock_online_sessions();
         for s in sessions.values() {
             if !s.authed || s.id == 0 {
                 continue;

@@ -50,6 +50,42 @@ impl std::fmt::Debug for OnlinePlayer {
 
 type OnlineMap = HashMap<i64, OnlinePlayer>;
 
+/// Helper to acquire read lock on `OnlineMap` with backoff retries.
+fn try_read_online_with_retry(
+    online_lock: &tokio::sync::RwLock<OnlineMap>,
+    max_retries: usize,
+    retry_delay: std::time::Duration,
+) -> Option<tokio::sync::RwLockReadGuard<'_, OnlineMap>> {
+    for attempt in 0..max_retries {
+        if let Ok(guard) = online_lock.try_read() {
+            return Some(guard);
+        }
+        if attempt + 1 < max_retries {
+            std::thread::yield_now();
+            std::thread::sleep(retry_delay);
+        }
+    }
+    None
+}
+
+/// Helper to acquire write lock on `Session` with backoff retries.
+fn try_write_session_with_retry(
+    session_lock: &tokio::sync::RwLock<Session>,
+    max_retries: usize,
+    retry_delay: std::time::Duration,
+) -> Option<tokio::sync::RwLockWriteGuard<'_, Session>> {
+    for attempt in 0..max_retries {
+        if let Ok(guard) = session_lock.try_write() {
+            return Some(guard);
+        }
+        if attempt + 1 < max_retries {
+            std::thread::yield_now();
+            std::thread::sleep(retry_delay);
+        }
+    }
+    None
+}
+
 /// The [`BattleSink`] implementation shared by all battles of one service.
 struct BattleSinkImpl {
     online: Arc<tokio::sync::RwLock<OnlineMap>>,
@@ -68,7 +104,7 @@ impl BattleSink for BattleSinkImpl {
     }
 
     fn send_map(&self, player: i64, frame: String) {
-        if let Ok(online) = self.online.try_read() {
+        if let Some(online) = try_read_online_with_retry(&self.online, 10, std::time::Duration::from_millis(2)) {
             for (id, p) in online.iter() {
                 if *id != player {
                     let _ = p.frames.send(frame.clone());
@@ -86,50 +122,121 @@ impl BattleSink for BattleSinkImpl {
     }
 
     fn apply_db(&self, update: DbUpdate) {
-        if let Ok(online) = self.online.try_read() {
+        let online_opt = try_read_online_with_retry(&self.online, 10, std::time::Duration::from_millis(2));
+        if let Some(online) = online_opt {
             apply_db_update(&online, update);
+        } else {
+            let mut map = crate::server::session::lock_online_sessions();
+            match update.target {
+                DbTarget::Player(id) => {
+                    if let Some(s) = map.get_mut(&(id as u32)) {
+                        apply_player_stat(s, update.stat, update.value);
+                    }
+                }
+                DbTarget::Pet { owner, stt } => {
+                    if let Some(s) = map.get_mut(&(owner as u32)) {
+                        if let Some(pet) = s.pets.iter_mut().find(|p| i64::from(p.stt) == stt) {
+                            match update.stat {
+                                Stat::Hp => pet.hp = clamp_u16(update.value),
+                                Stat::Sp => pet.sp = clamp_u16(update.value),
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
     fn apply_drop(&self, drop: Out) {
         if let Out::Drop { item_id, owner, .. } = drop {
-            if let Ok(online) = self.online.try_read() {
+            let item = crate::server::session::InventoryItem {
+                id: item_id as u16,
+                count: 1,
+                loai: 1,
+                doben: 100,
+                ..Default::default()
+            };
+            if let Some(online) = try_read_online_with_retry(&self.online, 10, std::time::Duration::from_millis(2)) {
                 if let Some(p) = online.get(&owner) {
-                    let mut s = match p.session.try_write() {
-                        Ok(s) => s,
-                        Err(_) => return,
-                    };
-                    s.add_homdo_item(crate::server::session::InventoryItem {
-                        id: item_id as u16,
-                        count: 1,
-                        loai: 1,
-                        doben: 100,
-                        ..Default::default()
-                    });
+                    if let Some(mut s) = try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2)) {
+                        s.add_homdo_item(item.clone());
+                    }
                 }
+            }
+            let mut map = crate::server::session::lock_online_sessions();
+            if let Some(s) = map.get_mut(&(owner as u32)) {
+                s.add_homdo_item(item);
             }
         }
     }
 
     fn apply_catch(&self, owner: i64, npc_id: i64) {
-        if let Ok(online) = self.online.try_read() {
+        if let Some(online) = try_read_online_with_retry(&self.online, 10, std::time::Duration::from_millis(2)) {
             if let Some(p) = online.get(&owner) {
-                if let Ok(mut s) = p.session.try_write() {
+                if let Some(mut s) = try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2)) {
                     add_pet_to_session(&mut s, npc_id as u16);
                 }
             }
         }
+        let mut map = crate::server::session::lock_online_sessions();
+        if let Some(s) = map.get_mut(&(owner as u32)) {
+            add_pet_to_session(s, npc_id as u16);
+        }
     }
 
     fn apply_fled(&self, player: i64) {
-        if let Ok(online) = self.online.try_read() {
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+
+        // 1. Remove player from self.members so they no longer receive in-battle frames
+        if let Ok(mut members) = self.members.lock() {
+            members.remove(&player);
+        }
+
+        let mut fled_session: Option<Session> = None;
+
+        // 2. Update their session in self.online with retry
+        if let Some(online) = try_read_online_with_retry(&self.online, 10, std::time::Duration::from_millis(2)) {
             if let Some(p) = online.get(&player) {
-                if let Ok(mut s) = p.session.try_write() {
+                if let Some(mut s) = try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2)) {
                     s.battle_id = 0;
-                    s.last_battle_end_ms = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .map(|d| d.as_millis() as u64)
-                        .unwrap_or(0);
+                    s.last_battle_end_ms = now_ms;
+                    s.encounter_steps = 0;
+                    fled_session = Some(s.clone());
+                    let mut map = crate::server::session::lock_online_sessions();
+                    if let Some(global_s) = map.get_mut(&(player as u32)) {
+                        *global_s = s.clone();
+                    }
+                }
+            }
+        }
+
+        // 3. Update global online_sessions() fallback if not in self.online
+        if fled_session.is_none() {
+            let mut map = crate::server::session::lock_online_sessions();
+            if let Some(s) = map.get_mut(&(player as u32)) {
+                s.battle_id = 0;
+                s.last_battle_end_ms = now_ms;
+                s.encounter_steps = 0;
+                fled_session = Some(s.clone());
+            }
+        }
+
+        // 4. Persist fled session to DB so stats and pet status are saved
+        if let Some(session) = fled_session {
+            if let Ok(pool) = self.pool.try_read() {
+                if let Some(pool) = pool.clone() {
+                    tokio::spawn(async move {
+                        crate::db::persist::persist_sessions_transaction(
+                            Some(&pool),
+                            &[&session],
+                            &["stats", "pet"],
+                        )
+                        .await;
+                    });
                 }
             }
         }
@@ -151,13 +258,19 @@ impl BattleSink for BattleSinkImpl {
     }
 
     fn apply_pet_exp(&self, owner: i64, stt: i64, exp: i64) {
-        if let Ok(online) = self.online.try_read() {
+        if let Some(online) = try_read_online_with_retry(&self.online, 10, std::time::Duration::from_millis(2)) {
             if let Some(p) = online.get(&owner) {
-                if let Ok(mut s) = p.session.try_write() {
+                if let Some(mut s) = try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2)) {
                     if let Some(pet) = s.pets.iter_mut().find(|p| i64::from(p.stt) == stt) {
                         pet.texp = pet.texp.saturating_add(exp as u32);
                     }
                 }
+            }
+        }
+        let mut map = crate::server::session::lock_online_sessions();
+        if let Some(s) = map.get_mut(&(owner as u32)) {
+            if let Some(pet) = s.pets.iter_mut().find(|p| i64::from(p.stt) == stt) {
+                pet.texp = pet.texp.saturating_add(exp as u32);
             }
         }
     }
@@ -166,12 +279,16 @@ impl BattleSink for BattleSinkImpl {
         if amount <= 0 {
             return;
         }
-        if let Ok(online) = self.online.try_read() {
+        if let Some(online) = try_read_online_with_retry(&self.online, 10, std::time::Duration::from_millis(2)) {
             if let Some(p) = online.get(&owner) {
-                if let Ok(mut s) = p.session.try_write() {
+                if let Some(mut s) = try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2)) {
                     s.gold = s.gold.saturating_add(amount as u32);
                 }
             }
+        }
+        let mut map = crate::server::session::lock_online_sessions();
+        if let Some(s) = map.get_mut(&(owner as u32)) {
+            s.gold = s.gold.saturating_add(amount as u32);
         }
     }
 
@@ -185,18 +302,36 @@ impl BattleSink for BattleSinkImpl {
         let mut ended_sessions: Vec<Session> = Vec::new();
         if let Ok(mut members) = self.members.lock() {
             let ids: Vec<i64> = members.iter().copied().collect();
-            if let Ok(online) = self.online.try_read() {
-                for id in ids {
-                    if let Some(p) = online.get(&id) {
-                        if let Ok(mut s) = p.session.try_write() {
+            members.clear();
+
+            let online_opt = try_read_online_with_retry(&self.online, 10, std::time::Duration::from_millis(2));
+            for id in &ids {
+                let mut session_updated = false;
+                if let Some(ref online) = online_opt {
+                    if let Some(p) = online.get(id) {
+                        if let Some(mut s) = try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2)) {
                             s.battle_id = 0;
                             s.last_battle_end_ms = now_ms;
+                            s.encounter_steps = 0;
                             ended_sessions.push(s.clone());
+                            let mut map = crate::server::session::lock_online_sessions();
+                            if let Some(global_s) = map.get_mut(&(*id as u32)) {
+                                *global_s = s.clone();
+                            }
+                            session_updated = true;
                         }
                     }
                 }
+                if !session_updated {
+                    let mut map = crate::server::session::lock_online_sessions();
+                    if let Some(s) = map.get_mut(&(*id as u32)) {
+                        s.battle_id = 0;
+                        s.last_battle_end_ms = now_ms;
+                        s.encounter_steps = 0;
+                        ended_sessions.push(s.clone());
+                    }
+                }
             }
-            members.clear();
         }
         // G3 — batch-persist the post-battle player stats (Hp/Sp/Texp/Lv/
         // HpMax/SpMax/Point/SkillPoint) + pet stats (texp) for every member on
@@ -216,13 +351,13 @@ impl BattleSink for BattleSinkImpl {
                 }
             }
         }
-        if outcome != Outcome::PlayerWin {
+        if outcome == Outcome::PlayerLose {
             // Defeat: run the OnLose dialog progression for every quest-battle
             // session (ticket 19 review #8 — PlayerLose must call OnLose).
-            if let Ok(online) = self.online.try_read() {
+            if let Some(online) = try_read_online_with_retry(&self.online, 5, std::time::Duration::from_millis(2)) {
                 for (player, p) in online.iter() {
                     let _ = player;
-                    if let Ok(mut s) = p.session.try_write() {
+                    if let Some(mut s) = try_write_session_with_retry(&p.session, 5, std::time::Duration::from_millis(2)) {
                         if s.talking_battle <= 0 {
                             continue;
                         }
@@ -286,7 +421,7 @@ impl BattleSink for BattleSinkImpl {
 }
 
 fn push(online: &tokio::sync::RwLock<OnlineMap>, player: i64, frame: String) {
-    if let Ok(online) = online.try_read() {
+    if let Some(online) = try_read_online_with_retry(online, 10, std::time::Duration::from_millis(2)) {
         if let Some(p) = online.get(&player) {
             let _ = p.frames.send(frame);
         }
@@ -297,7 +432,7 @@ fn push(online: &tokio::sync::RwLock<OnlineMap>, player: i64, frame: String) {
 /// (includes the sender's own map). Shared by the
 /// walk loop's wander/chase fan-out and the battle respawn broadcast.
 fn send_to_map(online: &tokio::sync::RwLock<OnlineMap>, map_id: i64, frame: String) {
-    if let Ok(online) = online.try_read() {
+    if let Some(online) = try_read_online_with_retry(online, 10, std::time::Duration::from_millis(2)) {
         for (id, p) in online.iter() {
             if let Ok(s) = p.session.try_read() {
                 if i64::from(s.map_id) == map_id {
@@ -315,23 +450,37 @@ fn apply_db_update(online: &OnlineMap, update: DbUpdate) {
     match update.target {
         DbTarget::Player(id) => {
             if let Some(p) = online.get(&id) {
-                if let Ok(mut s) = p.session.try_write() {
+                if let Some(mut s) = try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2)) {
                     let frame = apply_player_stat(&mut s, update.stat, update.value);
                     if let Some(f) = frame {
                         let _ = p.frames.send(f);
                     }
                 }
             }
+            let mut map = crate::server::session::lock_online_sessions();
+            if let Some(s) = map.get_mut(&(id as u32)) {
+                apply_player_stat(s, update.stat, update.value);
+            }
         }
         DbTarget::Pet { owner, stt } => {
             if let Some(p) = online.get(&owner) {
-                if let Ok(mut s) = p.session.try_write() {
+                if let Some(mut s) = try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2)) {
                     if let Some(pet) = s.pets.iter_mut().find(|p| i64::from(p.stt) == stt) {
                         match update.stat {
                             Stat::Hp => pet.hp = clamp_u16(update.value),
                             Stat::Sp => pet.sp = clamp_u16(update.value),
                             _ => {}
                         }
+                    }
+                }
+            }
+            let mut map = crate::server::session::lock_online_sessions();
+            if let Some(s) = map.get_mut(&(owner as u32)) {
+                if let Some(pet) = s.pets.iter_mut().find(|p| i64::from(p.stt) == stt) {
+                    match update.stat {
+                        Stat::Hp => pet.hp = clamp_u16(update.value),
+                        Stat::Sp => pet.sp = clamp_u16(update.value),
+                        _ => {}
                     }
                 }
             }
@@ -470,6 +619,31 @@ impl BattleService {
             );
         }
         rx
+    }
+
+    /// Register an online player with a pre-existing frame sender channel.
+    pub fn register_sender(
+        &self,
+        player: i64,
+        session: Arc<tokio::sync::RwLock<Session>>,
+        frames: mpsc::UnboundedSender<String>,
+    ) {
+        for attempt in 0..10 {
+            if let Ok(mut online) = self.online.try_write() {
+                online.insert(
+                    player,
+                    OnlinePlayer {
+                        session,
+                        frames,
+                    },
+                );
+                break;
+            }
+            if attempt + 1 < 10 {
+                std::thread::yield_now();
+                std::thread::sleep(std::time::Duration::from_millis(2));
+            }
+        }
     }
 
     pub fn unregister(&self, player: i64) {
@@ -693,35 +867,98 @@ impl BattleService {
         let mut extra_players = HashMap::new();
         let mut extra_pets = HashMap::new();
 
-        let online_lock = self.online.try_read();
-        for (i, &mem_id) in leader_session
-            .id_mem
-            .iter()
-            .filter(|&&m| m > 0)
-            .enumerate()
-            .take(4)
+        // Sync leader session into self.online if present
+        if let Some(online) = try_read_online_with_retry(&self.online, 10, std::time::Duration::from_millis(2)) {
+            if let Some(p) = online.get(&lid) {
+                if let Some(mut s) = try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2)) {
+                    *s = leader_session.clone();
+                    s.battle_id = id;
+                }
+            }
+        }
+
+        // Extract member session Arc pointers with retry, minimizing online lock duration
+        let member_session_arcs: Vec<(usize, i64, Arc<tokio::sync::RwLock<Session>>)> = {
+            if let Some(online) = try_read_online_with_retry(&self.online, 10, std::time::Duration::from_millis(2)) {
+                leader_session
+                    .id_mem
+                    .iter()
+                    .filter(|&&m| m > 0)
+                    .enumerate()
+                    .take(4)
+                    .filter_map(|(i, &mem_id)| {
+                        let mid = i64::from(mem_id);
+                        online.get(&mid).map(|p| (i, mid, Arc::clone(&p.session)))
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            }
+        };
+
+        for (i, mid, session_arc) in member_session_arcs {
+            if let Some(mut mem_sess) = try_write_session_with_retry(&session_arc, 10, std::time::Duration::from_millis(2)) {
+                if mem_sess.battle_id != 0 {
+                    continue;
+                }
+                // Sync with latest online_sessions() state if available
+                {
+                    let map = crate::server::session::lock_online_sessions();
+                    if let Some(global_s) = map.get(&(mid as u32)) {
+                        *mem_sess = global_s.clone();
+                    }
+                }
+                let col = member_cols[i];
+                battle.add_player(&mem_sess, lid, 3, col);
+                battle.load_member_pet(&mem_sess, lid, 3, col);
+
+                mem_sess.battle_id = id;
+                extra_members.push(mid);
+                extra_players.insert(mid, self.snapshot(&mem_sess));
+                extra_pets.insert(mid, self.pet_slots(&mem_sess));
+
+                // Generate open frames for member (0x0B Sub FA)
+                let frames = battle.member_battle_frame(terrain, mid);
+                extra_start.extend(frames);
+            }
+        }
+
+        // Synchronize global online_sessions() for leader & members, including fallback for any members not in self.online
         {
-            let mid = i64::from(mem_id);
-            if let Ok(ref online) = online_lock {
-                if let Some(p) = online.get(&mid) {
-                    if let Ok(mut mem_sess) = p.session.try_write() {
+            let mut map = crate::server::session::lock_online_sessions();
+            if let Some(s) = map.get_mut(&leader_session.id) {
+                s.battle_id = id;
+            }
+            for (i, &mem_id) in leader_session
+                .id_mem
+                .iter()
+                .filter(|&&m| m > 0)
+                .enumerate()
+                .take(4)
+            {
+                let mid = i64::from(mem_id);
+                if let Some(s) = map.get_mut(&mem_id) {
+                    if !extra_members.contains(&mid) {
+                        if s.battle_id != 0 {
+                            continue;
+                        }
+                        s.battle_id = id;
                         let col = member_cols[i];
-                        battle.add_player(&mem_sess, lid, 3, col);
-                        battle.load_member_pet(&mem_sess, lid, 3, col);
+                        battle.add_player(s, lid, 3, col);
+                        battle.load_member_pet(s, lid, 3, col);
 
-                        mem_sess.battle_id = id;
                         extra_members.push(mid);
-                        extra_players.insert(mid, self.snapshot(&mem_sess));
-                        extra_pets.insert(mid, self.pet_slots(&mem_sess));
+                        extra_players.insert(mid, self.snapshot(s));
+                        extra_pets.insert(mid, self.pet_slots(s));
 
-                        // Generate open frames for member (0x0B Sub FA)
                         let frames = battle.member_battle_frame(terrain, mid);
                         extra_start.extend(frames);
+                    } else {
+                        s.battle_id = id;
                     }
                 }
             }
         }
-        drop(online_lock);
 
         // 3. Enemy Formation
         for (idx, enemy) in fight_data.left_enemies.iter().enumerate().take(10) {
@@ -796,11 +1033,32 @@ impl BattleService {
         crate::protocol::frame(&format!("0BFA{}", encoder::le16(diahinh as u16)), &text)
     }
 
-    /// Leave the current battle (op 0x0B sub 1).
+    /// Leave the current battle (op 0x0B sub 1 or sub 5).
     pub fn leave_battle(&self, session: &mut Session) {
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
         session.battle_id = 0;
+        session.last_battle_end_ms = now_ms;
+        session.encounter_steps = 0;
         if let Ok(mut members) = self.sink.members.lock() {
             members.remove(&i64::from(session.id));
+        }
+        if let Some(online) = try_read_online_with_retry(&self.online, 10, std::time::Duration::from_millis(2)) {
+            if let Some(p) = online.get(&i64::from(session.id)) {
+                if let Some(mut s) = try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2)) {
+                    s.battle_id = 0;
+                    s.last_battle_end_ms = now_ms;
+                    s.encounter_steps = 0;
+                }
+            }
+        }
+        let mut map = crate::server::session::lock_online_sessions();
+        if let Some(s) = map.get_mut(&session.id) {
+            s.battle_id = 0;
+            s.last_battle_end_ms = now_ms;
+            s.encounter_steps = 0;
         }
     }
 

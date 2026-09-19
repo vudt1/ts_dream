@@ -492,6 +492,14 @@ pub fn online_sessions() -> &'static std::sync::Mutex<std::collections::HashMap<
     ONLINE.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
 }
 
+/// Safely lock the online session registry, recovering from poison if a previous test or thread panicked.
+pub fn lock_online_sessions() -> std::sync::MutexGuard<'static, std::collections::HashMap<u32, Session>> {
+    match online_sessions().lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    }
+}
+
 /// Locks player operations in stable id order. A shop purchase locks buyer and
 /// seller; ordinary frames and disconnects lock only their own player. This
 /// prevents cross-player lost updates without blocking unrelated sessions.

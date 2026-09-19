@@ -7,7 +7,7 @@
 //! delegates the gear-bonus math to `CharacterSheet` (the same formulas the
 //! login/equip flows use) and clamps current HP/SP into the new maxima.
 
-use crate::server::session::{online_sessions, Session};
+use crate::server::session::{lock_online_sessions, Session};
 
 /// A snapshot of the derived combat stats after a recompute.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -43,13 +43,13 @@ pub struct PlayerStateManager;
 impl PlayerStateManager {
     /// Point-in-time clone of a player's session, or `None` when offline.
     pub fn snapshot(player_id: u32) -> Option<Session> {
-        online_sessions().lock().unwrap().get(&player_id).cloned()
+        lock_online_sessions().get(&player_id).cloned()
     }
 
     /// Apply `f` to the live session under the registry lock. Returns `false`
     /// when the player is offline (f never runs).
     pub fn update(player_id: u32, f: impl FnOnce(&mut Session)) -> bool {
-        let mut sessions = online_sessions().lock().unwrap();
+        let mut sessions = lock_online_sessions();
         match sessions.get_mut(&player_id) {
             Some(s) => {
                 f(s);
@@ -71,9 +71,7 @@ impl PlayerStateManager {
 
     /// Read-only derived-stats view without recomputing.
     pub fn derived_stats(player_id: u32) -> Option<DerivedStats> {
-        online_sessions()
-            .lock()
-            .unwrap()
+        lock_online_sessions()
             .get(&player_id)
             .map(DerivedStats::of)
     }
@@ -87,9 +85,7 @@ impl PlayerStateManager {
         }) {
             return None;
         }
-        online_sessions()
-            .lock()
-            .unwrap()
+        lock_online_sessions()
             .get(&player_id)
             .map(|s| s.hp)
     }
@@ -102,9 +98,7 @@ impl PlayerStateManager {
         }) {
             return None;
         }
-        online_sessions()
-            .lock()
-            .unwrap()
+        lock_online_sessions()
             .get(&player_id)
             .map(|s| s.sp)
     }

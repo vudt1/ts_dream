@@ -2114,7 +2114,7 @@ impl Battle {
         out: &mut Vec<Out>,
     ) -> Outcome {
         ts.delay = skill_delay(data, skill);
-        let is_leader = attacker.id == attacker.leader_id || attacker.id_char == attacker.leader_id;
+        let is_leader = attacker.leader_id == 0 || attacker.id == attacker.leader_id || attacker.id_char == attacker.leader_id;
         let hit = damage::get_random_miss_flee(
             &mut self.rng.random_0,
             attacker.lv,
@@ -2123,7 +2123,7 @@ impl Battle {
             avg_of(ts, if attacker.team == 1 { 2 } else { 1 }),
         );
         if hit == 1 || skill == 14002 {
-            if is_leader && attacker.leader_id > 0 {
+            if is_leader {
                 return Outcome::PlayerFled;
             }
             // Party member flee.
@@ -2612,9 +2612,9 @@ impl Battle {
         }
     }
 
-    /// Register a hit type-7 npc for drop/exp processing.
+    /// Register a hit enemy npc (typ 7 or 3) for drop/exp processing.
     fn note_npc_hit(&self, ts: &mut TurnState, attacker: &mut WarInfo, npc: &WarInfo) {
-        if npc.typ == 7 {
+        if npc.typ == 7 || npc.typ == 3 {
             let entry = format!("{}.{}/{}", npc.row, npc.col, npc.lv);
             if !ts.killed_npcs.contains(&entry) {
                 ts.killed_npcs.push(entry);
@@ -2862,16 +2862,18 @@ impl Battle {
             }
 
             // Active-pet exp (pet cells cols 0,1,3,4 → stt = active..+3).
-            for &pc in &[0u8, 1, 3, 4] {
-                if let Some(pet) = self.cell(2, pc).cloned() {
-                    if pet.id > 0 {
-                        let exp = per_exp * pet.exp;
-                        if exp > 0 {
-                            out.push(Out::PetExp {
-                                owner: player,
-                                stt: pet.id_npc_on_map,
-                                exp,
-                            });
+            if !fled {
+                for &pc in &[0u8, 1, 3, 4] {
+                    if let Some(pet) = self.cell(2, pc).cloned() {
+                        if pet.id > 0 {
+                            let exp = per_exp * pet.exp;
+                            if exp > 0 {
+                                out.push(Out::PetExp {
+                                    owner: player,
+                                    stt: pet.id_npc_on_map,
+                                    exp,
+                                });
+                            }
                         }
                     }
                 }
@@ -2887,17 +2889,16 @@ impl Battle {
             }
             text9.push_str(&packets::hide_from_map(player as u32));
             text9.push_str(&packets::reposition(cell.row, cell.col));
+            text9.push_str(&packets::clear_pet_cell(cell.row, cell.col));
             out.push(Out::MapBroadcast {
                 player,
                 frame: packets::hide_from_map(player as u32),
             });
         }
 
-        // Win-path map-npc respawn — same `_Delay==0` gate + `_Delay=10`
-        // write + map-wide `F44406001603`/`F44408001605` frames.
-        // The flee path already respawned in `apply_flee` (runner.rs:2075);
-        // a defeat (players all dead) does not respawn the npc.
-        if won {
+        // Win-path and flee-path map-npc respawn.
+        // A defeat (players all dead) does not respawn the npc.
+        if won || fled {
             self.npc_respawn(data, out);
         }
         if !text9.is_empty() {

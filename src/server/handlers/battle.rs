@@ -20,6 +20,7 @@ pub fn handle_battle(ctx: &mut OpcodeCtx) {
     match sub {
         1 => handle_leave_battle(conn, payload, service, out),
         2 => handle_pk_or_attack(conn, payload, service, out),
+        5 => handle_flee_battle(conn, payload, service, out),
         6 => {
             // Broadcast `F44406000B06` + id4 to the map.
             service.send_map(
@@ -56,10 +57,29 @@ fn handle_leave_battle(
         return;
     }
     service.leave_battle(&mut conn.session);
-    out.send(format!(
-        "F44408000B00{}0000",
-        encoder::le32(conn.session.id)
-    ));
+    let smoke_clear = crate::battle::packets::hide_from_map(conn.session.id);
+    service.send_map(i64::from(conn.session.id), smoke_clear.clone());
+    out.send(smoke_clear);
+    out.send(crate::battle::packets::battle_exit_move());
+    out.send(crate::battle::packets::battle_exit_talk());
+}
+
+/// Sub 5 — flee / escape battle notification (PlayerFled / 0x0B Sub 0x05).
+fn handle_flee_battle(
+    conn: &mut Conn,
+    _payload: &[u8],
+    service: &BattleService,
+    out: &mut HandleOutcome,
+) {
+    if conn.session.battle_id == 0 {
+        return;
+    }
+    service.leave_battle(&mut conn.session);
+    let smoke_clear = crate::battle::packets::hide_from_map(conn.session.id);
+    service.send_map(i64::from(conn.session.id), smoke_clear.clone());
+    out.send(smoke_clear);
+    out.send(crate::battle::packets::battle_exit_move());
+    out.send(crate::battle::packets::battle_exit_talk());
 }
 
 /// Sub 2 — inner sub 2 (PK challenge) / inner sub 3 (attack NPC) / inner sub 4 (spectate) / inner sub 5 (jam).

@@ -275,7 +275,7 @@ pub async fn handle_login_complete(ctx: &mut OpcodeCtx<'_>) {
 
     // 3. Synchronize existing in-world players on this map to this client
     let others: Vec<crate::server::session::Session> = {
-        let sessions = crate::server::session::online_sessions().lock().unwrap();
+        let sessions = crate::server::session::lock_online_sessions();
         sessions
             .values()
             .filter(|s| s.id != my_id && s.map_id == map_id && s.in_world)

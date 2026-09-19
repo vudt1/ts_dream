@@ -10,7 +10,7 @@ use crate::protocol::encoder;
 use crate::server::dispatcher::{HandleOutcome, MapBroadcast, OpcodeCtx};
 use crate::server::gm;
 use crate::server::handlers::stats;
-use crate::server::session::{online_sessions, Conn};
+use crate::server::session::{lock_online_sessions, Conn};
 use crate::server::spawn;
 use crate::web::server_control::ServerControl;
 
@@ -232,7 +232,7 @@ async fn handle_slash(
                         continue;
                     }
                     let member = {
-                        let sessions = online_sessions().lock().unwrap();
+                        let sessions = lock_online_sessions();
                         sessions.get(&member_id).cloned()
                     };
                     let Some(mut m) = member else {
@@ -262,7 +262,7 @@ async fn handle_slash(
                     }
                     frames.push("F44403001F0100".to_string());
                     {
-                        let mut sessions = online_sessions().lock().unwrap();
+                        let mut sessions = lock_online_sessions();
                         sessions.insert(member_id, m.clone());
                     }
                     if let Some(hub) = hub {

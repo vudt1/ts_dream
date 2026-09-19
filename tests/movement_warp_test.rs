@@ -10,7 +10,7 @@ use ts_dream::db::pool::{bootstrap, DbPool};
 use ts_dream::server::auto_save;
 use ts_dream::server::dispatcher::{dispatch, HandleOutcome, OpcodeCtx, ServerEnv};
 use ts_dream::server::handlers::movement;
-use ts_dream::server::session::{online_sessions, Conn, Session};
+use ts_dream::server::session::{lock_online_sessions, Conn, Session};
 use ts_dream::server::spawn;
 use ts_dream::state::AppState;
 use ts_dream::web::server_control::ServerControl;
@@ -66,9 +66,7 @@ fn test_movement_voluntary_walk_sub1() {
     conn.session.map_y = 200;
     conn.session.gocnhin = 0;
 
-    online_sessions()
-        .lock()
-        .unwrap()
+    lock_online_sessions()
         .insert(1001, conn.session.clone());
 
     let data = GameData::default();
@@ -88,7 +86,7 @@ fn test_movement_voluntary_walk_sub1() {
     assert_eq!(conn.session.map_y, 480);
 
     // Verify shared online registry updated
-    let reg = online_sessions().lock().unwrap();
+    let reg = lock_online_sessions();
     let s = reg.get(&1001).expect("player in registry");
     assert_eq!(s.gocnhin, 3);
     assert_eq!(s.map_x, 240);
@@ -100,7 +98,7 @@ fn test_movement_voluntary_walk_sub1() {
     assert_eq!(out.map_broadcast[0].subject, 1001);
     assert!(out.map_broadcast[0].frame.starts_with("F4440B000601"));
 
-    online_sessions().lock().unwrap().remove(&1001);
+    lock_online_sessions().remove(&1001);
 }
 
 #[test]
@@ -111,9 +109,7 @@ fn test_movement_echo_reconciliation_sub2() {
     conn.session.map_x = 100;
     conn.session.map_y = 200;
 
-    online_sessions()
-        .lock()
-        .unwrap()
+    lock_online_sessions()
         .insert(1002, conn.session.clone());
 
     let data = GameData::default();
@@ -132,7 +128,7 @@ fn test_movement_echo_reconciliation_sub2() {
     assert_eq!(conn.session.map_y, 550);
 
     // Shared registry updated
-    let reg = online_sessions().lock().unwrap();
+    let reg = lock_online_sessions();
     let s = reg.get(&1002).unwrap();
     assert_eq!(s.map_x, 350);
     assert_eq!(s.map_y, 550);
@@ -145,7 +141,7 @@ fn test_movement_echo_reconciliation_sub2() {
     // Must NOT broadcast walk for echo reconciliation
     assert!(out.map_broadcast.is_empty());
 
-    online_sessions().lock().unwrap().remove(&1002);
+    lock_online_sessions().remove(&1002);
 }
 
 #[test]
@@ -190,13 +186,9 @@ fn test_party_movement_follow() {
         ..Default::default()
     };
 
-    online_sessions()
-        .lock()
-        .unwrap()
+    lock_online_sessions()
         .insert(2001, leader_conn.session.clone());
-    online_sessions()
-        .lock()
-        .unwrap()
+    lock_online_sessions()
         .insert(2002, member_session.clone());
 
     let data = GameData::default();
@@ -213,7 +205,7 @@ fn test_party_movement_follow() {
     assert_eq!(leader_conn.session.map_y, 400);
 
     // Member coords in online registry updated
-    let reg = online_sessions().lock().unwrap();
+    let reg = lock_online_sessions();
     let mem = reg.get(&2002).unwrap();
     assert_eq!(mem.map_x, 300);
     assert_eq!(mem.map_y, 400);
@@ -246,8 +238,8 @@ fn test_party_movement_follow() {
     );
     assert!(member_out.map_broadcast.is_empty());
 
-    online_sessions().lock().unwrap().remove(&2001);
-    online_sessions().lock().unwrap().remove(&2002);
+    lock_online_sessions().remove(&2001);
+    lock_online_sessions().remove(&2002);
 }
 
 // =========================================================================
@@ -267,9 +259,7 @@ async fn test_warp_confirm_and_teleport_confirm_cycle() {
     conn.session.map_y = 200;
     conn.session.in_world = true;
 
-    online_sessions()
-        .lock()
-        .unwrap()
+    lock_online_sessions()
         .insert(3001, conn.session.clone());
 
     // Step 1: Client triggers warp gate 1 at map 49902
@@ -322,14 +312,14 @@ async fn test_warp_confirm_and_teleport_confirm_cycle() {
     assert_eq!(out_confirm.map_broadcast[0].map_id, None); // default to new map
 
     // Online registry must reflect new map
-    let reg = online_sessions().lock().unwrap();
+    let reg = lock_online_sessions();
     let s = reg.get(&3001).unwrap();
     assert_eq!(s.map_id, 49901);
     assert_eq!(s.map_x, 222);
     assert_eq!(s.map_y, 295);
     drop(reg);
 
-    online_sessions().lock().unwrap().remove(&3001);
+    lock_online_sessions().remove(&3001);
 }
 
 #[tokio::test]
@@ -356,13 +346,9 @@ async fn test_party_warp_follow() {
         ..Default::default()
     };
 
-    online_sessions()
-        .lock()
-        .unwrap()
+    lock_online_sessions()
         .insert(4001, leader_conn.session.clone());
-    online_sessions()
-        .lock()
-        .unwrap()
+    lock_online_sessions()
         .insert(4002, member_session.clone());
 
     let env = ServerEnv::none();
@@ -375,7 +361,7 @@ async fn test_party_warp_follow() {
     assert_eq!(leader_conn.session.map_id, 49901);
 
     // Member in online registry updated to new map
-    let reg = online_sessions().lock().unwrap();
+    let reg = lock_online_sessions();
     let mem = reg.get(&4002).unwrap();
     assert_eq!(mem.map_id, 49901);
     assert_eq!(mem.map_x, 222);
@@ -389,8 +375,8 @@ async fn test_party_warp_follow() {
     assert_eq!(out.map_broadcast[1].subject, 4002);
     assert_eq!(out.map_broadcast[1].map_id, Some(49902));
 
-    online_sessions().lock().unwrap().remove(&4001);
-    online_sessions().lock().unwrap().remove(&4002);
+    lock_online_sessions().remove(&4001);
+    lock_online_sessions().remove(&4002);
 }
 
 // =========================================================================
@@ -470,18 +456,14 @@ async fn test_disconnect_persists_coordinates_to_db() {
         ..Default::default()
     };
 
-    online_sessions()
-        .lock()
-        .unwrap()
+    lock_online_sessions()
         .insert(account_id as u32, session);
 
     // Call disconnect_player
     control.disconnect_player(account_id as u32).await;
 
     // Verify session removed from online_sessions
-    assert!(online_sessions()
-        .lock()
-        .unwrap()
+    assert!(lock_online_sessions()
         .get(&(account_id as u32))
         .is_none());
 
