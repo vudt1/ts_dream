@@ -10,6 +10,7 @@
 //! - A **Talk Context** tracks `{talk_type, map_object_id, talk_count, select_menu}`.
 
 use crate::data::loader::GameData;
+use crate::protocol::codecs::npc_talk::{NpcTalkCodec, TalkLockMode};
 use crate::protocol::encoder;
 use crate::server::dispatcher::{HandleOutcome, OpcodeCtx};
 use crate::server::handlers::stats::build_stat_update;
@@ -18,6 +19,14 @@ use crate::server::session::Conn;
 
 /// EndTalk packet + reset the whole talk context.
 pub fn end_talk(conn: &mut Conn, out: &mut HandleOutcome) {
+    // When an Eve event session is active the client expects the actor-unlock
+    // frame (`0x14 Sub 0x2C`, mode 0x02) before the close-dialog frame
+    // (Bear `processStep` end-of-chain order). Legacy talk paths keep the
+    // bare `F44402001408` for golden parity.
+    if conn.session.current_event_session.is_some() {
+        let char_id = conn.session.id as u32;
+        out.send(NpcTalkCodec::build_talk_lock_hex(char_id, TalkLockMode::Unlock));
+    }
     out.send("F44402001408");
     conn.session.idtalking = 0;
     conn.session.select_menu = 0;
@@ -149,8 +158,22 @@ fn handle_talk_start(conn: &mut Conn, payload: &[u8], data: &GameData, out: &mut
         crate::server::handlers::npc_event::NpcTrigger::ClickNpc(map_object_id),
         &mut rng,
     ) {
+        // Wire order (Bear `ClickkNpc`/`processStep`): open dialog frame,
+        // then actor lock, then the first talk step when it is a Talk result.
+        let char_id = conn.session.id as u32;
+        let first_talk = event_session
+            .results
+            .first()
+            .filter(|r| r.result_type == 1)
+            .map(NpcTalkCodec::build_talk_step_hex);
+        // TODO(CP4): dispatch non-talk results (Action/Door/Surface) when
+        // results[0].result_type != 1.
         conn.session.current_event_session = Some(event_session);
         out.send("F44402000602");
+        out.send(NpcTalkCodec::build_talk_lock_hex(char_id, TalkLockMode::Lock));
+        if let Some(step) = first_talk {
+            out.send(step);
+        }
         return;
     }
 
