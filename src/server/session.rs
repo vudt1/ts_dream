@@ -143,6 +143,8 @@ pub struct Session {
     pub idtalking: i32,
     /// Real NPC database id resolved from the on-map index (`idnpctalking`).
     pub idnpctalking: i32,
+    /// Active Eve engine event session (ticket 04/05).
+    pub current_event_session: Option<crate::eve::auto_chain::EventSession>,
     pub select_menu: i32,
     /// Talk counter (`talkcount`); reset by EndTalk / teleport confirm.
     pub talk_count: i32,
@@ -279,6 +281,7 @@ impl Default for Session {
             authed: false,
             idtalking: 0,
             idnpctalking: 0,
+            current_event_session: None,
             select_menu: 0,
             talk_count: 0,
             warp_finish: false,

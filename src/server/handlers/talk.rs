@@ -23,6 +23,7 @@ pub fn end_talk(conn: &mut Conn, out: &mut HandleOutcome) {
     conn.session.select_menu = 0;
     conn.session.talk_count = 0;
     conn.session.warp_finish = false;
+    conn.session.current_event_session = None;
 }
 
 /// Split a dialog hex string on `F444` and emit each fragment 500 ms apart.
@@ -63,14 +64,25 @@ pub async fn handle_talk(ctx: &mut OpcodeCtx<'_>) {
 /// on-map instance is rejected with EndTalk (ticket 18 review: "reject
 /// missing/out-of-range before any packet").
 fn resolve_npc(data: &GameData, conn: &Conn, map_object_id: i32) -> Option<(i32, bool)> {
-    let npc = data
+    if let Some(npc) = data
         .npc_on_map
         .iter()
-        .find(|n| n.map_id == i64::from(conn.session.map_id) && n.id == i64::from(map_object_id))?;
-    let dx = i64::from(conn.session.map_x) - npc.x;
-    let dy = i64::from(conn.session.map_y) - npc.y;
-    let in_range = (-150..=150).contains(&dx) && (-150..=150).contains(&dy);
-    Some((npc.npc_id as i32, in_range))
+        .find(|n| n.map_id == i64::from(conn.session.map_id) && n.id == i64::from(map_object_id))
+    {
+        let dx = i64::from(conn.session.map_x) - npc.x;
+        let dy = i64::from(conn.session.map_y) - npc.y;
+        let in_range = (-150..=150).contains(&dx) && (-150..=150).contains(&dy);
+        return Some((npc.npc_id as i32, in_range));
+    }
+    if let Some(scene) = data.scene_eve_data.get(&u32::from(conn.session.map_id)) {
+        if let Some(npc) = scene.npcs.get(&(map_object_id as u16)) {
+            let dx = i64::from(conn.session.map_x) - i64::from(npc.x);
+            let dy = i64::from(conn.session.map_y) - i64::from(npc.y);
+            let in_range = (-150..=150).contains(&dx) && (-150..=150).contains(&dy);
+            return Some((i32::from(npc.npc_id), in_range));
+        }
+    }
+    None
 }
 
 fn handle_talk_start(conn: &mut Conn, payload: &[u8], data: &GameData, out: &mut HandleOutcome) {
@@ -124,6 +136,24 @@ fn handle_talk_start(conn: &mut Conn, payload: &[u8], data: &GameData, out: &mut
         end_talk(conn, out);
         return;
     }
+    // Eve Engine event bridge (ticket 04/05 / Checkpoint 2).
+    let mut rng = crate::battle::rng::DotNetRandom::new(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as i32)
+            .unwrap_or(12345),
+    );
+    if let Some(event_session) = crate::server::handlers::npc_event::resolve_npc_event(
+        &conn.session,
+        data,
+        crate::server::handlers::npc_event::NpcTrigger::ClickNpc(map_object_id),
+        &mut rng,
+    ) {
+        conn.session.current_event_session = Some(event_session);
+        out.send("F44402000602");
+        return;
+    }
+
     let key = crate::server::handlers::quest::quest_key(
         i64::from(conn.session.map_id),
         "NPC",
