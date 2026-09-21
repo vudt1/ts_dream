@@ -170,3 +170,39 @@ Số nguyên LE, double 8B kiểu `F098`. Độ dài sai/thiếu block cuối �
 | 9 | `functions/00573820/00743b6c/00743d54/00743e70/005b1ee0` (.c, body mới 2026-09-14) | §4.5–4.6 |
 | 10 | ls `functions/005749f0*` (rỗng) + grep `index.csv` 0 hit, kề `index.csv:3324-3325` | Gap `0x005749f0` vẫn còn sau redump 2026-09-14 |
 | 6 | `functions/0077f414_FUN_0077F414.c:984-985` | C→S rỗng |
+
+---
+
+<!-- VISCII-CORRECTION-START -->
+## Bản hiệu đính VISCII → UTF-8 (2026-09-21, từ main opcode > sub opcode)
+
+> Nguồn hiệu đính: `spec/Bản hiệu đính VISCII → UTF-8 cho báo cáo call graph S → C.md` §2–§3 (đối chiếu literal Delphi trực tiếp từ `aLogin.exe` theo VA + Pascal length prefix, giải mã VISCII → UTF-8). Cột **Literal gốc** giữ chứng cứ byte-string; cột **Bản hiệu đính** là câu đọc tự nhiên (không phải byte hiển thị nguyên văn của client). Phạm vi chính xác xem spec §5.
+
+### Chú thích asm / chứng cứ (tài liệu asm kèm theo)
+- Dispatcher S→C: `FUN_0078a89c` — asm `client_pseudo_c/0078a89c_FUN_0078a89c.asm.txt` (**đã copy từ `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/0078a89c_FUN_0078a89c.asm.txt`; file chỉ còn prologue 71 dòng tới `JMP [EAX*4+0x78a9b6]`, mapping đầy đủ xác nhận bằng `jumptable_byte200_0x78A8EE.hex` + `jumptable_dword200_0x78A9B6.hex` + `manifest.csv`**), C `client_pseudo_c/0078a89c_FUN_0078a89c.c`. Tra bảng `MOV AL,[EAX+0x78a8ee]` + `JMP [EAX*4+0x78a9b6]`.
+- Handler `0x00794977` — C `client_pseudo_c/case_041_00794977_FUN_00794977.c` (có); asm `client_pseudo_c/00794977_*.asm.txt` **THIẾU** (không có trong `client_pseudo_c/` lẫn `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` — xem danh sách thiếu cuối tài liệu). Basic block trong bảng dưới là chứng cứ thay thế.
+
+### Main opcode `0x2D` — 14 literal (Sub = `body[0]`; `—` = parser/branch trực tiếp)
+
+| Sub | Basic block | Literal VISCII gốc | Bản tiếng Việt hiệu đính | Ghi chú dịch |
+|---|---|---|---|---|
+| `1` | `0x007949EA` | Kết hôn thành công | Kết hôn thành công. | Hiệu đính ngữ nghĩa/câu chữ |
+| `1` | `0x007949EA` | Không thể đồng giới tính | Không thể đồng giới tính. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `1` | `0x007949EA` | Có người không đủ đẳng cấp | Có người không đủ đẳng cấp. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `2` | `0x00794B9D` | Sai lầm | Sai lầm. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `2` | `0x00794B9D` | Ly hôn thành công | Ly hôn thành công. | Hiệu đính ngữ nghĩa/câu chữ |
+| `2` | `0x00794B9D` | Bạn chơi độc thân | Bạn chơi độc thân. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `6` | `0x00794D3D` | Sai lầm | Sai lầm. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `6` | `0x00794D3D` | Tặng lễ kim thành công | Tặng lễ kim thành công. | Hiệu đính ngữ nghĩa/câu chữ |
+| `6` | `0x00794D3D` | Đối phương không có trên mạng | Đối phương không trực tuyến. | Hiệu đính ngữ nghĩa/câu chữ |
+| `6` | `0x00794D3D` | Đối phương đã hoàn hôn | Đối phương đã kết hôn. | Hiệu đính ngữ nghĩa/câu chữ |
+| `6` | `0x00794D3D` | Bạn không có nhiều tiền như vậy để phát | Bạn không có nhiều tiền như vậy để phát. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `8` | `0x00794E3C` | Đối phương không đồng ý lấy bạn | Đối phương không đồng ý kết hôn. | Hiệu đính ngữ nghĩa/câu chữ |
+| `9` | `0x00794E7E` | Số tiền thu người đến | Số tiền thu người đến. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `9` | `0x00794E7E` | Lễ kim | Lễ kim. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+
+### Danh sách asm thiếu (không copy được — không tồn tại ở nguồn)
+
+- `0x00794977`: không có `.asm.txt` trong `client_pseudo_c/` và không có trong `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` hay `case_functions/functions/` (chỉ có `.c`). Cần redump/disassemble lại từ `aLogin.exe` theo VA handler + basic block ở bảng trên.
+
+<!-- VISCII-CORRECTION-END -->

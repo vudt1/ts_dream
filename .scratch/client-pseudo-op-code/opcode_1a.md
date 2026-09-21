@@ -301,3 +301,42 @@ Kiểm chứng bổ sung (toàn cây `ts_decompile/functions`):
 | 32 | `ts_decompile/functions/0078a89c_FUN_0078a89c.c:4740,4762,4807` | nhãn `0x798118` nằm trong `case 0x1b:` | **Đính chính**: `0x798118` thuộc OP 0x1B, không phải OP 0x1A |
 
 **Bản đồ độ tin cậy (cập nhật 2026-09-14)**: mục 0, 2, 3 (field/wire/hàm/**nhãn đã dịch**), 4.1–4.10 (wire + offset ghi + **hành vi 9 helper từ body mới**), 5 (trạng thái `case 0x1a` rỗng; caveat về helper đã gỡ bỏ) = **xác minh trực tiếp từ mã nguồn sơ cấp**. Còn lại mức **suy luận có ràng buộc**: (i) thứ tự trái/phải của hai nhãn quanh `IntToStr` trong các banner (Ghidra mất varargs ở `case_023`), (ii) text 7 hằng đuôi caption/banner `0x72B158/16C/238/24C/DF8, 0x72BE0C, 0x7467C8` chưa dump, (iii) ý nghĩa chính xác cờ `+0x14` của hai form trong gate `0072c0f0`. Tên nghiệp vụ của sub-op 1,2,5,6,7,8,9,10 **không còn là suy luận** — đã chốt bằng field ghi + nhãn dịch (cộng/trừ tiền `+0x12F8`, cộng/trừ `+0x1300`, bộ đếm `+0x502/+0x513/+0x50e`, banner thiếu tiền, byte-trigger).
+
+---
+
+<!-- VISCII-CORRECTION-START -->
+## Bản hiệu đính VISCII → UTF-8 (2026-09-21, từ main opcode > sub opcode)
+
+> Nguồn hiệu đính: `spec/Bản hiệu đính VISCII → UTF-8 cho báo cáo call graph S → C.md` §2–§3 (đối chiếu literal Delphi trực tiếp từ `aLogin.exe` theo VA + Pascal length prefix, giải mã VISCII → UTF-8). Cột **Literal gốc** giữ chứng cứ byte-string; cột **Bản hiệu đính** là câu đọc tự nhiên (không phải byte hiển thị nguyên văn của client). Phạm vi chính xác xem spec §5.
+
+### Chú thích asm / chứng cứ (tài liệu asm kèm theo)
+- Dispatcher S→C: `FUN_0078a89c` — asm `client_pseudo_c/0078a89c_FUN_0078a89c.asm.txt` (**đã copy từ `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/0078a89c_FUN_0078a89c.asm.txt`; file chỉ còn prologue 71 dòng tới `JMP [EAX*4+0x78a9b6]`, mapping đầy đủ xác nhận bằng `jumptable_byte200_0x78A8EE.hex` + `jumptable_dword200_0x78A9B6.hex` + `manifest.csv`**), C `client_pseudo_c/0078a89c_FUN_0078a89c.c`. Tra bảng `MOV AL,[EAX+0x78a8ee]` + `JMP [EAX*4+0x78a9b6]`.
+- Handler `0x0079175F` — C `client_pseudo_c/case_023_0079175F_FUN_0079175f.c` (có); asm `client_pseudo_c/0079175f_*.asm.txt` **THIẾU** (không có trong `client_pseudo_c/` lẫn `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` — xem danh sách thiếu cuối tài liệu). Basic block trong bảng dưới là chứng cứ thay thế.
+
+### Main opcode `0x1A` — 17 literal (Sub = `body[0]`; `—` = parser/branch trực tiếp)
+
+| Sub | Basic block | Literal VISCII gốc | Bản tiếng Việt hiệu đính | Ghi chú dịch |
+|---|---|---|---|---|
+| `1` | `0x007917BA` | sound\WA0014.wav | sound\WA0014.wav | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `1` | `0x007917BA` | Nhận được | Nhận được. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `1` | `0x007917BA` | Thất bại đoạt được | Thất bại đoạt được. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `2` | `0x007918E3` | Thất bại giảm thiểu | Thất bại giảm thiểu. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `3` | `0x007919AF` | Dung lượng tiền bạc không đủ | Dung lượng tiền bạc không đủ. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `8` | `0x00791A82` | sound\WA0014.wav | sound\WA0014.wav | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `8` | `0x00791A82` | Nhận được | Nhận được. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `8` | `0x00791A82` | Thất bại đoạt được | Thất bại đoạt được. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `8` | `0x00791A82` | Thủy binh | Thủy binh. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `9` | `0x00791B93` | sound\WA0014.wav | sound\WA0014.wav | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `9` | `0x00791B93` | Nhận được | Nhận được. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `9` | `0x00791B93` | Thất bại đoạt được | Thất bại đoạt được. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `9` | `0x00791B93` | Tài bảo | Tài bảo. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `10` | `0x00791C93` | sound\WA0014.wav | sound\WA0014.wav | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `10` | `0x00791C93` | Nhận được | Nhận được. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `10` | `0x00791C93` | Thất bại đoạt được | Thất bại đoạt được. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `10` | `0x00791C93` | Điểm đạn dược | Điểm đạn dược. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+
+### Danh sách asm thiếu (không copy được — không tồn tại ở nguồn)
+
+- `0x0079175F`: không có `.asm.txt` trong `client_pseudo_c/` và không có trong `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` hay `case_functions/functions/` (chỉ có `.c`). Cần redump/disassemble lại từ `aLogin.exe` theo VA handler + basic block ở bảng trên.
+
+<!-- VISCII-CORRECTION-END -->

@@ -214,3 +214,31 @@ Ghi chú: cùng block dump còn lộ các chuỗi nằm ngoài phạm vi OP 0x0E
 - Còn thiếu body: callback `FUN_0075d738` (nút bấm của toast SubOp 2) và các lá `FUN_00763444/007633f0` (refresh bảng mời) — chưa dump.
 - Template/hằng toast mới phát hiện trong body, **không có dump**: `DAT_0075d66c` / `LAB_00760870` (SubOp 2), `DAT_007601F8` / `DAT_0076020C` (SubOp 4), `DAT_00747A74` (SubOp 7).
 - Ý nghĩa game-design của `id`, `blob8`, `flag`, các DWORD trong record SubOp 5, và **2 con số 9 chữ số BCD trong record SubOp 3 kind=1** nằm ngoài tầng case — chỉ kết luận ở mức "sự kiện/thông báo có tham số + toast + âm thanh"; nghiệp vụ friend/invite là **suy luận có cơ sở** từ bộ chuỗi §6 + bảng pending, chưa phải kết luận tuyệt đối.
+
+---
+
+<!-- VISCII-CORRECTION-START -->
+## Bản hiệu đính VISCII → UTF-8 (2026-09-21, từ main opcode > sub opcode)
+
+> Nguồn hiệu đính: `spec/Bản hiệu đính VISCII → UTF-8 cho báo cáo call graph S → C.md` §2–§3 (đối chiếu literal Delphi trực tiếp từ `aLogin.exe` theo VA + Pascal length prefix, giải mã VISCII → UTF-8). Cột **Literal gốc** giữ chứng cứ byte-string; cột **Bản hiệu đính** là câu đọc tự nhiên (không phải byte hiển thị nguyên văn của client). Phạm vi chính xác xem spec §5.
+
+### Chú thích asm / chứng cứ (tài liệu asm kèm theo)
+- Dispatcher S→C: `FUN_0078a89c` — asm `client_pseudo_c/0078a89c_FUN_0078a89c.asm.txt` (**đã copy từ `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/0078a89c_FUN_0078a89c.asm.txt`; file chỉ còn prologue 71 dòng tới `JMP [EAX*4+0x78a9b6]`, mapping đầy đủ xác nhận bằng `jumptable_byte200_0x78A8EE.hex` + `jumptable_dword200_0x78A9B6.hex` + `manifest.csv`**), C `client_pseudo_c/0078a89c_FUN_0078a89c.c`. Tra bảng `MOV AL,[EAX+0x78a8ee]` + `JMP [EAX*4+0x78a9b6]`.
+- Handler `0x0078E01C` — C `client_pseudo_c/case_014_0078E01C_FUN_0078e01c.c` (có); asm `client_pseudo_c/0078e01c_*.asm.txt` **THIẾU** (không có trong `client_pseudo_c/` lẫn `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` — xem danh sách thiếu cuối tài liệu). Basic block trong bảng dưới là chứng cứ thay thế.
+
+### Main opcode `0x0E` — 6 literal (Sub = `body[0]`; `—` = parser/branch trực tiếp)
+
+| Sub | Basic block | Literal VISCII gốc | Bản tiếng Việt hiệu đính | Ghi chú dịch |
+|---|---|---|---|---|
+| `1` | `0x0078E06B` | sound\m004.wav | sound\m004.wav | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `3` | `0x0078E193` | Bạn chơi | Bạn chơi. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `3` | `0x0078E193` | Tiếp nhận lời mời bạn hữu | Tiếp nhận lời mời bạn hữu. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `3` | `0x0078E193` | Cự tuyệt gia nhễp bạn hũu | Cự tuyệt gia nhễp bạn hũu. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `3` | `0x0078E193` | Không hồi ứng | Không hồi ứng. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `6` | `0x0078E331` | Thùng thư bạn hữu đã đầy | Thùng thư bạn hữu đã đầy. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+
+### Danh sách asm thiếu (không copy được — không tồn tại ở nguồn)
+
+- `0x0078E01C`: không có `.asm.txt` trong `client_pseudo_c/` và không có trong `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` hay `case_functions/functions/` (chỉ có `.c`). Cần redump/disassemble lại từ `aLogin.exe` theo VA handler + basic block ở bảng trên.
+
+<!-- VISCII-CORRECTION-END -->

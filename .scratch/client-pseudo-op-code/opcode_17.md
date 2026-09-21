@@ -193,3 +193,31 @@ Cùng run, record lân cận **Big5 phồn thể** (UI giao dịch/hạn mức, 
 | 11 | `functions/0076c248_FUN_0076c248.c`, `functions/00603d48_FUN_00603d48.c` (**mới**) | SubOp `0x11` | Bóc 2 callee SubOp 0x11 (§4) |
 
 **Giới hạn trung thực (cập nhật 2026-09-14):** ~86/97 hàm con pass-through **vẫn không có file body** — field nội bộ nhóm đó là hộp đen. `func_0x0076c248`/`func_0x00603d48` (SubOp 0x11) **đã có body**. 4 hằng toast/chat/format **đã dịch từ `lit_797ee8.hex`** (§6) — **đính chính bảng mã: VISCII, không phải cp1258** (cp1258 cho mojibake). Record `0x00797F38` (SubOp 0x6D) vẫn đánh dấu "chưa kết luận được" vì chữ "Chuyển Đản" có thể là lỗi dịch của game. Các call VMT/hiển thị chỉ tóm 1 dòng. Ý nghĩa game-design từng SubOp số nằm ngoài tầng case — chỉ kết luận ở mức bus đa năng S→C.
+
+---
+
+<!-- VISCII-CORRECTION-START -->
+## Bản hiệu đính VISCII → UTF-8 (2026-09-21, từ main opcode > sub opcode)
+
+> Nguồn hiệu đính: `spec/Bản hiệu đính VISCII → UTF-8 cho báo cáo call graph S → C.md` §2–§3 (đối chiếu literal Delphi trực tiếp từ `aLogin.exe` theo VA + Pascal length prefix, giải mã VISCII → UTF-8). Cột **Literal gốc** giữ chứng cứ byte-string; cột **Bản hiệu đính** là câu đọc tự nhiên (không phải byte hiển thị nguyên văn của client). Phạm vi chính xác xem spec §5.
+
+### Chú thích asm / chứng cứ (tài liệu asm kèm theo)
+- Dispatcher S→C: `FUN_0078a89c` — asm `client_pseudo_c/0078a89c_FUN_0078a89c.asm.txt` (**đã copy từ `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/0078a89c_FUN_0078a89c.asm.txt`; file chỉ còn prologue 71 dòng tới `JMP [EAX*4+0x78a9b6]`, mapping đầy đủ xác nhận bằng `jumptable_byte200_0x78A8EE.hex` + `jumptable_dword200_0x78A9B6.hex` + `manifest.csv`**), C `client_pseudo_c/0078a89c_FUN_0078a89c.c`. Tra bảng `MOV AL,[EAX+0x78a8ee]` + `JMP [EAX*4+0x78a9b6]`.
+- Handler `0x007902FB` — C `client_pseudo_c/case_020_007902FB_FUN_007902fb.c` (có); asm `client_pseudo_c/007902fb_*.asm.txt` **THIẾU** (không có trong `client_pseudo_c/` lẫn `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` — xem danh sách thiếu cuối tài liệu). Basic block trong bảng dưới là chứng cứ thay thế.
+
+### Main opcode `0x17` — 6 literal (Sub = `body[0]`; `—` = parser/branch trực tiếp)
+
+| Sub | Basic block | Literal VISCII gốc | Bản tiếng Việt hiệu đính | Ghi chú dịch |
+|---|---|---|---|---|
+| `15` | `0x007905F2` | sound\WA0014.wav | sound\WA0014.wav | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `25` | `0x00790811` | Vật phẩm này tạm thời không thể nhặt lên | Tạm thời không thể nhặt vật phẩm này. | Hiệu đính ngữ nghĩa/câu chữ |
+| `36` | `0x007908E7` | sound\WA0014.wav | sound\WA0014.wav | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `59` | `0x00790B02` | Hủy bỏ giao dịch | Hủy bỏ giao dịch. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `109` | `0x00790D97` | Tặng 1 Chuyển Đản ngoài định mức | Tặng 1 Chuyển Đản ngoài định mức. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `114` | `0x00790E01` | có được %s%d cái | có được %s%d cái | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+
+### Danh sách asm thiếu (không copy được — không tồn tại ở nguồn)
+
+- `0x007902FB`: không có `.asm.txt` trong `client_pseudo_c/` và không có trong `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` hay `case_functions/functions/` (chỉ có `.c`). Cần redump/disassemble lại từ `aLogin.exe` theo VA handler + basic block ở bảng trên.
+
+<!-- VISCII-CORRECTION-END -->

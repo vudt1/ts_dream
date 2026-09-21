@@ -576,3 +576,31 @@ Payload nhận được (sau khi bỏ Token/Length và giải XOR):
 4. **Class `gvar_007D9C48`** + giá trị `0`/`6` của SubOp 11 (chỉ 1/2 có nhánh).
 5. **Ý nghĩa từng mã SubOp 3** (ba banner 1200 ms của `TLottoManager`) — shape đã biết, text thiếu.
 6. **`FUN_0054f230` cmd 1 ghi `+0x170 := 1`** dùng để làm gì (field đọc lại ở đâu): chưa lần ra trong export.
+
+---
+
+<!-- VISCII-CORRECTION-START -->
+## Bản hiệu đính VISCII → UTF-8 (2026-09-21, từ main opcode > sub opcode)
+
+> Nguồn hiệu đính: `spec/Bản hiệu đính VISCII → UTF-8 cho báo cáo call graph S → C.md` §2–§3 (đối chiếu literal Delphi trực tiếp từ `aLogin.exe` theo VA + Pascal length prefix, giải mã VISCII → UTF-8). Cột **Literal gốc** giữ chứng cứ byte-string; cột **Bản hiệu đính** là câu đọc tự nhiên (không phải byte hiển thị nguyên văn của client). Phạm vi chính xác xem spec §5.
+
+### Chú thích asm / chứng cứ (tài liệu asm kèm theo)
+- Dispatcher S→C: `FUN_0078a89c` — asm `client_pseudo_c/0078a89c_FUN_0078a89c.asm.txt` (**đã copy từ `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/0078a89c_FUN_0078a89c.asm.txt`; file chỉ còn prologue 71 dòng tới `JMP [EAX*4+0x78a9b6]`, mapping đầy đủ xác nhận bằng `jumptable_byte200_0x78A8EE.hex` + `jumptable_dword200_0x78A9B6.hex` + `manifest.csv`**), C `client_pseudo_c/0078a89c_FUN_0078a89c.c`. Tra bảng `MOV AL,[EAX+0x78a8ee]` + `JMP [EAX*4+0x78a9b6]`.
+- Handler `0x007957DC` — C `client_pseudo_c/case_054_007957DC_FUN_007957dc.c` (có); asm `client_pseudo_c/007957dc_*.asm.txt` **THIẾU** (không có trong `client_pseudo_c/` lẫn `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` — xem danh sách thiếu cuối tài liệu). Basic block trong bảng dưới là chứng cứ thay thế.
+
+### Main opcode `0x3D` — 6 literal (Sub = `body[0]`; `—` = parser/branch trực tiếp)
+
+| Sub | Basic block | Literal VISCII gốc | Bản tiếng Việt hiệu đính | Ghi chú dịch |
+|---|---|---|---|---|
+| `5` | `0x0079588B` | Thời gian đối chiếu giải thưởng là ngày mở giải thưởng lúc 20:00 đến ngày mở giải thưởng lần sau là trước 18:00! | Thời gian đối chiếu giải thưởng là ngày mở giải thưởng lúc 20:00 đến ngày mở giải thưởng lần sau là trước 18:00! | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `5` | `0x0079588B` | Bạn mang theo bên mình rất nhiều tiền | Bạn mang theo bên mình rất nhiều tiền. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `5` | `0x0079588B` | Xổ số kỳ này bạn không trúng thưởng | Bạn không trúng thưởng ở kỳ xổ số này. | Hiệu đính ngữ nghĩa/câu chữ |
+| `5` | `0x0079588B` | Kỳ này cũng chồa mở thưởng! | Kỳ này cũng chồa mở thưởng! | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `5` | `0x0079588B` | Đã tạm ngưng đặt cược, xin mời lần sau nha! | Đặt cược đã tạm dừng. Vui lòng thử lại vào lần sau. | Hiệu đính ngữ nghĩa/câu chữ |
+| `5` | `0x0079588B` | Đã không thể đối chiếu xổ số rồi, xin hãy đợi mở thưởng lần sau! | Chưa thể đối chiếu kết quả xổ số. Vui lòng chờ kỳ mở thưởng tiếp theo. | Hiệu đính ngữ nghĩa/câu chữ |
+
+### Danh sách asm thiếu (không copy được — không tồn tại ở nguồn)
+
+- `0x007957DC`: không có `.asm.txt` trong `client_pseudo_c/` và không có trong `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` hay `case_functions/functions/` (chỉ có `.c`). Cần redump/disassemble lại từ `aLogin.exe` theo VA handler + basic block ở bảng trên.
+
+<!-- VISCII-CORRECTION-END -->

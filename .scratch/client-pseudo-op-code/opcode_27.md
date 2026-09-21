@@ -268,3 +268,39 @@ Lưu ý: SubOp 05 full-table → banner thay vì ghi; SubOp 06 chỉ banner nế
 - [ ] Redump toàn bộ dải literal mới (§5): `0x7538CC`, `0x7539A8–0x753A98`, `0x753D2C–0x753DE0`, `0x754308–0x754350`, `0x75462C`, `0x752BE8–0x752C30`, `0x7556FC–0x755C3C`.
 - [ ] Cơ chế bảng hạng (`007DA6D0` count + `007DA6E8` row 78B + slot `mgr+0xC..0x18` + `mgr+0x1C` page): ý nghĩa từng cột row (D1/D2/D3, f1..f4, x) và bản chất 3 mode của SubOp 0x0E — mới tới mức cơ chế, **chưa kết luận được** tên nghiệp vụ.
 - [ ] `DAT_0094928C` (đích SubOp 0x0B) và `FUN_00563E80`: chưa có body/dump vùng `.data` 0x949xxx để gọi tên danh sách.
+
+---
+
+<!-- VISCII-CORRECTION-START -->
+## Bản hiệu đính VISCII → UTF-8 (2026-09-21, từ main opcode > sub opcode)
+
+> Nguồn hiệu đính: `spec/Bản hiệu đính VISCII → UTF-8 cho báo cáo call graph S → C.md` §2–§3 (đối chiếu literal Delphi trực tiếp từ `aLogin.exe` theo VA + Pascal length prefix, giải mã VISCII → UTF-8). Cột **Literal gốc** giữ chứng cứ byte-string; cột **Bản hiệu đính** là câu đọc tự nhiên (không phải byte hiển thị nguyên văn của client). Phạm vi chính xác xem spec §5.
+
+### Chú thích asm / chứng cứ (tài liệu asm kèm theo)
+- Dispatcher S→C: `FUN_0078a89c` — asm `client_pseudo_c/0078a89c_FUN_0078a89c.asm.txt` (**đã copy từ `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/0078a89c_FUN_0078a89c.asm.txt`; file chỉ còn prologue 71 dòng tới `JMP [EAX*4+0x78a9b6]`, mapping đầy đủ xác nhận bằng `jumptable_byte200_0x78A8EE.hex` + `jumptable_dword200_0x78A9B6.hex` + `manifest.csv`**), C `client_pseudo_c/0078a89c_FUN_0078a89c.c`. Tra bảng `MOV AL,[EAX+0x78a8ee]` + `JMP [EAX*4+0x78a9b6]`.
+- Handler `0x007938C3` — C `client_pseudo_c/case_035_007938C3_FUN_007938c3.c` (có); asm `client_pseudo_c/007938c3_*.asm.txt` **THIẾU** (không có trong `client_pseudo_c/` lẫn `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` — xem danh sách thiếu cuối tài liệu). Basic block trong bảng dưới là chứng cứ thay thế.
+
+### Main opcode `0x27` — 14 literal (Sub = `body[0]`; `—` = parser/branch trực tiếp)
+
+| Sub | Basic block | Literal VISCII gốc | Bản tiếng Việt hiệu đính | Ghi chú dịch |
+|---|---|---|---|---|
+| `2` | `0x007939F6` | Hãy chú ý, Quân đoàn của bạn do chưa đủ số lượng 10 đoàn viên ở cấp 15, nên sẽ | Hãy chú ý, Quân đoàn của bạn do chưa đủ số lượng 10 đoàn viên ở cấp 15, nên sẽ. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `2` | `0x007939F6` | yyyy/m/d | yyyy/m/d | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `2` | `0x007939F6` | Giải tán | Giải tán. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `5` | `0x00793B08` | sound\m004.wav | sound\m004.wav | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `16` | `0x00793EC2` | Hãy chú ý, Quân đoàn của bạn do chưa đủ số lượng 10 đoàn viên ở cấp 15, nên sẽ | Hãy chú ý, Quân đoàn của bạn do chưa đủ số lượng 10 đoàn viên ở cấp 15, nên sẽ. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `16` | `0x00793EC2` | yyyy/m/d | yyyy/m/d | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `16` | `0x00793EC2` | Giải tán | Giải tán. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `16` | `0x00793EC2` | Số lượng đoàn viên đủ 10 người đạt đẳng cấp 15 nên quân đoàn của bạn sẽ không bị giải tán | Số lượng đoàn viên đủ 10 người đạt đẳng cấp 15 nên quân đoàn của bạn sẽ không bị giải tán. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `20` | `0x00793FC3` | Tổ chức thùng thư đã đầy! | Hộp thư của tổ chức đã đầy. | Hiệu đính ngữ nghĩa/câu chữ |
+| `29` | `0x007940DC` | Trong chiến tranh công kích thành trì không thể chọn chức năng rời khỏi | Trong chiến tranh công thành, không thể chọn chức năng rời khỏi. | Hiệu đính ngữ nghĩa/câu chữ |
+| `29` | `0x007940DC` | Trong chiến tranh công kích thành trì không thể chọn chức năng xóa bỏ | Trong chiến tranh công thành, không thể chọn chức năng xóa bỏ. | Hiệu đính ngữ nghĩa/câu chữ |
+| `29` | `0x007940DC` | Trong chiến tranh công kích thành trì không thể chọn chức năng giải tán | Trong chiến tranh công thành, không thể chọn chức năng giải tán. | Hiệu đính ngữ nghĩa/câu chữ |
+| `29` | `0x007940DC` | Trong chiến tranh công kích thành trì bạn chơi không thể xóa bỏ nhân vật | Trong chiến tranh công thành, người chơi không thể xóa nhân vật. | Hiệu đính ngữ nghĩa/câu chữ |
+| `29` | `0x007940DC` | Trong chiến tranh công kích thành trì không thể thiết lập quân đoàn | Trong chiến tranh công thành, không thể thành lập quân đoàn. | Hiệu đính ngữ nghĩa/câu chữ |
+
+### Danh sách asm thiếu (không copy được — không tồn tại ở nguồn)
+
+- `0x007938C3`: không có `.asm.txt` trong `client_pseudo_c/` và không có trong `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` hay `case_functions/functions/` (chỉ có `.c`). Cần redump/disassemble lại từ `aLogin.exe` theo VA handler + basic block ở bảng trên.
+
+<!-- VISCII-CORRECTION-END -->

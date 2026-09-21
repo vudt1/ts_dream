@@ -460,3 +460,27 @@ Payload nhận được (sau khi bỏ Token/Length và giải XOR):
 5. **Ý nghĩa nghiệp vụ chính xác của OP 0x37** (luồng "submit Cafe ID" / "ẩn form / banner lỗi") là **suy luận** từ cặp C→S `0x37` + S→C `0x01/0x02`; chưa có traffic thật để xác nhận.
 6. **Encoding chuỗi ID** trong payload C→S (VISCII/cp1258/ASCII) **chưa xác minh**.
 7. **Định danh chính xác của `gvar_007DA3B4+0x138`** đã xác minh là `TSe_Editor` (từ `param_1[0x4e]`), **nhưng** nhãn "editor nhập Cafe ID" là **suy luận** từ tên class + luồng validate `FUN_0051f5f4` (2 ký tự đầu + số phía sau, so với `DAT_0051f7d8`).
+
+---
+
+<!-- VISCII-CORRECTION-START -->
+## Bản hiệu đính VISCII → UTF-8 (2026-09-21, từ main opcode > sub opcode)
+
+> Nguồn hiệu đính: `spec/Bản hiệu đính VISCII → UTF-8 cho báo cáo call graph S → C.md` §2–§3 (đối chiếu literal Delphi trực tiếp từ `aLogin.exe` theo VA + Pascal length prefix, giải mã VISCII → UTF-8). Cột **Literal gốc** giữ chứng cứ byte-string; cột **Bản hiệu đính** là câu đọc tự nhiên (không phải byte hiển thị nguyên văn của client). Phạm vi chính xác xem spec §5.
+
+### Chú thích asm / chứng cứ (tài liệu asm kèm theo)
+- Dispatcher S→C: `FUN_0078a89c` — asm `client_pseudo_c/0078a89c_FUN_0078a89c.asm.txt` (**đã copy từ `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/0078a89c_FUN_0078a89c.asm.txt`; file chỉ còn prologue 71 dòng tới `JMP [EAX*4+0x78a9b6]`, mapping đầy đủ xác nhận bằng `jumptable_byte200_0x78A8EE.hex` + `jumptable_dword200_0x78A9B6.hex` + `manifest.csv`**), C `client_pseudo_c/0078a89c_FUN_0078a89c.c`. Tra bảng `MOV AL,[EAX+0x78a8ee]` + `JMP [EAX*4+0x78a9b6]`.
+- Handler `0x007954A5` — C `client_pseudo_c/case_048_007954A5_FUN_007954a5.c` (có); asm `client_pseudo_c/007954a5_*.asm.txt` **THIẾU** (không có trong `client_pseudo_c/` lẫn `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` — xem danh sách thiếu cuối tài liệu). Basic block trong bảng dưới là chứng cứ thay thế.
+
+### Main opcode `0x37` — 2 literal (Sub = `body[0]`; `—` = parser/branch trực tiếp)
+
+| Sub | Basic block | Literal VISCII gốc | Bản tiếng Việt hiệu đính | Ghi chú dịch |
+|---|---|---|---|---|
+| — | `0x007954A5` | Thành công | Thành công. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| — | `0x007954A5` | Thất bại | Thất bại. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+
+### Danh sách asm thiếu (không copy được — không tồn tại ở nguồn)
+
+- `0x007954A5`: không có `.asm.txt` trong `client_pseudo_c/` và không có trong `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` hay `case_functions/functions/` (chỉ có `.c`). Cần redump/disassemble lại từ `aLogin.exe` theo VA handler + basic block ở bảng trên.
+
+<!-- VISCII-CORRECTION-END -->

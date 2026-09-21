@@ -146,3 +146,28 @@ Không gọi codec trực tiếp ở dispatcher; codec gọi gián tiếp trong 
 | 5 | `functions/0077ed68/0077ef7c/0077eb9c/0077eb1c/0077ee84/0077f098` | Codec |
 | 6 | `functions/005952f4_FUN_005952f4.c:69-77` | Nhánh phụ editorBG |
 | 7 | `functions/0077f414_FUN_0077F414.c:980-981` | C→S rỗng |
+
+---
+
+<!-- VISCII-CORRECTION-START -->
+## Bản hiệu đính VISCII → UTF-8 (2026-09-21, từ main opcode > sub opcode)
+
+> Nguồn hiệu đính: `spec/Bản hiệu đính VISCII → UTF-8 cho báo cáo call graph S → C.md` §2–§3 (đối chiếu literal Delphi trực tiếp từ `aLogin.exe` theo VA + Pascal length prefix, giải mã VISCII → UTF-8). Cột **Literal gốc** giữ chứng cứ byte-string; cột **Bản hiệu đính** là câu đọc tự nhiên (không phải byte hiển thị nguyên văn của client). Phạm vi chính xác xem spec §5.
+
+### Chú thích asm / chứng cứ (tài liệu asm kèm theo)
+- Dispatcher S→C: `FUN_0078a89c` — asm `client_pseudo_c/0078a89c_FUN_0078a89c.asm.txt` (**đã copy từ `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/0078a89c_FUN_0078a89c.asm.txt`; file chỉ còn prologue 71 dòng tới `JMP [EAX*4+0x78a9b6]`, mapping đầy đủ xác nhận bằng `jumptable_byte200_0x78A8EE.hex` + `jumptable_dword200_0x78A9B6.hex` + `manifest.csv`**), C `client_pseudo_c/0078a89c_FUN_0078a89c.c`. Tra bảng `MOV AL,[EAX+0x78a8ee]` + `JMP [EAX*4+0x78a9b6]`.
+- Handler `0x00794799` — C `client_pseudo_c/case_039_00794799_FUN_00794799.c` (có); asm `client_pseudo_c/00794799_*.asm.txt` **THIẾU** (không có trong `client_pseudo_c/` lẫn `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` — xem danh sách thiếu cuối tài liệu). Basic block trong bảng dưới là chứng cứ thay thế.
+
+### Main opcode `0x2B` — 3 literal (Sub = `body[0]`; `—` = parser/branch trực tiếp)
+
+| Sub | Basic block | Literal VISCII gốc | Bản tiếng Việt hiệu đính | Ghi chú dịch |
+|---|---|---|---|---|
+| `6` | `0x00794881` | Trong chiến tranh công kích thành trì không thể chọn chức năng liên minh với người khác | Trong chiến tranh công kích thành trì không thể chọn chức năng liên minh với người khác. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `6` | `0x00794881` | Trong chiến tranh công kích thành trì không thể chọn chức năng hồi ứng liên minh với người khác | Trong chiến tranh công kích thành trì không thể chọn chức năng hồi ứng liên minh với người khác. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `6` | `0x00794881` | Trong chiến tranh công kích thành trì không thể chọn chức năng rời khỏi liên minh | Trong chiến tranh công kích thành trì không thể chọn chức năng rời khỏi liên minh. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+
+### Danh sách asm thiếu (không copy được — không tồn tại ở nguồn)
+
+- `0x00794799`: không có `.asm.txt` trong `client_pseudo_c/` và không có trong `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` hay `case_functions/functions/` (chỉ có `.c`). Cần redump/disassemble lại từ `aLogin.exe` theo VA handler + basic block ở bảng trên.
+
+<!-- VISCII-CORRECTION-END -->

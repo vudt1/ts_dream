@@ -220,3 +220,29 @@ C→S [1F]: KHÔNG TỒN TẠI
 | 12 | `functions/0077250c…/ FUN_00623f00 / FUN_0065b580` | Calables được nhắc (chưa mổ) — ghi chú trong 4.x |
 
 **Giới hạn còn lại (2026-09-14)**: (a) 4 literal tĩnh `0x79833C/70/A0/E4` chưa dump → text SubOp 0x01/0x02/0x0D chưa dịch; (b) param_3 của SubOp 0x03/0x05 là suy luận (asm của case không được export — dispatcher asm cắt 71 dòng, file case chỉ có `.c`); (c) nội dung `0x798314` chỉ có 4/30 byte trong window OP 0x1A; (d) `FUN_0077b614/0077ba20/0077baf0/0077250c-đích/0077499c-00774a84-00774af8` (họ 60bbe0 ở OP 0x19) chưa mổ; (e) tên lớp của `gvar_007DA694/007DA7C0/007DA504/007D9DE4/007DA660/007DA5A8` chưa định danh — chỉ mô tả cơ chế.
+
+---
+
+<!-- VISCII-CORRECTION-START -->
+## Bản hiệu đính VISCII → UTF-8 (2026-09-21, từ main opcode > sub opcode)
+
+> Nguồn hiệu đính: `spec/Bản hiệu đính VISCII → UTF-8 cho báo cáo call graph S → C.md` §2–§3 (đối chiếu literal Delphi trực tiếp từ `aLogin.exe` theo VA + Pascal length prefix, giải mã VISCII → UTF-8). Cột **Literal gốc** giữ chứng cứ byte-string; cột **Bản hiệu đính** là câu đọc tự nhiên (không phải byte hiển thị nguyên văn của client). Phạm vi chính xác xem spec §5.
+
+### Chú thích asm / chứng cứ (tài liệu asm kèm theo)
+- Dispatcher S→C: `FUN_0078a89c` — asm `client_pseudo_c/0078a89c_FUN_0078a89c.asm.txt` (**đã copy từ `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/0078a89c_FUN_0078a89c.asm.txt`; file chỉ còn prologue 71 dòng tới `JMP [EAX*4+0x78a9b6]`, mapping đầy đủ xác nhận bằng `jumptable_byte200_0x78A8EE.hex` + `jumptable_dword200_0x78A9B6.hex` + `manifest.csv`**), C `client_pseudo_c/0078a89c_FUN_0078a89c.c`. Tra bảng `MOV AL,[EAX+0x78a8ee]` + `JMP [EAX*4+0x78a9b6]`.
+- Handler `0x007922E6` — C `client_pseudo_c/case_027_007922E6_FUN_007922e6.c` (có); asm `client_pseudo_c/007922e6_*.asm.txt` **THIẾU** (không có trong `client_pseudo_c/` lẫn `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` — xem danh sách thiếu cuối tài liệu). Basic block trong bảng dưới là chứng cứ thay thế.
+
+### Main opcode `0x1F` — 4 literal (Sub = `body[0]`; `—` = parser/branch trực tiếp)
+
+| Sub | Basic block | Literal VISCII gốc | Bản tiếng Việt hiệu đính | Ghi chú dịch |
+|---|---|---|---|---|
+| `1` | `0x00792351` | Khách hàng quý mến, có rảnh thì ghé nhé! | Khách hàng quý mến, có rảnh thì ghé nhé! | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `1` | `0x00792351` | Số tiền trên người bạn không đủ nhé! | Số tiền trên người bạn không đủ nhé! | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `1` | `0x00792351` | Khách hàng sức khỏe rất tốt, không cần phải nghỉ ngơi nữa | Khách hàng sức khỏe rất tốt, không cần phải nghỉ ngơi nữa. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `13` | `0x00792824` | Đã có một võ tướng tương tự trong nhà trọ | Đã có một võ tướng tương tự trong nhà trọ. | Hiệu đính ngữ nghĩa/câu chữ |
+
+### Danh sách asm thiếu (không copy được — không tồn tại ở nguồn)
+
+- `0x007922E6`: không có `.asm.txt` trong `client_pseudo_c/` và không có trong `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` hay `case_functions/functions/` (chỉ có `.c`). Cần redump/disassemble lại từ `aLogin.exe` theo VA handler + basic block ở bảng trên.
+
+<!-- VISCII-CORRECTION-END -->

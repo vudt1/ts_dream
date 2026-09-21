@@ -233,3 +233,98 @@ Trong `ts_decompile/functions/0077f414_FUN_0077F414.c`:
 * `research`: Dùng để tiếp tục điều tra các Main OP kế tiếp từ `ts_decompile/case_functions/` (ví dụ: Case 3 ứng với OP 0x02, Case 4 ứng với OP 0x03, Case 9 ứng với OP 0x08 Stats, Case 21 ứng với OP 0x14, Case 27 ứng với OP 0x1A Talk).
 * `to-spec`: Tổng hợp các phát hiện thành đặc tả Mock Server hoàn chỉnh tại `.scratch/op-code/spec.md`.
 * `wayfinder`: Quản lý lộ trình phân tích các OP còn lại theo định dạng ticket `issues/NN-<slug>.md`.
+
+---
+
+<!-- VISCII-CORRECTION-START -->
+## Bản hiệu đính VISCII → UTF-8 (2026-09-21, từ main opcode > sub opcode)
+
+> Nguồn hiệu đính: `spec/Bản hiệu đính VISCII → UTF-8 cho báo cáo call graph S → C.md` §2–§3 (đối chiếu literal Delphi trực tiếp từ `aLogin.exe` theo VA + Pascal length prefix, giải mã VISCII → UTF-8). Cột **Literal gốc** giữ chứng cứ byte-string; cột **Bản hiệu đính** là câu đọc tự nhiên (không phải byte hiển thị nguyên văn của client). Phạm vi chính xác xem spec §5.
+
+### Chú thích asm / chứng cứ (tài liệu asm kèm theo)
+- Dispatcher S→C: `FUN_0078a89c` — asm `client_pseudo_c/0078a89c_FUN_0078a89c.asm.txt` (**đã copy từ `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/0078a89c_FUN_0078a89c.asm.txt`; file chỉ còn prologue 71 dòng tới `JMP [EAX*4+0x78a9b6]`, mapping đầy đủ xác nhận bằng `jumptable_byte200_0x78A8EE.hex` + `jumptable_dword200_0x78A9B6.hex` + `manifest.csv`**), C `client_pseudo_c/0078a89c_FUN_0078a89c.c`. Tra bảng `MOV AL,[EAX+0x78a8ee]` + `JMP [EAX*4+0x78a9b6]`.
+- Handler `0x0078AABE` — C `client_pseudo_c/case_001_0078AABE_FUN_0078aabe.c` (có); asm `client_pseudo_c/0078aabe_*.asm.txt` **THIẾU** (không có trong `client_pseudo_c/` lẫn `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` — xem danh sách thiếu cuối tài liệu). Basic block trong bảng dưới là chứng cứ thay thế.
+- Handler `0x0078B149` — C `client_pseudo_c/case_002_0078B149_FUN_0078b149.c` (có); asm `client_pseudo_c/0078b149_*.asm.txt` **THIẾU** (không có trong `client_pseudo_c/` lẫn `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` — xem danh sách thiếu cuối tài liệu). Basic block trong bảng dưới là chứng cứ thay thế.
+
+### Main opcode `0x00` — 59 literal (Sub = `body[0]`; `—` = parser/branch trực tiếp)
+
+| Sub | Basic block | Literal VISCII gốc | Bản tiếng Việt hiệu đính | Ghi chú dịch |
+|---|---|---|---|---|
+| `0` | `0x0078AF97` | Mất kết nối | Đã mất kết nối. | Hiệu đính ngữ nghĩa/câu chữ |
+| `0` | `0x0078AF97` | Mất kết nối với Server | Mất kết nối với máy chủ. | Hiệu đính ngữ nghĩa/câu chữ |
+| `1` | `0x0078ABD1` | Dữ liệu quá nhiều bị mất kết nối | Dữ liệu quá lớn; kết nối đã bị ngắt. | Hiệu đính ngữ nghĩa/câu chữ |
+| `2` | `0x0078ABE3` | Trả lời sai 3 lần sẽ bị mất kết nối | Trả lời sai 3 lần; kết nối sẽ bị ngắt. | Hiệu đính ngữ nghĩa/câu chữ |
+| `3` | `0x0078ABF5` | Đăng nhập sai 3 lần | Đăng nhập sai 3 lần. | Hiệu đính ngữ nghĩa/câu chữ |
+| `4` | `0x0078AC07` | vì Server gặp trục trặc | Do máy chủ gặp sự cố. | Hiệu đính ngữ nghĩa/câu chữ |
+| `5` | `0x0078AC19` | Phát hiện sự kiện phạm luật bị mất kết nối 1 | Phát hiện hành vi vi phạm (mã 1); kết nối đã bị ngắt. | Hiệu đính ngữ nghĩa/câu chữ |
+| `6` | `0x0078AC2B` | Phát hiện sự kiện phạm luật bị mất kết nối 2 | Phát hiện hành vi vi phạm (mã 2); kết nối đã bị ngắt. | Hiệu đính ngữ nghĩa/câu chữ |
+| `7` | `0x0078AC3D` | Tra không ra sự kiện phải làm, mất kết nối | Không tìm thấy sự kiện cần thực hiện; kết nối đã bị ngắt. | Hiệu đính ngữ nghĩa/câu chữ |
+| `8` | `0x0078AC4F` | Không kết nối được, mất kết nối | Không thể thiết lập kết nối; kết nối đã bị ngắt. | Hiệu đính ngữ nghĩa/câu chữ |
+| `9` | `0x0078AC61` | Không kết nối được, mất kết nối | Không thể thiết lập kết nối; kết nối đã bị ngắt. | Hiệu đính ngữ nghĩa/câu chữ |
+| `10` | `0x0078AC73` | mất kết nối do version không phù hợp | Kết nối bị ngắt do phiên bản không tương thích. | Hiệu đính ngữ nghĩa/câu chữ |
+| `11` | `0x0078AC85` | Kết nối gặp trục trặc, mất kết nối | Kết nối gặp sự cố; đã ngắt kết nối. | Hiệu đính ngữ nghĩa/câu chữ |
+| `12` | `0x0078AC97` | Sử dụng chương trình bất hợp pháp | Phát hiện sử dụng chương trình không hợp lệ. | Hiệu đính ngữ nghĩa/câu chữ |
+| `13` | `0x0078ACA9` | Mất kết nối | Đã mất kết nối. | Hiệu đính ngữ nghĩa/câu chữ |
+| `14` | `0x0078ACBB` | Mất kết nối do sử dụng thêm chương trình khác | Kết nối bị ngắt do phát hiện chương trình bên thứ ba. | Hiệu đính ngữ nghĩa/câu chữ |
+| `15` | `0x0078ACCD` | Loại bỏ thành công, xin khởi động lại máy | Đã gỡ bỏ thành công. Vui lòng khởi động lại máy. | Hiệu đính ngữ nghĩa/câu chữ |
+| `16` | `0x0078ACDF` | mất kết nối do đăng nhập IP bất hợp pháp | Kết nối bị ngắt do địa chỉ IP đăng nhập không hợp lệ. | Hiệu đính ngữ nghĩa/câu chữ |
+| `17` | `0x0078ACF1` | Version không phù hợp, xin cập nhật version mới | Phiên bản không tương thích. Vui lòng cập nhật phiên bản mới. | Hiệu đính ngữ nghĩa/câu chữ |
+| `18` | `0x0078AD03` | Dữ liệu thay đổi,mất kết nối | Dữ liệu đã thay đổi; kết nối đã bị ngắt. | Hiệu đính ngữ nghĩa/câu chữ |
+| `19` | `0x0078AD15` | Mất kết nối do có sự đăng nhập khác | Kết nối bị ngắt do tài khoản đã đăng nhập ở nơi khác. | Hiệu đính ngữ nghĩa/câu chữ |
+| `20` | `0x0078AD27` | Hệ thống gặp trục trặc bất thường | Hệ thống gặp sự cố bất thường. | Hiệu đính ngữ nghĩa/câu chữ |
+| `21` | `0x0078AD39` | Gặp trục trặc với việc lưu trữ, mất kết nối | Lỗi lưu trữ dữ liệu; kết nối đã bị ngắt. | Hiệu đính ngữ nghĩa/câu chữ |
+| `22` | `0x0078AD4B` | Mất kết nối do dạng dữ liệu không phù hợp | Kết nối bị ngắt do định dạng dữ liệu không hợp lệ. | Hiệu đính ngữ nghĩa/câu chữ |
+| `23` | `0x0078AD5D` | Đổi tên, mất kết nối | Lỗi đổi tên; kết nối đã bị ngắt. | Hiệu đính ngữ nghĩa/câu chữ |
+| `24` | `0x0078AD6F` | Mật khẩu quá ngắn, mất kết nối | Mật khẩu quá ngắn; kết nối đã bị ngắt. | Hiệu đính ngữ nghĩa/câu chữ |
+| `25` | `0x0078AD81` | Trùng lập tên, mất kết nối | Tên đã tồn tại; kết nối đã bị ngắt. | Hiệu đính ngữ nghĩa/câu chữ |
+| `26` | `0x0078AD93` | Sự kiện phạm luật, mất kết nối | Phát hiện sự kiện vi phạm; kết nối đã bị ngắt. | Hiệu đính ngữ nghĩa/câu chữ |
+| `27` | `0x0078ADA5` | Mất kết nối do đăng nhập sai | Kết nối bị ngắt do thông tin đăng nhập không hợp lệ. | Hiệu đính ngữ nghĩa/câu chữ |
+| `28` | `0x0078ADB7` | Phòng vệ mất kết nối | Kết nối bị ngắt bởi cơ chế bảo vệ. | Hiệu đính ngữ nghĩa/câu chữ |
+| `29` | `0x0078ADC9` | Dữ liệu quá nhiều | Dữ liệu quá lớn. | Hiệu đính ngữ nghĩa/câu chữ |
+| `30` | `0x0078ADDB` | Khóa tài khoản, mất kết nối | Tài khoản đã bị khóa; kết nối đã bị ngắt. | Hiệu đính ngữ nghĩa/câu chữ |
+| `31` | `0x0078ADED` | Không thể sử dụng ID này | Không thể sử dụng ID này. | Hiệu đính ngữ nghĩa/câu chữ |
+| `32` | `0x0078ADFF` | Cảnh chiến đấu bị lỗi | Khung cảnh chiến đấu xảy ra lỗi. | Hiệu đính ngữ nghĩa/câu chữ |
+| `33` | `0x0078AE11` | Ký hiệu và quang cảnh không phù hợp, mất kết nối | Ký hiệu và khung cảnh không tương thích; kết nối đã bị ngắt. | Hiệu đính ngữ nghĩa/câu chữ |
+| `34` | `0x0078AE23` | Đăng nhập lại qua Server | Đăng nhập lại thông qua máy chủ. | Hiệu đính ngữ nghĩa/câu chữ |
+| `35` | `0x0078AE35` | Hiệp định đăng nhập | Quy ước/phiên đăng nhập. | Hiệu đính ngữ nghĩa/câu chữ |
+| `36` | `0x0078AE47` | Phạm vi - ID không phù hợp | ID nằm ngoài phạm vi hợp lệ. | Hiệu đính ngữ nghĩa/câu chữ |
+| `37` | `0x0078AE59` | Rớt mạng do không cùng quang cảnh | Mất kết nối do không cùng khung cảnh. | Hiệu đính ngữ nghĩa/câu chữ |
+| `38` | `0x0078AE6B` | Mục đích quang cảnh không phù hợp nên rớt mạng | Mục tiêu khung cảnh không hợp lệ; kết nối đã bị ngắt. | Hiệu đính ngữ nghĩa/câu chữ |
+| `39` | `0x0078AF97` | Mất kết nối | Đã mất kết nối. | Hiệu đính ngữ nghĩa/câu chữ |
+| `39` | `0x0078AF97` | Mất kết nối với Server | Mất kết nối với máy chủ. | Hiệu đính ngữ nghĩa/câu chữ |
+| `40` | `0x0078AE7D` | Sửa đổi files Tạo Vật bị rớt mạng | Sửa đổi tệp dữ liệu nhân vật; kết nối đã bị ngắt. | Hiệu đính ngữ nghĩa/câu chữ |
+| `41` | `0x0078AE8F` | Lưu lại sau khi đăng nhập | Lưu lại sau khi đăng nhập. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `42` | `0x0078AEA1` | Sửa đổi tư liệu chiến đấu | Dữ liệu chiến đấu đã bị chỉnh sửa. | Hiệu đính ngữ nghĩa/câu chữ |
+| `43` | `0x0078AEB3` | Độ sai lệch hình thái chiến đấu của bạn chơi 0 | Dữ liệu trạng thái chiến đấu của người chơi không khớp. | Hiệu đính ngữ nghĩa/câu chữ |
+| `44` | `0x0078AEC5` | Sự kiện và quang cảnh xẩy ra không phù hợp | Sự kiện và khung cảnh không tương thích. | Hiệu đính ngữ nghĩa/câu chữ |
+| `45` | `0x0078AED7` | Tài khoản sử dụng của bạn đã bị tạm khóa do phạm luật | Tài khoản của bạn đã tạm khóa do vi phạm quy định. | Hiệu đính ngữ nghĩa/câu chữ |
+| `46` | `0x0078AEE9` | Gian xảo trong vấn đáp của Bắc Đẩu Quân | Phát hiện gian lận trong phần vấn đáp của Bắc Đẩu Quân. | Hiệu đính ngữ nghĩa/câu chữ |
+| `47` | `0x0078AEFB` | Sự kiện kết thúc trước khi chiến đấu kết thúc | Sự kiện kết thúc trước khi trận chiến hoàn tất. | Hiệu đính ngữ nghĩa/câu chữ |
+| `48` | `0x0078AF0D` | Phi pháp sử dụng kỹ năng Kêu Gọi | Sử dụng trái phép kỹ năng Triệu Hồi. | Hiệu đính ngữ nghĩa/câu chữ |
+| `49` | `0x0078AF1F` | Cấm vận gia nhập đối với bạn chưa đủ 18 | Người chơi chưa đủ 18 tuổi không được phép tham gia. | Hiệu đính ngữ nghĩa/câu chữ |
+| `50` | `0x0078AF2E` | Đăng nhập thi đấu chuyên thuộc Server | Đăng nhập máy chủ thi đấu chuyên dụng. | Hiệu đính ngữ nghĩa/câu chữ |
+| `51` | `0x0078AF3D` | Không thể đăng nhập thi đấu chuyên thuộc Server | Không thể đăng nhập máy chủ thi đấu chuyên dụng. | Hiệu đính ngữ nghĩa/câu chữ |
+| `52` | `0x0078AF4C` | Không thể đăng nhập thi đấu chuyên thuộc Server | Không thể đăng nhập máy chủ thi đấu chuyên dụng. | Hiệu đính ngữ nghĩa/câu chữ |
+| `53` | `0x0078AF5B` | Chưa đăng nhập vào Server | Chưa đăng nhập vào máy chủ. | Hiệu đính ngữ nghĩa/câu chữ |
+| `54` | `0x0078AF6A` | Hoạt động lôi đài đấu trận kết thúc | Sự kiện đấu trường đã kết thúc. | Hiệu đính ngữ nghĩa/câu chữ |
+| `55` | `0x0078AF79` | Mục đích trong lưu trữ tư liệu di dân server | Mục tiêu lưu dữ liệu chuyển máy chủ không hợp lệ. | Hiệu đính ngữ nghĩa/câu chữ |
+| `56` | `0x0078AF88` | Server đang bận xin chờ tý xíu. | Máy chủ đang bận. Vui lòng chờ một lát. | Hiệu đính ngữ nghĩa/câu chữ |
+
+### Main opcode `0x01` — 7 literal (Sub = `body[0]`; `—` = parser/branch trực tiếp)
+
+| Sub | Basic block | Literal VISCII gốc | Bản tiếng Việt hiệu đính | Ghi chú dịch |
+|---|---|---|---|---|
+| `1` | `0x0078B1A8` | Đối tượng thì thầm | Đối tượng trò chuyện riêng. | Hiệu đính ngữ nghĩa/câu chữ |
+| `1` | `0x0078B1A8` | Rời mạng | Đã ngắt kết nối mạng. | Hiệu đính ngữ nghĩa/câu chữ |
+| `5` | `0x0078B464` | Không thể kết nối với server, xin bạn đợi sau đó thử lại lần nữa | Không thể kết nối đến máy chủ. Vui lòng chờ rồi thử lại. | Hiệu đính ngữ nghĩa/câu chữ |
+| `6` | `0x0078B4CB` | Số liệu mật mã sai lệch | Dữ liệu mã hóa không khớp. | Hiệu đính ngữ nghĩa/câu chữ |
+| `7` | `0x0078B532` | Đối tượng server chưa được liên mạng,xin bạn đợi sau đó thử lại lần nữa | Đối tượng máy chủ chưa kết nối mạng. Vui lòng chờ rồi thử lại. | Hiệu đính ngữ nghĩa/câu chữ |
+| `8` | `0x0078B599` | Account này hiện đang bị khóa | Tài khoản này hiện đang bị khóa. | Hiệu đính ngữ nghĩa/câu chữ |
+| `10` | `0x0078B674` | Server đang bận xin chờ tý xíu. | Máy chủ đang bận. Vui lòng chờ một lát. | Hiệu đính ngữ nghĩa/câu chữ |
+
+### Danh sách asm thiếu (không copy được — không tồn tại ở nguồn)
+
+- `0x0078AABE`: không có `.asm.txt` trong `client_pseudo_c/` và không có trong `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` hay `case_functions/functions/` (chỉ có `.c`). Cần redump/disassemble lại từ `aLogin.exe` theo VA handler + basic block ở bảng trên.
+- `0x0078B149`: không có `.asm.txt` trong `client_pseudo_c/` và không có trong `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` hay `case_functions/functions/` (chỉ có `.c`). Cần redump/disassemble lại từ `aLogin.exe` theo VA handler + basic block ở bảng trên.
+
+<!-- VISCII-CORRECTION-END -->

@@ -267,3 +267,31 @@ Ghi chú bảng mã **(đính chính 2026-09-14)**: các dump `lit_7967f8/797ee8
 - Nội dung toast `0x19` (10 hằng `0x007076b4…`) + 6 hằng `UNK_007970xx/00797120/0079714c`: **vẫn chưa có `redump/` phủ** → chưa dịch, không bịa.
 - Các call `VMT+0x8c/0x90/0x6c/0x7c/0x20/0x24` vẫn là method ảo chưa resolve từ tầng case.
 - Ý nghĩa game-design (chức năng GM cụ thể, quiz Day55) nằm ngoài tầng case.
+
+---
+
+<!-- VISCII-CORRECTION-START -->
+## Bản hiệu đính VISCII → UTF-8 (2026-09-21, từ main opcode > sub opcode)
+
+> Nguồn hiệu đính: `spec/Bản hiệu đính VISCII → UTF-8 cho báo cáo call graph S → C.md` §2–§3 (đối chiếu literal Delphi trực tiếp từ `aLogin.exe` theo VA + Pascal length prefix, giải mã VISCII → UTF-8). Cột **Literal gốc** giữ chứng cứ byte-string; cột **Bản hiệu đính** là câu đọc tự nhiên (không phải byte hiển thị nguyên văn của client). Phạm vi chính xác xem spec §5.
+
+### Chú thích asm / chứng cứ (tài liệu asm kèm theo)
+- Dispatcher S→C: `FUN_0078a89c` — asm `client_pseudo_c/0078a89c_FUN_0078a89c.asm.txt` (**đã copy từ `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/0078a89c_FUN_0078a89c.asm.txt`; file chỉ còn prologue 71 dòng tới `JMP [EAX*4+0x78a9b6]`, mapping đầy đủ xác nhận bằng `jumptable_byte200_0x78A8EE.hex` + `jumptable_dword200_0x78A9B6.hex` + `manifest.csv`**), C `client_pseudo_c/0078a89c_FUN_0078a89c.c`. Tra bảng `MOV AL,[EAX+0x78a8ee]` + `JMP [EAX*4+0x78a9b6]`.
+- Handler `0x0078E593` — C `client_pseudo_c/case_016_0078E593_FUN_0078e593.c` (có); asm `client_pseudo_c/0078e593_*.asm.txt` **THIẾU** (không có trong `client_pseudo_c/` lẫn `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` — xem danh sách thiếu cuối tài liệu). Basic block trong bảng dưới là chứng cứ thay thế.
+
+### Main opcode `0x10` — 6 literal (Sub = `body[0]`; `—` = parser/branch trực tiếp)
+
+| Sub | Basic block | Literal VISCII gốc | Bản tiếng Việt hiệu đính | Ghi chú dịch |
+|---|---|---|---|---|
+| `2` | `0x0078E7D9` | Thật thông minh...Chúc mừng bạn đã trả lời đúng!! | Thật thông minh...Chúc mừng bạn đã trả lời đúng!! | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `2` | `0x0078E7D9` | Ồ...bạn trả lời sai rồi! | Ồ...bạn trả lời sai rồi! | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `2` | `0x0078E7D9` | Ồ... Bạn đã sai đến lần thứ 3 rồi! | Ồ... Bạn đã sai đến lần thứ 3 rồi! | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `2` | `0x0078E7D9` | Ồ,...Trả lời sai quá nhiều rồi! | Ồ, ...Trả lời sai quá nhiều rồi! | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `8` | `0x0078E943` | Giải trừ lệnh cấm 15 phút cấm nói | Giải trừ lệnh cấm 15 phút cấm nói. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `13` | `0x0078E9BB` | Giải trừ cấm Kênh GM 15 phút | Giải trừ cấm Kênh GM 15 phút. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+
+### Danh sách asm thiếu (không copy được — không tồn tại ở nguồn)
+
+- `0x0078E593`: không có `.asm.txt` trong `client_pseudo_c/` và không có trong `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` hay `case_functions/functions/` (chỉ có `.c`). Cần redump/disassemble lại từ `aLogin.exe` theo VA handler + basic block ở bảng trên.
+
+<!-- VISCII-CORRECTION-END -->

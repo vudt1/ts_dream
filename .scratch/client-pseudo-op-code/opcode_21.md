@@ -148,3 +148,29 @@ C→S [21]: KHÔNG TỒN TẠI
 | 5 | `functions/00642c2c_FUN_00642c2c.c:100-104` | Chứng minh `+0x180` là cờ option |
 | 6 | `functions/0077f414_FUN_0077F414.c:962-963` | C→S rỗng |
 | 7 | `functions/00602f68_FUN_00602f68.c:25-50` | **Mới**: body apply — vòng 2 lần đọc `+0x180/+0x181`, tra `btn_off`/`btn_on` (`:32,41`), ghi handle vào `*(+0x16C+i*4)+0x4C` (`:38,47`) |
+
+---
+
+<!-- VISCII-CORRECTION-START -->
+## Bản hiệu đính VISCII → UTF-8 (2026-09-21, từ main opcode > sub opcode)
+
+> Nguồn hiệu đính: `spec/Bản hiệu đính VISCII → UTF-8 cho báo cáo call graph S → C.md` §2–§3 (đối chiếu literal Delphi trực tiếp từ `aLogin.exe` theo VA + Pascal length prefix, giải mã VISCII → UTF-8). Cột **Literal gốc** giữ chứng cứ byte-string; cột **Bản hiệu đính** là câu đọc tự nhiên (không phải byte hiển thị nguyên văn của client). Phạm vi chính xác xem spec §5.
+
+### Chú thích asm / chứng cứ (tài liệu asm kèm theo)
+- Dispatcher S→C: `FUN_0078a89c` — asm `client_pseudo_c/0078a89c_FUN_0078a89c.asm.txt` (**đã copy từ `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/0078a89c_FUN_0078a89c.asm.txt`; file chỉ còn prologue 71 dòng tới `JMP [EAX*4+0x78a9b6]`, mapping đầy đủ xác nhận bằng `jumptable_byte200_0x78A8EE.hex` + `jumptable_dword200_0x78A9B6.hex` + `manifest.csv`**), C `client_pseudo_c/0078a89c_FUN_0078a89c.c`. Tra bảng `MOV AL,[EAX+0x78a8ee]` + `JMP [EAX*4+0x78a9b6]`.
+- Handler `0x007928E4` — C `client_pseudo_c/case_029_007928E4_FUN_007928e4.c` (có); asm `client_pseudo_c/007928e4_*.asm.txt` **THIẾU** (không có trong `client_pseudo_c/` lẫn `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` — xem danh sách thiếu cuối tài liệu). Basic block trong bảng dưới là chứng cứ thay thế.
+
+### Main opcode `0x21` — 4 literal (Sub = `body[0]`; `—` = parser/branch trực tiếp)
+
+| Sub | Basic block | Literal VISCII gốc | Bản tiếng Việt hiệu đính | Ghi chú dịch |
+|---|---|---|---|---|
+| — | `0x007928E4` | Đối phương chưa mở chức năng PK / PvP | Đối phương chưa mở chức năng PK / PvP. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| — | `0x007928E4` | Đối phương chưa mở chức năng Tham Chiến | Đối phương chưa mở chức năng Tham Chiến. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| — | `0x007928E4` | Trong khi trả lời câu hỏi Bắc Tinh Quân không thể quan chiến | Trong khi trả lời câu hỏi của Bắc Tinh Quân, không thể quan chiến. | Hiệu đính ngữ nghĩa/câu chữ |
+| — | `0x007928E4` | Chiến đấu đặc thù không thể tham chiến | Chiến đấu đặc thù không thể tham chiến. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+
+### Danh sách asm thiếu (không copy được — không tồn tại ở nguồn)
+
+- `0x007928E4`: không có `.asm.txt` trong `client_pseudo_c/` và không có trong `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` hay `case_functions/functions/` (chỉ có `.c`). Cần redump/disassemble lại từ `aLogin.exe` theo VA handler + basic block ở bảng trên.
+
+<!-- VISCII-CORRECTION-END -->

@@ -175,3 +175,48 @@ switch(SubOp){ case 1,2,3,4,6,7,8,9,10,0xB ... }
 | 4 | `functions/0077ef7c / 0077f098 / 0077eb9c / 0077eb1c / 0077ee84` | Codec DWORD/double/Word + builder C→S |
 | 5 | `functions/007ab870 / 007c56c8 / 00766360 / 005afd98` | Chat-log, format double, duyệt file, ẩn form |
 | 6 | `functions/0077f414_FUN_0077F414.c:966-967` | C→S rỗng |
+
+---
+
+<!-- VISCII-CORRECTION-START -->
+## Bản hiệu đính VISCII → UTF-8 (2026-09-21, từ main opcode > sub opcode)
+
+> Nguồn hiệu đính: `spec/Bản hiệu đính VISCII → UTF-8 cho báo cáo call graph S → C.md` §2–§3 (đối chiếu literal Delphi trực tiếp từ `aLogin.exe` theo VA + Pascal length prefix, giải mã VISCII → UTF-8). Cột **Literal gốc** giữ chứng cứ byte-string; cột **Bản hiệu đính** là câu đọc tự nhiên (không phải byte hiển thị nguyên văn của client). Phạm vi chính xác xem spec §5.
+
+### Chú thích asm / chứng cứ (tài liệu asm kèm theo)
+- Dispatcher S→C: `FUN_0078a89c` — asm `client_pseudo_c/0078a89c_FUN_0078a89c.asm.txt` (**đã copy từ `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/0078a89c_FUN_0078a89c.asm.txt`; file chỉ còn prologue 71 dòng tới `JMP [EAX*4+0x78a9b6]`, mapping đầy đủ xác nhận bằng `jumptable_byte200_0x78A8EE.hex` + `jumptable_dword200_0x78A9B6.hex` + `manifest.csv`**), C `client_pseudo_c/0078a89c_FUN_0078a89c.c`. Tra bảng `MOV AL,[EAX+0x78a8ee]` + `JMP [EAX*4+0x78a9b6]`.
+- Handler `0x00792BAD` — C `client_pseudo_c/case_031_00792BAD_FUN_00792bad.c` (có); asm `client_pseudo_c/00792bad_*.asm.txt` **THIẾU** (không có trong `client_pseudo_c/` lẫn `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` — xem danh sách thiếu cuối tài liệu). Basic block trong bảng dưới là chứng cứ thay thế.
+
+### Main opcode `0x23` — 23 literal (Sub = `body[0]`; `—` = parser/branch trực tiếp)
+
+| Sub | Basic block | Literal VISCII gốc | Bản tiếng Việt hiệu đính | Ghi chú dịch |
+|---|---|---|---|---|
+| `1` | `0x00792C0C` | Sửa đổi thất bại | Sửa đổi thất bại. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `1` | `0x00792C0C` | Sửa đổi thành công | Sửa đổi thành công. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `1` | `0x00792C0C` | Mật mã cũ sai lầm | Mật mã cũ sai lầm. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `1` | `0x00792C0C` | Mã cá nhân cũ sai lầm | Mã cá nhân cũ sai lầm. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `1` | `0x00792C0C` | Mật mã quá ngắn | Mật mã quá ngắn. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `1` | `0x00792C0C` | Không thể sửa đổi mật mã và mã cá nhân trên server này | Không thể sửa đổi mật mã và mã cá nhân trên máy chủ này. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `2` | `0x00792D2F` | Loại trừ nhân vật thành công | Loại trừ nhân vật thành công. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `2` | `0x00792D2F` | Mật mã loại trừ nhân vật sai lệch | Mật mã loại trừ nhân vật sai lệch. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `2` | `0x00792D2F` | Mã cá nhân loại trừ nhân vât sai lệch | Mã cá nhân loại trừ nhân vât sai lệch. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `2` | `0x00792D2F` | Loại trừ nhân vật thất bại | Loại trừ nhân vật thất bại. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `3` | `0x00792E00` | Lưu trữ thành công | Lưu trữ thành công. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `3` | `0x00792E00` | Lưu trữ thất bại | Lưu trữ thất bại. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `3` | `0x00792E00` | Tài khoản thẻ sai lầm | Tài khoản thẻ không hợp lệ. | Hiệu đính ngữ nghĩa/câu chữ |
+| `3` | `0x00792E00` | Mật mã sai lệch | Mật mã không khớp. | Hiệu đính ngữ nghĩa/câu chữ |
+| `3` | `0x00792E00` | Thẻ đã sử dụng qua | Thẻ đã sử dụng qua. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `3` | `0x00792E00` | Đã lưu trữ điểm số thẻ khởi động | Đã lưu trữ điểm số thẻ khởi động. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `4` | `0x00792F5D` | Điểm số còn dư | Điểm số còn dư. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `4` | `0x00792F5D` | Kỳ hạn có thể chơi | Kỳ hạn có thể chơi. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `7` | `0x00793113` | Giới thiệu thành công | Giới thiệu thành công. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `7` | `0x00793113` | Giới thiệu thất bại! Hãy xác định lại tư cách người giới thiệu và người được giới thiệu có phù hợp hay không! | Giới thiệu thất bại! Hãy xác định lại tư cách người giới thiệu và người được giới thiệu có phù hợp hay không! | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `8` | `0x0079317C` | Được giới thiệu 5 lần được thưởng số điểm là Kỳ hạn có thể chơi | Được giới thiệu 5 lần được thưởng số điểm là Kỳ hạn có thể chơi. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `9` | `0x00793224` | Điểm số được giới thiệu đạt đến | Điểm số được giới thiệu đạt đến. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+| `10` | `0x007933F0` | Do quy định số thời gian online, lần sau bạn có thể đăng nhập thời gian tiến hành game là | Do quy định số thời gian online, lần sau bạn có thể đăng nhập thời gian tiến hành game là. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+
+### Danh sách asm thiếu (không copy được — không tồn tại ở nguồn)
+
+- `0x00792BAD`: không có `.asm.txt` trong `client_pseudo_c/` và không có trong `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` hay `case_functions/functions/` (chỉ có `.c`). Cần redump/disassemble lại từ `aLogin.exe` theo VA handler + basic block ở bảng trên.
+
+<!-- VISCII-CORRECTION-END -->

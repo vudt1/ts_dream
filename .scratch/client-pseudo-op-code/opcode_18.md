@@ -222,3 +222,26 @@ case 0x18:
 | 16 | `functions/00729a88_FUN_00729a88.c:60-121` | SubOp 8 | Field cờ thật: `LocalActor+0x448` (kind1) / `+0x455` (kind2); id lạ → record `gvar_007DA6BC[...]+0x36/0x37` + actor `gvar_007DA300[...]+0x448/0x455`; chỉ kind 1 có WAV+toast |
 
 **Giới hạn (không suy diễn — cập nhật 2026-09-14):** `FUN_00721088` đã bóc cả hai nửa (§4.5 — chỉ còn công thức index bit mất tham số Round); các call toast/refresh là presentation 1 dòng; 2 hằng toast nhánh đặc thù `DAT_00721444/00721464` chưa có dump; **toast SubOp 3 + SubOp 8 đã dịch** (§6, decode VISCII sạch; record Big5 `0x798004/0x798018` đã đọc là `整個刪除 !!` / `刪除失敗`; record cuối `lit_7967f8` + record `lit_729d0c` sau off 0x1FC/0x17 bị cắt dump 512B); chủ thể "Thần xui" của toast SubOp 8 chưa rõ nghiệp vụ; ý nghĩa game-design chi tiết (vật phẩm nào, cờ nào) nằm ngoài tầng case — chỉ kết luận ở mức "kho/vật phẩm + cờ trạng thái".
+
+---
+
+<!-- VISCII-CORRECTION-START -->
+## Bản hiệu đính VISCII → UTF-8 (2026-09-21, từ main opcode > sub opcode)
+
+> Nguồn hiệu đính: `spec/Bản hiệu đính VISCII → UTF-8 cho báo cáo call graph S → C.md` §2–§3 (đối chiếu literal Delphi trực tiếp từ `aLogin.exe` theo VA + Pascal length prefix, giải mã VISCII → UTF-8). Cột **Literal gốc** giữ chứng cứ byte-string; cột **Bản hiệu đính** là câu đọc tự nhiên (không phải byte hiển thị nguyên văn của client). Phạm vi chính xác xem spec §5.
+
+### Chú thích asm / chứng cứ (tài liệu asm kèm theo)
+- Dispatcher S→C: `FUN_0078a89c` — asm `client_pseudo_c/0078a89c_FUN_0078a89c.asm.txt` (**đã copy từ `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/0078a89c_FUN_0078a89c.asm.txt`; file chỉ còn prologue 71 dòng tới `JMP [EAX*4+0x78a9b6]`, mapping đầy đủ xác nhận bằng `jumptable_byte200_0x78A8EE.hex` + `jumptable_dword200_0x78A9B6.hex` + `manifest.csv`**), C `client_pseudo_c/0078a89c_FUN_0078a89c.c`. Tra bảng `MOV AL,[EAX+0x78a8ee]` + `JMP [EAX*4+0x78a9b6]`.
+- Handler `0x00790ED5` — C `client_pseudo_c/case_021_00790ED5_FUN_00790ed5.c` (có); asm `client_pseudo_c/00790ed5_*.asm.txt` **THIẾU** (không có trong `client_pseudo_c/` lẫn `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` — xem danh sách thiếu cuối tài liệu). Basic block trong bảng dưới là chứng cứ thay thế.
+
+### Main opcode `0x18` — 1 literal (Sub = `body[0]`; `—` = parser/branch trực tiếp)
+
+| Sub | Basic block | Literal VISCII gốc | Bản tiếng Việt hiệu đính | Ghi chú dịch |
+|---|---|---|---|---|
+| `3` | `0x007912C2` | Dung lượng nhiệm vụ đã đầy | Dung lượng nhiệm vụ đã đầy. | Chuẩn hóa thuật ngữ/chính tả; giữ sát literal |
+
+### Danh sách asm thiếu (không copy được — không tồn tại ở nguồn)
+
+- `0x00790ED5`: không có `.asm.txt` trong `client_pseudo_c/` và không có trong `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/functions/` hay `case_functions/functions/` (chỉ có `.c`). Cần redump/disassemble lại từ `aLogin.exe` theo VA handler + basic block ở bảng trên.
+
+<!-- VISCII-CORRECTION-END -->
