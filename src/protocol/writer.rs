@@ -154,6 +154,37 @@ impl PacketWriter {
         self
     }
 
+    /// Write a 14-byte `EveResult` struct to the buffer.
+    pub fn write_eve_result(
+        &mut self,
+        result: &crate::data::loaders::EveResult,
+    ) -> &mut Self {
+        let bytes = crate::protocol::codecs::NpcTalkCodec::encode_eve_result(result);
+        self.write_bytes(&bytes);
+        self
+    }
+
+    /// Write a 4-byte `QuestTaskEntry` to the buffer.
+    pub fn write_quest_task_entry(
+        &mut self,
+        entry: &crate::protocol::codecs::QuestTaskEntry,
+    ) -> &mut Self {
+        self.write_u8(entry.slot);
+        self.write_u16_le(entry.quest_id);
+        self.write_u8(entry.mark_step);
+        self
+    }
+
+    /// Write a 3-byte `QuestDontEntry` to the buffer.
+    pub fn write_quest_dont_entry(
+        &mut self,
+        entry: &crate::protocol::codecs::QuestDontEntry,
+    ) -> &mut Self {
+        self.write_u16_le(entry.mark);
+        self.write_u8(entry.flag);
+        self
+    }
+
     /// Returns a slice of the internal body buffer.
     pub fn as_slice(&self) -> &[u8] {
         &self.buf

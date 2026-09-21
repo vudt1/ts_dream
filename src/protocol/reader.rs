@@ -164,4 +164,19 @@ impl<'a> PacketReader<'a> {
     pub fn read_battle_role(&mut self) -> Result<crate::protocol::codecs::BattleRoleData> {
         crate::protocol::codecs::BattleRoleData::decode(self)
     }
+
+    /// Read an `EveResult` 14-byte struct from the stream.
+    pub fn read_eve_result(&mut self) -> Result<crate::data::loaders::EveResult> {
+        crate::protocol::codecs::NpcTalkCodec::decode_eve_result(self)
+    }
+
+    /// Read a `QuestTaskEntry` from the stream.
+    pub fn read_quest_task_entry(&mut self) -> Result<crate::protocol::codecs::QuestTaskEntry> {
+        crate::protocol::codecs::QuestSyncCodec::decode_task_entry(self)
+    }
+
+    /// Read a `QuestDontEntry` from the stream.
+    pub fn read_quest_dont_entry(&mut self) -> Result<crate::protocol::codecs::QuestDontEntry> {
+        crate::protocol::codecs::QuestSyncCodec::decode_dont_entry(self)
+    }
 }

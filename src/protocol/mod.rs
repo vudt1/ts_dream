@@ -394,8 +394,9 @@ pub mod system_alert;
 pub mod writer;
 
 pub use codecs::{
-    ehuman, BattleRoleData, BattleRoleSerializer, FriendExtra, PlayerCard, PlayerInfoCodec,
-    ThingData, ThingDataCodec, FRIEND_EXTRA_SIZE, THING_DATA_SIZE,
+    ehuman, BattleRoleData, BattleRoleSerializer, FriendExtra, NpcTalkCodec, PlayerCard,
+    PlayerInfoCodec, QuestDontEntry, QuestSyncCodec, QuestTaskEntry, TalkLockMode, ThingData,
+    ThingDataCodec, FRIEND_EXTRA_SIZE, THING_DATA_SIZE,
 };
 pub use reader::PacketReader;
 pub use system_alert::{SystemAlert, SystemAlertReason};
