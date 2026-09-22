@@ -63,7 +63,7 @@ ts_dream/
 │   └── codebase_design.md      # Thiết kế kiến trúc ban đầu
 ├── migrations/
 │   ├── 0001_init.sql           # SQLx migration legacy
-│   └── 0003_production_domain.sql # Mở rộng production legacy
+│   
 ├── golden/                     # 18 golden packets (01-hello → 18-player-trade) để diffing khi test (giữ lại, không phải test source)
 ├── tests/                      # Thư mục test tập trung — **hiện trống** (tạm thời không cần test)
 │   └── .gitkeep                # Scaffold sẵn cho test tương lai; mọi test mới phải đặt ở đây, cấm #[cfg(test)] trong src/

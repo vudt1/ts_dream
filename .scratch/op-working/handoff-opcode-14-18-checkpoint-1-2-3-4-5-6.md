@@ -119,11 +119,11 @@ Tài liệu thiết kế chi tiết và lộ trình tổng thể:
   - [`src/server/handlers/shops.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/src/server/handlers/shops.rs): `gold_frame` → `pub`.
   - [`src/server/auto_save.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/src/server/auto_save.rs): fingerprint mix thêm `quest_tasks` / `quest_dont` / `quest_items` / `completed_eve_counts` — **sort key trước khi mix** (HashMap iteration order random per instance).
   - [`src/db/modern/sqlite/session.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/src/db/modern/sqlite/session.rs): `load_eve_state` (**private**, hook best-effort ở cuối `load()`) + `save_eve_state` (**pub**, transaction **riêng** sau `tx.commit()` của `save()`); thiếu bảng 0002 → `tracing::debug` + skip, login/save không fail (ADR 0004).
-  - [`migrations/0002_eve_persistence.sql`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/migrations/0002_eve_persistence.sql) (**mới**): `ALTER TABLE character_completed_events ADD COLUMN completioncount` + `character_quest_tasks` / `character_quest_dont` / `character_quest_items`. **`pool::migrate` là no-op (ADR 0004) ⇒ phải apply MỘT LẦN thủ công cho DB production:**
+  - [`migrations/0001_init.sql`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/migrations/0001_init.sql) (**đã gộp**): `character_completed_events` có thêm cột `completioncount` + 3 bảng `character_quest_tasks` / `character_quest_dont` / `character_quest_items` — trước đây nằm ở `0002_eve_persistence.sql`, đã gộp 2026-09-22 vì DB chưa từng chạy lần nào. **`pool::migrate` là no-op (ADR 0004) ⇒ DB mới chỉ cần chạy 0001 MỘT LẦN:**
     ```bash
-    sqlite3 DB/ts_dream.db < migrations/0002_eve_persistence.sql
+    sqlite3 DB/ts_dream.db < migrations/0001_init.sql
     ```
-    Trước khi apply, server vẫn chạy bình thường (best-effort degrade) — test `persistence_degrades_without_migration_0002` chứng minh.
+    Trước khi apply, server vẫn chạy bình thường (best-effort degrade) — test `persistence_degrades_when_quest_tables_are_missing` chứng minh.
 - **Kiểm thử**: [`tests/npc_eve_e2e_test.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/tests/npc_eve_e2e_test.rs) (**mới, 19 tests — 19/19 PASS**):
   - class 2 (4 test): quest mới + floor step 1 + completion count, increment, battle-backup (`resBattle` 2 → −1), remove (`pStyle3+step0`), save-gate skip — mỗi case assert đúng frame `QuestSyncCodec` + tail unlock/`1408`.
   - class 5 (1) + class 7 (1): point×20 / gold / type2 skip; skill_point `0x25`, point `0x26`, `pStyle1` → `save_map`, army+type4 deferred không đổi state.
@@ -142,8 +142,8 @@ Tài liệu thiết kế chi tiết và lộ trình tổng thể:
 **Checkpoint 6 đã hoàn thành** — toàn bộ CP1–CP6 xong, tất cả file **chưa commit** (repo không có remote, agent không tự commit).
 
 - **Việc cần làm ngay (human)**:
-  1. Apply migration 0002 thủ công cho DB production (1 lần): `sqlite3 DB/ts_dream.db < migrations/0002_eve_persistence.sql`.
-  2. Review & commit thủ công. File CP6: `src/server/handlers/talk.rs`, `src/server/handlers/npc_event.rs`, `src/server/handlers/shops.rs`, `src/battle/service.rs`, `src/web/server_control.rs`, `src/server/auto_save.rs`, `src/db/modern/sqlite/session.rs`, `migrations/0002_eve_persistence.sql`, `tests/npc_eve_e2e_test.rs` (+ research CP6 + handoff này). File CP4/CP5 vẫn chờ commit: `src/server/handlers/quest_sync.rs`, `src/server/handlers/mod.rs`, `src/server/spawn.rs`, `src/server/session.rs`, `tests/quest_sync_18_test.rs`, `tests/npc_talk_multistep_test.rs`, `tests/npc_eve_resolve_test.rs`, `tests/db_repository_init_test.rs`.
+  1. Apply schema thủ công cho DB production (1 lần): `sqlite3 DB/ts_dream.db < migrations/0001_init.sql` (baseline duy nhất — phần Eve/quest đã gộp, không còn file 0002).
+  2. Review & commit thủ công. File CP6: `src/server/handlers/talk.rs`, `src/server/handlers/npc_event.rs`, `src/server/handlers/shops.rs`, `src/battle/service.rs`, `src/web/server_control.rs`, `src/server/auto_save.rs`, `src/db/modern/sqlite/session.rs`, `migrations/0001_init.sql` (gộp 0002), `tests/npc_eve_e2e_test.rs` (+ research CP6 + handoff này). File CP4/CP5 vẫn chờ commit: `src/server/handlers/quest_sync.rs`, `src/server/handlers/mod.rs`, `src/server/spawn.rs`, `src/server/session.rs`, `tests/quest_sync_18_test.rs`, `tests/npc_talk_multistep_test.rs`, `tests/npc_eve_resolve_test.rs`, `tests/db_repository_init_test.rs`.
   3. (Tùy chọn) Bật eve feature `TS_EVE_EVENTS=1` để smoke-test live; mặc định **tắt** để giữ golden parity (resolve trả `None` khi tắt → replay không đổi).
 
 ---

@@ -99,22 +99,22 @@ impl SqliteSessionRepository<'_> {
                 session.hotkeys[slot as usize] = clamp_u16(row.get("skill_id"));
             }
         }
-        // CP6: quest-log / Eve state is best-effort — a database that has not
-        // applied `0002_eve_persistence.sql` (ADR 0004 keeps `pool::migrate`
-        // a no-op) logs at debug and logs in with empty quest state instead
-        // of failing.
+        // CP6: quest-log / Eve state is best-effort — a database whose
+        // `character_quest_*` tables are missing (e.g. a pre-CP6 baseline)
+        // logs at debug and signs in with empty quest state instead of
+        // failing. `0001_init.sql` is the single baseline containing them.
         if let Err(err) = self.load_eve_state(session).await {
             tracing::debug!(
                 player = session.db_character_id,
                 %err,
-                "Eve/quest state load skipped (apply migrations/0002_eve_persistence.sql?)"
+                "Eve/quest state load skipped (character_quest_* tables missing?)"
             );
         }
         Ok(true)
     }
 
     /// CP6: hydrate the Eve/quest-log collections (`quest_tasks`, `quest_dont`,
-    /// `quest_items`, `completed_eve_counts`) from the 0002 tables.
+    /// `quest_items`, `completed_eve_counts`) from the quest tables.
     async fn load_eve_state(&self, session: &mut Session) -> Result<(), sqlx::Error> {
         let id = session.db_character_id;
         if id <= 0 {
@@ -355,13 +355,14 @@ impl SqliteSessionRepository<'_> {
         }
         tx.commit().await?;
         // CP6: quest/Eve state commits in its **own** transaction after the
-        // main one — a database without migration 0002 then logs and skips
-        // instead of failing a save that already succeeded.
+        // main one — a database whose `character_quest_*` tables are missing
+        // (e.g. a pre-CP6 baseline) then logs and skips instead of failing a
+        // save that already succeeded.
         if let Err(err) = self.save_eve_state(session).await {
             tracing::debug!(
                 player = session.id,
                 %err,
-                "Eve/quest state save skipped (apply migrations/0002_eve_persistence.sql?)"
+                "Eve/quest state save skipped (character_quest_* tables missing?)"
             );
         }
         Ok(())
