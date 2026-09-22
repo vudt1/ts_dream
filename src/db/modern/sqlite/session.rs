@@ -99,7 +99,78 @@ impl SqliteSessionRepository<'_> {
                 session.hotkeys[slot as usize] = clamp_u16(row.get("skill_id"));
             }
         }
+        // CP6: quest-log / Eve state is best-effort — a database that has not
+        // applied `0002_eve_persistence.sql` (ADR 0004 keeps `pool::migrate`
+        // a no-op) logs at debug and logs in with empty quest state instead
+        // of failing.
+        if let Err(err) = self.load_eve_state(session).await {
+            tracing::debug!(
+                player = session.db_character_id,
+                %err,
+                "Eve/quest state load skipped (apply migrations/0002_eve_persistence.sql?)"
+            );
+        }
         Ok(true)
+    }
+
+    /// CP6: hydrate the Eve/quest-log collections (`quest_tasks`, `quest_dont`,
+    /// `quest_items`, `completed_eve_counts`) from the 0002 tables.
+    async fn load_eve_state(&self, session: &mut Session) -> Result<(), sqlx::Error> {
+        let id = session.db_character_id;
+        if id <= 0 {
+            return Ok(());
+        }
+        for row in sqlx::query(
+            "SELECT questid, slot, markstep FROM character_quest_tasks WHERE playerid = ?",
+        )
+        .bind(id)
+        .fetch_all(&self.pool.read)
+        .await?
+        {
+            if let Ok(quest_id) = u16::try_from(row.get::<i64, _>("questid")) {
+                session.quest_tasks.insert(
+                    quest_id,
+                    (clamp_u8(row.get("slot")), clamp_u8(row.get("markstep"))),
+                );
+            }
+        }
+        for row in sqlx::query("SELECT mark FROM character_quest_dont WHERE playerid = ?")
+            .bind(id)
+            .fetch_all(&self.pool.read)
+            .await?
+        {
+            if let Ok(mark) = u16::try_from(row.get::<i64, _>("mark")) {
+                session.quest_dont.insert(mark);
+            }
+        }
+        session.quest_items = sqlx::query(
+            "SELECT slot, itemid AS item_id, count FROM character_quest_items \
+             WHERE playerid = ? ORDER BY slot",
+        )
+        .bind(id)
+        .fetch_all(&self.pool.read)
+        .await?
+        .into_iter()
+        .map(|r| InventoryItem {
+            slot: clamp_u8(r.get("slot")),
+            id: clamp_u16(r.get("item_id")),
+            count: clamp_u8(r.get("count")),
+            ..Default::default()
+        })
+        .collect();
+        for row in sqlx::query(
+            "SELECT eventid, completioncount FROM character_completed_events WHERE playerid = ?",
+        )
+        .bind(id)
+        .fetch_all(&self.pool.read)
+        .await?
+        {
+            session.completed_eve_counts.insert(
+                row.get::<i64, _>("eventid") as i32,
+                row.get::<i64, _>("completioncount") as i32,
+            );
+        }
+        Ok(())
     }
 
     async fn load_items(
@@ -282,6 +353,114 @@ impl SqliteSessionRepository<'_> {
             .execute(&mut *tx)
             .await?;
         }
+        tx.commit().await?;
+        // CP6: quest/Eve state commits in its **own** transaction after the
+        // main one — a database without migration 0002 then logs and skips
+        // instead of failing a save that already succeeded.
+        if let Err(err) = self.save_eve_state(session).await {
+            tracing::debug!(
+                player = session.id,
+                %err,
+                "Eve/quest state save skipped (apply migrations/0002_eve_persistence.sql?)"
+            );
+        }
+        Ok(())
+    }
+
+    /// CP6: persist the Eve/quest-log collections (`quest_tasks`, `quest_dont`,
+    /// `quest_items`, `completed_eve_counts`) in one transaction. Called by
+    /// [`Self::save`] after the main transaction committed.
+    ///
+    /// Rows are written in sorted order so repeated saves of unchanged state
+    /// produce identical table contents (the fingerprint ledger keys off the
+    /// session, but stable rows keep diffs and tests quiet).
+    pub async fn save_eve_state(&self, session: &Session) -> Result<(), sqlx::Error> {
+        let character_id = session.db_character_id;
+        if character_id <= 0 {
+            return Ok(());
+        }
+        let mut tx = self.pool.write.begin().await?;
+
+        sqlx::query("DELETE FROM character_quest_tasks WHERE playerid = ?")
+            .bind(character_id)
+            .execute(&mut *tx)
+            .await?;
+        let mut tasks: Vec<(u16, (u8, u8))> = session
+            .quest_tasks
+            .iter()
+            .map(|(&quest_id, &row)| (quest_id, row))
+            .collect();
+        tasks.sort_unstable();
+        for (quest_id, (slot, step)) in tasks {
+            sqlx::query(
+                "INSERT INTO character_quest_tasks (playerid, questid, slot, markstep) \
+                 VALUES (?, ?, ?, ?)",
+            )
+            .bind(character_id)
+            .bind(i64::from(quest_id))
+            .bind(i64::from(slot))
+            .bind(i64::from(step))
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        sqlx::query("DELETE FROM character_quest_dont WHERE playerid = ?")
+            .bind(character_id)
+            .execute(&mut *tx)
+            .await?;
+        let mut marks: Vec<u16> = session.quest_dont.iter().copied().collect();
+        marks.sort_unstable();
+        for mark in marks {
+            sqlx::query("INSERT INTO character_quest_dont (playerid, mark) VALUES (?, ?)")
+                .bind(character_id)
+                .bind(i64::from(mark))
+                .execute(&mut *tx)
+                .await?;
+        }
+
+        sqlx::query("DELETE FROM character_quest_items WHERE playerid = ?")
+            .bind(character_id)
+            .execute(&mut *tx)
+            .await?;
+        let mut quest_items = session.quest_items.clone();
+        quest_items.sort_by_key(|item| item.slot);
+        for item in quest_items.iter().filter(|i| i.id > 0 && i.count > 0) {
+            sqlx::query(
+                "INSERT INTO character_quest_items (playerid, itemid, slot, count) \
+                 VALUES (?, ?, ?, ?)",
+            )
+            .bind(character_id)
+            .bind(i64::from(item.id))
+            .bind(i64::from(item.slot))
+            .bind(i64::from(item.count))
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        let now = chrono::Utc::now().timestamp();
+        let mut counts: Vec<(i32, i32)> = session
+            .completed_eve_counts
+            .iter()
+            .map(|(&eve_no, &count)| (eve_no, count))
+            .collect();
+        counts.sort_unstable();
+        for (event_id, count) in counts {
+            // First completion stamps `completedat`; later ones only bump the
+            // counter, keeping the original timestamp meaningful.
+            sqlx::query(
+                "INSERT INTO character_completed_events \
+                 (playerid, eventid, completedat, completioncount) VALUES (?, ?, ?, ?) \
+                 ON CONFLICT(playerid, eventid) DO UPDATE SET \
+                 completioncount = excluded.completioncount",
+            )
+            .bind(character_id)
+            .bind(i64::from(event_id))
+            .bind(now)
+            .bind(i64::from(count))
+            .execute(&mut *tx)
+            .await?;
+        }
+
         tx.commit().await
     }
 

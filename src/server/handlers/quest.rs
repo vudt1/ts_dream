@@ -81,8 +81,11 @@ pub fn trigger_teamdef(conn: &mut Conn, teamdef: &[i64], out: &mut HandleOutcome
 /// `savemap` canonical seam: refresh the session's respawn point from the
 /// current map. Deferred drift: the `savemap` column is not persisted (in-memory
 /// only), so a server restart loses the saved respawn point.
-pub fn save_map(conn: &mut Conn) {
-    conn.session.savemap = conn.session.map_id;
+///
+/// Takes `&mut Session` so the Eve action walkers (which also run from the
+/// post-battle resume path, where only a session guard is available) can call it.
+pub fn save_map(session: &mut Session) {
+    session.savemap = session.map_id;
 }
 
 /// Attempt the data-driven quest path for H6 continue.
@@ -831,6 +834,53 @@ pub struct BattleTrigger {
     pub diahinh: i32,
 }
 
+/// Relocate the session's character to `warp`'s destination, emitting the
+/// canonical frame sequence: fade (`1407`) → relocate (`0x0C`) → hide-from-old-map
+/// broadcast, and mirror the position into the online-session registry.
+///
+/// Shared seam extracted from [`handle_warp_confirm`] so the Eve **Door**
+/// result (`result_type == 2`, Checkpoint 6) applies byte-identical relocation
+/// to the legacy warp-confirm path. Synchronous by design: the Eve walkers also
+/// run from the post-battle resume (a sync `BattleSink` callback), so no
+/// `hub.send_to().await` may appear here.
+///
+/// Deliberately does **not** warp party members (that loop needs the async hub
+/// and stays in [`handle_warp_confirm`]); an Eve Door warp therefore moves only
+/// the triggering character. It also does not reset talk state — callers do.
+pub fn perform_warp(session: &mut Session, warp: &crate::data::tables::Warp, out: &mut HandleOutcome) {
+    let id = session.id;
+    let old_map = session.map_id;
+    let dest_map = warp.map2 as u16;
+    let dest_x = warp.x as u16;
+    let dest_y = warp.y as u16;
+    let warp_id = (warp.warpid & 0xFF) as u8;
+
+    session.map_id = dest_map;
+    session.map_x = dest_x;
+    session.map_y = dest_y;
+
+    if let Some(s) = crate::server::session::online_sessions()
+        .lock()
+        .unwrap()
+        .get_mut(&id)
+    {
+        s.map_id = dest_map;
+        s.map_x = dest_x;
+        s.map_y = dest_y;
+    }
+
+    // 1. Fade screen
+    out.send("F44402001407");
+
+    // 2. Relocate packet Opcode 0x0C (13 bytes payload)
+    out.send(crate::server::spawn::build_relocate_packet(
+        id, dest_map, dest_x, dest_y, warp_id,
+    ));
+
+    // 3. Hide from old map peers
+    out.broadcast_to_map(id, old_map, crate::battle::packets::hide_from_map(id));
+}
+
 /// Handle warp-talk (H8) completion: confirm warp into 0x0C flow.
 pub async fn handle_warp_confirm(
     conn: &mut Conn,
@@ -935,30 +985,9 @@ pub async fn handle_warp_confirm(
         let dest_y = warp.y as u16;
         let warp_id = (warp.warpid & 0xFF) as u8;
 
-        conn.session.map_id = dest_map;
-        conn.session.map_x = dest_x;
-        conn.session.map_y = dest_y;
-
-        if let Some(s) = crate::server::session::online_sessions()
-            .lock()
-            .unwrap()
-            .get_mut(&id)
-        {
-            s.map_id = dest_map;
-            s.map_x = dest_x;
-            s.map_y = dest_y;
-        }
-
-        // 1. Fade screen
-        out.send("F44402001407");
-
-        // 2. Relocate packet Opcode 0x0C (13 bytes payload)
-        out.send(crate::server::spawn::build_relocate_packet(
-            id, dest_map, dest_x, dest_y, warp_id,
-        ));
-
-        // 3. Hide from old map peers
-        out.broadcast_to_map(id, old_map, crate::battle::packets::hide_from_map(id));
+        // Fade → relocate → hide, plus the session/registry position update
+        // (shared with the Eve Door path via `perform_warp`).
+        perform_warp(&mut conn.session, warp, out);
 
         // 4. Party warp: if leader, warp all party members too
         if id_leader == id {

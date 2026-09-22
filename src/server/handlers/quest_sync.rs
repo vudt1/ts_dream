@@ -20,6 +20,10 @@
 //! the **session-facing half**: it mutates `Session` quest state, mirrors every
 //! mutation into exactly one frame, and builds the login bulk sync.
 //!
+//! Mutators take `&mut Session` (not `&mut Conn`) so the Eve walkers in
+//! `handlers::talk` — which also run from the post-battle resume path where
+//! only a session guard is available — can apply quest-log writes directly.
+//!
 //! ### Capacity rules (client bounds, verified in the decompile)
 //! - Quest items and quest task rows share **one** 200-row array on the client
 //!   (`FUN_00720ca8` and `FUN_0072bb6c` both write `0x654 + slot * 3`), so both
@@ -41,7 +45,7 @@ use crate::protocol::codecs::quest_sync::{
     QuestDontEntry, QuestSyncCodec, QuestTaskEntry,
 };
 use crate::server::dispatcher::HandleOutcome;
-use crate::server::session::{Conn, InventoryItem, Session};
+use crate::server::session::{InventoryItem, Session};
 
 /// Highest quest-entry slot the client accepts (`if (200 < slot) _BoundErr`
 /// in `FUN_0072bb6c` / `FUN_00720ca8` / `FUN_00720df0`).
@@ -92,32 +96,36 @@ fn send_full(out: &mut HandleOutcome, reason: &str, id: u16) {
 /// whole add fits under [`QUEST_ITEM_STACK_CAP`], a new item takes the next
 /// free shared row, and any refusal emits the full toast instead of a partial
 /// write. Returns `true` when the state changed and the frame was sent.
-pub fn add_quest_item(conn: &mut Conn, out: &mut HandleOutcome, item_id: u16, count: u8) -> bool {
+pub fn add_quest_item(
+    session: &mut Session,
+    out: &mut HandleOutcome,
+    item_id: u16,
+    count: u8,
+) -> bool {
     if item_id == 0 || count == 0 {
         return false;
     }
-    if let Some(idx) = conn
-        .session
+    if let Some(idx) = session
         .quest_items
         .iter()
         .position(|item| item.id == item_id)
     {
-        let owned = u16::from(conn.session.quest_items[idx].count);
+        let owned = u16::from(session.quest_items[idx].count);
         if u16::from(count) > QUEST_ITEM_STACK_CAP.saturating_sub(owned) {
             // `FUN_00720ca8` returns 0 (no write) when the merge would carry
             // the byte past 0xFF — refuse here too rather than desync.
             send_full(out, "quest item stack would exceed 255", item_id);
             return false;
         }
-        conn.session.quest_items[idx].count += count;
+        session.quest_items[idx].count += count;
         out.send(QuestSyncCodec::build_item_add_hex(item_id, count));
         return true;
     }
-    let Some(slot) = next_free_slot(&conn.session) else {
+    let Some(slot) = next_free_slot(session) else {
         send_full(out, "quest bag has no free row (200 rows used)", item_id);
         return false;
     };
-    conn.session.quest_items.push(InventoryItem {
+    session.quest_items.push(InventoryItem {
         slot,
         id: item_id,
         count,
@@ -132,19 +140,23 @@ pub fn add_quest_item(conn: &mut Conn, out: &mut HandleOutcome, item_id: u16, co
 /// Mirrors `FUN_00720df0`: removing more than owned is refused (returns `0`,
 /// no frame), an empty stack frees its row, and a successful removal emits the
 /// frame with the **requested** count. Returns the count actually removed.
-pub fn remove_quest_item(conn: &mut Conn, out: &mut HandleOutcome, item_id: u16, count: u8) -> u32 {
+pub fn remove_quest_item(
+    session: &mut Session,
+    out: &mut HandleOutcome,
+    item_id: u16,
+    count: u8,
+) -> u32 {
     if item_id == 0 || count == 0 {
         return 0;
     }
-    let Some(idx) = conn
-        .session
+    let Some(idx) = session
         .quest_items
         .iter()
         .position(|item| item.id == item_id)
     else {
         return 0;
     };
-    let owned = u32::from(conn.session.quest_items[idx].count);
+    let owned = u32::from(session.quest_items[idx].count);
     if u32::from(count) > owned {
         tracing::debug!(
             item_id,
@@ -154,9 +166,9 @@ pub fn remove_quest_item(conn: &mut Conn, out: &mut HandleOutcome, item_id: u16,
         );
         return 0;
     }
-    conn.session.quest_items[idx].count -= count;
-    if conn.session.quest_items[idx].count == 0 {
-        conn.session.quest_items.remove(idx);
+    session.quest_items[idx].count -= count;
+    if session.quest_items[idx].count == 0 {
+        session.quest_items.remove(idx);
     }
     out.send(QuestSyncCodec::build_item_remove_hex(item_id, count));
     u32::from(count)
@@ -165,15 +177,13 @@ pub fn remove_quest_item(conn: &mut Conn, out: &mut HandleOutcome, item_id: u16,
 /// `0x18 Sub 0x04` — drop every stack of `item_id` from the quest bag in one
 /// frame (`FUN_00720f00`). Returns `true` when an entry existed (only then is
 /// the frame sent — the client toasts "not found" for an unknown id).
-pub fn clear_quest_item(conn: &mut Conn, out: &mut HandleOutcome, item_id: u16) -> bool {
+pub fn clear_quest_item(session: &mut Session, out: &mut HandleOutcome, item_id: u16) -> bool {
     if item_id == 0 {
         return false;
     }
-    let before = conn.session.quest_items.len();
-    conn.session
-        .quest_items
-        .retain(|item| item.id != item_id);
-    if conn.session.quest_items.len() == before {
+    let before = session.quest_items.len();
+    session.quest_items.retain(|item| item.id != item_id);
+    if session.quest_items.len() == before {
         return false;
     }
     out.send(QuestSyncCodec::build_item_clear_hex(item_id));
@@ -184,7 +194,7 @@ pub fn clear_quest_item(conn: &mut Conn, out: &mut HandleOutcome, item_id: u16) 
 /// mark, then emit the single-entry frame. Marks outside
 /// `1..=QUEST_DONT_MARK_MAX` are rejected before the wire (the client raises
 /// `_BoundErr` on them). Returns `false` when the mark was rejected.
-pub fn set_quest_dont(conn: &mut Conn, out: &mut HandleOutcome, mark: u16, flag: u8) -> bool {
+pub fn set_quest_dont(session: &mut Session, out: &mut HandleOutcome, mark: u16, flag: u8) -> bool {
     if !(QUEST_DONT_MARK_MIN..=QUEST_DONT_MARK_MAX).contains(&mark) {
         tracing::debug!(
             mark,
@@ -193,9 +203,9 @@ pub fn set_quest_dont(conn: &mut Conn, out: &mut HandleOutcome, mark: u16, flag:
         return false;
     }
     if flag == 0 {
-        conn.session.quest_dont.remove(&mark);
+        session.quest_dont.remove(&mark);
     } else {
-        conn.session.quest_dont.insert(mark);
+        session.quest_dont.insert(mark);
     }
     out.send(QuestSyncCodec::build_dont_single_hex(mark, flag));
     true
@@ -206,14 +216,19 @@ pub fn set_quest_dont(conn: &mut Conn, out: &mut HandleOutcome, mark: u16, flag:
 /// A quest already in the log keeps its row (only the step changes); a new one
 /// takes the next free shared row. Returns `false` when `quest_id` is 0 or the
 /// shared 200-row array is exhausted (full toast, no state change).
-pub fn set_quest_task(conn: &mut Conn, out: &mut HandleOutcome, quest_id: u16, mark_step: u8) -> bool {
+pub fn set_quest_task(
+    session: &mut Session,
+    out: &mut HandleOutcome,
+    quest_id: u16,
+    mark_step: u8,
+) -> bool {
     if quest_id == 0 {
         tracing::debug!("quest task rejected: quest_id 0 is the client's free-row marker");
         return false;
     }
-    let slot = match conn.session.quest_tasks.get(&quest_id) {
+    let slot = match session.quest_tasks.get(&quest_id) {
         Some((slot, _)) => *slot,
-        None => match next_free_slot(&conn.session) {
+        None => match next_free_slot(session) {
             Some(slot) => slot,
             None => {
                 send_full(out, "quest log has no free row (200 rows used)", quest_id);
@@ -221,10 +236,31 @@ pub fn set_quest_task(conn: &mut Conn, out: &mut HandleOutcome, quest_id: u16, m
             }
         },
     };
-    conn.session
-        .quest_tasks
-        .insert(quest_id, (slot, mark_step));
+    session.quest_tasks.insert(quest_id, (slot, mark_step));
     out.send(QuestSyncCodec::build_task_entry_hex(slot, quest_id, mark_step));
+    true
+}
+
+/// Drop one quest-log row in a single frame.
+///
+/// The client stores quest **items** and quest **task rows** in one shared
+/// 200-row array (`LocalActor + 0x654 + slot * 3`, id in the leading 2 bytes),
+/// and `FUN_00720f00` (Sub `0x04`) clears a row by scanning that array for the
+/// matching id. A task row therefore clears with the same Sub `0x04` frame the
+/// item clear uses — which is exactly what Bear's `removerTask` sends
+/// (`PacketCreator(24, 4)` + `add16(questId)`). Dropping the row here frees its
+/// shared slot for a later [`set_quest_task`].
+///
+/// Returns `false` when `quest_id` is 0 or not in the log (nothing to clear).
+pub fn remove_quest_task(session: &mut Session, out: &mut HandleOutcome, quest_id: u16) -> bool {
+    if quest_id == 0 {
+        return false;
+    }
+    let Some((_slot, _)) = session.quest_tasks.remove(&quest_id) else {
+        return false;
+    };
+    out.send(QuestSyncCodec::build_item_clear_hex(quest_id));
+    tracing::debug!(quest_id, "quest task removed (0x18 Sub 0x04 clear-by-id)");
     true
 }
 
@@ -232,8 +268,8 @@ pub fn set_quest_task(conn: &mut Conn, out: &mut HandleOutcome, quest_id: u16, m
 /// (`Kind = 1` Bad-Luck-God `+0x448`, `Kind = 2` secondary `+0x455`; `Flag = 0`
 /// plays `sound\WA0006.wav` + expiry toast on the client). Unknown kinds are
 /// ignored client-side, so none are rejected here.
-pub fn send_actor_state_flag(conn: &Conn, out: &mut HandleOutcome, kind: u16, flag: u8) {
-    out.send(QuestSyncCodec::build_state_flag_hex(conn.session.id, kind, flag));
+pub fn send_actor_state_flag(session: &Session, out: &mut HandleOutcome, kind: u16, flag: u8) {
+    out.send(QuestSyncCodec::build_state_flag_hex(session.id, kind, flag));
 }
 
 /// Full login sync (Checkpoint 5 §2): bulk quest log (`0x18 Sub 0x06`),

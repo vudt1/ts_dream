@@ -123,9 +123,22 @@ fn scene_for(data: &GameData, map_id: u16) -> Option<&SceneEveData> {
 
 /// Snapshot a session into the pure engine state.
 ///
-/// Mission steps/flags and completion counts are not yet persisted per-scene
-/// (ticket 08 migrates quest storage); they enter as empty and the engine's
-/// fallback-Talk path still resolves. `mark_defs` projection is likewise empty.
+/// CP6 wiring:
+/// - **Missions** come from the quest log (`quest_tasks`: quest id → stored
+///   `mark_step`), so `conditionClass=2` reads the step the class-2 action
+///   executor writes.
+/// - **`battle_result`** is the active event session's outcome (0 when no
+///   session is in flight), feeding `conditionClass=8`.
+/// - **Completion counts** are the session's `completed_eve_counts`
+///   (incremented by `finish_event_session`), feeding `conditionClass=12`.
+/// - **Quest-dont marks** are projected into `mission_flags` keyed by the
+///   mark id itself — an explicit key-space assumption (wire mark 1..=300 vs
+///   Bear's mission-id-keyed `QuestDont`). It stays inert until a condition
+///   actually targets such a mission id, because nothing in the Eve flow
+///   sets `quest_dont` today.
+/// - **`mark_defs`** (missionId → bitId) stays empty (CP6 decision #6): no
+///   consumer exists yet, and inventing a projection would make up a mapping
+///   the data files do not define.
 pub fn snapshot_state(session: &Session) -> PlayerEventState {
     let bag_slots: Vec<(i32, i32)> = session
         .homdo
@@ -139,16 +152,23 @@ pub fn snapshot_state(session: &Session) -> PlayerEventState {
         .filter(|i| i.id > 0)
         .map(|i| i32::from(i.id))
         .collect();
-    // Surface/choice context of the active event session feeds
-    // conditionClass=10 (dialog-choice) evaluation; a session without one
-    // keeps the "no dialogue seen yet" -1 defaults (Checkpoint 4).
-    let (last_surface_id, last_choice_code) = session
+    // Quest log rows double as the Eve mission store: quest id → step.
+    let missions: Vec<(i32, i32)> = session
+        .quest_tasks
+        .iter()
+        .map(|(&quest_id, &(_slot, step))| (i32::from(quest_id), i32::from(step)))
+        .collect();
+    // Surface/choice/battle context of the active event session feeds
+    // conditionClass=10 (dialog choice) and =8 (battle result); a session
+    // without one keeps the "no dialogue seen yet" -1 / "no battle" 0
+    // defaults (Checkpoint 4).
+    let (last_surface_id, last_choice_code, battle_result) = session
         .current_event_session
         .as_ref()
-        .map(|ev| (ev.last_surface_id, ev.last_choice_code))
-        .unwrap_or((-1, -1));
-    EveStateBuilder::build_player_state(&PlayerStateInputs {
-        missions: &[],
+        .map(|ev| (ev.last_surface_id, ev.last_choice_code, ev.battle_result))
+        .unwrap_or((-1, -1, 0));
+    let mut state = EveStateBuilder::build_player_state(&PlayerStateInputs {
+        missions: &missions,
         raw_flags: &[],
         mark_defs: &std::collections::HashMap::new(),
         bag_slots: &bag_slots,
@@ -157,12 +177,16 @@ pub fn snapshot_state(session: &Session) -> PlayerEventState {
         reborn_count: i32::from(session.reborn),
         last_surface_id,
         last_choice_code,
-        battle_result: 0,
-        completed_eve_counts: std::collections::HashMap::new(),
+        battle_result,
+        completed_eve_counts: session.completed_eve_counts.clone(),
         follow_npc_ids: &[],
         inn_npc_ids: &[],
         cart_npc_ids: &[],
-    })
+    });
+    for &mark in session.quest_dont.iter() {
+        state.mission_flags.insert(i32::from(mark), 1);
+    }
+    state
 }
 
 /// Resolve one NPC/door interaction against the scene's event list.

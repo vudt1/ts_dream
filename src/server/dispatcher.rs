@@ -138,6 +138,10 @@ pub struct HandleOutcome {
     pub shutdown: bool,
     /// If set, a TEAMDEF battle should be triggered after processing.
     pub battle_trigger: Option<crate::server::handlers::quest::BattleTrigger>,
+    /// If set, an Eve-scripted battle (`result_type==3`) starts after the talk's
+    /// own frames flush: `(fight_id, diahinh)`. The continuation resumes in
+    /// `battle_ended` via `current_event_session` (`phase == AwaitingBattle`).
+    pub eve_battle: Option<(u16, i32)>,
     pub map_broadcast: Vec<MapBroadcast>,
 }
 

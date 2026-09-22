@@ -118,14 +118,14 @@ fn test_add_merge_remove_clear_quest_item() {
     let mut out = HandleOutcome::default();
 
     // New item takes shared row 1 and emits Sub 0x01.
-    assert!(quest_sync::add_quest_item(&mut conn, &mut out, 10001, 2));
+    assert!(quest_sync::add_quest_item(&mut conn.session, &mut out, 10001, 2));
     assert_eq!(out.outgoing[0].frame, "F44405001801112702");
     assert_eq!(conn.session.quest_items.len(), 1);
     assert_eq!(conn.session.quest_items[0].slot, 1);
     assert_eq!(conn.session.quest_items[0].count, 2);
 
     // Same id merges into the same row (client `FUN_00720ca8` merge path).
-    assert!(quest_sync::add_quest_item(&mut conn, &mut out, 10001, 3));
+    assert!(quest_sync::add_quest_item(&mut conn.session, &mut out, 10001, 3));
     assert_eq!(
         conn.session.quest_items.len(),
         1,
@@ -135,14 +135,14 @@ fn test_add_merge_remove_clear_quest_item() {
     assert_eq!(out.outgoing[1].frame, "F44405001801112703");
 
     // Successful removal emits Sub 0x02 with the requested count.
-    assert_eq!(quest_sync::remove_quest_item(&mut conn, &mut out, 10001, 2), 2);
+    assert_eq!(quest_sync::remove_quest_item(&mut conn.session, &mut out, 10001, 2), 2);
     assert_eq!(out.outgoing[2].frame, "F44405001802112702");
     assert_eq!(conn.session.quest_items[0].count, 3);
 
     // Client parity: `FUN_00720df0` requires count <= owned -> refuse both
     // the write and the frame (a sent frame the client rejects would toast
     // "failed" while the server bag keeps the item).
-    assert_eq!(quest_sync::remove_quest_item(&mut conn, &mut out, 10001, 9), 0);
+    assert_eq!(quest_sync::remove_quest_item(&mut conn.session, &mut out, 10001, 9), 0);
     assert_eq!(conn.session.quest_items[0].count, 3);
     assert_eq!(
         out.outgoing.len(),
@@ -151,17 +151,17 @@ fn test_add_merge_remove_clear_quest_item() {
     );
 
     // Removing the last of a stack frees the row.
-    assert_eq!(quest_sync::remove_quest_item(&mut conn, &mut out, 10001, 3), 3);
+    assert_eq!(quest_sync::remove_quest_item(&mut conn.session, &mut out, 10001, 3), 3);
     assert!(conn.session.quest_items.is_empty());
     assert_eq!(out.outgoing.len(), 4);
 
     // Sub 0x04 clears everything for an id, once.
-    assert!(quest_sync::add_quest_item(&mut conn, &mut out, 26012, 1));
-    assert!(quest_sync::clear_quest_item(&mut conn, &mut out, 26012));
+    assert!(quest_sync::add_quest_item(&mut conn.session, &mut out, 26012, 1));
+    assert!(quest_sync::clear_quest_item(&mut conn.session, &mut out, 26012));
     // 26012 = 0x659C -> LE `9C65`.
     assert_eq!(out.outgoing[5].frame, "F444040018049C65");
     assert!(conn.session.quest_items.is_empty());
-    assert!(!quest_sync::clear_quest_item(&mut conn, &mut out, 26012));
+    assert!(!quest_sync::clear_quest_item(&mut conn.session, &mut out, 26012));
     assert_eq!(
         out.outgoing.len(),
         6,
@@ -176,8 +176,8 @@ fn test_quest_item_capacity_refuses_with_full_toast() {
 
     // Stack cap: a merge past 255 is refused wholesale (client returns 0 and
     // writes nothing), and the client's only signal is Sub 0x03.
-    assert!(quest_sync::add_quest_item(&mut conn, &mut out, 10001, 255));
-    assert!(!quest_sync::add_quest_item(&mut conn, &mut out, 10001, 1));
+    assert!(quest_sync::add_quest_item(&mut conn.session, &mut out, 10001, 255));
+    assert!(!quest_sync::add_quest_item(&mut conn.session, &mut out, 10001, 1));
     assert_eq!(conn.session.quest_items[0].count, 255, "refused merge must not write");
     assert_eq!(out.outgoing.last().unwrap().frame, "F44402001803");
 
@@ -185,14 +185,14 @@ fn test_quest_item_capacity_refuses_with_full_toast() {
     // rows 2..=200 take ids 10002..=10200).
     for id in 10002..=10200 {
         assert!(
-            quest_sync::add_quest_item(&mut conn, &mut out, id, 1),
+            quest_sync::add_quest_item(&mut conn.session, &mut out, id, 1),
             "id {id} must still fit before the 200-row cap"
         );
     }
     assert_eq!(conn.session.quest_items.len(), quest_sync::QUEST_SLOT_MAX as usize);
 
     let before = out.outgoing.len();
-    assert!(!quest_sync::add_quest_item(&mut conn, &mut out, 20001, 1));
+    assert!(!quest_sync::add_quest_item(&mut conn.session, &mut out, 20001, 1));
     assert_eq!(conn.session.quest_items.len(), 200, "full bag must not grow");
     assert_eq!(
         out.outgoing[before].frame,
@@ -202,7 +202,7 @@ fn test_quest_item_capacity_refuses_with_full_toast() {
     assert_eq!(out.outgoing.len(), before + 1, "no add frame may follow the toast");
 
     // A zero-count add is a no-op (nothing on the wire, nothing in state).
-    assert!(!quest_sync::add_quest_item(&mut conn, &mut out, 30001, 0));
+    assert!(!quest_sync::add_quest_item(&mut conn.session, &mut out, 30001, 0));
     assert_eq!(out.outgoing.len(), before + 1);
 }
 
@@ -216,14 +216,14 @@ fn test_quest_dont_marks_and_client_bounds() {
     let mut out = HandleOutcome::default();
 
     // Set: mark 101 = 0x0065 LE -> `6500`, flag 1.
-    assert!(quest_sync::set_quest_dont(&mut conn, &mut out, 101, 1));
+    assert!(quest_sync::set_quest_dont(&mut conn.session, &mut out, 101, 1));
     assert!(conn.session.quest_dont.contains(&101));
     assert_eq!(out.outgoing[0].frame, "F44405001805650001");
 
     // Bounds: the client computes `mark - 1` bounded to 299, so 0 underflows
     // and 301 overflows into `_BoundErr` -> reject before the wire.
-    assert!(!quest_sync::set_quest_dont(&mut conn, &mut out, 0, 1));
-    assert!(!quest_sync::set_quest_dont(&mut conn, &mut out, 301, 1));
+    assert!(!quest_sync::set_quest_dont(&mut conn.session, &mut out, 0, 1));
+    assert!(!quest_sync::set_quest_dont(&mut conn.session, &mut out, 301, 1));
     assert_eq!(
         out.outgoing.len(),
         1,
@@ -231,11 +231,11 @@ fn test_quest_dont_marks_and_client_bounds() {
     );
 
     // Upper edge 300 = 0x012C LE -> `2C01` is still accepted.
-    assert!(quest_sync::set_quest_dont(&mut conn, &mut out, 300, 1));
+    assert!(quest_sync::set_quest_dont(&mut conn.session, &mut out, 300, 1));
     assert_eq!(out.outgoing[1].frame, "F444050018052C0101");
 
     // Clearing emits flag 0 and drops the mark.
-    assert!(quest_sync::set_quest_dont(&mut conn, &mut out, 101, 0));
+    assert!(quest_sync::set_quest_dont(&mut conn.session, &mut out, 101, 0));
     assert!(!conn.session.quest_dont.contains(&101));
     assert_eq!(out.outgoing[2].frame, "F44405001805650000");
 }
@@ -247,7 +247,7 @@ fn test_actor_state_flag_frame() {
     conn.session.id = 1001; // 0x000003E9 -> LE `E9030000`
 
     // Kind 1 (Bad-Luck-God), flag 0 = expiry (client plays WA0006.wav).
-    quest_sync::send_actor_state_flag(&conn, &mut out, 1, 0);
+    quest_sync::send_actor_state_flag(&conn.session, &mut out, 1, 0);
     assert_eq!(out.outgoing[0].frame, "F44409001808E9030000010000");
 }
 
@@ -263,8 +263,8 @@ fn test_quest_task_rows_share_pool_with_items() {
     // Item takes row 1 -> the first quest task must land on row 2, proving
     // both collections draw from the client's single `0x654 + slot * 3` array
     // (Bear's `TaskQuest.Count + 1` numbering would have collided here).
-    assert!(quest_sync::add_quest_item(&mut conn, &mut out, 10001, 1));
-    assert!(quest_sync::set_quest_task(&mut conn, &mut out, 10801, 3));
+    assert!(quest_sync::add_quest_item(&mut conn.session, &mut out, 10001, 1));
+    assert!(quest_sync::set_quest_task(&mut conn.session, &mut out, 10801, 3));
     assert_eq!(
         out.outgoing[1].frame,
         "F4440600180602312A03",
@@ -273,16 +273,16 @@ fn test_quest_task_rows_share_pool_with_items() {
     assert_eq!(conn.session.quest_tasks[&10801], (2, 3));
 
     // Re-saving the same quest keeps its row and only advances the step.
-    assert!(quest_sync::set_quest_task(&mut conn, &mut out, 10801, 4));
+    assert!(quest_sync::set_quest_task(&mut conn.session, &mut out, 10801, 4));
     assert_eq!(out.outgoing[2].frame, "F4440600180602312A04");
     assert_eq!(conn.session.quest_tasks.len(), 1);
 
     // The next quest takes row 3.
-    assert!(quest_sync::set_quest_task(&mut conn, &mut out, 10802, 1));
+    assert!(quest_sync::set_quest_task(&mut conn.session, &mut out, 10802, 1));
     assert_eq!(out.outgoing[3].frame, "F4440600180603322A01");
 
     // quest_id 0 is the client's free-row marker -> rejected, no frame.
-    assert!(!quest_sync::set_quest_task(&mut conn, &mut out, 0, 1));
+    assert!(!quest_sync::set_quest_task(&mut conn.session, &mut out, 0, 1));
     assert_eq!(out.outgoing.len(), 4);
 }
 

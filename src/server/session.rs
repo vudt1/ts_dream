@@ -228,6 +228,9 @@ pub struct Session {
     /// Quest-only item bag (`0x18 Sub 0x01..0x04`), separate from `homdo` and
     /// stacked per quest rules (200 rows, stack <= 255 — not the homdo 25/50).
     pub quest_items: Vec<InventoryItem>,
+    /// Per-event completion counters (`eveid -> count`), incremented by
+    /// `finish_event_session` when the session produced state-changing results.
+    pub completed_eve_counts: std::collections::HashMap<i32, i32>,
 
     pub pets: Vec<PetState>,
     pub active_pet_stt: u8,
@@ -358,6 +361,7 @@ impl Default for Session {
             quest_tasks: std::collections::HashMap::new(),
             quest_dont: std::collections::HashSet::new(),
             quest_items: Vec::new(),
+            completed_eve_counts: std::collections::HashMap::new(),
 
             pets: Vec::new(),
             active_pet_stt: 0,

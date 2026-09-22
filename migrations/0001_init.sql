@@ -2,6 +2,13 @@
 -- TS Dream — SQLite Database Schema (Migration 0001)
 -- Converted from 0001_init_mysql.sql with SQLite 3 standard conventions.
 -- Contains full domain column comments for future coding agents.
+--
+-- Đây là BASELINE DUY NHẤT chứa toàn bộ schema trong một file (kể cả phần Eve
+-- persistence — 3 bảng character_quest_* + cột completioncount — trước đây nằm
+-- ở 0002_eve_persistence.sql, đã gộp lại 2026-09-22 vì chưa từng chạy lên DB
+-- nào). MỌI câu lệnh đều CREATE ... IF NOT EXISTS → chạy lặp lại an toàn
+-- (test suite thực thi file này nhiều lần trong cùng process; KHÔNG được thêm
+-- ALTER TABLE ADD COLUMN vì SQLite không hỗ trợ IF NOT EXISTS cho ALTER).
 -- ============================================================================
 
 -- ============================================================================
@@ -227,6 +234,7 @@ CREATE TABLE IF NOT EXISTS character_completed_events (
     playerid    INTEGER NOT NULL,       -- Mã ID nhân vật người chơi
     eventid     INTEGER NOT NULL,       -- Mã ID sự kiện kịch bản trong eve.emg đã tham gia
     completedat INTEGER DEFAULT 0,      -- Thời điểm hoàn thành sự kiện (timestamp unix)
+    completioncount INTEGER NOT NULL DEFAULT 0, -- Số lần hoàn thành sự kiện (Eve conditionClass=12, Checkpoint 6)
     PRIMARY KEY (playerid, eventid)
 );
 
@@ -284,5 +292,41 @@ CREATE TABLE IF NOT EXISTS gm_audit_log (
     action            TEXT NOT NULL,
     details           TEXT NOT NULL,
     created_at        INTEGER NOT NULL
+);
+
+-- ============================================================================
+-- character_quest_tasks — dòng nhật ký nhiệm vụ phía client (Opcode 0x18
+-- Sub 0x06, Checkpoint 6). Hàng chia sẻ `slot` (1..=200) nằm chung mảng với
+-- quest item; `markstep` là bước hiện tại (byte thấp của result_value của
+-- action class 2).
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS character_quest_tasks (
+    playerid INTEGER NOT NULL,              -- Mã ID nhân vật người chơi (PK chung)
+    questid  INTEGER NOT NULL,              -- Mã nhiệm vụ (parameter của action class 2)
+    slot     INTEGER NOT NULL,              -- Hàng chia sẻ trên client, 1..=200
+    markstep INTEGER NOT NULL DEFAULT 0,    -- Bước hiện tại của nhiệm vụ
+    PRIMARY KEY (playerid, questid)
+);
+
+-- ============================================================================
+-- character_quest_dont — cờ quest-dont (Opcode 0x18 Sub 0x05), mark 1..=300.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS character_quest_dont (
+    playerid INTEGER NOT NULL,              -- Mã ID nhân vật người chơi
+    mark     INTEGER NOT NULL,              -- Chỉ số mark quest-dont (1..=300)
+    PRIMARY KEY (playerid, mark)
+);
+
+-- ============================================================================
+-- character_quest_items — túi item riêng của nhiệm vụ (Opcode 0x18 Sub
+-- 0x01..0x04), tách khỏi `inventories`: stack tối đa 255, tối đa 200 hàng
+-- dùng chung với quest task.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS character_quest_items (
+    playerid INTEGER NOT NULL,              -- Mã ID nhân vật người chơi
+    itemid   INTEGER NOT NULL,              -- Mã vật phẩm nhiệm vụ
+    slot     INTEGER NOT NULL,              -- Hàng chia sẻ trên client, 1..=200
+    count    INTEGER NOT NULL DEFAULT 0,    -- Số lượng (không vượt 255)
+    PRIMARY KEY (playerid, itemid)
 );
 

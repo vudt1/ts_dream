@@ -1,4 +1,4 @@
-# Handoff: NPC Talk & Eve Script System (Opcodes 0x14 & 0x18)
+# Handoff: NPC Talk & Eve Script System — Checkpoint 1–6 (Opcodes 0x14 & 0x18)
 
 ## 1. Summary of Work Completed
 
@@ -102,22 +102,49 @@ Tài liệu thiết kế chi tiết và lộ trình tổng thể:
   `test_research_builder_hexes_match_wire` (8 sub-opcode), `test_add_merge_remove_clear_quest_item`, `test_quest_item_capacity_refuses_with_full_toast` (200 row + stack 255), `test_quest_dont_marks_and_client_bounds`, `test_quest_task_rows_share_pool_with_items` (item chiếm row 1 → task nhận row 2), `test_actor_state_flag_frame`, `test_login_sequence_syncs_quest_state_only_when_present`.
 - **Regression targeted** (không chạy `--all-targets` theo yêu cầu user): `db_repository_init_test` 11/11 + `login_char_flow_test` 5/5 + 4 suite CP1–4 (`npc_talk_multistep` 3/3, `npc_talk_transmit` 3/3, `npc_eve_resolve` 3/3, `wire_codec_14_18` 11/11) + `wiring_hotkey_notice` 6/6 — **tổng 49/49 PASS**, đã tự chạy xác nhận.
 
+### Checkpoint 6 (Đã hoàn thành 100% — 2026-09-22)
+
+- **Mục tiêu**: đóng nốt phần còn lại của Eve pipeline — Door/Battle dispatch trong walker trung tâm, trigger Eve battle từ server, Action executor class 2/5/7, nối quest/mission vào `snapshot_state`, auto-chain sau Door/Battle, SQLite persist cho quest/Eve state, và bộ targeted test E2E.
+- **Spec & 11 quyết định design**: nằm ở [`.scratch/op-working/research-checkpoint-6-autochain-battle-persist.md`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/.scratch/op-working/research-checkpoint-6-autochain-battle-persist.md) — tài liệu này chỉ ghi phần code đã triển khai + test, không lặp lại spec.
+- **Mã nguồn triển khai** (7 file src + 1 migration mới + 1 test mới):
+  - [`src/server/handlers/talk.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/src/server/handlers/talk.rs) (file chính của CP6):
+    - `execute_event_step` — **Door** (`result_type 2`): tra `data.warps[(map_id, parameter)]` → `quest::perform_warp` → `finish_event_session` (quyết định CP6 #11: Door tự kết thúc session — warp đã đẩy player khỏi map nên auto-chain ra `NoMatch`); warp thiếu → skip (advance + đi tiếp); party follower (`id_leader > 0 && != id`) → từ chối warp + đóng thoại an toàn. **Battle** (`result_type 3`): pre-check `scene.fight_datas[result_mean_no]` (thiếu row → skip, **không bao giờ park**), `diahinh = scene_infos[1].background_no` fallback **112**, park `phase = AwaitingBattle` với index giữ trên battle result (quy ước Talk/Sub 6), giao `out.eve_battle = (fight_id, diahinh)` rồi trả về — không gửi frame nào.
+    - `execute_action_result` — **class 2** (Bear `QuestSaveHandler` parity): save gate `pStyle1 ∈ {1,2,3,10,30,50,70}` / `pStyle4` (luôn) / `pStyle2 ∈ {1,9}`; `pStyle3 + step0` → `remove_quest_task` (frame `0x18 Sub 0x04` clear-by-id); quest mới → `step.max(1)`; quest cũ → `current + step`, hoặc `current - 1` khi `battle_result ∈ {2,3}` (đọc từ `current_event_session`). **class 5** (gold, `GoldEffectHandler`): type1 `< 1000` → cộng `point` theo tỷ lệ 20:1, `≥ 1000` → cộng `gold` + frame `gold_frame`; type2 debug-skip. **class 7** (`StatBonusAndBallEffectHandler` + `GetSaveMap`): `pStyle1` → `save_map`; `param1 + pStyle2/3` → `skill_point` (stat `0x25`) / `point` (stat `0x26`); type4 (EXP) & army → deferred có log.
+    - **`resume_eve_after_battle(session, outcome, data) -> (Vec<String>, Option<(u16, i32)>)`** (`pub`, đặt trong `talk.rs` vì nó drive máy trạng thái dialog của module này — `battle::service` chỉ forward): **Win** → `battle_result=1`, `phase=Executing`, index+1, walk tiếp tới điểm cần input; **Lose/Flee** → ghi 2/3 rồi `end_talk_session` (unlock + `1408`, **không** auto-chain sau trận thua); `Running` / session chưa park → no-op. `next_battle` mang eve battle phát sinh **trong lúc** walk resume (trận thứ 2 cùng session).
+    - Guards mới: Sub 6 (`handle_talk_continue`) và Sub 9 (`handle_talk_select_menu`) bị **ignore** trong lúc `AwaitingBattle` — stray packet không advance qua battle result đang park (advance thuộc về resume).
+    - Walker refactor: mọi eve-path fn nhận `&mut Session` (không phải `&mut Conn`) — resume chạy từ sync `BattleSink` callback nên chỉ có session guard.
+  - [`src/battle/service.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/src/battle/service.rs): `start_eve_encounter(&self, session, fight_id, diahinh) -> i32` (tra `scene.fight_datas`, trả `0` khi thiếu → caller không được park); `BattleSinkImpl.eve_service: OnceLock<Weak<BattleService>>` + `install_eve_backref(&Arc<Self>)`; `battle_ended` gọi resume **bên trong** vòng xoá `members` và **trước** snapshot `ended_sessions` (stat write của resume kịp persist), collect `eve_followups` rồi start **sau khi** `members` unlock; thiếu backref → `tracing::warn` + skip (không bao giờ kẹt `AwaitingBattle`). Gate legacy `battle_quest_win` bằng `talking_battle <= 0`.
+  - [`src/web/server_control.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/src/web/server_control.rs): `BattleService::install_eve_backref(&battle_service)` ngay sau `Arc::new`; start eve battle (`start_eve_encounter` + re-insert online registry) **ngay sau khi flush xong** `out.outgoing` — FIFO của connection channel đảm bảo talk frames luôn đứng trước battle frames.
+  - [`src/server/handlers/npc_event.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/src/server/handlers/npc_event.rs): `snapshot_state` wired — `missions` từ `quest_tasks` (qid → step), `battle_result`/surface/choice từ `current_event_session` (mặc định `-1/-1/0`), `completed_eve_counts` clone, `quest_dont` → `mission_flags` (key-space assumption, inert tới khi có setter), `mark_defs` để rỗng (CP6 #6).
+  - [`src/server/handlers/shops.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/src/server/handlers/shops.rs): `gold_frame` → `pub`.
+  - [`src/server/auto_save.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/src/server/auto_save.rs): fingerprint mix thêm `quest_tasks` / `quest_dont` / `quest_items` / `completed_eve_counts` — **sort key trước khi mix** (HashMap iteration order random per instance).
+  - [`src/db/modern/sqlite/session.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/src/db/modern/sqlite/session.rs): `load_eve_state` (**private**, hook best-effort ở cuối `load()`) + `save_eve_state` (**pub**, transaction **riêng** sau `tx.commit()` của `save()`); thiếu bảng 0002 → `tracing::debug` + skip, login/save không fail (ADR 0004).
+  - [`migrations/0002_eve_persistence.sql`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/migrations/0002_eve_persistence.sql) (**mới**): `ALTER TABLE character_completed_events ADD COLUMN completioncount` + `character_quest_tasks` / `character_quest_dont` / `character_quest_items`. **`pool::migrate` là no-op (ADR 0004) ⇒ phải apply MỘT LẦN thủ công cho DB production:**
+    ```bash
+    sqlite3 DB/ts_dream.db < migrations/0002_eve_persistence.sql
+    ```
+    Trước khi apply, server vẫn chạy bình thường (best-effort degrade) — test `persistence_degrades_without_migration_0002` chứng minh.
+- **Kiểm thử**: [`tests/npc_eve_e2e_test.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/tests/npc_eve_e2e_test.rs) (**mới, 19 tests — 19/19 PASS**):
+  - class 2 (4 test): quest mới + floor step 1 + completion count, increment, battle-backup (`resBattle` 2 → −1), remove (`pStyle3+step0`), save-gate skip — mỗi case assert đúng frame `QuestSyncCodec` + tail unlock/`1408`.
+  - class 5 (1) + class 7 (1): point×20 / gold / type2 skip; skill_point `0x25`, point `0x26`, `pStyle1` → `save_map`, army+type4 deferred không đổi state.
+  - Door (3): warp byte-identical (`1407` fade → `0x0C` relocate → hide broadcast → unlock/`1408`, registry cập nhật, **không** bump completion watermark), missing-warp skip, party follower từ chối.
+  - Battle (3): **flush order** — walker entry 1 giao Talk frame, walker entry 2 qua `dispatch(0x14 Sub 6)` park với `eve_battle = Some((7, 55))` và 0 frame (chứng minh talk frames đứng trước battle frames); stray Sub 6 / Sub 9 lúc `AwaitingBattle` bị ignore; missing fight/scene skip; `diahinh` fallback 112.
+  - resume (3): Win → advance + quest write + count bump + `next_battle=None`; Lose/Flee → unlock + `1408`, session sạch, không auto-chain; `Running` & unparked → no-op.
+  - `snapshot_state` wiring (1), persistence round-trip qua `save()`/`load()` + đọc trực tiếp cột `completioncount` (1), degrade không có 0002 trên tempfile DB (1), fingerprint sensitivity + insertion-order independence (1).
+  - Kỹ thuật: synthetic `GameData` (không load `Data/`), `EventSession` `eve_no=5` + `scene.npcs` rỗng → auto-chain luôn `NoMatch` tất định; frame assert so với chính codec pub server dùng.
+- **Regression targeted** (từng lệnh một, không `--all-targets`): `quest_sync_18` 7/7 + `db_repository_init` 11/11 + `movement_warp` 8/8 + `create_char_atomic` 5/5 + `npc_eve_resolve` 3/3 + `npc_talk_multistep` 3/3 — cùng `npc_eve_e2e` 19/19 ⇒ **tổng 56/56 PASS**.
+- **Deviation đã ghi nhận** (chi tiết research CP6 §decisions): gold bão hòa `u16::MAX` (khác Bear 1e9 — `Session.point` là `u16`); class 2 quest cũ + step0 → `current+0` (Bear outer guard là no-op); `quest_dont → mission_flags` key mark↔mission chưa có setter; `load_eve_state` giữ **private** (test round-trip đi qua hook public `save()`/`load()` thật).
+
 ---
 
 ## 2. Current State & Next Steps
 
-Hệ thống đã sẵn sàng cho **Checkpoint 6**:
+**Checkpoint 6 đã hoàn thành** — toàn bộ CP1–CP6 xong, tất cả file **chưa commit** (repo không có remote, agent không tự commit).
 
-- **Checkpoint 6 (các phần còn lại)**:
-  - Door/Warp (`result_type 2`) & Battle trigger (`result_type 3` → `BattleTrigger::Eve`) — hiện đang safe-end + `TODO(CP6)` trong `execute_event_step`.
-  - Action class 2 (Eve mission store — `TODO(ticket 08)`) & class 7 (exp/gold selector mapping — chưa proven).
-  - Nối `quest_tasks`/`quest_dont` vào `npc_event::snapshot_state` (`missions`/`raw_flags` đang là rỗng) để điều kiện Eve đọc được tiến trình quest đã sync ở CP5.
-  - Mở lại auto-chain cho nhánh Door/Battle nếu cần (deviation #5 của CP4).
-  - SQLite Persist: nạp `quest_tasks`/`quest_dont` khi login (trước Step 22) + ghi-through khi `has_state_changing_results()`.
-  - Nghiên cứu: [`.scratch/op-working/research-checkpoint-6-autochain-battle-persist.md`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/.scratch/op-working/research-checkpoint-6-autochain-battle-persist.md).
-- **Việc cần làm ngay (human/agent)**:
-  1. User review & commit thủ công các file CP5: `src/server/session.rs`, `src/server/handlers/quest_sync.rs`, `src/server/handlers/mod.rs`, `src/server/spawn.rs`, `tests/quest_sync_18_test.rs`, `tests/db_repository_init_test.rs` (cùng doc: handoff này + research CP5).
-  2. Các file CP4 vẫn chờ commit: `src/server/handlers/talk.rs`, `src/server/handlers/npc_event.rs`, `tests/npc_talk_multistep_test.rs`, `tests/npc_eve_resolve_test.rs`, research CP4.
+- **Việc cần làm ngay (human)**:
+  1. Apply migration 0002 thủ công cho DB production (1 lần): `sqlite3 DB/ts_dream.db < migrations/0002_eve_persistence.sql`.
+  2. Review & commit thủ công. File CP6: `src/server/handlers/talk.rs`, `src/server/handlers/npc_event.rs`, `src/server/handlers/shops.rs`, `src/battle/service.rs`, `src/web/server_control.rs`, `src/server/auto_save.rs`, `src/db/modern/sqlite/session.rs`, `migrations/0002_eve_persistence.sql`, `tests/npc_eve_e2e_test.rs` (+ research CP6 + handoff này). File CP4/CP5 vẫn chờ commit: `src/server/handlers/quest_sync.rs`, `src/server/handlers/mod.rs`, `src/server/spawn.rs`, `src/server/session.rs`, `tests/quest_sync_18_test.rs`, `tests/npc_talk_multistep_test.rs`, `tests/npc_eve_resolve_test.rs`, `tests/db_repository_init_test.rs`.
+  3. (Tùy chọn) Bật eve feature `TS_EVE_EVENTS=1` để smoke-test live; mặc định **tắt** để giữ golden parity (resolve trả `None` khi tắt → replay không đổi).
 
 ---
 
@@ -125,8 +152,9 @@ Hệ thống đã sẵn sàng cho **Checkpoint 6**:
 Tuân thủ tuyệt đối quy định trong [`AGENTS.md`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/AGENTS.md):
 - **Cấm** viết `#[cfg(test)]` inline trong thư mục `src/`.
 - Mọi unit / integration test mới bắt buộc phải nằm ở thư mục `tests/`.
-- **Ràng buộc bổ sung từ user (từ CP4 trở đi)**: **hạn chế `cargo test --all-targets`** — chỉ chạy `cargo test --test <tên_test>` với các file test đã **thay đổi hoặc tạo mới** trong lượt làm việc. Khi cần kiểm regression phạm vi hẹp, dùng 4 lệnh targeted:
+- **Ràng buộc bổ sung từ user (từ CP4 trở đi)**: **hạn chế `cargo test --all-targets`** — chỉ chạy `cargo test --test <tên_test>` với các file test đã **thay đổi hoặc tạo mới** trong lượt làm việc. Khi cần kiểm regression phạm vi hẹp, dùng các lệnh targeted:
   ```bash
+  cargo test --test npc_eve_e2e_test           # CP6 suite mới (19 tests)
   cargo test --test npc_talk_multistep_test
   cargo test --test npc_talk_transmit_test
   cargo test --test npc_eve_resolve_test
@@ -134,13 +162,17 @@ Tuân thủ tuyệt đối quy định trong [`AGENTS.md`](file:///mnt/d/VUDT/GI
   cargo test --test quest_sync_18_test
   cargo test --test db_repository_init_test   # sửa Session literal
   cargo test --test login_char_flow_test      # sửa chuỗi Logined1
+  cargo test --test movement_warp_test        # fingerprint + warp (8)
+  cargo test --test create_char_atomic_test   # sửa Session literal (5)
   ```
 - Không tự ý commit source — user sẽ commit thủ công.
 
 ---
 
 ## 4. Suggested Skills
-Khi tiếp tục làm việc, các subagents hoặc agent kế tiếp nên sử dụng:
-- `DeepCoder`: Cho các bước implement mã nguồn và chạy test suite targeted.
-- `DeepInvestigator`: Khi cần tra cứu decompile Ghidra C của `aLogin.exe` hoặc cấu trúc opcode trong client (kỳ tới dùng để xác minh byte ChoiceCode client gửi — deviation #1).
+Khi tiếp tục làm việc, các agent kế tiếp nên invoke các skill có sẵn trong repo:
+- `implement`: Các bước implement mã nguồn theo spec/ticket đã chốt + chạy test suite targeted.
+- `diagnosing-bugs`: Khi test fail hoặc có regression sau khi sửa `talk.rs` / `service.rs` / persistence.
+- `code-review`: Review thay đổi từ một commit/điểm cố định trước khi user commit thủ công (2 nhánh Standards + Spec).
+- `tdd`: Khi bổ sung test cho executor/codec mới (red-green trong `tests/`, không `#[cfg(test)]` trong `src/`).
 - `handoff`: Khi kết thúc một checkpoint tiếp theo để cập nhật tài liệu bàn giao.

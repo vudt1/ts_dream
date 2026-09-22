@@ -51,6 +51,9 @@ impl ServerControl {
             svc = svc.with_pool(p.clone());
         }
         let battle_service = Arc::new(svc);
+        // CP6 #4: let `battle_ended` start a chained Eve battle through the
+        // weak back-reference (the sink has no spawn machinery of its own).
+        BattleService::install_eve_backref(&battle_service);
         Self {
             game_port,
             app,
@@ -432,6 +435,18 @@ async fn handle_client_connection(
                                         .await;
                                 }
                                 let _ = tx.send(frame.frame.clone());
+                            }
+                            // CP6 #3: a scripted Eve battle starts only after
+                            // this outcome's own frames are queued — the
+                            // battle's start frames then land behind them in
+                            // the same client channel, so talk frames are
+                            // never reordered behind battle frames.
+                            if let Some((fight_id, diahinh)) = out.eve_battle {
+                                service.start_eve_encounter(&mut conn.session, fight_id, diahinh);
+                                if logined_id > 0 {
+                                    lock_online_sessions()
+                                        .insert(logined_id, conn.session.clone());
+                                }
                             }
                             if !out.map_broadcast.is_empty() {
                                 control.broadcast_map(id, &out.map_broadcast).await;

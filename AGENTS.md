@@ -173,6 +173,8 @@ ts_dream/
         └── texps.rs            # Load công thức tăng điểm kinh nghiệm (TEXP)
 ```
 
-## Lưu ý khác
-Không tự ý commit source, user sẽ tự commit source thủ công.
+## Tool Execution Constraints
+- DO NOT chain multiple search queries or tool calls in parallel.
+- Execute codebase searches and file operations sequentially.
+- Không tự ý commit source, user sẽ tự commit source thủ công.
 ---

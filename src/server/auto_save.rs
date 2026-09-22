@@ -83,6 +83,39 @@ pub fn fingerprint(s: &Session) -> u64 {
         mix_i64(&mut h, *npc);
         mix_i64(&mut h, *step);
     }
+    // CP6: Eve/quest-log state persisted by `save_eve_state`. HashMap/HashSet
+    // iteration order is unstable, so every collection is sorted by key first
+    // — otherwise an unchanged session would fingerprint differently every pass.
+    let mut quest_tasks: Vec<(u16, (u8, u8))> =
+        s.quest_tasks.iter().map(|(&k, &v)| (k, v)).collect();
+    quest_tasks.sort_unstable();
+    for (quest_id, (slot, step)) in quest_tasks {
+        mix_i64(&mut h, i64::from(quest_id));
+        mix_i64(&mut h, i64::from(slot));
+        mix_i64(&mut h, i64::from(step));
+    }
+    let mut quest_dont: Vec<u16> = s.quest_dont.iter().copied().collect();
+    quest_dont.sort_unstable();
+    for mark in quest_dont {
+        mix_i64(&mut h, i64::from(mark));
+    }
+    let mut quest_items = s.quest_items.clone();
+    quest_items.sort_by_key(|item| item.slot);
+    for item in quest_items.iter().filter(|i| i.id > 0) {
+        mix_i64(&mut h, i64::from(item.slot));
+        mix_i64(&mut h, i64::from(item.id));
+        mix_i64(&mut h, i64::from(item.count));
+    }
+    let mut eve_counts: Vec<(i32, i32)> = s
+        .completed_eve_counts
+        .iter()
+        .map(|(&eve_no, &count)| (eve_no, count))
+        .collect();
+    eve_counts.sort_unstable();
+    for (eve_no, count) in eve_counts {
+        mix_i64(&mut h, i64::from(eve_no));
+        mix_i64(&mut h, i64::from(count));
+    }
     h
 }
 

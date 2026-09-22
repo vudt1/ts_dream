@@ -6,8 +6,9 @@ use crate::server::dispatcher::OpcodeCtx;
 use crate::server::session::{Conn, InventoryItem};
 
 /// `F4440A001A04` + gold + `00000000` — the gold-update frame sent after
-/// every successful shop transaction.
-fn gold_frame(gold: u32) -> String {
+/// every successful shop transaction (also used by the Eve gold action in
+/// `handlers::talk`).
+pub fn gold_frame(gold: u32) -> String {
     format!("F4440A001A04{}00000000", encoder::le32(gold))
 }
 

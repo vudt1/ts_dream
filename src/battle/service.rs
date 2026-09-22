@@ -96,6 +96,12 @@ struct BattleSinkImpl {
     /// Shared (same Arc) with the owning [`BattleService`] so `with_pool` can
     /// set it after construction, before any battle starts.
     pool: Arc<tokio::sync::RwLock<Option<crate::db::pool::DbPool>>>,
+    /// Weak back-reference to the owning service, installed by
+    /// [`BattleService::install_eve_backref`] right after construction. It
+    /// lets `battle_ended` start a *chained* Eve battle — the sink itself has
+    /// no battle-spawn machinery. Unset (bare service instances in tests) =
+    /// the chained request is logged and skipped, never left parked.
+    eve_service: std::sync::OnceLock<std::sync::Weak<BattleService>>,
 }
 
 impl BattleSink for BattleSinkImpl {
@@ -300,6 +306,11 @@ impl BattleSink for BattleSinkImpl {
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0);
         let mut ended_sessions: Vec<Session> = Vec::new();
+        // CP6 #4: a battle started from an Eve script parks its session in
+        // `AwaitingBattle`; collect the resume here. A battle hit *during*
+        // the resumed walk needs the spawn machinery (`members` lock still
+        // held below), so it is deferred to right after this block.
+        let mut eve_followups: Vec<(i64, Session, u16, i32)> = Vec::new();
         if let Ok(mut members) = self.members.lock() {
             let ids: Vec<i64> = members.iter().copied().collect();
             members.clear();
@@ -313,6 +324,23 @@ impl BattleSink for BattleSinkImpl {
                             s.battle_id = 0;
                             s.last_battle_end_ms = now_ms;
                             s.encounter_steps = 0;
+                            // CP6 #4 — resume the parked Eve session (frames
+                            // go out on the same channel the battle just
+                            // used, so they land after the battle's own end
+                            // frames). Runs before the snapshot below so the
+                            // resumed stat writes persist too.
+                            let (eve_frames, next_battle) =
+                                crate::server::handlers::talk::resume_eve_after_battle(
+                                    &mut s,
+                                    outcome,
+                                    self.data.as_ref(),
+                                );
+                            for f in &eve_frames {
+                                let _ = p.frames.send(f.clone());
+                            }
+                            if let Some((fight_id, diahinh)) = next_battle {
+                                eve_followups.push((*id, s.clone(), fight_id, diahinh));
+                            }
                             ended_sessions.push(s.clone());
                             let mut map = crate::server::session::lock_online_sessions();
                             if let Some(global_s) = map.get_mut(&(*id as u32)) {
@@ -323,6 +351,9 @@ impl BattleSink for BattleSinkImpl {
                     }
                 }
                 if !session_updated {
+                    // Not in the online registry (logged out / test harness):
+                    // no frame channel exists, so no resume can be delivered.
+                    // A fresh login builds a clean session anyway.
                     let mut map = crate::server::session::lock_online_sessions();
                     if let Some(s) = map.get_mut(&(*id as u32)) {
                         s.battle_id = 0;
@@ -332,6 +363,21 @@ impl BattleSink for BattleSinkImpl {
                     }
                 }
             }
+        }
+        // Chained Eve battle: the `members` lock above is free again, so the
+        // spawn path (which re-enters the sink) can run. A session clone is
+        // passed — `start_encounter_battle` syncs the online entry itself.
+        for (player, session, fight_id, diahinh) in eve_followups {
+            let Some(service) = self.eve_service.get().and_then(std::sync::Weak::upgrade) else {
+                tracing::warn!(
+                    player,
+                    fight_id,
+                    "chained Eve battle skipped: no BattleService backref installed"
+                );
+                continue;
+            };
+            let mut session = session;
+            service.start_eve_encounter(&mut session, fight_id, diahinh);
         }
         // G3 — batch-persist the post-battle player stats (Hp/Sp/Texp/Lv/
         // HpMax/SpMax/Point/SkillPoint) + pet stats (texp) for every member on
@@ -384,6 +430,10 @@ impl BattleSink for BattleSinkImpl {
             for (player, p) in online.iter() {
                 if let Ok(mut s) = p.session.try_write() {
                     if s.talking_battle <= 0 {
+                        // Legacy quest battles only: Eve-scripted sessions
+                        // (CP6 #4) already resumed in the clearing pass and
+                        // never set `talking_battle`, so this gate skips
+                        // `battle_quest_win` for them by construction.
                         continue;
                     }
                     let mut frames = Vec::new();
@@ -420,6 +470,7 @@ impl BattleSink for BattleSinkImpl {
     }
 }
 
+/// Send `frame` to the given player when they are online.
 fn push(online: &tokio::sync::RwLock<OnlineMap>, player: i64, frame: String) {
     if let Some(online) = try_read_online_with_retry(online, 10, std::time::Duration::from_millis(2)) {
         if let Some(p) = online.get(&player) {
@@ -561,6 +612,7 @@ impl BattleService {
             members: Arc::new(Mutex::new(HashSet::new())),
             data: Arc::clone(&data),
             pool: Arc::clone(&pool),
+            eve_service: std::sync::OnceLock::new(),
         });
         BattleService {
             manager: Arc::new(BattleManager::new()),
@@ -845,6 +897,46 @@ impl BattleService {
     ///
     /// Populates the leader, leader's pets, online party members (cols 1, 3, 0, 4)
     /// and their pets, and up to 10 enemies defined in `fight_data.left_enemies`.
+    /// Install the weak self-reference the sink needs to start a *chained*
+    /// Eve battle from `battle_ended` (CP6 #4). Call once right after the
+    /// service is placed in its `Arc`:
+    ///
+    /// ```ignore
+    /// let service = Arc::new(BattleService::new(data));
+    /// BattleService::install_eve_backref(&service);
+    /// ```
+    ///
+    /// Without it a chained request is logged and skipped (never parked), so
+    /// the bare service instances built by tests keep working unchanged.
+    pub fn install_eve_backref(this: &Arc<Self>) {
+        let _ = this.sink.eve_service.set(Arc::downgrade(this));
+    }
+
+    /// Start the scripted Eve battle behind a `result_type == 3` result
+    /// (CP6 #2): resolve `fight_id` in the current map's `scene.fight_datas`
+    /// and spawn the same PvE encounter the random-encounter path uses, on the
+    /// caller-resolved background (`diahinh`).
+    ///
+    /// Returns the spawned battle id, or `0` when the map has no such fight
+    /// row — the caller must then close instead of parking a session on a
+    /// battle that can never start.
+    pub fn start_eve_encounter(&self, session: &mut Session, fight_id: u16, diahinh: i32) -> i32 {
+        let Some(fight) = self
+            .data
+            .scene_eve_data
+            .get(&u32::from(session.map_id))
+            .and_then(|scene| scene.fight_datas.get(&fight_id))
+        else {
+            tracing::debug!(
+                map_id = session.map_id,
+                fight_id,
+                "Eve battle start skipped: map has no FightData row"
+            );
+            return 0;
+        };
+        self.start_encounter_battle(session, fight, diahinh)
+    }
+
     pub fn start_encounter_battle(
         &self,
         leader_session: &mut Session,
