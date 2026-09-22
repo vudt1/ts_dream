@@ -82,23 +82,42 @@ Tài liệu thiết kế chi tiết và lộ trình tổng thể:
 4. Stray Sub 6 trong lúc `AwaitingChoice` bị ignore (spec không đề cập; an toàn hơn là nhảy qua Surface).
 5. `finish_event_session` **không** auto-chain cho nhánh Door/Battle safe-end — nếu CP6 muốn chain ngay sau door thì mở lại.
 
+### Checkpoint 5 (Đã hoàn thành 100% — 2026-09-22)
+- **Mục tiêu**: Triển khai kênh đồng bộ quest & cờ trạng thái Opcode `0x18 Sub 0x01..0x08` (S→C): Session fields + session-facing handler + login bulk sync. Codec vốn đã sẵn từ CP1.
+- **Mã nguồn triển khai**:
+  - [`src/server/session.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/src/server/session.rs): +3 fields — `quest_tasks: HashMap<u16, (u8, u8)>` (quest_id → slot, mark_step), `quest_dont: HashSet<u16>`, `quest_items: Vec<InventoryItem>` (túi quest tách `homdo`).
+  - [`src/server/handlers/quest_sync.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/src/server/handlers/quest_sync.rs) (mới, ~270 dòng): hằng số biên client (`QUEST_SLOT_MAX=200`, `QUEST_DONT_MARK_MIN/MAX=1..=300`, `QUEST_ITEM_STACK_CAP=255`), allocator slot dùng chung `next_free_slot`, và các mutator 1-1 với frame: `add_quest_item` (Sub 1), `remove_quest_item` (Sub 2), `clear_quest_item` (Sub 4), `set_quest_dont` (Sub 5), `set_quest_task` (Sub 6 single), `send_actor_state_flag` (Sub 8), `sync_frames` (bulk login: Sub 6 bulk → Sub 7 bulk → Sub 1/item).
+  - [`src/server/spawn.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/src/server/spawn.rs): **Step 22** của chuỗi `Logined1` — `frames.extend(quest_sync::sync_frames(s))`, khớp thứ tự Bear `loginChar` (tasks → dont, sau inventory dumps). Trạng thái rỗng ⇒ **không frame `0x18` nào** → giữ nguyên golden parity.
+  - [`src/server/handlers/mod.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/src/server/handlers/mod.rs): export `pub mod quest_sync`.
+  - [`tests/db_repository_init_test.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/tests/db_repository_init_test.rs): 3 struct literal `Session` exhaustive được thêm 3 field mới (cùng lỗi CP3 đã từng sửa).
+  - Dispatcher **không đổi**: `0x18` là kênh S→C thuần (aLogin không gửi `0x18` C→S), nên nhánh C→S vẫn nằm ở unimplemented boundary có kiểm soát.
+- **Deviation & phát hiện mới** (chi tiết: research CP5 §5, cập nhật 2026-09-22):
+  1. **Túi quest & quest log dùng CHUNG mảng 200 row của client** — `FUN_00720ca8` (Sub 1) và `FUN_0072bb6c` (Sub 6) đều ghi `LocalActor + 0x654 + slot*3`. ⇒ Server cấp slot từ **một pool dùng chung** cho cả `quest_items` và `quest_tasks` (khác Bear: `TaskQuest.Count + 1` → có thể đè row của item).
+  2. **Biên client hard-fail (`_BoundErr`)**: slot `1..=200`, mark `1..=300` (mark 0 underflow), stack quest item `≤255`, và `FUN_00720df0` **từ chối** remove khi `count > owned`. Mutator đều reject trước wire để hai túi không desync.
+  3. **Sub 0x03 là tín hiệu "full" duy nhất** ⇒ phát `F44402001803` khi add bị từ chối (stack tràn / hết row). Bear không bao giờ gửi Sub 1/2/3/7/8 → các nhánh này suy từ decompile, chưa có capture thật.
+  4. **Lỗi hex trong research §4**: `build_quest_task_hex(1, 10801, 3)` đúng là `F4440600180601312A03` (payload 6B), research ghi `0500` là typo — đã đối chiếu `FUN_0072bb6c` stride 4 và `tests/wire_codec_14_18_test.rs`.
+  5. Bear `refreshQuestTask` gửi `add16(mark)` (thừa 1 byte) — client bỏ qua nhờ tính `Len>>2`; codec của ta giữ entry 4B đúng đặc tả.
+  6. Không có wire "xóa quest log" (khác item Clear Sub 4) ⇒ `quest_tasks` không có hàm remove; hoàn thành quest sẽ do CP6 (mission store) định nghĩa.
+- **Kiểm thử**: [`tests/quest_sync_18_test.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/tests/quest_sync_18_test.rs) (mới) **7/7 PASS**:
+  `test_research_builder_hexes_match_wire` (8 sub-opcode), `test_add_merge_remove_clear_quest_item`, `test_quest_item_capacity_refuses_with_full_toast` (200 row + stack 255), `test_quest_dont_marks_and_client_bounds`, `test_quest_task_rows_share_pool_with_items` (item chiếm row 1 → task nhận row 2), `test_actor_state_flag_frame`, `test_login_sequence_syncs_quest_state_only_when_present`.
+- **Regression targeted** (không chạy `--all-targets` theo yêu cầu user): `db_repository_init_test` 11/11 + `login_char_flow_test` 5/5 + 4 suite CP1–4 (`npc_talk_multistep` 3/3, `npc_talk_transmit` 3/3, `npc_eve_resolve` 3/3, `wire_codec_14_18` 11/11) + `wiring_hotkey_notice` 6/6 — **tổng 49/49 PASS**, đã tự chạy xác nhận.
+
 ---
 
 ## 2. Current State & Next Steps
 
-Hệ thống đã sẵn sàng cho **Checkpoint 5**:
+Hệ thống đã sẵn sàng cho **Checkpoint 6**:
 
-- **Checkpoint 5: Quest Synchronization (`0x18 Sub 0x01..0x08`)**:
-  - Codec đã sẵn sàng từ Checkpoint 1 ([`src/protocol/codecs/quest_sync.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/src/protocol/codecs/quest_sync.rs)), cần handler + Session fields (`quest_tasks`, `quest_dont`, `quest_items`).
-  - Nghiên cứu chi tiết: [`.scratch/op-working/research-checkpoint-5-quest-sync.md`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/.scratch/op-working/research-checkpoint-5-quest-sync.md).
 - **Checkpoint 6 (các phần còn lại)**:
   - Door/Warp (`result_type 2`) & Battle trigger (`result_type 3` → `BattleTrigger::Eve`) — hiện đang safe-end + `TODO(CP6)` trong `execute_event_step`.
   - Action class 2 (Eve mission store — `TODO(ticket 08)`) & class 7 (exp/gold selector mapping — chưa proven).
-  - Mở lại auto-chain cho nhánh Door/Battle nếu cần (deviation #5).
-  - SQLite Persist.
+  - Nối `quest_tasks`/`quest_dont` vào `npc_event::snapshot_state` (`missions`/`raw_flags` đang là rỗng) để điều kiện Eve đọc được tiến trình quest đã sync ở CP5.
+  - Mở lại auto-chain cho nhánh Door/Battle nếu cần (deviation #5 của CP4).
+  - SQLite Persist: nạp `quest_tasks`/`quest_dont` khi login (trước Step 22) + ghi-through khi `has_state_changing_results()`.
   - Nghiên cứu: [`.scratch/op-working/research-checkpoint-6-autochain-battle-persist.md`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/.scratch/op-working/research-checkpoint-6-autochain-battle-persist.md).
 - **Việc cần làm ngay (human/agent)**:
-  1. User review & commit thủ công các file: `src/server/handlers/talk.rs`, `src/server/handlers/npc_event.rs`, `tests/npc_talk_multistep_test.rs`, `tests/npc_eve_resolve_test.rs` (cùng 2 doc đã cập nhật: handoff này + research CP4).
+  1. User review & commit thủ công các file CP5: `src/server/session.rs`, `src/server/handlers/quest_sync.rs`, `src/server/handlers/mod.rs`, `src/server/spawn.rs`, `tests/quest_sync_18_test.rs`, `tests/db_repository_init_test.rs` (cùng doc: handoff này + research CP5).
+  2. Các file CP4 vẫn chờ commit: `src/server/handlers/talk.rs`, `src/server/handlers/npc_event.rs`, `tests/npc_talk_multistep_test.rs`, `tests/npc_eve_resolve_test.rs`, research CP4.
 
 ---
 
@@ -112,6 +131,9 @@ Tuân thủ tuyệt đối quy định trong [`AGENTS.md`](file:///mnt/d/VUDT/GI
   cargo test --test npc_talk_transmit_test
   cargo test --test npc_eve_resolve_test
   cargo test --test wire_codec_14_18_test
+  cargo test --test quest_sync_18_test
+  cargo test --test db_repository_init_test   # sửa Session literal
+  cargo test --test login_char_flow_test      # sửa chuỗi Logined1
   ```
 - Không tự ý commit source — user sẽ commit thủ công.
 

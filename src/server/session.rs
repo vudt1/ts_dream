@@ -217,6 +217,18 @@ pub struct Session {
     pub tuideo: Vec<InventoryItem>,
     pub luulang: Vec<InventoryItem>,
 
+    // Quest state (Opcode 0x18 sync — Checkpoint 5).
+    /// Active quest log rows: `quest_id -> (slot, mark_step)`. The slot indexes
+    /// the client's shared quest-entry array (`LocalActor + 0x654 + slot * 3`,
+    /// 1..=200) and is allocated by `handlers::quest_sync`.
+    pub quest_tasks: std::collections::HashMap<u16, (u8, u8)>,
+    /// Quest "dont" marks (non-repeatable quests): mark ids 1..=300. The wire
+    /// carries `(mark, flag)`; a mark present here is flag `1`, absent = `0`.
+    pub quest_dont: std::collections::HashSet<u16>,
+    /// Quest-only item bag (`0x18 Sub 0x01..0x04`), separate from `homdo` and
+    /// stacked per quest rules (200 rows, stack <= 255 — not the homdo 25/50).
+    pub quest_items: Vec<InventoryItem>,
+
     pub pets: Vec<PetState>,
     pub active_pet_stt: u8,
 
@@ -342,6 +354,10 @@ impl Default for Session {
             tientrang: Vec::new(),
             tuideo: Vec::new(),
             luulang: Vec::new(),
+
+            quest_tasks: std::collections::HashMap::new(),
+            quest_dont: std::collections::HashSet::new(),
+            quest_items: Vec::new(),
 
             pets: Vec::new(),
             active_pet_stt: 0,

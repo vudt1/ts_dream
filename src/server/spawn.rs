@@ -593,6 +593,13 @@ pub fn build_logined_sequence_session(s: &Session) -> Vec<String> {
     frames.push(store_frame(s.hp_store));
     frames.push(store_frame(s.sp_store));
 
+    // 22. Step 22: Quest state sync (Opcode 0x18: bulk quest log `Sub 0x06`,
+    //     bulk quest-dont `Sub 0x07`, one `Sub 0x01` per quest item) — the
+    //     Bear `loginChar` order (tasks -> dont) after the inventory dumps.
+    //     Emitted only when the session carries quest state, so a fresh
+    //     character's Logined1 byte stream is unchanged (golden parity).
+    frames.extend(crate::server::handlers::quest_sync::sync_frames(s));
+
     frames
 }
 

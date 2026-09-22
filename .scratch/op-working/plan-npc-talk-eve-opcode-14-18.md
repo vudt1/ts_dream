@@ -133,8 +133,8 @@ flowchart TD
 
 ---
 
-### Checkpoint 5: Triển Khai Kênh Đồng Bộ Nhiệm Vụ & Cờ Trạng Thái (Opcode `0x18`) — [ĐÃ HOÀN THÀNH RESEARCH]
-- **Trạng thái**: **HOÀN THÀNH RESEARCH (2026-09-21)**. Đã đối chiếu chéo Client decompile `case_021`, `0072bb6c` (phát hiện bước nhảy chuẩn 4B/entry), Server Bear `TSClient.cs` và thiết kế trọn bộ API Codec.
+### Checkpoint 5: Triển Khai Kênh Đồng Bộ Nhiệm Vụ & Cờ Trạng Thái (Opcode `0x18`) — [ĐÃ HOÀN THÀNH RESEARCH & IMPLEMENT]
+- **Trạng thái**: **HOÀN THÀNH IMPLEMENT (2026-09-22)**. Đã đối chiếu chéo Client decompile `case_021`, `0072bb6c` (phát hiện bước nhảy chuẩn 4B/entry), Server Bear `TSClient.cs`; đã code handler + Session fields + login bulk sync (test `tests/quest_sync_18_test.rs` 7/7 PASS, regression targeted 42/42 PASS). Bàn giao: [handoff-checkpoint-1-2-3-4.md](handoff-checkpoint-1-2-3-4.md) §Checkpoint 5.
 - **Tài liệu kết quả chi tiết**: Xem [.scratch/op-working/research-checkpoint-5-quest-sync.md](file:///mnt/d/VUDT/GIT_PCC/ts_dream/.scratch/op-working/research-checkpoint-5-quest-sync.md).
 - **Mục tiêu**: Xây dựng handler và builder cho Opcode `0x18` để đồng bộ bảng nhiệm vụ, vật phẩm quest và cờ nhiệm vụ về client `aLogin.exe`.
 - **Kết quả nghiệm thu**:
