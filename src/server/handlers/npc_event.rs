@@ -139,6 +139,14 @@ pub fn snapshot_state(session: &Session) -> PlayerEventState {
         .filter(|i| i.id > 0)
         .map(|i| i32::from(i.id))
         .collect();
+    // Surface/choice context of the active event session feeds
+    // conditionClass=10 (dialog-choice) evaluation; a session without one
+    // keeps the "no dialogue seen yet" -1 defaults (Checkpoint 4).
+    let (last_surface_id, last_choice_code) = session
+        .current_event_session
+        .as_ref()
+        .map(|ev| (ev.last_surface_id, ev.last_choice_code))
+        .unwrap_or((-1, -1));
     EveStateBuilder::build_player_state(&PlayerStateInputs {
         missions: &[],
         raw_flags: &[],
@@ -147,8 +155,8 @@ pub fn snapshot_state(session: &Session) -> PlayerEventState {
         equips: &equips,
         level: i32::from(session.level),
         reborn_count: i32::from(session.reborn),
-        last_surface_id: -1,
-        last_choice_code: -1,
+        last_surface_id,
+        last_choice_code,
         battle_result: 0,
         completed_eve_counts: std::collections::HashMap::new(),
         follow_npc_ids: &[],

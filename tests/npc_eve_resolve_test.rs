@@ -273,13 +273,13 @@ async fn test_dispatch_click_npc_bridges_to_eve_session() {
         &env,
     )
     .await;
+    // Checkpoint 4 superseded the CP2 expectation above: the matched Eve
+    // session (eve 3 = two Action/class-1 results: -32012, +26012) now
+    // executes inline during the click itself and runs to completion, so the
+    // session clears in the same dispatch instead of lingering.
     assert!(
-        conn.session.current_event_session.is_some(),
-        "NPC 3 with item 32012 must activate Eve session"
-    );
-    assert_eq!(
-        conn.session.current_event_session.as_ref().unwrap().eve_no,
-        3
+        conn.session.current_event_session.is_none(),
+        "eve 3 runs to completion on click (action results) and clears"
     );
     assert!(
         outcome_npc3_met
@@ -287,6 +287,29 @@ async fn test_dispatch_click_npc_bridges_to_eve_session() {
             .iter()
             .any(|f| f.frame == "F44402000602"),
         "Must emit F44402000602 dialog trigger"
+    );
+    assert!(
+        outcome_npc3_met
+            .outgoing
+            .iter()
+            .any(|f| f.frame == "F44402001408"),
+        "eve 3 must close the dialog after its action results"
+    );
+    // The bag side effects prove the Eve session activated — a legacy
+    // talk/quest fallback would never touch the inventory.
+    assert!(
+        conn.session
+            .homdo
+            .iter()
+            .all(|i| i.id != 32012 || i.count == 0),
+        "eve 3 must consume item 32012"
+    );
+    assert!(
+        conn.session
+            .homdo
+            .iter()
+            .any(|i| i.id == 26012 && i.count == 1),
+        "eve 3 must grant item 26012"
     );
 }
 

@@ -9,13 +9,28 @@
 //!   selected on this id, never on the object id.
 //! - A **Talk Context** tracks `{talk_type, map_object_id, talk_count, select_menu}`.
 
+use crate::battle::rng::DotNetRandom;
 use crate::data::loader::GameData;
+use crate::data::loaders::EveResult;
+use crate::eve::auto_chain::{AutoChainResult, EventPhase};
 use crate::protocol::codecs::npc_talk::{NpcTalkCodec, TalkLockMode};
 use crate::protocol::encoder;
 use crate::server::dispatcher::{HandleOutcome, OpcodeCtx};
+use crate::server::handlers::npc_event::{self, NpcTrigger};
 use crate::server::handlers::stats::build_stat_update;
 use crate::db::pool::DbPool;
 use crate::server::session::Conn;
+
+/// Reset the legacy talk-context fields (`typetalk`, menu, warp confirm)
+/// plus the active event session — the packet-less half of [`end_talk`],
+/// shared with the CP4 event finish path (whose frames were already sent).
+fn reset_talk_context(conn: &mut Conn) {
+    conn.session.idtalking = 0;
+    conn.session.select_menu = 0;
+    conn.session.talk_count = 0;
+    conn.session.warp_finish = false;
+    conn.session.current_event_session = None;
+}
 
 /// EndTalk packet + reset the whole talk context.
 pub fn end_talk(conn: &mut Conn, out: &mut HandleOutcome) {
@@ -28,11 +43,16 @@ pub fn end_talk(conn: &mut Conn, out: &mut HandleOutcome) {
         out.send(NpcTalkCodec::build_talk_lock_hex(char_id, TalkLockMode::Unlock));
     }
     out.send("F44402001408");
-    conn.session.idtalking = 0;
-    conn.session.select_menu = 0;
-    conn.session.talk_count = 0;
-    conn.session.warp_finish = false;
-    conn.session.current_event_session = None;
+    reset_talk_context(conn);
+}
+
+/// Wall-clock millisecond seed for the Eve RNG (shared by the talk-start
+/// bridge and the Checkpoint 4 continue / menu continuations).
+fn eve_rng_seed() -> i32 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i32)
+        .unwrap_or(12345)
 }
 
 /// Split a dialog hex string on `F444` and emit each fragment 500 ms apart.
@@ -61,7 +81,7 @@ pub async fn handle_talk(ctx: &mut OpcodeCtx<'_>) {
         4 => end_talk(conn, out),
         6 => handle_talk_continue(conn, payload, data, pool, out).await,
         8 => handle_talk_warp(conn, payload, data, &ctx.env, out).await,
-        9 => handle_talk_select_menu(conn, payload),
+        9 => handle_talk_select_menu(conn, payload, data, out),
         _ => end_talk(conn, out),
     }
 }
@@ -92,6 +112,180 @@ fn resolve_npc(data: &GameData, conn: &Conn, map_object_id: i32) -> Option<(i32,
         }
     }
     None
+}
+
+/// Central Checkpoint 4 walker: dispatch the active event session's result
+/// queue from `current_index` until the session needs client input or runs
+/// out of results.
+///
+/// Queue-index convention: `current_index` points at the **last dispatched**
+/// result (talk-start and talk-continue leave it sitting on the delivered
+/// Talk/Surface); Action results advance it inline while walking. Callers
+/// re-entering after a delivered result (Sub 6 / Sub 9) advance it first.
+///
+/// - Talk (`result_type == 1`): emit the step frame and stop — the next
+///   `0x14 Sub 0x06` continues.
+/// - Action (`0`): apply the state change and keep walking (non-blocking).
+/// - Surface (`6`): record `last_surface_id`, switch to
+///   [`EventPhase::AwaitingChoice`], emit the frame and stop — the
+///   `0x14 Sub 0x09` choice answers it.
+/// - Door (`2`) / Battle (`3`): close the talk safely.
+///   TODO(CP6): dispatch door warp / battle trigger instead of ending here.
+/// - Exhausted queue: unlock + close-dialog, then auto-chain into the next
+///   matching event or reset the talk context.
+fn execute_event_step(conn: &mut Conn, data: &GameData, out: &mut HandleOutcome) {
+    loop {
+        // Clone the current result so the action executors below can borrow
+        // `conn` mutably.
+        let next = conn
+            .session
+            .current_event_session
+            .as_ref()
+            .and_then(|ev| ev.results.get(ev.current_index).cloned());
+        let Some(result) = next else {
+            if conn.session.current_event_session.is_some() {
+                finish_event_session(conn, data, out);
+            }
+            return;
+        };
+
+        match result.result_type {
+            // Talk: deliver the step and wait for the client's Sub 6.
+            1 => {
+                out.send(NpcTalkCodec::build_talk_step_hex(&result));
+                return;
+            }
+            // Surface/menu: remember the surface id (conditionClass=10 key),
+            // wait for the client's Sub 9 choice.
+            6 => {
+                if let Some(ev) = conn.session.current_event_session.as_mut() {
+                    ev.last_surface_id = i32::from(result.result_mean_no);
+                    ev.phase = EventPhase::AwaitingChoice;
+                }
+                out.send(NpcTalkCodec::build_talk_step_hex(&result));
+                return;
+            }
+            // Action: apply non-blocking state changes, keep walking.
+            0 => {
+                execute_action_result(conn, data, out, &result);
+                match conn.session.current_event_session.as_mut() {
+                    Some(ev) => ev.current_index = ev.current_index.saturating_add(1),
+                    // Defensive: action executors never clear the session.
+                    None => return,
+                }
+            }
+            // Door / Battle: end safely for now.
+            // TODO(CP6): dispatch door warp / battle trigger here instead.
+            2 | 3 => {
+                tracing::debug!(
+                    result_type = result.result_type,
+                    result_no = result.result_no,
+                    "Eve Door/Battle result reached; closing the talk safely"
+                );
+                end_talk(conn, out);
+                return;
+            }
+            other => {
+                tracing::debug!(other, "unhandled Eve result type; skipping");
+                match conn.session.current_event_session.as_mut() {
+                    Some(ev) => ev.current_index = ev.current_index.saturating_add(1),
+                    None => return,
+                }
+            }
+        }
+    }
+}
+
+/// Close an exhausted event session: unlock the actor, emit the close-dialog
+/// frame, then either auto-chain into the next matching event (re-opening the
+/// dialog) or reset the whole talk context.
+fn finish_event_session(conn: &mut Conn, data: &GameData, out: &mut HandleOutcome) {
+    let char_id = conn.session.id as u32;
+    out.send(NpcTalkCodec::build_talk_lock_hex(char_id, TalkLockMode::Unlock));
+    out.send(NpcTalkCodec::build_end_talk_hex());
+
+    let Some(completed) = conn.session.current_event_session.take() else {
+        return;
+    };
+    let mut rng = DotNetRandom::new(eve_rng_seed());
+    match npc_event::auto_chain_after(&completed, &conn.session, data, &mut rng) {
+        AutoChainResult::Chained(new_ev) => {
+            conn.session.current_event_session = Some(new_ev);
+            out.send("F44402000602");
+            out.send(NpcTalkCodec::build_talk_lock_hex(char_id, TalkLockMode::Lock));
+            // Bounded recursion: EveAutoChainEngine::MAX_CHAIN_DEPTH caps the
+            // chain depth, so a chained session cannot recurse forever.
+            execute_event_step(conn, data, out);
+        }
+        AutoChainResult::NoMatch => {
+            // Frames already sent above — reset only the context (the same
+            // field set `end_talk` clears).
+            reset_talk_context(conn);
+        }
+    }
+}
+
+/// Apply one non-blocking Action result (`result_type == 0`).
+///
+/// `parameter` carries the target id and `result_value` the signed delta
+/// (both live item operations in `eve.emg` use `parameter_style = 0`, so the
+/// delta's sign is the give/take discriminator). Classes without a proven
+/// executor are skipped with a debug log — the walker keeps advancing, so an
+/// unsupported action can never wedge the dialog.
+fn execute_action_result(
+    conn: &mut Conn,
+    data: &GameData,
+    out: &mut HandleOutcome,
+    result: &EveResult,
+) {
+    match result.result_class {
+        // Item: parameter=itemId, result_value=signed quantity.
+        1 => {
+            let qty = result.result_value;
+            if qty < 0 {
+                conn.session
+                    .remove_homdo_item(result.parameter, qty.unsigned_abs());
+            } else if qty > 0 {
+                let count = u8::try_from(qty).unwrap_or(u8::MAX);
+                let item = crate::server::inventory::from_template(data, result.parameter, count);
+                conn.session.add_homdo_item(item);
+            }
+            if qty != 0 {
+                // Sync the mutated bag to the client (legacy H6 gift flow).
+                out.send(conn.session.dump_homdo());
+            }
+        }
+        // Quest/mission flag (parameter=missionId, result_value=target step).
+        2 => {
+            // TODO(ticket 08): no Eve mission-flag store is wired yet —
+            // Session.quest_steps is keyed by NPC object id (legacy H6) and
+            // snapshot_state feeds missions as empty, so writing would land
+            // in the wrong store. Skip honestly rather than invent semantics.
+            tracing::debug!(
+                mission = result.parameter,
+                value = result.result_value,
+                "Eve action quest-flag result skipped: no mission store wired"
+            );
+        }
+        // Player attribute deltas (exp/gold selectors).
+        7 => {
+            // TODO(ticket 08/CP6): the parameter->exp/gold selector mapping
+            // for PC result payloads is not proven and Session carries no
+            // EXP field; skipping is safer than inventing a gold/EXP write.
+            tracing::debug!(
+                param = result.parameter,
+                value = result.result_value,
+                "Eve action player-attribute result skipped: selector unverified"
+            );
+        }
+        other => {
+            tracing::debug!(
+                class = other,
+                param = result.parameter,
+                "Eve action result class has no executor; skipped"
+            );
+        }
+    }
 }
 
 fn handle_talk_start(conn: &mut Conn, payload: &[u8], data: &GameData, out: &mut HandleOutcome) {
@@ -146,16 +340,11 @@ fn handle_talk_start(conn: &mut Conn, payload: &[u8], data: &GameData, out: &mut
         return;
     }
     // Eve Engine event bridge (ticket 04/05 / Checkpoint 2).
-    let mut rng = crate::battle::rng::DotNetRandom::new(
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_millis() as i32)
-            .unwrap_or(12345),
-    );
-    if let Some(event_session) = crate::server::handlers::npc_event::resolve_npc_event(
+    let mut rng = DotNetRandom::new(eve_rng_seed());
+    if let Some(event_session) = npc_event::resolve_npc_event(
         &conn.session,
         data,
-        crate::server::handlers::npc_event::NpcTrigger::ClickNpc(map_object_id),
+        NpcTrigger::ClickNpc(map_object_id),
         &mut rng,
     ) {
         // Wire order (Bear `ClickkNpc`/`processStep`): open dialog frame,
@@ -166,13 +355,16 @@ fn handle_talk_start(conn: &mut Conn, payload: &[u8], data: &GameData, out: &mut
             .first()
             .filter(|r| r.result_type == 1)
             .map(NpcTalkCodec::build_talk_step_hex);
-        // TODO(CP4): dispatch non-talk results (Action/Door/Surface) when
-        // results[0].result_type != 1.
         conn.session.current_event_session = Some(event_session);
         out.send("F44402000602");
         out.send(NpcTalkCodec::build_talk_lock_hex(char_id, TalkLockMode::Lock));
-        if let Some(step) = first_talk {
-            out.send(step);
+        match first_talk {
+            Some(step) => out.send(step),
+            // CP4: a non-Talk head result goes through the central walker —
+            // Action results run to completion inline, a Surface awaits the
+            // Sub 9 choice, and Door/Battle close the talk safely
+            // (TODO(CP6): dispatch door warp / battle trigger).
+            None => execute_event_step(conn, data, out),
         }
         return;
     }
@@ -207,6 +399,24 @@ async fn handle_talk_continue(
     _pool: Option<&DbPool>,
     out: &mut HandleOutcome,
 ) {
+    // Eve engine path (Checkpoint 4): an active event session owns the
+    // continue — the legacy H6 guards below must not run for it.
+    if conn.session.current_event_session.is_some() {
+        if let Some(ev) = conn.session.current_event_session.as_mut() {
+            if ev.phase == EventPhase::AwaitingChoice {
+                // The pending Surface must be answered with Sub 9; a stray
+                // continue must not skip the menu result.
+                tracing::debug!("ignoring talk-continue while awaiting Surface choice");
+                return;
+            }
+            // The queue index sits on the result already delivered; advance
+            // past it before walking the queue again (research CP4 §1.3).
+            ev.current_index = ev.current_index.saturating_add(1);
+        }
+        execute_event_step(conn, data, out);
+        return;
+    }
+
     // H6 pre-dispatch guards.
     if conn.session.warp_finish {
         out.send("F44402000504");
@@ -327,8 +537,77 @@ async fn handle_talk_warp(
     crate::server::handlers::quest::handle_warp_confirm(conn, data, env, out).await;
 }
 
-fn handle_talk_select_menu(conn: &mut Conn, payload: &[u8]) {
-    if !payload.is_empty() {
-        conn.session.select_menu = payload[0] as i32;
+fn handle_talk_select_menu(
+    conn: &mut Conn,
+    payload: &[u8],
+    data: &GameData,
+    out: &mut HandleOutcome,
+) {
+    let Some(&choice) = payload.first() else {
+        return;
+    };
+
+    // Eve menu path (Checkpoint 4): answer a pending Surface choice.
+    let awaiting_choice = conn
+        .session
+        .current_event_session
+        .as_ref()
+        .is_some_and(|ev| ev.phase == EventPhase::AwaitingChoice);
+    if awaiting_choice {
+        // ChoiceCode 0 = "nothing selected yet" (wire default) — ignore it.
+        if choice == 0 {
+            tracing::debug!("ignoring menu select with default ChoiceCode 0");
+            return;
+        }
+        // Record the choice on the active session: `snapshot_state` reads it
+        // back for the conditionClass=10 branch re-evaluation, and the queue
+        // index skips the already-delivered Surface result.
+        let trigger = conn
+            .session
+            .current_event_session
+            .as_mut()
+            .and_then(|ev| {
+                ev.last_choice_code = i32::from(choice);
+                ev.phase = EventPhase::Executing;
+                ev.current_index = ev.current_index.saturating_add(1);
+                match ev.trigger_kind {
+                    1 => Some(NpcTrigger::ClickNpc(ev.npc_click_id)),
+                    4 => Some(NpcTrigger::ClickDoor(ev.npc_click_id)),
+                    8 => Some(NpcTrigger::MeetDoor(ev.npc_click_id)),
+                    _ => None,
+                }
+            });
+        conn.session.select_menu = i32::from(choice);
+
+        let Some(trigger) = trigger else {
+            tracing::debug!("unsupported Eve trigger kind for menu select; ending talk");
+            end_talk(conn, out);
+            return;
+        };
+        // Re-resolve the NPC's event list against the updated snapshot: the
+        // conditionClass=10 chain matching (surfaceId, choiceCode) wins and
+        // becomes the branch session (research CP4 §2.3).
+        let mut rng = DotNetRandom::new(eve_rng_seed());
+        match npc_event::resolve_npc_event(&conn.session, data, trigger, &mut rng) {
+            Some(mut branch) => {
+                // Carry the answered Surface context into the branch session:
+                // later snapshot reads (and auto-chain guard #2, "no Surface
+                // right after answering") must still see the choice.
+                if let Some(prev) = conn.session.current_event_session.as_ref() {
+                    branch.last_surface_id = prev.last_surface_id;
+                    branch.last_choice_code = prev.last_choice_code;
+                }
+                // The dialog frame and actor lock stay in place — deliver the
+                // first step of the matched branch directly.
+                conn.session.current_event_session = Some(branch);
+                execute_event_step(conn, data, out);
+            }
+            // No branch matches this choice: close safely (unlock + 1408).
+            None => end_talk(conn, out),
+        }
+        return;
     }
+
+    // Legacy H6 path: store the raw choice byte for the talk-continue routing.
+    conn.session.select_menu = i32::from(choice);
 }
