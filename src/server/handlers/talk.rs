@@ -216,11 +216,13 @@ pub fn execute_event_step(session: &mut Session, data: &GameData, out: &mut Hand
                     return;
                 }
                 crate::server::handlers::quest::perform_warp(session, warp, out);
-                // Scoping decision (CP6 #11): Door ends its event session —
-                // the warp already moved the player off `completed.map_id`, so
-                // the auto-chain map check below yields NoMatch and the next
-                // `q_open` starts fresh.
-                finish_event_session(session, data, out);
+                // Scoping decision (CP6 #11 & Fix Vấn đề 3): Door ends its event session —
+                // the warp already moved the player off `completed.map_id`.
+                // Do NOT call finish_event_session here: sending 14 08 prematurely clears
+                // the screen fade (14 07) before the client finishes loading the map.
+                // 14 08 will be sent upon map load confirmation (0x0C Sub 1) in system.rs.
+                reset_talk_context(session);
+                session.current_event_session = None;
                 return;
             }
             // Battle: park the session; the connection loop starts the fight
@@ -305,15 +307,15 @@ fn finish_event_session(session: &mut Session, data: &GameData, out: &mut Handle
     }
 }
 
-/// CP6 decision #4 — advance a parked Eve event session
+/// CP6 decision #4 & Phase 1 Fix Vấn đề 2 — advance a parked Eve event session
 /// (`phase == AwaitingBattle`) after its scripted battle ended.
 ///
 /// Returns `(frames, next_battle)`:
-/// - **Win** records `battle_result = 1`, re-enters the queue at the result
-///   *after* the delivered battle (the index was left parked on it — the same
-///   Talk/Sub 6 convention) and walks to the next client-input point.
-/// - **Lose/flee** records 2/3 and closes the talk ([`end_talk_session`]), so
-///   a failed encounter can never leave the dialog frozen.
+/// - **Win / Lose / Flee** records `battle_result` (1=Win, 2=Lose, 3=Flee),
+///   advances `current_index` past the delivered battle, sets
+///   `phase = EventPhase::Executing`, and walks `execute_event_step`.
+///   Subsequent actions (e.g. quest step back-up on loss/flee, loss dialogue,
+///   or post-battle auto-chain) will execute properly.
 /// - `next_battle` carries an `eve_battle` requested *by the resumed walk*
 ///   (a second scripted battle in the same session); the caller — the battle
 ///   service, once its `members` lock is free — starts it.
@@ -345,21 +347,12 @@ pub fn resume_eve_after_battle(
             return (Vec::new(), None);
         };
         ev.battle_result = battle_result;
-        if outcome == Outcome::PlayerWin {
-            ev.phase = EventPhase::Executing;
-            // Index sits on the delivered battle result — advance first.
-            ev.current_index = ev.current_index.saturating_add(1);
-        }
+        ev.phase = EventPhase::Executing;
+        // Index sits on the delivered battle result — advance first.
+        ev.current_index = ev.current_index.saturating_add(1);
     }
     let mut out = HandleOutcome::default();
-    if outcome == Outcome::PlayerWin {
-        execute_event_step(session, data, &mut out);
-    } else {
-        // Lose/flee closes the talk outright (no auto-chain after a failed
-        // encounter). The battle_result recorded above dies with the session
-        // reset; it is kept for symmetry with the win path.
-        end_talk_session(session, &mut out);
-    }
+    execute_event_step(session, data, &mut out);
     let next_battle = out.eve_battle;
     let frames = out.outgoing.into_iter().map(|f| f.frame).collect();
     (frames, next_battle)

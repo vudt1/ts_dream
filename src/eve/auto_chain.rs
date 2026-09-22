@@ -59,11 +59,18 @@ pub struct EventSession {
 
 impl EventSession {
     /// Whether any result mutates server state (decides completion tracking).
+    ///
+    /// If a session included a battle and ended in defeat (`battle_result == 2`)
+    /// or flight (`battle_result == 3`), the encounter was not completed successfully
+    /// and must not be marked completed, allowing the player to retry the encounter.
     #[must_use]
     pub fn has_state_changing_results(&self) -> bool {
+        if self.battle_result == 2 || self.battle_result == 3 {
+            return false;
+        }
         self.results
             .iter()
-            .any(|r| r.result_type == 0 || r.result_type == 3)
+            .any(|r| r.result_type == 0 || (r.result_type == 3 && self.battle_result == 1))
     }
 }
 

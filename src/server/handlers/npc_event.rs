@@ -139,7 +139,10 @@ fn scene_for(data: &GameData, map_id: u16) -> Option<&SceneEveData> {
 /// - **`mark_defs`** (missionId → bitId) stays empty (CP6 decision #6): no
 ///   consumer exists yet, and inventing a projection would make up a mapping
 ///   the data files do not define.
-pub fn snapshot_state(session: &Session) -> PlayerEventState {
+pub fn snapshot_state_with_context(
+    session: &Session,
+    active: Option<&EventSession>,
+) -> PlayerEventState {
     let bag_slots: Vec<(i32, i32)> = session
         .homdo
         .iter()
@@ -158,13 +161,12 @@ pub fn snapshot_state(session: &Session) -> PlayerEventState {
         .iter()
         .map(|(&quest_id, &(_slot, step))| (i32::from(quest_id), i32::from(step)))
         .collect();
-    // Surface/choice/battle context of the active event session feeds
+    // Surface/choice/battle context of the active or completed event session feeds
     // conditionClass=10 (dialog choice) and =8 (battle result); a session
     // without one keeps the "no dialogue seen yet" -1 / "no battle" 0
     // defaults (Checkpoint 4).
-    let (last_surface_id, last_choice_code, battle_result) = session
-        .current_event_session
-        .as_ref()
+    let (last_surface_id, last_choice_code, battle_result) = active
+        .or(session.current_event_session.as_ref())
         .map(|ev| (ev.last_surface_id, ev.last_choice_code, ev.battle_result))
         .unwrap_or((-1, -1, 0));
     let mut state = EveStateBuilder::build_player_state(&PlayerStateInputs {
@@ -187,6 +189,10 @@ pub fn snapshot_state(session: &Session) -> PlayerEventState {
         state.mission_flags.insert(i32::from(mark), 1);
     }
     state
+}
+
+pub fn snapshot_state(session: &Session) -> PlayerEventState {
+    snapshot_state_with_context(session, None)
 }
 
 /// Resolve one NPC/door interaction against the scene's event list.
@@ -268,6 +274,6 @@ pub fn auto_chain_after(
     if i32::from(session.map_id) != completed.map_id {
         return AutoChainResult::NoMatch;
     }
-    let state = snapshot_state(session);
+    let state = snapshot_state_with_context(session, Some(completed));
     EveAutoChainEngine::try_auto_chain(scene, completed, &state, rng)
 }

@@ -432,15 +432,13 @@ fn door_warps_then_finishes_session() {
     assert_eq!(
         out.outgoing[1].frame,
         spawn::build_relocate_packet(5555, DEST_MAP, 12, 34, WARP_ID as u8),
-        "byte-identical relocate to the legacy warp-confirm path"
     );
-    assert_eq!(out.outgoing[2].frame, unlock_frame(5555));
-    assert_eq!(out.outgoing[3].frame, "F44402001408");
-    assert_eq!(out.outgoing.len(), 4);
+    // Vấn đề 3 (Fix): Eve Door must NOT emit 14 08 or unlock before map load completes.
+    assert_eq!(out.outgoing.len(), 2);
     assert!(out.eve_battle.is_none());
     assert!(
         session.current_event_session.is_none(),
-        "Door ends its event session (CP6 #11)"
+        "Door ends its event session"
     );
     // Door carries neither Action nor Battle -> the completion watermark is
     // NOT bumped (CP6 #7).
@@ -665,17 +663,18 @@ fn resume_lose_or_flee_ends_talk_and_running_is_noop() {
         assert_eq!(ev.current_index, 0);
     }
 
-    // Lose closes the talk outright (never a frozen dialog, no auto-chain).
+    // Lose continues walk into the next step (Phase 1 Fix Vấn đề 2).
     let (frames, next) = resume_eve_after_battle(&mut session, Outcome::PlayerLose, &data);
     assert_eq!(
         frames,
-        vec![unlock_frame(session.id), "F44402001408".to_string()],
-        "unlock then close — both fixed legacy frames"
+        vec![NpcTalkCodec::build_talk_step_hex(&talk_result(10365))],
+        "subsequent talk step delivered after loss"
     );
-    assert!(next.is_none(), "a failed encounter never auto-chains");
-    assert!(session.current_event_session.is_none());
+    assert!(next.is_none());
+    assert!(session.current_event_session.is_some());
+    assert_eq!(session.current_event_session.as_ref().unwrap().battle_result, 2);
 
-    // Flee behaves like lose.
+    // Flee on a queue with no further results advances past the end and finishes cleanly.
     let mut session = session_with_event(SOURCE_MAP, vec![fight_result(FIGHT_ID)]);
     {
         let ev = session.current_event_session.as_mut().expect("session");
@@ -683,6 +682,7 @@ fn resume_lose_or_flee_ends_talk_and_running_is_noop() {
     }
     let (frames, next) = resume_eve_after_battle(&mut session, Outcome::PlayerFled, &data);
     assert_eq!(frames.len(), 2);
+    assert_eq!(frames[0], unlock_frame(session.id));
     assert_eq!(frames[1], "F44402001408");
     assert!(next.is_none());
     assert!(session.current_event_session.is_none());
