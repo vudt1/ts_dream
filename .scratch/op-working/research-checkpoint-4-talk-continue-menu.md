@@ -64,12 +64,32 @@ Từ mã nguồn assembly client `0077f414_FUN_0077f414.asm.txt` (dòng 1437–1
   - Payload XOR `0xAD`: `0x14 ^ 0xAD = 0xB9`, `0x09 ^ 0xAD = 0xA4`, `ChoiceCode ^ 0xAD`
   - Chuỗi bytes ví dụ chọn câu 1: `F4 44 03 00 B9 A4 AC` (Thô: `F4 44 03 00 14 09 01`).
 
-### 2.2. Quy Tắc Định Danh `ChoiceCode`
-- `ChoiceCode` bắt đầu từ **`1` (1-based index)**:
-  - Lựa chọn thứ nhất: `0x01`
-  - Lựa chọn thứ hai: `0x02`
-  - Lựa chọn thứ ba: `0x03`
-  - `0x00`: trạng thái mặc định (chưa chọn).
+### 2.2. Quy Tắc Định Danh `ChoiceCode` — **CẬP NHẬT 2026-09-22 theo đối chiếu mã nguồn server C# tham chiếu**
+
+> **Lịch sử**: Bản thảo ban đầu (2026-09-21) đề xuất `ChoiceCode` là 1-based index (`01/02/03`). Kết luận này **đã bị bác bỏ** sau khi đối chiếu với server C# tham chiếu và data `eve.emg` thật.
+
+**Kết luận đã chốt**: `ChoiceCode` là **raw byte mã option lấy trực tiếp từ data**, server chỉ đọc và so bằng nhau — **không có bất kỳ quy đổi 1-based nào** ở cả 3 tầng (nhận packet, parse data, match điều kiện).
+
+Bằng chứng từ mã nguồn server C# (3 mắt xích):
+1. **Nhận packet** — `PacketHandlers/ActionHandler.cs`, `case 9` (Sub `0x09`):
+   ```csharp
+   client.selectMenu = data[2];   // đọc nguyên byte ChoiceCode, không normalize
+   ```
+2. **Parse data** — `DataTools/EveData.cs` (condition type 10): `optionId = read16(array4, num14 + 1)` và `DataTools/QuestLogics/ConditionTypeParserAdapter.cs` (`typeCondition == 10`): `tempStep.optionId = bit_4` — `optionId` lấy **trực tiếp** từ file data.
+3. **Match điều kiện** — `Client/QuestStepHelper/StepMenuSelectionHandler.cs`:
+   ```csharp
+   x.idDialog == client.idDialog && x.optionId == client.selectMenu  // raw equality
+   ```
+4. **Cộng chứng** — `Client/TSClient.cs`: hardcode `selectMenu == 30` (lựa chọn đầu tiên của menu thử nhiệm) và `selectMenu == 40` (đóng thoại).
+
+**Quy ước thực tế** (khớp 100% data `eve.emg`: toàn bộ 1127 điều kiện `class == 10` dùng mã bắt đầu từ 30 — trùng quy ước legacy H6 `select_menu`):
+- Lựa chọn thứ nhất: `30` (`0x1E`)
+- Lựa chọn thứ hai: `31` (`0x1F`)
+- Các lựa chọn kế tiếp: `32`, `33`, ...
+- `40` (`0x28`): đóng menu / kết thúc thoại
+- `0x00`: trạng thái mặc định (chưa chọn) — server bỏ qua, không xử lý
+
+**Áp dụng trong Rust** (`src/server/handlers/talk.rs` `handle_talk_select_menu`): lưu nguyên byte `payload[0]` vào `ev.last_choice_code` và `session.select_menu` (không normalize) — tương đương `selectMenu` phía server C#; `ev.last_surface_id` (từ `result_mean_no` của Surface) tương đương `idDialog` phía server C#.
 
 ### 2.3. Nguồn Gốc Menu & Phân Nhánh Kịch Bản (`condition_class == 10`)
 1. **Nguồn gốc UI Menu**:
@@ -108,4 +128,4 @@ Xây dựng các hàm:
 ### 3.3. Test Kịch Bản Nghiệm Thu (`tests/npc_talk_multistep_test.rs`)
 1. **Multi-step dialog**: Click NPC 1 Trác Quận $\to$ Bước 1 $\to$ Bấm `Sub 6` liên tiếp 6 lần qua các bước 2..7 $\to$ Bấm `Sub 6` lần thứ 7 $\to$ Nhận Unlock Actor và EndTalk.
 2. **Action execution**: Click NPC 3 Trác Quận với item `32012` $\to$ Trừ item `32012` và cộng item `26012` $\to$ Đóng thoại an toàn.
-3. **Menu branching**: Gặp Surface $\to$ Chọn câu 1 (`Sub 9 01`) $\to$ Sang nhánh 1; Chọn câu 2 (`Sub 9 02`) $\to$ Sang nhánh 2.
+3. **Menu branching** (đã hiệu chỉnh theo quy ước `ChoiceCode` §2.2): Gặp Surface $\to$ Chọn mã 30 (`Sub 9 1E`) $\to$ Sang nhánh 1; Chọn mã 31 (`Sub 9 1F`) $\to$ Sang nhánh 2. Test thật hiện dùng map 10851, NPC click id 2 (Surface `mean_no=3`, nhánh `conditionNo=3` / `conditionNo=4`).

@@ -71,9 +71,13 @@ Tài liệu thiết kế chi tiết và lộ trình tổng thể:
   - Toàn bộ targeted suite: `npc_talk_multistep` 3/3 + `npc_talk_transmit` 3/3 + `npc_eve_resolve` 3/3 + `wire_codec_14_18` 11/11 = **20/20 PASS**, đã được coordinator chạy lại xác nhận独立 (không tin báo cáo subagent suông).
 - **Kết quả**: không chạy `cargo test --all-targets` (user yêu cầu chỉ test targeted file đã sửa/ tạo mới).
 
-#### 1.1. Deviation & điểm chờ human confirm
-1. **ChoiceCode 30/31 lệch research CP4** (quan trọng): research §2.2 nói 1-based `01/02/03`, nhưng **toàn bộ 1127 điều kiện class-10 trong `eve.emg` thật dùng mã 30, 31, 32...** = quy ước legacy H6 `select_menu` (30 = lựa chọn đầu, 40 = đóng). Handler lưu byte bất kỳ nên cả 2 dialect đều chạy; **cần capture client thật** để chốt. Đề xuất: cập nhật research CP4.
-2. **Sửa [`tests/npc_eve_resolve_test.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/tests/npc_eve_resolve_test.rs)** ngoài danh sách file được phép: assertion cũ `current_event_session.is_some()` với NPC 3 là stale (viết thời CP3 khi Action chưa dispatch). Đã thay bằng: session `None` (eve 3 chạy xong trong click) + có `F44402001408` + túi bị trừ 32012/cộng 26012 (chứng cứ mạnh hơn — legacy fallback không đụng túi). Coordinator đã review = hợp lý, nhưng **cần user gật đầu chính thức**.
+#### 1.1. Deviation & kết quả confirm
+1. **ChoiceCode 30/31 lệch research CP4 — ĐÃ CHỐT bằng đối chiếu mã nguồn server C#** (`TS_Server_Bear/`): research §2.2 nói 1-based `01/02/03` là **SAI** với luồng hoạt động thực tế. Chuỗi bằng chứng 3 mắt xích:
+   - [`TS_Server_Bear/TS_Server/PacketHandlers/ActionHandler.cs:34-36`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/TS_Server_Bear/TS_Server/PacketHandlers/ActionHandler.cs): `case 9: client.selectMenu = data[2]` — Bear đọc **raw byte** từ `0x14 Sub 0x09`, **không normalize** 1-based → 30/31.
+   - [`TS_Server_Bear/TS_Server/DataTools/EveData.cs:1301-1307`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/TS_Server_Bear/TS_Server/DataTools/EveData.cs) + [`DataTools/QuestLogics/ConditionTypeParserAdapter.cs:98-104`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/TS_Server_Bear/DataTools/QuestLogics/ConditionTypeParserAdapter.cs): condition type 10 parse `optionId` **trực tiếp từ data file** (`read16` / `bit_4`) — không quy đổi.
+   - [`TS_Server_Bear/TS_Server/Client/QuestStepHelper/StepMenuSelectionHandler.cs:20`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/TS_Server_Bear/TS_Server/Client/QuestStepHelper/StepMenuSelectionHandler.cs): match `x.optionId == client.selectMenu` — **raw equality**. Data thật chứa 30/31 ⇒ client **phải** gửi 30/31 thì mới match được (client gửi 01/02 sẽ không bao giờ khớp optionId nào). Cộng chứng: [`TSClient.cs:2823,2844`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/TS_Server_Bear/TS_Server/Client/TSClient.cs) hardcode `selectMenu == 30` (lựa chọn đầu) / `40` (đóng) = đúng quy ước legacy H6.
+   - $\implies$ **Implementation hiện tại đúng**: lưu raw byte ChoiceCode, match `last_surface_id` (= `idDialog`) + `last_choice_code` (= `optionId`) — tương đương server C#. **Đã cập nhật research CP4 §2.2 + §3.3** (2026-09-22) theo finding này.
+2. **Sửa [`tests/npc_eve_resolve_test.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/tests/npc_eve_resolve_test.rs)** ngoài danh sách file được phép: assertion cũ `current_event_session.is_some()` với NPC 3 là stale (viết thời CP3 khi Action chưa dispatch). Đã thay bằng: session `None` (eve 3 chạy xong trong click) + có `F44402001408` + túi bị trừ 32012/cộng 26012. **User đã duyệt (2026-09-22).**
 3. Kế thừa `last_surface_id`/`last_choice_code` vào branch session khi Sub 9 (spec không nói rõ, bắt buộc để guard #2 hoạt động — đã trace trên data map 10851).
 4. Stray Sub 6 trong lúc `AwaitingChoice` bị ignore (spec không đề cập; an toàn hơn là nhảy qua Surface).
 5. `finish_event_session` **không** auto-chain cho nhánh Door/Battle safe-end — nếu CP6 muốn chain ngay sau door thì mở lại.
@@ -94,8 +98,7 @@ Hệ thống đã sẵn sàng cho **Checkpoint 5**:
   - SQLite Persist.
   - Nghiên cứu: [`.scratch/op-working/research-checkpoint-6-autochain-battle-persist.md`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/.scratch/op-working/research-checkpoint-6-autochain-battle-persist.md).
 - **Việc cần làm ngay (human/agent)**:
-  1. Confirm/deviation #1 & #2 ở trên; cập nhật research CP4 về ChoiceCode 30/31 nếu confirm.
-  2. User review & commit thủ công các file: `src/server/handlers/talk.rs`, `src/server/handlers/npc_event.rs`, `tests/npc_talk_multistep_test.rs`, `tests/npc_eve_resolve_test.rs`.
+  1. User review & commit thủ công các file: `src/server/handlers/talk.rs`, `src/server/handlers/npc_event.rs`, `tests/npc_talk_multistep_test.rs`, `tests/npc_eve_resolve_test.rs` (cùng 2 doc đã cập nhật: handoff này + research CP4).
 
 ---
 
