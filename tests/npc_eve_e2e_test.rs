@@ -347,37 +347,46 @@ fn action_class5_gold_type1_points_then_gold() {
     assert_eq!(out.outgoing[0].frame, gold_frame(1700));
     assert_eq!(session.point, 0);
 
-    // Type 2 has no proven executor: skipped (closing frames only).
-    let mut session = session_with_event(SOURCE_MAP, vec![gold_action(2, 999)]);
-    session.gold = 5;
+    // Type 2: deduct gold with saturating_sub (Task 2.1).
+    let mut session = session_with_event(SOURCE_MAP, vec![gold_action(2, 3)]);
+    session.gold = 10;
     session.point = 7;
     let mut out = HandleOutcome::default();
     execute_event_step(&mut session, &data, &mut out);
-    assert_eq!(session.gold, 5);
+    assert_eq!(session.gold, 7);
     assert_eq!(session.point, 7);
-    assert_eq!(out.outgoing[0].frame, unlock_frame(session.id));
-    assert_eq!(out.outgoing.len(), 2);
+    assert_eq!(out.outgoing[0].frame, gold_frame(7));
+
+    // Type 2 saturating at 0 when amount exceeds owned gold:
+    let mut session = session_with_event(SOURCE_MAP, vec![gold_action(2, 999)]);
+    session.gold = 5;
+    let mut out = HandleOutcome::default();
+    execute_event_step(&mut session, &data, &mut out);
+    assert_eq!(session.gold, 0);
+    assert_eq!(out.outgoing[0].frame, gold_frame(0));
 }
 
 #[test]
 fn action_class7_player_effects_and_deferred_types() {
     let data = synthetic_data();
 
-    // parameter 1 + pStyle 2: skill points (0x25).
+    // parameter 1 + pStyle 2: skill points (0x25) + toast & sound WA0014 (14 17).
     let mut session = session_with_event(SOURCE_MAP, vec![player_action(1, 2, 5)]);
     session.skill_point = 10;
     let mut out = HandleOutcome::default();
     execute_event_step(&mut session, &data, &mut out);
     assert_eq!(session.skill_point, 15);
     assert_eq!(out.outgoing[0].frame, build_stat_update(0x25, 15));
+    assert_eq!(out.outgoing[1].frame, NpcTalkCodec::build_skill_point_toast_hex(5));
 
-    // parameter 1 + pStyle 3: stat points (0x26).
+    // parameter 1 + pStyle 3: stat points (0x26) + toast & sound WA0014 (14 16).
     let mut session = session_with_event(SOURCE_MAP, vec![player_action(1, 3, 7)]);
     session.point = 100;
     let mut out = HandleOutcome::default();
     execute_event_step(&mut session, &data, &mut out);
     assert_eq!(session.point, 107);
     assert_eq!(out.outgoing[0].frame, build_stat_update(0x26, 107));
+    assert_eq!(out.outgoing[1].frame, NpcTalkCodec::build_stat_point_toast_hex(7));
 
     // pStyle 1 (Bear GetSaveMap): refresh the respawn point from the map.
     let mut session = session_with_event(SOURCE_MAP, vec![player_action(5, 1, 0)]);
@@ -386,7 +395,7 @@ fn action_class7_player_effects_and_deferred_types() {
     execute_event_step(&mut session, &data, &mut out);
     assert_eq!(session.savemap, SOURCE_MAP, "pStyle 1 must save the map");
 
-    // parameter 2 (army) and pStyle 4 (EXP grant): deferred, no state change.
+    // parameter 2 (army): deferred, no state change.
     let mut session = session_with_event(SOURCE_MAP, vec![player_action(2, 3, 99)]);
     session.point = 11;
     session.savemap = 0;
@@ -396,13 +405,13 @@ fn action_class7_player_effects_and_deferred_types() {
     assert_eq!(session.savemap, 0, "pStyle 3 must not save the map");
     assert_eq!(out.outgoing.len(), 2, "deferred types emit only closing frames");
 
+    // parameter 1 + pStyle 4: EXP reward into session.texp + stat update 0x24 (Task 2.2).
     let mut session = session_with_event(SOURCE_MAP, vec![player_action(1, 4, 50_000)]);
-    session.point = 3;
-    session.skill_point = 4;
+    session.texp = 10_000;
     let mut out = HandleOutcome::default();
     execute_event_step(&mut session, &data, &mut out);
-    assert_eq!(session.point, 3, "type 4 (setExp) stays deferred");
-    assert_eq!(session.skill_point, 4);
+    assert_eq!(session.texp, 60_000);
+    assert_eq!(out.outgoing[0].frame, build_stat_update(0x24, 60_000));
 }
 
 // ============================================================================

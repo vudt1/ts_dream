@@ -451,6 +451,11 @@ async fn handle_client_connection(
                             if !out.map_broadcast.is_empty() {
                                 control.broadcast_map(id, &out.map_broadcast).await;
                             }
+                            if !out.direct_messages.is_empty() {
+                                for (target_id, frame) in &out.direct_messages {
+                                    control.send_to(*target_id, frame).await;
+                                }
+                            }
                             if conn.session.logined && logined_id == 0 && id > 0 {
                                 logined_id = id;
                             }

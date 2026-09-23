@@ -841,12 +841,11 @@ pub struct BattleTrigger {
 /// Shared seam extracted from [`handle_warp_confirm`] so the Eve **Door**
 /// result (`result_type == 2`, Checkpoint 6) applies byte-identical relocation
 /// to the legacy warp-confirm path. Synchronous by design: the Eve walkers also
-/// run from the post-battle resume (a sync `BattleSink` callback), so no
-/// `hub.send_to().await` may appear here.
+/// run from the post-battle resume (a sync `BattleSink` callback).
 ///
-/// Deliberately does **not** warp party members (that loop needs the async hub
-/// and stays in [`handle_warp_confirm`]); an Eve Door warp therefore moves only
-/// the triggering character. It also does not reset talk state — callers do.
+/// Warps party members when the caller is the party leader (`session.id_leader == session.id`),
+/// updating online sessions, queuing direct member frames via `out.direct_messages`,
+/// and broadcasting hide on the old map. Does not reset talk state — callers do.
 pub fn perform_warp(session: &mut Session, warp: &crate::data::tables::Warp, out: &mut HandleOutcome) {
     let id = session.id;
     let old_map = session.map_id;
@@ -879,13 +878,40 @@ pub fn perform_warp(session: &mut Session, warp: &crate::data::tables::Warp, out
 
     // 3. Hide from old map peers
     out.broadcast_to_map(id, old_map, crate::battle::packets::hide_from_map(id));
+
+    // 4. Party warp: if leader, warp all party members too
+    if session.id_leader == id && id > 0 {
+        for member in session.id_mem {
+            if member > 0 && member != id {
+                let member_old_map = if let Some(mem) = crate::server::session::online_sessions()
+                    .lock()
+                    .unwrap()
+                    .get_mut(&member)
+                {
+                    let m_old = mem.map_id;
+                    mem.map_id = dest_map;
+                    mem.map_x = dest_x;
+                    mem.map_y = dest_y;
+                    m_old
+                } else {
+                    old_map
+                };
+                let member_pkt = crate::server::spawn::build_relocate_packet(
+                    member, dest_map, dest_x, dest_y, warp_id,
+                );
+                out.send_to(member, "F44402001407");
+                out.send_to(member, member_pkt);
+                out.broadcast_to_map(member, member_old_map, crate::battle::packets::hide_from_map(member));
+            }
+        }
+    }
 }
 
 /// Handle warp-talk (H8) completion: confirm warp into 0x0C flow.
 pub async fn handle_warp_confirm(
     conn: &mut Conn,
     data: &GameData,
-    env: &crate::server::dispatcher::ServerEnv<'_>,
+    _env: &crate::server::dispatcher::ServerEnv<'_>,
     out: &mut HandleOutcome,
 ) {
     let map_id = conn.session.map_id;
@@ -979,40 +1005,12 @@ pub async fn handle_warp_confirm(
             return; // Member cannot warp independently while following leader
         }
 
-        let old_map = conn.session.map_id;
-        let dest_map = warp.map2 as u16;
-        let dest_x = warp.x as u16;
-        let dest_y = warp.y as u16;
-        let warp_id = (warp.warpid & 0xFF) as u8;
-
         // Fade → relocate → hide, plus the session/registry position update
         // (shared with the Eve Door path via `perform_warp`).
         perform_warp(&mut conn.session, warp, out);
 
-        // 4. Party warp: if leader, warp all party members too
-        if id_leader == id {
-            for member in conn.session.id_mem {
-                if member > 0 {
-                    if let Some(mem) = crate::server::session::online_sessions()
-                        .lock()
-                        .unwrap()
-                        .get_mut(&member)
-                    {
-                        mem.map_id = dest_map;
-                        mem.map_x = dest_x;
-                        mem.map_y = dest_y;
-                    }
-                    let member_pkt = crate::server::spawn::build_relocate_packet(
-                        member, dest_map, dest_x, dest_y, warp_id,
-                    );
-                    if let Some(hub) = env.hub {
-                        hub.send_to(member, "F44402001407").await;
-                        hub.send_to(member, &member_pkt).await;
-                    }
-                    out.broadcast_to_map(member, old_map, crate::battle::packets::hide_from_map(member));
-                }
-            }
-        }
+        // Party warp direct messages are queued in out.direct_messages and dispatched
+        // uniformly by the connection loop (server_control).
 
         // Reset talk state without 1408 (1408 is sent upon teleport confirm 0x0C 0x01)
         conn.session.idtalking = 0;

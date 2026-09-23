@@ -24,6 +24,8 @@ pub struct GameData {
     /// Mission-mark definitions and the mobile reverse bit index.
     pub mark_defs: HashMap<u16, MarkDef>,
     pub bit_to_mission_id: HashMap<u16, u16>,
+    /// Quest marks mapping `quest_id -> position (mark)` loaded from `Mark.Dat`.
+    pub quest_marks: HashMap<u16, u16>,
     pub mount_defs: HashMap<u16, MountDef>,
     pub mount_grow_defs: HashMap<u8, MountGrowDef>,
     pub achievement_defs: HashMap<u16, AchievementDef>,
@@ -278,6 +280,13 @@ impl GameData {
             d.scene_eve_data = EveDataLoader::load(&bytes)?;
         }
 
+        // 13. Mark.Dat (binary quest marks table)
+        if let Some(p) = resolve_data_file(data_dir, "Mark.Dat") {
+            let bytes = std::fs::read(&p)
+                .map_err(|e| TsError::Data(format!("read {}: {}", p.display(), e)))?;
+            d.quest_marks = MarkDatLoader::load(&bytes)?;
+        }
+
         d.texps = compute_texps();
         d.loaded = true;
         Ok(d)
@@ -320,13 +329,14 @@ impl GameData {
         // mainKind 68 / 0x44, unimplemented in `dispatcher.rs`), keyed by
         // client-sent index — not the `(map_id, warpid)` talk-warp lookup in
         // `quest.rs` which reads `data.warps` (from `Warps.txt`, absent).
-        let optional_binary: [(&str, &str); 3] = [
+        let optional_binary: [(&str, &str); 4] = [
             // PC `Skill.Dat` is the authoritative source (preferred per ADR
             // 0002). `Skill_C.dat` is the mobile variant; if PC is absent
             // and mobile is present, fall back to the mobile parser.
             ("Skill.dat", "skill_pc"),
             ("Skill_C.dat", "skill"),
             ("eve.emg", "eve"),
+            ("Mark.Dat", "mark"),
         ];
         for (file_name, _) in optional_binary {
             let Some(path) = resolve_data_file(data_dir, file_name) else {
@@ -338,6 +348,7 @@ impl GameData {
                 "skill.dat" => self.binary_skill_defs = SkillDatLoaderPc::load(&bytes)?,
                 "skill_c.dat" => self.binary_skill_defs = SkillDatLoader::load(&bytes)?,
                 "eve.emg" => self.scene_eve_data = EveDataLoader::load(&bytes)?,
+                "mark.dat" => self.quest_marks = MarkDatLoader::load(&bytes)?,
                 _ => unreachable!("optional binary list contains unknown file"),
             }
         }

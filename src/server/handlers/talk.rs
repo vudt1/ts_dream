@@ -18,7 +18,7 @@ use crate::protocol::codecs::npc_talk::{NpcTalkCodec, TalkLockMode};
 use crate::protocol::encoder;
 use crate::server::dispatcher::{HandleOutcome, OpcodeCtx};
 use crate::server::handlers::npc_event::{self, NpcTrigger};
-use crate::server::handlers::quest_sync::{remove_quest_task, set_quest_task};
+use crate::server::handlers::quest_sync::{remove_quest_task, set_quest_dont, set_quest_task};
 use crate::server::handlers::shops::gold_frame;
 use crate::server::handlers::stats::build_stat_update;
 use crate::db::pool::DbPool;
@@ -444,6 +444,15 @@ fn execute_action_result(
                 }
             };
             set_quest_task(session, out, quest_id, next_step);
+            // Task 3.2: If quest has a mark position > 0 in Mark.Dat, record quest_dont and emit frame 18 05.
+            // Only award completion when the battle was not lost or fled.
+            if !matches!(battle_result, 2 | 3) {
+                if let Some(&mark) = data.quest_marks.get(&quest_id) {
+                    if mark > 0 {
+                        set_quest_dont(session, out, mark, 1);
+                    }
+                }
+            }
         }
         // Gold / stat-point reward (Bear `GoldEffectHandler`, CP6 #10):
         // parameter_style=type, result_value=amount.
@@ -463,6 +472,14 @@ fn execute_action_result(
                         session.gold = session.gold.saturating_add(amount as u32);
                         out.send(gold_frame(session.gold));
                     }
+                }
+                // Type 2 (Bear `GoldEffectHandler`): deduct gold from player
+                // (e.g. gate entry fees or penalties). Saturating to prevent underflow.
+                2 => {
+                    if amount > 0 {
+                        session.gold = session.gold.saturating_sub(amount as u32);
+                    }
+                    out.send(gold_frame(session.gold));
                 }
                 other => {
                     tracing::debug!(
@@ -489,14 +506,20 @@ fn execute_action_result(
                         let gained = (result.result_value & 0xFFFF) as u16;
                         session.skill_point = session.skill_point.saturating_add(gained);
                         out.send(build_stat_update(0x25, i32::from(session.skill_point)));
+                        out.send(NpcTalkCodec::build_skill_point_toast_hex(gained.min(255) as u8));
                     }
                     3 => {
                         let gained = (result.result_value & 0xFFFF) as u16;
                         session.point = session.point.saturating_add(gained);
                         out.send(build_stat_update(0x26, i32::from(session.point)));
+                        out.send(NpcTalkCodec::build_stat_point_toast_hex(gained.min(255) as u8));
                     }
-                    // Bear type 4 calls `setExp(50000)`; `Session` carries no
-                    // EXP field, so the fixed grant stays deferred (CP6 #10).
+                    // Type 4: EXP reward into session.texp and broadcast stat update 0x24.
+                    4 => {
+                        let exp = result.result_value.max(0) as u32;
+                        session.texp = session.texp.saturating_add(exp);
+                        out.send(build_stat_update(0x24, session.texp as i32));
+                    }
                     other => tracing::debug!(
                         stt_bonus_type = other,
                         value = result.result_value,

@@ -188,6 +188,24 @@ pub fn handle_teleport_confirm(ctx: &mut OpcodeCtx) {
     conn.session.idtalking = 0;
 
     let my_id = conn.session.id;
+
+    // Synchronize conn.session from online_sessions if relocated externally (e.g. party leader warp)
+    if let Some(s) = crate::server::session::online_sessions()
+        .lock()
+        .unwrap()
+        .get(&my_id)
+    {
+        if s.map_id != conn.session.map_id
+            || s.map_x != conn.session.map_x
+            || s.map_y != conn.session.map_y
+        {
+            conn.session.map_id = s.map_id;
+            conn.session.map_x = s.map_x;
+            conn.session.map_y = s.map_y;
+            conn.session.gocnhin = s.gocnhin;
+        }
+    }
+
     let map_id = conn.session.map_id;
 
     // 2. Synchronize current player coords in the shared online registry

@@ -16,6 +16,8 @@ pub const SUB_END_TALK: u8 = 0x04; // C -> S end talk request
 pub const SUB_TALK_CONTINUE: u8 = 0x06; // C -> S next step request
 pub const SUB_CLOSE_TALK_WINDOW: u8 = 0x08; // S -> C close talk dialog form
 pub const SUB_SELECT_MENU: u8 = 0x09; // C -> S menu option select
+pub const SUB_STAT_POINT_TOAST: u8 = 0x16; // S -> C stat point toast & WA0014 sound
+pub const SUB_SKILL_POINT_TOAST: u8 = 0x17; // S -> C skill point toast & WA0014 sound
 pub const SUB_LOCK_ACTOR: u8 = 0x2C; // S -> C lock/unlock character
 
 /// Size of the raw EveResult binary payload in bytes.
@@ -142,4 +144,31 @@ impl NpcTalkCodec {
     pub fn build_end_talk_hex() -> &'static str {
         "F44402001408"
     }
+
+    /// Builds the decoded 7-byte frame for stat point toast & sound:
+    /// `F4 44 03 00 14 16 [pts: 1B]`
+    pub fn build_stat_point_toast_frame(pts: u8) -> Vec<u8> {
+        let mut writer = PacketWriter::new(OP_NPC_EVENT, SUB_STAT_POINT_TOAST);
+        writer.write_u8(pts);
+        writer.build_frame()
+    }
+
+    /// Builds the hex string representation of stat point toast frame.
+    pub fn build_stat_point_toast_hex(pts: u8) -> String {
+        encoder::hex(&Self::build_stat_point_toast_frame(pts))
+    }
+
+    /// Builds the decoded 7-byte frame for skill point toast & sound:
+    /// `F4 44 03 00 14 17 [pts: 1B]`
+    pub fn build_skill_point_toast_frame(pts: u8) -> Vec<u8> {
+        let mut writer = PacketWriter::new(OP_NPC_EVENT, SUB_SKILL_POINT_TOAST);
+        writer.write_u8(pts);
+        writer.build_frame()
+    }
+
+    /// Builds the hex string representation of skill point toast frame.
+    pub fn build_skill_point_toast_hex(pts: u8) -> String {
+        encoder::hex(&Self::build_skill_point_toast_frame(pts))
+    }
 }
+

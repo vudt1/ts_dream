@@ -143,11 +143,17 @@ pub struct HandleOutcome {
     /// `battle_ended` via `current_event_session` (`phase == AwaitingBattle`).
     pub eve_battle: Option<(u16, i32)>,
     pub map_broadcast: Vec<MapBroadcast>,
+    pub direct_messages: Vec<(u32, String)>,
 }
 
 impl HandleOutcome {
     pub fn send(&mut self, frame: impl Into<String>) {
         self.outgoing.push(OutFrame::new(frame));
+    }
+
+    /// Queue a direct message frame for `target` character ID.
+    pub fn send_to(&mut self, target: u32, frame: impl Into<String>) {
+        self.direct_messages.push((target, frame.into()));
     }
 
     /// Send `frame` after `delay_ms` (non-blocking). The first paced fragment
