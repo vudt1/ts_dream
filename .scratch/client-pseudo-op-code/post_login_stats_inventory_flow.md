@@ -1,21 +1,28 @@
 # Nghiên Cứu Luồng Sau Đăng Nhập: Xác Nhận Chỉ Số (Stats) & Túi Đồ (Hòm Đồ)
 
-Ngày: 2026-09-23
+Ngày: 2026-09-23; cập nhật xác minh: 2026-09-24
 Workspace: `/mnt/d/VUDT/GIT_PCC/ts_dream`
 Tài liệu tham chiếu:
-- Client decompile: `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/` (C + ASM)
+- Client decompile chính: `client_pseudo_c/` (C + ASM + HEX, đã bổ sung sau đợt dump Round-3)
+- Client decompile đối chiếu: `/mnt/d/VUDT/GIT_PCC/test/ts_decompile/` (C + ASM)
 - Tài liệu nền: [`login_flow_research.md`](./login_flow_research.md) (kết nối & gửi gói auth)
 - Các tài liệu opcode hiện có: `opcode_03.md`, `opcode_05.md`, `opcode_08.md`, `opcode_09.md`, `opcode_17.md`, `opcode_1a.md`
 - Source Rust: `src/` trong repo này
 - Tham chiếu server C#: `TS_Server_Bear/TS_Server/`
 
+> **Phạm vi bằng chứng mới:** `client_pseudo_c/` đã có body/ASM cho parser `17 05`, `17 0B`, parser `1E 01` (`FUN_00730F4C`), các dispatcher C→S `02/17/19/1C`, literal `0x78A8xx`, hàm `FUN_006547a8`, và ASM `09 01` empty-payload. Những claim cũ trong §6 về việc các artifact này chưa tồn tại đã được sửa. Parser `1E 01` đã được phân tích: client đọc một header có tên/stall và các record 5 byte, **không** dùng entry inventory 12 byte.
+
 ---
 
 ## 1. Tổng Quan Luồng (Big Picture)
 
-**Kết luận quan trọng nhất:** Client **KHÔNG** gửi opcode nào để "xin xác nhận chỉ số" hay "xin danh sách túi đồ".
-Cả bảng chỉ số lẫn túi đồ đều là **PUSH một chiều từ Server → Client**, gửi ngay trong chuỗi
-`Logined1` sau khi client xác nhận vào game bằng gói **`03 01`**.
+**Kết luận cập nhật:** Trong các builder/handler đã dump, không tìm thấy opcode C→S chuyên để
+“xin” toàn bộ chỉ số hoặc xin lại toàn bộ túi đồ. `05 03` và `17 05` là các frame push từ
+Server → Client trong `Logined1`; `08 01` là đường phân bổ chỉ số, không phải query.
+Tuy nhiên, các claim cũ còn dùng pseudo-C `case ...: break` làm bằng chứng phải bị loại bỏ:
+ASM hiện có đã chứng minh có các builder C→S `02/17/19/1C`, đồng thời xác nhận một nhánh gửi
+`09 01` với payload rỗng. Full create payload `09 01` mà server parse trong `character.rs`
+vẫn là contract phía server; chưa có builder client độc lập tương ứng trong dump hiện tại.
 
 ```
 ┌─────────────┐   01 .. (auth)      ┌─────────────┐
@@ -29,7 +36,7 @@ Cả bảng chỉ số lẫn túi đồ đều là **PUSH một chiều từ Ser
        │                                   │
        │  ──► 09 02 + name      (kiểm tra tên)     character.rs:101
        │  ◄── 09 03 ss          (ss=1 trùng, ss=2 sai)
-       │  ──► 09 01 + payload   (TẠO NHÂN VẬT)     character.rs:138
+       │  ──► 09 01 + payload   (TẠO NHÂN VẬT; server contract) character.rs:39-143
        │  ◄── 09 03 00          (tạo OK)
        │                                   │
        │  ──► 03 01             (XÁC NHẬN VÀO GAME) login.rs:88
@@ -40,7 +47,7 @@ Cả bảng chỉ số lẫn túi đồ đều là **PUSH một chiều từ Ser
        │      • 05 03              (hp/sp/int/atk/def/agi/lv/exp) ← STATS
        │      • 0F xx pet, 21 02 PK
        │      • 17 05              (HÒM ĐỒ)                       ← INVENTORY
-       │      • 1E 01, 17 2F, 17 66, 17 0B, 1A 04, 27 09 ...
+       │      • 1E 01 (stall/vendor listing theo parser client), 17 2F, 17 66, 17 0B, 1A 04, 27 09 ...
        │      • 28 01 hotkeys, 23 04 store, 18 06/07 quest sync
        │                                   │
        │  ──► 25 01             (map loaded — xong login)  login.rs:238
@@ -49,10 +56,14 @@ Cả bảng chỉ số lẫn túi đồ đều là **PUSH một chiều từ Ser
        │  ──► 08 01 (chỉ khi PHÂN BỔ chỉ số)             stats.rs:28
        │  ◄── 08 01 (server push khi chỉ số đổi)
        │  ──► 17 xx ( thao tác túi đồ: sắp xếp, thả, dùng ) inventory.rs
-       │      — KHÔNG có sub nào "xin lại toàn bộ 17 05"
+       │      — KHÔNG có bằng chứng cho sub "xin lại toàn bộ 17 05"
 ```
 
----
+> **Phân biệt hai path `09 01`:** ASM `client_pseudo_c/0077f414_FUN_0077f414.asm.txt:711-736`
+> xác nhận một call-site gửi frame chỉ có main/sub `09 01`, không đọc body. Layout create đầy đủ
+> trong §3.2 là contract của `src/server/handlers/character.rs`; dump client hiện tại chưa
+> cung cấp builder full-payload độc lập để đối chiếu byte-for-byte. Không được dùng
+> `case 9: break` trong pseudo-C để phủ nhận path empty này.
 
 ## 2. Bảng Opcode Liên Quan (Đã Verify)
 
@@ -60,17 +71,23 @@ Cả bảng chỉ số lẫn túi đồ đều là **PUSH một chiều từ Ser
 
 | Main | Sub | Ý nghĩa | Payload (sau main+sub) | Bằng chứng |
 |:---:|:---:|---|---|---|
-| `09` | `02` | Kiểm tra tên nhân vật | string name | asm `0077f414:682-710`; server `character.rs:101-135` |
-| `09` | `01` | **Tạo nhân vật** | 14 phần — xem §3.2 | asm `0077f414:502-681`; server `character.rs:39-77` |
-| `03` | `01` | **Xác nhận vào game** | `[03][gself+0x63c]` (2 byte) | asm `0077f414:183-207`; server `login.rs:88` |
+| `09` | `02` | Kiểm tra tên nhân vật | string name | `character.rs:101-135`; client `0077f414`/ASM hiện có các call-site liên quan |
+| `09` | `01` | **Tạo nhân vật** (server contract) | 14 phần — xem §3.2 | `character.rs:39-77`; full client builder chưa có body độc lập trong dump |
+| `09` | `01` | **Empty send path đã xác minh** | không có body sau main/sub | `client_pseudo_c/0077f414_FUN_0077f414.asm.txt:711-736`; server `character.rs:137-143` |
+| `03` | `01` | **Xác nhận vào game** | `[03][gself+0x63c]` (2 byte) | server `login.rs:88`; client builder liên quan trong `0077f414` |
 | `25` | `01` | Map loaded / login complete | — | server `login.rs:238-317` |
-| `08` | `01` | **Phân bổ chỉ số** (KHÔNG phải "xin stats") | 10 byte: `[08][01][u16][attr][u32][byte]` | asm `0077f414:444-501`; server `stats.rs:32-44` |
-| `17` | `00..3C` | Thao tác túi đồ (61 sub) | chưa dump được body | bảng sub @ `0x783405` |
+| `08` | `01` | **Phân bổ chỉ số** (KHÔNG phải "xin stats") | `[08][01][u16 @+0xFCC][u8 @+0xFCE][u32 @+0xFCF][u8 @+0xFD3]` | ASM `0077f414:444-501`; server `stats.rs:32-44` |
+| `02` | `00..07` | Các thao tác C→S của nhóm `0x02` | đã có ASM cho 8 target | `cs_op02_dispatch_cases.asm.txt:1-231`; target `0x77F883` |
+| `17` | `00..3C` | Thao tác túi đồ (61 sub) | dispatcher + target table + body sub `01/02`; chưa có body riêng cho toàn bộ 61 sub | `cs_op17_dispatch.asm.txt`, `cs_op17_first_cases.asm.txt`, `cs_op17_targets_0x783405.hex` |
+| `19` | `00..29` | Dispatcher C→S theo byte-map | đã có ASM cho các target hợp lệ; một số sub map về default | `cs_op19_dispatch_cases.asm.txt`, `cs_op19_byte_map_0x7853e5.hex` |
+| `1C` | `00..06` | Dispatcher C→S theo target table | sub `00/03` là default; sub `01/02/04/05/06` có body ASM | `cs_op1c_dispatch_cases.asm.txt`, `cs_op1c_targets_0x785dbb.hex` |
 
-> **Lưu ý quan trọng:** `opcode_08.md:267-283` ghi "OP 0x08 KHÔNG có phía gửi" là **sai một phần** —
-> bảng byte `table_0x77F474` cho thấy `byte[0x08] = 0x08` → builder `0x0077FF2E` tồn tại và payload
-> 10 byte đã verify khớp nguyên vẹn với parser của server tại `stats.rs:32-44`.
-> Ý đúng là: client không gửi `08 01` để *yêu cầu* stats, mà chỉ gửi khi *phân bổ* điểm.
+> **Lưu ý quan trọng:** `opcode_08.md:267-283` ghi “OP 0x08 KHÔNG có phía gửi” là
+> **sai một phần**. Bảng byte `table_0x77F474` cho thấy `byte[0x08] = 0x08` → builder
+> `0x0077FF2E` tồn tại. ASM hiện tại xác nhận client gửi thêm hai field trailing
+> (`u32` tại `+0xFCF`, `byte` tại `+0xFD3`) sau `u16 + u8`; server hiện chỉ parse
+> `stat_id` và `target_val` (`stats.rs:32-44`). Ý đúng là: client gửi `08 01` khi
+> **phân bổ chỉ số**, không phải để *yêu cầu* snapshot.
 
 ### 2.2. S → C (Server đẩy xuống) — trong chuỗi Logined1
 
@@ -81,16 +98,16 @@ Cả bảng chỉ số lẫn túi đồ đều là **PUSH một chiều từ Ser
 | `05` | `03` | **Snapshot chỉ số đầy đủ** (xem §3.1) | `spawn.rs:128-187` |
 | `0F` | `08/14/0A/12/13` | pet summary | `spawn.rs:370-394` |
 | `21` | `02` | PK / tham chiến | `spawn.rs:549` |
-| `17` | `05` | **HÒM ĐỒ (danh sách túi đồ)** | `session.rs:425-427` |
-| `1E` | `01` | Tiền trang | `session.rs:435-437` |
-| `17` | `2F` | Túi đeo | `session.rs:440-442` |
-| `17` | `66` | Lưu lang | `session.rs:445-447` |
-| `17` | `0B` | Trang bị đang mặc | `session.rs:430-432` |
+| `17` | `05` | **HÒM ĐỒ (danh sách túi đồ)** | Rust `session.rs:425-427`; client parser `FUN_0076BFC8` xác nhận stride 12B |
+| `1E` | `01` | **Stall/vendor listing** (client-side payload) | `[01][name_len:1][name:name_len][stall_id:1][(slot:1,id:4LE)...]` | Client `FUN_00730F4C` tạo `TVenderItem` và cập nhật UI `StallN`; Rust hiện gọi đây là storage `TienTrang` và vẫn serialize bằng `dump_table()` 12B, nên contract hiện **không còn khớp** |
+| `17` | `2F` | Túi đeo | Rust `session.rs:440-442`; client layout chưa tách riêng trong dump hiện tại |
+| `17` | `66` | Lưu lang | Rust `session.rs:445-447`; client layout chưa tách riêng trong dump hiện tại |
+| `17` | `0B` | Trang bị đang mặc | Client parser `FUN_0077CC2C` dùng stride 10B, **không giống** 12B của `dump_table()` |
 | `1A` | `04` | **Gold** `[A:4 LE][B:4 LE]` | `spawn.rs:561-564` |
 | `27` | `09` | Server name + id LE32 | `spawn.rs:305-314` |
 | `28` | `01` | Hotkeys | `session.rs:480-493` |
 | `23` | `04` ×3 | store (god/hp/sp) | `spawn.rs:592-594` |
-| `08` | `01` | Push chỉ số đơn lẻ (delta/attr) | **không có trong Logined1** — xem §5 gap #1 |
+| `08` | `01` | Push chỉ số đơn lẻ (delta/attr) | **không có trong Logined1**; client parser S→C `case_008` có body, xem §5 gap #1 |
 
 ---
 
@@ -99,7 +116,11 @@ Cả bảng chỉ số lẫn túi đồ đều là **PUSH một chiều từ Ser
 ### 3.1. Gói `05 03` — Bảng chỉ số (Stats Snapshot)
 
 Builder: `src/server/spawn.rs:128-187` (`fn stats()`).
-Spec parser phía client: `opcode_05.md:130-151` (header cố định đến `p[0x70]`, tail là record 3 byte từ `p[0x71]`).
+Tài liệu `opcode_05.md:130-151` mô tả header/tail, nhưng đây là **spec thứ cấp**, không
+phải parser client đầy đủ đã được dump. `client_pseudo_c/case_005_0078C7DB_FUN_0078c7db.c`
+xác nhận handler `05` xử lý dữ liệu actor, nhưng không đủ để chứng minh toàn bộ tail
+`05 03` byte-for-byte. Vì vậy claim “header cố định đến `p[0x70]`” chỉ giữ mức tham chiếu
+tài liệu, chưa phải bằng chứng capture.
 
 ```
 [05] [03]
@@ -123,44 +144,117 @@ Spec parser phía client: `opcode_05.md:130-151` (header cố định đến `p[
 > - `id` lại xuất hiện trong **`27 09`** (`spawn.rs:309`).
 > - `gold` ở **`1A 04`**, `map/x/y` ở **`03`**.
 
-### 3.2. Gói `09 01` — Tạo nhân vật (tham chiếu đầy đủ)
+### 3.2. Gói `09 01` — Server contract create + empty client path
 
-Payload sau `[09][01]` (= server `data[6..]`), khớp nguyên vẹn `character.rs:39-77`:
+Payload create sau `[09][01]` (= server `data[6..]`) được parser Rust xác định trong
+`src/server/handlers/character.rs:39-77`. Đây là **contract phía server**; các dòng asm
+cũ từng được dùng để gán cho client không còn là bằng chứng đầy đủ, vì pseudo-C hiện tại
+còn cảnh báo Ghidra loại bỏ nhiều unreachable block.
 
-| Off | Len | Field | Nguồn client (asm lines) |
+Độc lập với contract create, ASM `client_pseudo_c/0077f414_FUN_0077f414.asm.txt:711-736`
+xác nhận một call-site gửi `09 01` **không có body**, chỉ tạo hai byte main/sub rồi gọi
+`TForm1_CY_AddSedQueue` (`0x0051633C`). Server hiện map `payload.is_empty()` sang
+`handle_enter_game` (`character.rs:137-143`).
+
+| Off | Len | Field | Độ xác minh |
 |---:|---:|---|---|
-| 0 | 1 | sex | 526–537 |
-| 1 | 1 | (unused) | 541–550 |
-| 2 | 1 | hair | 554–565 |
-| 3 | 1 | (gap) | 569–580 |
-| 4 | 4 | color A (u32 LE) | 584–590 |
-| 8 | 4 | color B (u32 LE) | 591–597 |
-| 12 | 1 | thuoctinh (1..4) | 599–603 |
-| 13–18 | 6 | **int, atk, def, hpx, spx, agi** | 604–640 |
-| 19 | 1 | pass1_len | 641–649 |
-| 20.. | n | pass1 | 650–553 |
-| 20+n | 1 | pass2_len | 654–662 |
-| 21+n.. | m | pass2 | 663–666 |
+| 0 | 1 | sex | server parser `character.rs:39-77` |
+| 1 | 1 | (unused) | server parser `character.rs:39-77` |
+| 2 | 1 | hair | server parser `character.rs:39-77` |
+| 3 | 1 | (gap) | server parser `character.rs:39-77` |
+| 4 | 4 | color A (u32 LE) | server parser `character.rs:39-77` |
+| 8 | 4 | color B (u32 LE) | server parser `character.rs:39-77` |
+| 12 | 1 | thuoctinh (1..4) | server parser `character.rs:39-77` |
+| 13–18 | 6 | **int, atk, def, hpx, spx, agi** | server parser `character.rs:39-77` |
+| 19 | 1 | pass1_len | server parser `character.rs:39-77` |
+| 20.. | n | pass1 | server parser `character.rs:39-77` |
+| 20+n | 1 | pass2_len | server parser `character.rs:39-77` |
+| 21+n.. | m | pass2 | server parser `character.rs:39-77` |
+
+> **Kết luận:** full create layout đã được xác minh ở boundary server, nhưng chưa được
+> xác minh byte-for-byte bằng một client builder riêng trong dump hiện tại. Empty `09 01`
+> là một call-site khác và đã được xác minh bằng ASM.
 
 ### 3.3. Gói `17 05` — Hòm đồ (Inventory Dump)
 
-Serializer: `src/server/session.rs:424-468` (`dump_table`).
+Server serializer: `src/server/session.rs:424-468` (`dump_table`).
 
 ```
 Frame = [F4 44] [len LE16] [17] [05] [entry...]  (toàn frame XOR 0xAD)
 
-Entry = 12 byte:
+17 05 client entry = 12 byte:
 +--------+-----------+-------+--------+----------+-----------------+--------+-----------+
 | slot:1 | itemId:2LE| cnt:1 | doben:1| long_val:1| (giatri_long+100):1 | khang:1 | texp:4LE |
 +--------+-----------+-------+--------+----------+-----------------+--------+-----------+
 ```
 
-Các container khác dùng **cùng entry 12 byte**: `1E 01` (tiền trang), `17 2F` (túi đéo),
-`17 66` (lưu lang), `17 0B` (trang bị), `28 01` (hotkey — format riêng).
+Bằng chứng client: `client_pseudo_c/0076bfc8_FUN_0076bfc8.c:87-203` và
+`0076bfc8_FUN_0076bfc8.asm.txt:35-180`; hàm tính số entry bằng `IDIV 0x0C`,
+đọc `slot`, `itemId`, các byte trạng thái và 4 byte `texp`.
+
+**Không được suy rộng layout 12B cho mọi container:**
+
+- `17 05`: parser `FUN_0076BFC8`, stride **12B**, có byte slot.
+- `17 0B`: parser `FUN_0077CC2C`, stride **10B**, không có byte slot đầu tiên trong
+  entry client (`0077cc2c_FUN_0077cc2c.c:64-144`, ASM tương ứng). Đây là mismatch
+  nghiêm trọng với `dump_trangbi()` hiện vẫn gọi `dump_table()` 12B.
+- `1E 01`: **không phải generic inventory 12B**. Body `FUN_00730F4C` đã được dump tại
+  `client_pseudo_c/00730f4c_FUN_00730f4c.c:32-175` và
+  `client_pseudo_c/00730f4c_FUN_00730f4c.asm.txt:5-173`; xem layout chi tiết ở §3.3.1.
+  Parser đọc một header động và các record 5 byte, đồng thời tạo/cập nhật `TVenderItem` và
+  UI `StallN`. Vì vậy cách gọi `dump_tientrang()` của Rust chỉ là contract nội bộ hiện tại,
+  chưa phải layout được client xác nhận.
+- `17 2F`, `17 66`: layout client chưa được tách riêng trong dump hiện tại; Rust vẫn dùng
+  cùng `dump_table()` 12B, đây là giả định cần kiểm tra thêm.
+- `28 01`: format hotkey riêng, không dùng entry inventory.
 
 > **ThingData 35 byte KHÔNG nằm trên đường truyền này.**
 > `write_thing_data` (`protocol/writer.rs:127`) và `read_thing_data` (`protocol/reader.rs:148`)
 > **không có call site nào** trong toàn repo.
+
+### 3.3.1. Gói `1E 01` — Stall/vendor listing (không phải entry 12B)
+
+`FUN_00730F4C` được dispatcher S→C gọi tại `client_pseudo_c/007902fb_FUN_007902fb.c:283-285`.
+Body mới đã được dump:
+
+- `client_pseudo_c/00730f4c_FUN_00730f4c.c:32-175`
+- `client_pseudo_c/00730f4c_FUN_00730f4c.asm.txt:5-173`
+- Đối chiếu callee: `test/ts_decompile/functions/00768638_FUN_00768638.c:18-23`
+
+Parser không dùng chung `dump_table()` 12B. Với `param_2` bắt đầu tại byte sub `01`, layout client đọc được là:
+
+```text
+[1E] [01]
+[name_len:1]                         // A; độ dài tên/stall
+[name:name_len]                      // A byte, client copy tối đa 14 byte
+[stall_id:1]                         // B; dùng để tạo/cập nhật StallB
+[record:5] × N
+  ├─ slot:1                          // client kiểm tra <= 0x19 (25)
+  └─ item_id:4 LE                   // đọc bởi FUN_0077ef7c
+```
+
+Công thức số record trong C là:
+
+```text
+N = (len - (A + 3)) / 5
+```
+
+trong đó `len` là độ dài chuỗi `param_2` tính từ byte `[01]`. Byte đầu record nằm tại
+packet offset `A + 3`; bốn byte ID nằm ngay sau byte slot. `FUN_0077ef7c` ghép bốn byte
+theo thứ tự little-endian thành `u32`, sau đó `FUN_00768638` ghi `flag=1` và `item_id`
+vào object theo slot tương ứng. Mỗi slot được index trong bảng client 26 phần tử
+(`0..25`).
+
+Sau khi đọc record, client gọi `FUN_0071e164` với tên đã cắt ngắn và `stall_id`; hàm này
+tạo `TVenderItem`, cập nhật `StallN`, rồi `FUN_00730F4C` cập nhật thêm state/UI liên quan
+(`00730f4c_FUN_00730f4c.c:161-168`). Vì vậy ngữ nghĩa client-side tối thiểu đã xác minh là
+**dữ liệu trạng thái stall/vendor**, không phải một bảng `InventoryItem` 12 byte.
+
+**Hệ quả đối với contract hiện tại:** `src/server/session.rs:434-437` gọi
+`dump_tientrang()` → `dump_table(..., "1E01")`, tức gửi các record 12 byte không có header
+stall. Đây là mismatch đã đủ bằng chứng từ client parser, không còn chỉ là gap “chưa có
+source”. Cần phân biệt `1E 01` stall/vendor với các storage dump `17 2F`/`17 66` trước
+khi dùng lại logic `dump_table()` cho `1E 01`.
 
 ### 3.4. Quy ước Slot — 1-based trên wire
 
@@ -202,98 +296,193 @@ Không có giá trị slot `2` nào cho 32012. Comment "slot 2" trong `character
 
 ### 4.3. Bằng chứng phía Client (decompile)
 
-- Chỉ **MỘT** tham chiếu tới `32012` — `functions/006547a8_FUN_006547a8.c:57-58`:
+- `client_pseudo_c/006547a8_FUN_006547a8.c:55-70` và ASM tương ứng xác nhận client có
+  đúng một điểm kiểm tra ID trong bộ entry nội bộ:
   ```c
-  if (id - 0x7D04 < 4) return id - 0x7D08;   // 32012→−4, 32013→−3, 32014→−2, 32015→−1
+  if (iVar2 - 0x7D04U < 4) {
+    return iVar2 + -0x7D08;
+  }
   ```
-  Quét 21 slot (`local_9 == 0x15`, dòng 70) của mảng item `param_1+0x158`.
-  Ý nghĩa mã trả về âm: **UNDETERMINED**.
-- Grep exhaustive: `32012` (thập phân) → **0 hit** trong mọi `*.c`; `047D0000` → **0 hit** trong `*.asm.txt`.
-  **Không có** tham chiếu nào về số lượng 4 hay index slot cho 32012 phía client.
-- Server tham chiếu **Bear không seed 32012 כלל** (`TSCharacter.cs:733,745` chỉ có equip 19737,
-  inventory rỗng `[]`; grep `32012` trong `TS_Server_Bear` = 0 hit).
-- 32012 cũng được biết là **item gate của eve/NPC** (`.scratch/op-working/research-checkpoint-2-click-npc-bridge.md:22-47`).
+  Vì vậy mapping là `32012 → -4`, `32013 → -3`, `32014 → -2`, `32015 → -1`.
+- Cùng hàm quét `local_9` từ `0` đến `0x14` (`21` entry) và truy cập
+  `param_1 + 0x158 + local_9*4`. Đây là **mảng object nội bộ của client**, không phải
+  bằng chứng về wire slot.
+- Hàm không đọc field quantity/count; vì vậy decompile không xác nhận `count = 4`.
+- Hàm cũng không map `local_9` sang wire slot `01` hay `02`; không thể dùng hàm này để
+  kết luận 32012 nằm ở ô thứ hai.
+- Server tham chiếu Bear không seed 32012 (`TSCharacter.cs:733,745`; inventory mặc định
+  rỗng), nên Bear cũng không cung cấp bằng chứng cho qty/slot này.
+- 32012 vẫn được ghi nhận là item gate của eve/NPC tại
+  `.scratch/op-working/research-checkpoint-2-click-npc-bridge.md:22-47`.
 
-**⇒ Con số "4 cái @ slot 2" không thể xác minh từ decompile hay Bear.
-Rust hiện tại nhất quán internally (slot 1, qty 4, có test) nhưng cần đối chiếu capture/client thật.**
+**Kết luận sau xác minh:** client xác nhận ID `32012` tồn tại và được `FUN_006547a8`
+map thành `-4`; client **không** xác nhận quantity `4` hoặc wire slot `02`. Rust hiện
+seed `32012 × 4` ở wire slot byte `01`, phù hợp với test nội bộ nhưng vẫn là quyết
+định thiết kế của server, chưa phải dữ liệu được client xác nhận.
+
 
 ---
 
 ## 5. Đánh Giá Source Rust: Đã Đáp Ứng Chưa?
 
-### 5.1. ✅ Đã cài đặt (verify)
+### 5.1. ✅ Đã cài đặt / xác minh được
 
 1. **Bảng chỉ số được đẩy** — frame `05 03` chứa hp/sp/int/atk/def/agi/hpx/spx/level/exp/
    skill-point/point/danh dự/hp_max/sp_max + gear bonus (`spawn.rs:502-526`).
-   Name + id + map + xy nằm ở frame `03` (`spawn.rs:83-120`); gold ở `1A 04` (`spawn.rs:561-564`).
-2. **Hòm đồ được đẩy** — frame `17 05` ở Logined1 bước 10 (`spawn.rs:552`),
-   layout 12 byte/entry (`session.rs:450-468`), cộng 4 container khác + `17 0B` trang bị.
-3. **Seed starter nhất quán** — 32012×4 @ homdo slot 1 (1-based) + 19737 @ trangbi slot 2,
-   cả in-memory lẫn DB nguyên tử, có test khẳng định (`create_char_atomic_test.rs:151-160`).
-4. **Không thiếu opcode "xin stats" / "xin inventory"** — cả hai tham chiếu nói client không
-   gửi `08`/`17` dạng query (`opcode_08.md:267-283`, `opcode_17.md:130-137`);
-   C→S duy nhất cần xử lý sau login là `25 01` — **đã xử lý** (`login.rs:238-317`).
-5. **Parse `09 01`, `09 02`, `03 01`, `08 01` khớp byte-exact** với builder phía client
-   (`character.rs:39-77`, `stats.rs:32-44`, `login.rs:88`).
+   Name + id + map + xy nằm ở frame `03` (`spawn.rs:83-120`); gold ở `1A 04`
+   (`spawn.rs:561-564`).
+2. **Hòm đồ `17 05` được đẩy và đã đối chiếu parser client** — frame `17 05` ở Logined1
+   bước 10 (`spawn.rs:552`), layout 12 byte/entry (`session.rs:450-468`), parser client
+   `FUN_0076BFC8` xác nhận cùng stride/field order. **Không áp dụng layout này cho `17 0B`:**
+   parser `FUN_0077CC2C` dùng stride 10B, trong khi `dump_trangbi()` hiện vẫn serialize 12B.
+   **Cũng không áp dụng layout này cho `1E 01`:** `FUN_00730F4C` đọc header
+   `name_len/name/stall_id` và record 5 byte, đồng thời cập nhật `TVenderItem`/UI
+   `StallN`; xem §3.3.1.
+3. **Các dispatcher C→S đã có bằng chứng ASM** — `02` có 8 target body; `17` có target table
+   61 sub và body sub `01/02`; `19` có byte-map/target table và ASM các target hợp lệ;
+   `1C` có target table và ASM sub `01/02/04/05/06` (sub `00/03` là default).
+4. **Seed starter nhất quán trong source Rust** — 32012×4 @ homdo slot 1 (1-based) +
+   19737 @ trangbi slot 2, cả in-memory lẫn DB nguyên tử, có test khẳng định
+   (`create_char_atomic_test.rs:151-160`). Client chỉ xác nhận mapping ID `32012→-4`,
+   không xác nhận qty/slot.
+5. **Không có bằng chứng query stats/inventory trong các path đã dump** — `05 03`/`17 05`
+   là push S→C; `08 01` là builder phân bổ C→S; `17`/`02`/`19`/`1C` là dispatcher hành động,
+   không phải request snapshot. `25 01` là handshake map-loaded đầu tiên sau Logined1 và đã
+   được xử lý (`login.rs:238-317`); sau đó vẫn có các opcode hành động `08/17/...`.
+6. **Các builder `02/08/09 01 empty` đã có ASM trực tiếp** — không nên dùng
+   `case ...: break` của Ghidra làm bằng chứng phủ nhận chúng.
 
-### 5.2. ❌ Khoảng trống / đáng ngờ
+### 5.2. ❌ Khoảng trống / đáng ngờ sau đợt xác minh
 
 | # | Mức độ | Vấn đề | Chi tiết |
 |:-:|:--:|---|---|
-| 1 | **CAO** | **Không push `08 01` nào khi login** | Bear `loginChar` (`TSCharacter.cs:5100-5445`) push 10+ gói `08 01` (hpx 31, spx 32, atk 28, def 29, int 27, agi 30, hp 25, sp 26, + toàn gear bonus `0xD4/0xD2/0xD3/0xCF/0xD0/0xD6/0xDA/0xDB`). `opcode_08.md:286-303` cũng liệt kê bộ tối thiểu (class, level, hp, sp, int/atk/def/agi, exp, points). Rust Logined1 **gửi 0 gói `08 01`** → client nào dựng HUD từ `08 01` sẽ hiện số 0/stale cho tới khi equip/phân bổ điểm. |
-| 2 | **TRUNG BÌNH** | **Gear bonus = 0 khi login lại từ DB** | `recompute_stats()` không được gọi trên path load (chỉ có caller từ `stats.rs`, `quest.rs`, `gm.rs`, `inventory.rs`). `SqliteSessionRepository::load` (`session.rs:19-114`) không nạp `int2/atk2/def2/hpx2/spx2/agi2` (default `session.rs:335-340`) → `05 03` gửi bonus = 0 cho nhân vật đã có trang bị. |
-| 3 | **TRUNG BÌNH** | **Item load từ DB mất template fields** | `load_items` (`session.rs:176-199`) chỉ đọc `slot/itemid/quantity/damage`; `loai`, `lv`, mọi field `_1/_2` = 0. Hệ quả: gate equip `!(1..=6).contains(&loai)` (`inventory.rs:292`) **từ chối item đã lưu từ DB**; gear recompute = 0; starter 19737 cũng mất `loai:2/agi1:1` sau relog (tạo từ struct literal ở `character.rs:271-279`, không qua `from_template`). |
-| 4 | **TRUNG BÌNH** | **Tail `05 03` lệch cả Bear lẫn spec client** | Rust: `F401×5` + **90** zero + skill list (`spawn.rs:182-184`). Bear: `500×5` + **43** zero + skill list + block 32 byte cuối (`hp3..spx3`, `hp4..spx4`) (`TSCharacter.cs:5072-5098`). Spec client: header cố định đến `p[0x70]`, record 3 byte từ `p[0x71]` (`opcode_05.md:131,151`). → skill list của Rust bắt đầu lệch ~47 byte so với chỗ parser decompile mong đợi, và block 32 byte tail bị thiếu. **Cần verify bằng capture thật.** |
-| 5 | THẤP | Chưa validate end-to-end với `aLogin.exe` thật | `.scratch/op-working/handoff-login-handshake.md:100-102` còn open action này; test tự động duy nhất chỉ đếm 21 frame (`tests/login_char_flow_test.rs:232-236`). |
-| 6 | THẤP | 32012 qty/slot không có nguồn đối chiếu | Bear không seed 32012; decompile không xác nhận qty/slot → chỉ internal consistency. |
+| 1 | **CAO** | **Logined1 không push `08 01`** | Rust `spawn.rs` không gửi frame `08 01` trong chuỗi login. Bear `loginChar` (`TSCharacter.cs:5100-5445`) có bộ push lớn; tuy nhiên chưa có capture chạy `aLogin.exe` để kết luận HUD client bắt buộc cần toàn bộ các frame đó ngay lúc login. Không push là khác biệt protocol cần xử lý/verify, không phải bằng chứng chắc chắn client sẽ hiện 0/stale. |
+| 2 | **TRUNG BÌNH** | **Gear bonus có thể bằng 0 khi login lại từ DB** | `recompute_stats()` không được gọi trên path load; `SqliteSessionRepository::load` (`src/db/modern/sqlite/session.rs:19-114`) không nạp `int2/atk2/def2/hpx2/spx2/agi2` (default `Session`) → `05 03` gửi bonus = 0 cho nhân vật đã có trang bị. |
+| 3 | **TRUNG BÌNH** | **Item load từ DB có thể mất template fields** | `SqliteSessionRepository::load_items` (`src/db/modern/sqlite/session.rs:176-199`) chỉ đọc `slot/itemid/quantity/damage`; `loai`, `lv`, các field `_1/_2` mặc định 0. Hệ quả gate equip và gear recompute có thể sai sau relog. |
+| 4 | **TRUNG BÌNH** | **Tail `05 03` vẫn chưa đối chiếu byte-exact** | Rust: `F401×5` + 90 zero + skill list (`spawn.rs:182-184`); Bear: `500×5` + 43 zero + skill list + block 32 byte cuối; spec `opcode_05.md` mô tả parser fixed header/tail khác. Đợt dump mới không cung cấp capture `aLogin.exe`, nên chưa thể chọn layout chuẩn. |
+| 5 | **CAO** | **`17 0B` đang có khả năng lệch layout** | Client `FUN_0077CC2C` dùng stride 10B/no leading slot; Rust `dump_trangbi()` dùng `dump_table()` 12B. Cần sửa serializer hoặc xác minh lại frame trước khi coi `17 0B` là đúng. |
+| 6 | **CAO** | **`1E 01` không dùng layout inventory 12B** | Đã có body/ASM `FUN_00730F4C`. Client đọc header `name_len/name/stall_id` + record 5 byte `(slot, u32 id)` và cập nhật `TVenderItem`/`StallN`; Rust `dump_tientrang()` vẫn gọi `dump_table()` 12B. Cần xác định contract server đúng trước khi coi frame này là storage push. |
+| 7 | **TRUNG BÌNH** | **Full create `09 01` chưa có client builder độc lập** | ASM xác nhận empty `09 01`; layout 14 phần vẫn chỉ được xác minh tại server parser `character.rs`. Không được ghi “client builder byte-exact” như bản cũ. |
+| 8 | THẤP | **Chưa validate end-to-end với `aLogin.exe` thật** | `handoff-login-handshake.md` còn open action; test tự động chủ yếu đếm frame, chưa kiểm tra client UI/session state. |
+| 9 | THẤP | **32012 qty/slot chưa có nguồn đối chiếu** | `FUN_006547a8` xác nhận ID mapping `32012→-4` và quét 21 entry nội bộ, nhưng không đọc quantity hoặc wire slot. |
 
 ### 5.3. Đề xuất hành động (theo thứ tự ưu tiên)
 
-1. **Thêm push `08 01` vào cuối Logined1** — bộ tối thiểu theo `opcode_08.md:286-303`:
-   class, level, hp, sp, int/atk/def/agi, exp, points; tham chiếu cách Bear làm ở
-   `TSCharacter.cs:5380-5445` (`refreshChr` + `refresh(FullHpMax, 215)` / `(FullSpMax, 216)`).
-2. **Gọi `recompute_stats()` ngay sau khi load session** (trong `login_db` `login.rs:169-235`
-   hoặc trong `SqliteSessionRepository::load`) để `05 03` mang gear bonus đúng.
-3. **Bổ sung `loai/lv/_1/_2` vào `load_items`** (`session.rs:176-199`) hoặc join với bảng template —
-   fix luôn gate equip cho item đã lưu.
-4. **Đối chiếu byte-exact tail `05 03`** với capture từ client thật; cân nhắc sửa
-   `F401×5 + 90 zero` → layout spec (`opcode_05.md:131,151`) hoặc layout Bear.
-5. **Chạy end-to-end với `aLogin.exe`** theo `handoff-login-handshake.md`.
+1. **Tách serializer `17 0B` khỏi `dump_table()` 12B** — lấy client `FUN_0077CC2C` làm
+   chuẩn 10B, hoặc chụp/đối chiếu frame thật trước khi sửa. Đây là mismatch có thể làm
+   lệch toàn bộ equipment record.
+2. **Đối chiếu lại contract `1E 01`** — body `FUN_00730F4C` đã xác nhận header
+   `name_len/name/stall_id` và record 5 byte `(slot, u32 id)`, không phải `dump_table()` 12B.
+   Cần phân biệt payload stall/vendor với storage push trước khi sửa hoặc giữ nguyên
+   `dump_tientrang()`.
+3. **Thêm push `08 01` hoặc chứng minh HUD không cần bộ push đó** — tham chiếu Bear
+   `loginChar`/`refreshChr`, rồi đối chiếu bằng capture `aLogin.exe`; không chỉ suy từ
+   thiếu frame trong Rust.
+4. **Gọi `recompute_stats()` ngay sau khi load session** (trong `login_db` hoặc
+   `SqliteSessionRepository::load`) để `05 03` mang gear bonus đúng.
+5. **Bổ sung `loai/lv/_1/_2` vào `load_items`** hoặc join với bảng template để giữ
+   được gate equip và gear bonus sau relog.
+6. **Đối chiếu byte-exact tail `05 03`** bằng capture từ client thật; chưa tự sửa layout
+   dựa trên Bear hoặc Ghidra khi hai nguồn đang lệch nhau.
+7. **Tìm builder full create `09 01`** nếu cần tuyên bố byte-exact client↔server; hiện
+   chỉ có server contract và empty client send path.
+8. **Chạy end-to-end với `aLogin.exe`** theo `handoff-login-handshake.md`.
+
 
 ---
 
-## 6. Danh Sách UNDETERMINED (chưa xác định được)
+## 6. Danh Sách UNDETERMINED (sau đợt xác minh `client_pseudo_c/`)
 
-1. **Parser client cho `17 05` / `17 0B` / `1E 01`** — `func_0x0076bfc8`, `func_0x0077cc2c`,
-   `func_0x0077d0b8` **không có decompiled body** (`index.csv` grep `76bfc8|77cc2c|77d0b8` → 0 hit).
-   → Entry 12 byte phía Rust là contract đã validate, nhưng decode phía client không xác minh được.
-2. **Sub-body C→S của `0x17` (61 sub), `0x19` (≤0x29), `0x1C` (7 sub), `0x02` (8 sub)** —
-   jump table tồn tại (`0x783405`, `0x7853E5`, `0x785DBB`, `0x77F883`) nhưng body không có
-   trong ASM dump lẫn mọi file decompile.
-3. **Hằng byte tại `0x78A834` (payload op `00`), `0x78A838..0x78A83E`, `0x78A848/854/880`** —
-   không dump file nào phủ dải `0x78A8xx`, và không có `.exe` trong tree để re-dump.
-4. **Xử lý qty/slot của 32012 phía client** + ý nghĩa mã trả về `id − 32016` của `FUN_006547a8`.
-5. **Ý nghĩa field cuối của `08 01`** (`u32 @+0xFCF`, `byte @+0xFD3`) — server chỉ đọc 2 byte đầu.
-6. **Client thật có bao giờ gửi `09 01` payload rỗng không** (server mặc định = enter-game, `character.rs:139-141`).
+Các mục dưới đây đã được phân loại lại thành **đã xác minh**, **xác minh một phần**, hoặc
+**còn mở**; không còn dùng danh sách cũ như một khối claim “chưa có bằng chứng”.
+
+1. **Parser client `17 05` / `17 0B` / `1E 01` — layout đã đóng, contract `1E 01` còn lệch**
+   - `17 05`: `client_pseudo_c/0076bfc8_FUN_0076bfc8.c/.asm.txt` có body; stride 12B,
+     có slot → layout 12B của Rust được xác minh.
+   - `17 0B`: `0077cc2c_FUN_0077cc2c.c/.asm.txt` có body; stride 10B, không có leading
+     slot → layout 12B của `dump_trangbi()` **không còn được coi là đúng**.
+   - `1E 01`: `00730f4c_FUN_00730f4c.c/.asm.txt` đã có body; layout là header
+     `name_len/name/stall_id` + record 5 byte `(slot, u32 id)`, không phải inventory 12B.
+     `FUN_0071e164` tạo `TVenderItem` và UI `StallN`; `dump_tientrang()` hiện vẫn dùng
+     `dump_table()` 12B, nên phần còn mở là **contract server/business semantics**, không
+     còn là thiếu source.
+   - `0077d0b9` là parser `17 0C`, không phải parser `1E 01`.
+
+2. **C→S body `0x02` / `0x17` / `0x19` / `0x1C` — claim cũ đã sửa**
+   - `02`: đã dump ASM 8 sub/target trong `cs_op02_dispatch_cases.asm.txt`.
+   - `17`: đã có dispatcher, target table 61 sub và body sub `01/02`; chưa có source
+     C/ASM riêng cho toàn bộ 61 sub.
+   - `19`: đã có byte-map, target table và ASM các target hợp lệ; các sub không map
+     về target hợp lệ rơi vào default.
+   - `1C`: đã có target table và ASM sub `01/02/04/05/06`; sub `00/03` là default.
+   Vì vậy không còn được viết rằng “chỉ có jump table, không có body”; phần còn thiếu là
+   **coverage đầy đủ từng sub**, không phải bằng chứng rằng client không gửi các opcode này.
+
+3. **Literal/data `0x78A8xx` — đã dump, không còn là gap**
+   - `cs_literals_0x78a818_0x78a8ed.hex` phủ `0x78A818..0x78A8ED` (214 byte).
+   - `cs_lit_0x78a834.hex`, `cs_lit_0x78a848.hex`, `cs_lit_0x78a854.hex`,
+     `cs_lit_0x78a860.hex`, `cs_lit_0x78a880.hex` đã có trong `client_pseudo_c/`.
+   - Call-site trong `0077f414` xác nhận đây là Delphi string/data constants và buffer
+     metadata, không phải raw wire fields. `0x78A834` được dùng trong path main `00`;
+     `0x78A838..0x3E` được copy vào object; `0x78A848/854/860/880` được dùng trong các
+     builder liên quan. Semantic đầy đủ của từng constant vẫn cần call-site/UI context,
+     nhưng claim “không có file dump” đã sai.
+
+   | Địa chỉ | Bytes quan sát được | Call-site/ý nghĩa tối thiểu |
+   |---|---|---|
+   | `0x78A834` | `00 00 00 00 06 "123123" 00 ...` | được đưa vào queue ở path main `00`; không phải raw payload field |
+   | `0x78A838..0x3E` | `FF FF FF FF 01 00 00` | copy 7 byte vào object `+0x648`; là buffer/metadata runtime |
+   | `0x78A848` | `20 20 00 00 ...` | chuỗi fallback khi độ dài tên < 2 |
+   | `0x78A854` | `30 00 00 00 ...` | chuỗi `"0"` dùng trong `StrToInt` ở builder liên quan |
+   | `0x78A860` | `31 32 33 34 35 36 37 38 00` | chuỗi `"12345678"` dùng làm dữ liệu test/reset trong builder |
+   | `0x78A880` | metadata + `31 32 33 34 35 36 37 38 39 30 00` | chuỗi `"1234567890"` và buffer liên quan; vùng này xen kẽ data/code |
+
+4. **32012 qty/slot — mapping ID đã xác minh, wire layout chưa**
+   - `FUN_006547a8` xác nhận `32012..32015 → -4..-1` và quét 21 entry nội bộ.
+   - Không có bằng chứng quantity `4` hoặc wire slot `02`; client không đọc count/slot
+     trong hàm này. Rust `slot:1, count:4` vẫn là seed nội bộ của server.
+
+5. **Field trailing của `08 01` — wire presence đã xác minh, semantic chưa**
+   - ASM `0077f414_FUN_0077f414.asm.txt:469-500` xác nhận gửi `u16`, `u8`, `u32`, `u8`
+     sau `08 01`; field cuối đọc từ `+0xFCF` và `+0xFD3`.
+   - Server `stats.rs:37-44` chỉ parse `stat_id` và `target_val`; chưa có tên nghiệp vụ
+     chắc chắn cho `u32`/byte trailing. Gap còn lại là **semantic**, không phải “client có
+     gửi hay không”.
+
+6. **`09 01` empty — đã xác minh một call-site; full create vẫn chưa đóng**
+   - ASM `0077f414_FUN_0077f414.asm.txt:711-736` tạo rồi gửi frame chỉ có main/sub,
+     không đọc body; server map `payload.is_empty()` sang enter-game.
+   - Layout create 14 phần ở §3.2 vẫn là server contract. Chưa tìm thấy client builder
+     full-payload tương ứng trong dump hiện tại, nên không được tuyên bố full create đã
+     byte-exact hai chiều.
+
 
 ---
 
-## 7. Sửa Lỗi Tài Liệu Đề Xuất (cho các file `.md` hiện có)
+## 7. Sửa Lỗi Tài Liệu Đề Xuất (đã cập nhật theo ASM mới)
 
-1. **`opcode_02.md:176-180,218` SAI**: khẳng định "client never sends 0x02; chat at 0x1A" dựa trên
-   `case 2: break;`. Chứng cứ ngược: `byte[0x02] = 0x03` → builder `0x0077F86E` có bảng 8 sub
-   (asm 178–182), **và chính ts_dream xử lý chat C→S tại op `0x02`** (`chat.rs:68-227`).
-   Redirect "chat at 0x1A" cũng sai — `1A` subs 1–4 gửi **tiền** (`opcode_1a.md`).
+1. **`opcode_02.md:176-180,218`**: claim “client never sends 0x02; chat at 0x1A” dựa trên
+   `case 2: break` là **sai**. `cs_op02_dispatch_cases.asm.txt` xác nhận dispatcher 8 sub
+   và có body gửi thực tế; server cũng xử lý chat C→S tại `chat.rs:68-227`. `1A` không
+   phải redirect của chat.
 2. **`opcode_3c.md:224-226`, `opcode_3d.md:24,557`**: index dword table bằng raw opcode là sai.
    Đúng: op `0x3C` → `dword[0x32] = 0x007892B9`; op `0x3D` → `dword[0x33] = 0x007893E6`;
-   `0x0078A142` là builder của **op `0x48`**, `0x0078A318` là của **op `0xC7`**.
-3. **Line-drift ≈ +44** với mọi citation vào `0077f414_FUN_0077f414.c`:
-   `case 9` thực tế `942-943` (doc ghi 898–899), `case 2` thực tế `863-864` (ghi 819–820),
-   `case 0x1a` thực tế `983`, `case 0x3d` thực tế `1088`.
-4. **`opcode_08.md:267-283`**: câu "OP 0x08 KHÔNG có phía gửi" cần diễn đạt lại:
-   builder C→S tồn tại và payload 10 byte verify khớp `stats.rs:32-44` — chỉ là không dùng để *query*.
-5. Mọi claim "client never sends X" suy từ `case` rỗng là **chưa chứng minh** — với `byte[X] ≠ 0`
-   thì `case X: break;` là lỗi recovery của Ghidra, không phải bằng chứng.
+   `0x0078A142` là builder của op `0x48`, `0x0078A318` là builder của op `0xC7`.
+3. **Line-drift citations**: các line number cũ trong `0077f414_FUN_0077f414.c` phải được
+   đối chiếu lại; pseudo-C có nhiều `WARNING: Removing unreachable block`, nên các
+   `case ...: break` không phải bằng chứng thiếu code.
+4. **`opcode_08.md:267-283`**: sửa thành “builder C→S `08 01` tồn tại và dùng cho phân bổ
+   điểm; không phải query”. ASM mới xác nhận thêm `u32 @+0xFCF` và `byte @+0xFD3`; server
+   hiện bỏ qua các field này.
+5. **Mọi claim “client never sends X” suy từ `case` rỗng**: phải bị loại bỏ khi
+   `byte[X] != 0` hoặc ASM dispatch đã có target. Đây là lỗi recovery của Ghidra, không
+   phải bằng chứng protocol.
+6. **`0x17`/inventory docs**: không còn ghi mọi container dùng cùng entry 12B. `17 05` là
+   12B; `17 0B` là 10B; `1E 01` là header stall/vendor + record 5 byte
+   `(slot, u32 id)`. Cần sửa cả tài liệu opcode liên quan nếu chúng còn dùng chung
+   `dump_table()`.
+7. **`0077d0b9`**: phải ghi là parser `17 0C`, không dùng nhầm làm bằng chứng cho `1E 01`.
+
 
 ---
 
@@ -304,21 +493,28 @@ Rust hiện tại nhất quán internally (slot 1, qty 4, có test) nhưng cần
 2.  Server ──► danh sách nhân vật / 09 03
 3.  Client ──► 09 02 + name                     character.rs:101
     Server ──► 09 03 ss
-4.  Client ──► 09 01 + 14 phần (sex,hair,color,thuoctinh,int/atk/def/hpx/spx/agi,pass×2)
+4.  Client ──► 09 01 + full create payload      server contract: character.rs:39-77
+    (client full builder chưa có body độc lập; empty 09 01 đã xác minh tại ASM 007803C0)
     Server ──► tạo DB nguyên tử: homdo 32012×4 @slot1, trangbi 19737 @slot2
                                                     character.rs:138 → session.rs:483-556
 5.  Client ──► 03 01                            login.rs:88  (XÁC NHẬN VÀO GAME)
 6.  Server ──► CHUỖI LOGINED1 (21 frame)        spawn.rs:471-604
     ├─ 03         id LE32 + name VISCII + map/xy + equip list
     ├─ 05 03      hp/sp/int/atk/def/agi/lv/exp + gear bonus   ◄── STATS
-    ├─ 17 05      hòm đồ (entry 12B: slot,id,cnt,...)          ◄── INVENTORY
-    ├─ 1E 01 / 17 2F / 17 66 / 17 0B / 1A 04 / 27 09 / 28 01 / 23 04×3
+    ├─ 17 05      hòm đồ (client entry 12B: slot,id,cnt,...) ◄── INVENTORY
+    ├─ 1E 01 / 17 2F / 17 66 / 1A 04 / 27 09 / 28 01 / 23 04×3
+    │              1E01: client đọc stall header + record 5B, không phải 12B
+    │              17 2F/17 66: layout client chưa đủ bằng chứng
+    ├─ 17 0B      trang bị; client parser stride 10B — Rust hiện còn 12B, cần sửa/verify
     └─ 02 0B ×2 banner, 14 08/14 21 marker, 21 02 PK, 0F xx pet
 7.  Client ──► 25 01 (map loaded)               login.rs:238  → broadcast appear
-8.  Về sau:  08 01 chỉ khi phân bổ điểm (C→S) / server push khi stat đổi (S→C)
-             17 xx thao tác túi — KHÔNG có "xin lại 17 05"
+8.  Về sau:
+    ├─ 08 01 C→S = phân bổ điểm; ASM xác nhận u16+u8+u32+u8, server dùng 2 field đầu
+    ├─ 08 01 S→C = push delta theo handler
+    └─ 17/02/19/1C = các dispatcher hành động; không có bằng chứng query snapshot
 ```
+
 
 ---
 
-*Tài liệu được tạo từ khảo sát decompile + source Rust ngày 2026-09-23. Mọi claim đều kèm file:line; các mục chưa xác định được liệt kê ở §6.*
+*Tài liệu được tạo từ khảo sát decompile + source Rust ngày 2026-09-23 và cập nhật xác minh ngày 2026-09-24. Các claim đã phân biệt rõ **đã xác minh**, **xác minh một phần**, và **còn mở**; nguồn chính là `client_pseudo_c/`, với `test/ts_decompile/` chỉ dùng để đối chiếu.*
