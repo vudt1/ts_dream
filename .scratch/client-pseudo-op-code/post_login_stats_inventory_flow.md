@@ -1,6 +1,6 @@
 # Nghiên Cứu Luồng Sau Đăng Nhập: Xác Nhận Chỉ Số (Stats) & Túi Đồ (Hòm Đồ)
 
-Ngày: 2026-09-23; cập nhật xác minh: 2026-09-24
+Ngày: 2026-09-23; cập nhật xác minh: 2026-09-24; **đính chính `1E 01`/`17 1E`: 2026-10-01**
 Workspace: `/mnt/d/VUDT/GIT_PCC/ts_dream`
 Tài liệu tham chiếu:
 - Client decompile chính: `client_pseudo_c/` (C + ASM + HEX, đã bổ sung sau đợt dump Round-3)
@@ -10,7 +10,12 @@ Tài liệu tham chiếu:
 - Source Rust: `src/` trong repo này
 - Tham chiếu server C#: `TS_Server_Bear/TS_Server/`
 
-> **Phạm vi bằng chứng mới:** `client_pseudo_c/` đã có body/ASM cho parser `17 05`, `17 0B`, parser `1E 01` (`FUN_00730F4C`), các dispatcher C→S `02/17/19/1C`, literal `0x78A8xx`, hàm `FUN_006547a8`, và ASM `09 01` empty-payload. Những claim cũ trong §6 về việc các artifact này chưa tồn tại đã được sửa. Parser `1E 01` đã được phân tích: client đọc một header có tên/stall và các record 5 byte, **không** dùng entry inventory 12 byte.
+> **Phạm vi bằng chứng mới:** `client_pseudo_c/` đã có body/ASM cho parser `17 05`, `17 0B`, parser `1E 01` (`FUN_007707a0`), stall `17 1E` (`FUN_00730F4C`), các dispatcher C→S `02/17/19/1C`, literal `0x78A8xx`, hàm `FUN_006547a8`, và ASM `09 01` empty-payload. Những claim cũ trong §6 về việc các artifact này chưa tồn tại đã được sửa.
+>
+> **🛠 Đính chính 2026-10-01 (sau nghiên cứu battle):** bản gốc gán `1E 01` = stall/vendor
+> dựa trên `FUN_00730F4C`. **Sai** — `FUN_00730F4C` được gọi từ main `0x17` (tức `17 1E`).
+> `1E 01` thật là container 51 ô, record 12 byte, **khớp** `dump_table()` của Rust.
+> Chi tiết: §3.3.1.
 
 ---
 
@@ -47,7 +52,7 @@ vẫn là contract phía server; chưa có builder client độc lập tương �
        │      • 05 03              (hp/sp/int/atk/def/agi/lv/exp) ← STATS
        │      • 0F xx pet, 21 02 PK
        │      • 17 05              (HÒM ĐỒ)                       ← INVENTORY
-       │      • 1E 01 (stall/vendor listing theo parser client), 17 2F, 17 66, 17 0B, 1A 04, 27 09 ...
+       │      • 1E 01 (container 51 ô), 17 2F, 17 66, 17 0B, 1A 04, 27 09 ...
        │      • 28 01 hotkeys, 23 04 store, 18 06/07 quest sync
        │                                   │
        │  ──► 25 01             (map loaded — xong login)  login.rs:238
@@ -99,7 +104,8 @@ vẫn là contract phía server; chưa có builder client độc lập tương �
 | `0F` | `08/14/0A/12/13` | pet summary | `spawn.rs:370-394` |
 | `21` | `02` | PK / tham chiến | `spawn.rs:549` |
 | `17` | `05` | **HÒM ĐỒ (danh sách túi đồ)** | Rust `session.rs:425-427`; client parser `FUN_0076BFC8` xác nhận stride 12B |
-| `1E` | `01` | **Stall/vendor listing** (client-side payload) | `[01][name_len:1][name:name_len][stall_id:1][(slot:1,id:4LE)...]` | Client `FUN_00730F4C` tạo `TVenderItem` và cập nhật UI `StallN`; Rust hiện gọi đây là storage `TienTrang` và vẫn serialize bằng `dump_table()` 12B, nên contract hiện **không còn khớp** |
+| `1E` | `01` | **Container 51 ô** (`player+0xA48`) | `n = (Len(RP)−1)/12` record 12B: `[slot:1][itemCode:2LE][b3][b4][b5][b6][b7][qty:4LE]` | Client `case_026:28-29 → FUN_007707a0`; **KHÔNG phải stall** — xem §3.3.1 (đã đính chính 2026-10-01) |
+| `17` | `1E` | **Stall/vendor listing** | `[1E][name_len:1][name:name_len][stall_id:1][(slot:1,id:4LE)...]` | Client `case_020:149 → FUN_00730F4C` tạo `TVenderItem` + UI `StallN` (chuỗi `"Stall"`) |
 | `17` | `2F` | Túi đeo | Rust `session.rs:440-442`; client layout chưa tách riêng trong dump hiện tại |
 | `17` | `66` | Lưu lang | Rust `session.rs:445-447`; client layout chưa tách riêng trong dump hiện tại |
 | `17` | `0B` | Trang bị đang mặc | Client parser `FUN_0077CC2C` dùng stride 10B, **không giống** 12B của `dump_table()` |
@@ -198,12 +204,12 @@ Bằng chứng client: `client_pseudo_c/0076bfc8_FUN_0076bfc8.c:87-203` và
 - `17 0B`: parser `FUN_0077CC2C`, stride **10B**, không có byte slot đầu tiên trong
   entry client (`0077cc2c_FUN_0077cc2c.c:64-144`, ASM tương ứng). Đây là mismatch
   nghiêm trọng với `dump_trangbi()` hiện vẫn gọi `dump_table()` 12B.
-- `1E 01`: **không phải generic inventory 12B**. Body `FUN_00730F4C` đã được dump tại
-  `client_pseudo_c/00730f4c_FUN_00730f4c.c:32-175` và
-  `client_pseudo_c/00730f4c_FUN_00730f4c.asm.txt:5-173`; xem layout chi tiết ở §3.3.1.
-  Parser đọc một header động và các record 5 byte, đồng thời tạo/cập nhật `TVenderItem` và
-  UI `StallN`. Vì vậy cách gọi `dump_tientrang()` của Rust chỉ là contract nội bộ hiện tại,
-  chưa phải layout được client xác nhận.
+- `1E 01`: **container 51 ô** (`player+0xA48`), record **12B** — parser `FUN_007707a0`
+  (`client_pseudo_c/007707a0_FUN_007707a0.c:78-200`), `n = (Len(RP)−1)/12`. Layout này
+  **khớp** `dump_table()` 12B của Rust. Xem §3.3.1.a.
+  *(Đính chính 2026-10-01: bản trước gán nhầm frame này là stall/vendor.)*
+- `17 1E`: **stall/vendor** — header `name_len/name/stall_id` + record 5 byte
+  `(slot, u32 id)`, tạo `TVenderItem`/UI `StallN`. Xem §3.3.1.b. Rust chưa implement.
 - `17 2F`, `17 66`: layout client chưa được tách riêng trong dump hiện tại; Rust vẫn dùng
   cùng `dump_table()` 12B, đây là giả định cần kiểm tra thêm.
 - `28 01`: format hotkey riêng, không dùng entry inventory.
@@ -212,19 +218,61 @@ Bằng chứng client: `client_pseudo_c/0076bfc8_FUN_0076bfc8.c:87-203` và
 > `write_thing_data` (`protocol/writer.rs:127`) và `read_thing_data` (`protocol/reader.rs:148`)
 > **không có call site nào** trong toàn repo.
 
-### 3.3.1. Gói `1E 01` — Stall/vendor listing (không phải entry 12B)
+### 3.3.1. Gói `1E 01` — Container 51 ô (ĐÃ ĐÍNH CHÍNH 2026-10-01: KHÔNG phải stall)
 
-`FUN_00730F4C` được dispatcher S→C gọi tại `client_pseudo_c/007902fb_FUN_007902fb.c:283-285`.
-Body mới đã được dump:
+> **⚠️ Đính chính.** Bản trước của mục này ghi `1E 01` = stall/vendor dựa trên
+> `FUN_00730F4C`. **Gán nhãn sai.** Đã đối chiếu lại bảng dispatch:
+>
+> | Frame | Handler | Ngữ nghĩa thật |
+> |:--|:--|:--|
+> | **`17 1E`** | `case idx 20` (main `0x17`) `case 0x1e:` → `FUN_00730F4C` | **stall/vendor** |
+> | **`1E 01`** | `case idx 26` (main `0x1E`) `case_026:28-29` → `FUN_007707a0` | **container 51 ô** |
+>
+> Bằng chứng: `jumptable_byte200_0x78A8EE[0x1E] = 26` ≠ `[0x17] = 20`, và
+> `FUN_00730F4C` chỉ được gọi từ `client_pseudo_c/007902fb_FUN_007902fb.c:149`
+> (grep `0x00730f4c` trong `client_pseudo_c/`: chỉ `007902fb` + `case_020`).
+
+#### 3.3.1.a `1E 01` — layout thật (mức A)
+
+Client đọc `n = (Len(RP) − 1) / 12` record, mỗi record **12 byte**
+(`client_pseudo_c/007707a0_FUN_007707a0.c:78-200`):
+
+```text
+[1E] [01]
+[record:12] × N
+  ├─ slot       :1     // guard <= 0x32 (50); index vào player+0xA48 + slot*4
+  ├─ itemCode   :2 LE  // FUN_0077eb9c (Word LE) → local_1a
+  ├─ b3         :1     // local_e
+  ├─ b4         :1     // local_f
+  ├─ b5         :1     // local_10
+  ├─ b6         :1     // local_11
+  ├─ b7         :1     // local_12
+  └─ qty        :4 LE  // FUN_0077ed68 (DWORD LE) → local_18
+```
+
+Client dùng 5 byte giữa (`local_e..local_12`) cộng với `FUN_0065b580(itemCode, 0, qty)`
+để gọi một **virtual method** trên object tại `player+0xA48` (`007707a0_FUN_007707a0.c:172-179`).
+
+> **Hệ quả cho contract Rust:** `src/server/session.rs:434-437` `dump_tientrang()` gửi
+> `1E 01` với **record 12 byte** → **khớp về layout**. "Mismatch" ở gap #6 của §5.2 trước đây
+> là do **nhận nhầm opcode** khi gán nhãn stall, **không phải** do sai layout.
+> Điểm còn mở chuyển sang câu hỏi ngữ nghĩa: `tientrang` (storagetype 2) có đúng là container
+> `+0xA48` 51 ô không, hay thuộc `+0xB14` (51 ô) / `+0xDC0` (26 ô).
+> Migration `migrations/0001_init.sql:99` ghi slot `1..50` cho TienTrang — **khớp** guard 51 ô.
+> Xem thêm [`opcode_1e.md`](./opcode_1e.md) §4 (đã mô tả đúng `0x1E` là nhóm bảng slot
+> `+0xA48`/`+0xB14`/`+0xDC0`, **không** phải stall).
+
+#### 3.3.1.b `17 1E` — Stall/vendor (layout đã xác minh, mức A)
+
+`FUN_00730F4C` được dispatcher S→C gọi tại `client_pseudo_c/007902fb_FUN_007902fb.c:149`.
+Body đã dump:
 
 - `client_pseudo_c/00730f4c_FUN_00730f4c.c:32-175`
 - `client_pseudo_c/00730f4c_FUN_00730f4c.asm.txt:5-173`
 - Đối chiếu callee: `test/ts_decompile/functions/00768638_FUN_00768638.c:18-23`
 
-Parser không dùng chung `dump_table()` 12B. Với `param_2` bắt đầu tại byte sub `01`, layout client đọc được là:
-
 ```text
-[1E] [01]
+[17] [1E]
 [name_len:1]                         // A; độ dài tên/stall
 [name:name_len]                      // A byte, client copy tối đa 14 byte
 [stall_id:1]                         // B; dùng để tạo/cập nhật StallB
@@ -233,28 +281,13 @@ Parser không dùng chung `dump_table()` 12B. Với `param_2` bắt đầu tại
   └─ item_id:4 LE                   // đọc bởi FUN_0077ef7c
 ```
 
-Công thức số record trong C là:
+Công thức: `N = (len − (A + 3)) / 5`. Sau khi đọc record, client gọi `FUN_0071e164` với
+tên đã cắt ngắn và `stall_id` → tạo `TVenderItem`, cập nhật `StallN`. Bằng chứng trực tiếp
+cho nhãn "stall": `_LStrCat3(&local_144, "Stall", IntToStr(stall_id))` tại
+`00730f4c_FUN_00730f4c.c:161-168`.
 
-```text
-N = (len - (A + 3)) / 5
-```
-
-trong đó `len` là độ dài chuỗi `param_2` tính từ byte `[01]`. Byte đầu record nằm tại
-packet offset `A + 3`; bốn byte ID nằm ngay sau byte slot. `FUN_0077ef7c` ghép bốn byte
-theo thứ tự little-endian thành `u32`, sau đó `FUN_00768638` ghi `flag=1` và `item_id`
-vào object theo slot tương ứng. Mỗi slot được index trong bảng client 26 phần tử
-(`0..25`).
-
-Sau khi đọc record, client gọi `FUN_0071e164` với tên đã cắt ngắn và `stall_id`; hàm này
-tạo `TVenderItem`, cập nhật `StallN`, rồi `FUN_00730F4C` cập nhật thêm state/UI liên quan
-(`00730f4c_FUN_00730f4c.c:161-168`). Vì vậy ngữ nghĩa client-side tối thiểu đã xác minh là
-**dữ liệu trạng thái stall/vendor**, không phải một bảng `InventoryItem` 12 byte.
-
-**Hệ quả đối với contract hiện tại:** `src/server/session.rs:434-437` gọi
-`dump_tientrang()` → `dump_table(..., "1E01")`, tức gửi các record 12 byte không có header
-stall. Đây là mismatch đã đủ bằng chứng từ client parser, không còn chỉ là gap “chưa có
-source”. Cần phân biệt `1E 01` stall/vendor với các storage dump `17 2F`/`17 66` trước
-khi dùng lại logic `dump_table()` cho `1E 01`.
+> **Rust chưa có frame `17 1E`** — đây là gap thật (stall chưa được implement), khác với
+> `1E 01` vốn đã đúng layout. Chi tiết: [`battle/README.md`](./battle/README.md) §6.1.
 
 ### 3.4. Quy ước Slot — 1-based trên wire
 
@@ -335,9 +368,9 @@ seed `32012 × 4` ở wire slot byte `01`, phù hợp với test nội bộ như
    bước 10 (`spawn.rs:552`), layout 12 byte/entry (`session.rs:450-468`), parser client
    `FUN_0076BFC8` xác nhận cùng stride/field order. **Không áp dụng layout này cho `17 0B`:**
    parser `FUN_0077CC2C` dùng stride 10B, trong khi `dump_trangbi()` hiện vẫn serialize 12B.
-   **Cũng không áp dụng layout này cho `1E 01`:** `FUN_00730F4C` đọc header
+   **Cũng không áp dụng layout này cho `17 1E` (stall):** `FUN_00730F4C` đọc header
    `name_len/name/stall_id` và record 5 byte, đồng thời cập nhật `TVenderItem`/UI
-   `StallN`; xem §3.3.1.
+   `StallN`; xem §3.3.1.b. (`1E 01` thì **có** dùng entry 12B — xem §3.3.1.a.)
 3. **Các dispatcher C→S đã có bằng chứng ASM** — `02` có 8 target body; `17` có target table
    61 sub và body sub `01/02`; `19` có byte-map/target table và ASM các target hợp lệ;
    `1C` có target table và ASM sub `01/02/04/05/06` (sub `00/03` là default).
@@ -361,7 +394,7 @@ seed `32012 × 4` ở wire slot byte `01`, phù hợp với test nội bộ như
 | 3 | **TRUNG BÌNH** | **Item load từ DB có thể mất template fields** | `SqliteSessionRepository::load_items` (`src/db/modern/sqlite/session.rs:176-199`) chỉ đọc `slot/itemid/quantity/damage`; `loai`, `lv`, các field `_1/_2` mặc định 0. Hệ quả gate equip và gear recompute có thể sai sau relog. |
 | 4 | **TRUNG BÌNH** | **Tail `05 03` vẫn chưa đối chiếu byte-exact** | Rust: `F401×5` + 90 zero + skill list (`spawn.rs:182-184`); Bear: `500×5` + 43 zero + skill list + block 32 byte cuối; spec `opcode_05.md` mô tả parser fixed header/tail khác. Đợt dump mới không cung cấp capture `aLogin.exe`, nên chưa thể chọn layout chuẩn. |
 | 5 | **CAO** | **`17 0B` đang có khả năng lệch layout** | Client `FUN_0077CC2C` dùng stride 10B/no leading slot; Rust `dump_trangbi()` dùng `dump_table()` 12B. Cần sửa serializer hoặc xác minh lại frame trước khi coi `17 0B` là đúng. |
-| 6 | **CAO** | **`1E 01` không dùng layout inventory 12B** | Đã có body/ASM `FUN_00730F4C`. Client đọc header `name_len/name/stall_id` + record 5 byte `(slot, u32 id)` và cập nhật `TVenderItem`/`StallN`; Rust `dump_tientrang()` vẫn gọi `dump_table()` 12B. Cần xác định contract server đúng trước khi coi frame này là storage push. |
+| 6 | ~~**CAO**~~ → **ĐÃ ĐÓNG** | ~~**`1E 01` không dùng layout inventory 12B**~~ | **Sai — do nhận nhầm opcode.** `FUN_00730F4C` (stall) được gọi từ main `0x17` (`17 1E`), không phải `1E 01`. `1E 01` thật là container 51 ô với record **12B** (`FUN_007707a0`), **khớp** `dump_table()` của Rust. Xem §3.3.1. Gap còn lại (mức thấp) là xác định `tientrang` có đúng là container `+0xA48` không. |
 | 7 | **TRUNG BÌNH** | **Full create `09 01` chưa có client builder độc lập** | ASM xác nhận empty `09 01`; layout 14 phần vẫn chỉ được xác minh tại server parser `character.rs`. Không được ghi “client builder byte-exact” như bản cũ. |
 | 8 | THẤP | **Chưa validate end-to-end với `aLogin.exe` thật** | `handoff-login-handshake.md` còn open action; test tự động chủ yếu đếm frame, chưa kiểm tra client UI/session state. |
 | 9 | THẤP | **32012 qty/slot chưa có nguồn đối chiếu** | `FUN_006547a8` xác nhận ID mapping `32012→-4` và quét 21 entry nội bộ, nhưng không đọc quantity hoặc wire slot. |
@@ -371,10 +404,10 @@ seed `32012 × 4` ở wire slot byte `01`, phù hợp với test nội bộ như
 1. **Tách serializer `17 0B` khỏi `dump_table()` 12B** — lấy client `FUN_0077CC2C` làm
    chuẩn 10B, hoặc chụp/đối chiếu frame thật trước khi sửa. Đây là mismatch có thể làm
    lệch toàn bộ equipment record.
-2. **Đối chiếu lại contract `1E 01`** — body `FUN_00730F4C` đã xác nhận header
-   `name_len/name/stall_id` và record 5 byte `(slot, u32 id)`, không phải `dump_table()` 12B.
-   Cần phân biệt payload stall/vendor với storage push trước khi sửa hoặc giữ nguyên
-   `dump_tientrang()`.
+2. ~~**Đối chiếu lại contract `1E 01`**~~ — **ĐÃ ĐÓNG 2026-10-01.** `1E 01` là container
+   51 ô với record 12 byte, **khớp** `dump_table()`; gap cũ là do nhận nhầm với `17 1E`.
+   Việc còn lại (mức thấp): xác nhận `tientrang` (storagetype 2) có đúng là container
+   `player+0xA48` không — xem §3.3.1.a. Việc thật còn thiếu: **implement frame `17 1E`**.
 3. **Thêm push `08 01` hoặc chứng minh HUD không cần bộ push đó** — tham chiếu Bear
    `loginChar`/`refreshChr`, rồi đối chiếu bằng capture `aLogin.exe`; không chỉ suy từ
    thiếu frame trong Rust.
@@ -396,16 +429,18 @@ seed `32012 × 4` ở wire slot byte `01`, phù hợp với test nội bộ như
 Các mục dưới đây đã được phân loại lại thành **đã xác minh**, **xác minh một phần**, hoặc
 **còn mở**; không còn dùng danh sách cũ như một khối claim “chưa có bằng chứng”.
 
-1. **Parser client `17 05` / `17 0B` / `1E 01` — layout đã đóng, contract `1E 01` còn lệch**
+1. **Parser client `17 05` / `17 0B` / `1E 01` — layout đã đóng; gap `1E 01` đã đóng**
    - `17 05`: `client_pseudo_c/0076bfc8_FUN_0076bfc8.c/.asm.txt` có body; stride 12B,
      có slot → layout 12B của Rust được xác minh.
    - `17 0B`: `0077cc2c_FUN_0077cc2c.c/.asm.txt` có body; stride 10B, không có leading
      slot → layout 12B của `dump_trangbi()` **không còn được coi là đúng**.
-   - `1E 01`: `00730f4c_FUN_00730f4c.c/.asm.txt` đã có body; layout là header
-     `name_len/name/stall_id` + record 5 byte `(slot, u32 id)`, không phải inventory 12B.
-     `FUN_0071e164` tạo `TVenderItem` và UI `StallN`; `dump_tientrang()` hiện vẫn dùng
-     `dump_table()` 12B, nên phần còn mở là **contract server/business semantics**, không
-     còn là thiếu source.
+   - `1E 01`: `007707a0_FUN_007707a0.c` đã có body; layout là **container 51 ô**
+     (`player+0xA48`), record 12 byte `(slot, itemCode u16 LE, 5 byte, qty u32 LE)`,
+     `n = (Len(RP)−1)/12` → **khớp** `dump_table()` 12B của Rust.
+     *(Đính chính 2026-10-01: bản trước gán frame này là stall/vendor do nhầm với `17 1E`.)*
+   - `17 1E`: `00730f4c_FUN_00730f4c.c/.asm.txt` đã có body; layout là header
+     `name_len/name/stall_id` + record 5 byte `(slot, u32 id)`; `FUN_0071e164` tạo
+     `TVenderItem` và UI `StallN`. **Rust chưa implement frame này** — gap thật.
    - `0077d0b9` là parser `17 0C`, không phải parser `1E 01`.
 
 2. **C→S body `0x02` / `0x17` / `0x19` / `0x1C` — claim cũ đã sửa**
@@ -478,9 +513,12 @@ Các mục dưới đây đã được phân loại lại thành **đã xác min
    `byte[X] != 0` hoặc ASM dispatch đã có target. Đây là lỗi recovery của Ghidra, không
    phải bằng chứng protocol.
 6. **`0x17`/inventory docs**: không còn ghi mọi container dùng cùng entry 12B. `17 05` là
-   12B; `17 0B` là 10B; `1E 01` là header stall/vendor + record 5 byte
-   `(slot, u32 id)`. Cần sửa cả tài liệu opcode liên quan nếu chúng còn dùng chung
-   `dump_table()`.
+   12B; `17 0B` là 10B; `1E 01` là container 51 ô record 12B (§3.3.1.a); stall là
+   **`17 1E`** với header + record 5 byte `(slot, u32 id)` (§3.3.1.b).
+   *(Đính chính 2026-10-01: bản trước gán `1E 01` = stall — sai.)*
+8. **`post_login_stats_inventory_flow.md` §2.2/§3.3.1/§5.2 gap #6/§6.1**: đã đính chính
+   `1E 01` (container 51 ô) và tách `17 1E` (stall). Chi tiết ở §3.3.1 và
+   [`battle/README.md`](./battle/README.md) §6.1.
 7. **`0077d0b9`**: phải ghi là parser `17 0C`, không dùng nhầm làm bằng chứng cho `1E 01`.
 
 
@@ -503,7 +541,8 @@ Các mục dưới đây đã được phân loại lại thành **đã xác min
     ├─ 05 03      hp/sp/int/atk/def/agi/lv/exp + gear bonus   ◄── STATS
     ├─ 17 05      hòm đồ (client entry 12B: slot,id,cnt,...) ◄── INVENTORY
     ├─ 1E 01 / 17 2F / 17 66 / 1A 04 / 27 09 / 28 01 / 23 04×3
-    │              1E01: client đọc stall header + record 5B, không phải 12B
+    │              1E01: container 51 ô, record 12B (đã khớp dump_table)
+    │              17 1E: stall/vendor (header + record 5B) — Rust chưa implement
     │              17 2F/17 66: layout client chưa đủ bằng chứng
     ├─ 17 0B      trang bị; client parser stride 10B — Rust hiện còn 12B, cần sửa/verify
     └─ 02 0B ×2 banner, 14 08/14 21 marker, 21 02 PK, 0F xx pet
