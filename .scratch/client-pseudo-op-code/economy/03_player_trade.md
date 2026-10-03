@@ -10,6 +10,60 @@
 
 ---
 
+> **🔴 CẬP NHẬT 2026-10-02 (Round-4 redump) — Undet.3b + G9 đóng, Undet.9/10 đã có hex**
+
+---
+
+## 0.1 🔴 ROUND-4 REDUMP
+
+### 0.1.1 ✅ Undet.3b đóng — `LAB_00609218` (btn_Trade P2P) nay có body
+
+> §684: *"`LAB_00609218` (btn_Trade P2P) gọi CL nào? — **Không có body trong bộ export**
+> → export thêm `0x609218`; kỳ vọng `CL=0x03`"*
+
+**ĐÃ ĐÓNG.** `00609218_LAB_00609218.{c,asm.txt}` tồn tại (HOLE `0x006091D8..0x0060936C`
+= 404 B trước đây). ⇒ **Đọc file này để chốt `CL`** — việc đọc, không cần redump.
+
+### 0.1.2 ✅ G9 / §646 + §694 (12) — `17 06` layout ĐÃ CHỐT
+
+Handler `FUN_0076B458` nay có body. Layout **14 B**:
+
+```
+RP[0]=0x06  RP[1]=slot  RP[2..3]=u16 id  RP[4..5]=u16
+RP[6..8]=u8×3  RP[9]=?  RP[10..13]=u32 texp
+```
+
+`17 05` = record **12 B** `[slot:1][id:2][×5][texp:4]`; `17 06` = `0x06` + record đó.
+
+⚠️ Rust `trade_storage.rs::transferred_item_wire` đặt `id` tại `RP[0..1]`, tổng 12 B
+⇒ **lệch 1 byte mọi field**. Chi tiết: `battle/04_battle_end_rewards.md §0.1.2-0.1.3`.
+
+### 0.1.3 ✅ Undet.9 + Undet.10 — literal đã dump hex
+
+| Mục | Vấn đề | Trạng thái |
+|:-:|---|---|
+| §309, §691 (Undet.9) | `lit_75b1e4_75b3a0.hex` **dừng đúng tại `0x75B3A0`** | ✅ `lit_75b3a0_75b3d0.hex` đã dump |
+| §692 (Undet.10) | `lit_75bbb4.hex` chỉ 64 B | ✅ `lit_75bbec_75bf14.hex` (808 B) đã dump |
+
+⇒ **Dùng `tools_decode_literals.py` để giải 15 chuỗi NPC/pet `19 0B` + 2 chuỗi `19 02`.**
+
+### 0.1.4 ✅ Toast cancel P2P đã dump
+
+`lit_75af20.hex` (`0x75AF20..0x75AF5F`) — §321-324.
+
+### 0.1.5 ⚪ Vẫn cần traffic thật
+
+| # | Câu hỏi | Vì say |
+|:-:|---|---|
+| §568 | túi có ô trống xen kẽ thì server có nhậm nhầm slot không | cần capture |
+| §577 | state byte `Form_Trade[0x228]` có hai phía không | chưa có caller C→S `CL=0x03` trong export |
+| §604 (11.6-11.8) | index base `1B 01`/`1B 02` | ✅ Round-4 đã dump ASM (xem `02_buy_sell_transaction.md §0.1.5`) |
+| §604 (11.13) | thứ tự `1A 01` / `1A 04` khi bán | cần traffic thật |
+| §604 (11.14) | client có gửi `1B 01 00` không | cần traffic |
+| §604 (11.9) | `index`/`price` của form MUA | ✅ `FUN_005EB530` **đã có body** (kiểm chứng lại) |
+| §604 (11.10) | `Show`/`Hide` của `VMT_5D55D4` / `VMT_5D5510` | ✅ `VMT` directive đã chạy, đọc report |
+| §604 (11.11) | text `DAT_005D75D0` | ✅ đã dump hex |
+
 ## 1. Tổng quan luồng
 
 Bộ khung: `FUN_0078a89c` = dispatcher S→C (đọc MainOp, index `byte[0x78A8EE]` → case idx →

@@ -23,6 +23,84 @@ Ngày: 2026-10-01 · Nguồn: decompile Ghidra `aLogin.exe` (Delphi) — `test/t
 
 ---
 
+> **🔴 CẬP NHẬT 2026-10-02 (Round-4 redump) — U3/U4/U5/U14 ĐÃ ĐÓNG**
+
+---
+
+## 0.1 🔴 ROUND-4 REDUMP
+
+### 0.1.1 ✅ U3/U4/U5/U14 đóng — 3 handler `17 1F` / `17 21` / `17 22` nay có body
+
+> §111-115, §534 (U14): *"`17 1F` → `func_0x007311c8` — **không có body**"* (tương tự `17 21`, `17 22`)
+
+**ĐÃ ĐÓNG.** Round-4 tạo function trong các HOLE:
+
+| Handler | Frame | File mới | HOLE trước đây |
+|---|---|---|---|
+| `FUN_007311C8` | `17 1F` | `007311c8_FUN_007311c8.{c,asm.txt}` | `0x007311AD..0x00731388` (475 B) |
+| `FUN_00610290` | `17 21` | `00610290_FUN_00610290.{c,asm.txt}` | `0x0060FDC1..0x00611330` (5 487 B) |
+| `FUN_0060E3CC` | `17 22` | `0060e3cc_FUN_0060e3cc.{c,asm.txt}` | `0x0060E36B..0x0060E62C` (705 B) |
+
+Quan sát đầu:
+
+- `0x00610290`: `_LStrCopy(_, 2, 4, _)` ⇒ đọc **`RP[2..5]`** (4 byte)
+- `0x0060E3CC`: bound check `MOV EAX,0x2` ⇒ đọc **`RP[2]`** (1 byte)
+
+⇒ **Đọc 3 file này để chốt layout byte.** Không cần redump thêm.
+
+### 0.1.2 ✅ U9 đã dump — literal 3 toast của form mua
+
+> §534 (U9): *"Text 3 toast của form mua (`DAT_00611484/60/4A0`) — không có `lit_*.hex`
+> cho `0x611460–0x6114C0`"*
+
+✅ `lit_611460_6114c0.hex` đã dump (`0x00611460..0x006114C0`, 96 B).
+
+### 0.1.3 ✅ U11 đóng — `FUN_0071E164` đã có body
+
+> §536 (U11): *"Nội dung `FUN_0071E164` … **Không có body**"*
+
+**SAI** — `0071e164_FUN_0071e164.{c,asm.txt}` **đã tồn tại từ trước Round-4**.
+Đây là việc đọc, không cần redump.
+
+### 0.1.4 ✅ U12 đóng — 3 class vendor đã có body
+
+> §537 (U12): *"`TVenderManage.Create` (`0x0075C004`), `TVenderItem.Create` (`0x007716DC`),
+> `TVenderItem.Destroy` (`0x00771728`) — chỉ có dòng `index.csv`, không có `.c`"*
+
+**SAI** — cả 3 `.c` **đã tồn tại**. Round-4 dump thêm
+`asm_7716dc_venderitem_create.asm.txt` (180 B) để đọc field
+`+0x20/+0x24/+0x4C/+0xFC/+0xFD/+0xF0` của `TVenderItem`.
+
+### 0.1.5 ⚠️ U7 — caller `sub_0078D82F` vẫn chưa có
+
+`FUNC 0x0078D82F` **fail duy nhất** của Round-4:
+`NO_FUNCTION (needs manual boundaries / disassembly in CodeBrowser)`.
+HOLE `0x0078D14D..0x007902FB` (12 718 B). Cần disassemble thủ công rồi chạy lại `FUNC`.
+
+### 0.1.6 ⚠️ U8 — `TItemCell` VMT đã có dữ liệu
+
+`VMT 0x0060868C` + `VMT 0x00608368` đã chạy; đọc `round3_report.txt` (mục `VMT`).
+Cũng đã dump `asm_60f89c_buyvendermenu_ctor.asm.txt` (1 322 B) và
+`asm_60cd78_vendermenu_ctor.asm.txt` (1 161 B) — đọc 2 file này để chốt
+`entry[10] stride 0x11` không ai khởi tạo.
+
+### 0.1.7 ⚠️ §242-244 — sai lệch "7 KB" (K2)
+
+> §443: *"`0x00784000–0x00785000` … ≈ 7 KB"*
+
+Span `0x784000..0x785000` chỉ **4 096 B**. Con số 7 KB khớp với
+`0x783403..0x785225` = **7 714 B** (band C→S `0x17`), nay đã dump 100%
+(`asm_cs17_783405_builders.asm.txt`, 7 710 B).
+
+### 0.1.8 ⚪ Vẫn cần traffic thật
+
+| # | Câu hỏi |
+|:-:|---|
+| §484 (G2) | `17 20` có 1 byte pad thật không |
+| §485 (G3) | sub-op C→S thật của stall open/close/price |
+| §486 (G4) | độ dài thật của prefix `17 21` |
+| §526 (U1) | toàn bộ tập sub `0x17`/`0x19` của stall |
+
 ## 1. Tổng quan luồng
 
 ```text

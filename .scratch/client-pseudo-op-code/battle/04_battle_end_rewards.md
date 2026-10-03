@@ -20,6 +20,103 @@ Source Rust: `src/battle/{service,runner,packets,manager,engine,construction}.rs
 
 ---
 
+> **🔴 CẬP NHẬT 2026-10-02 (Round-4 redump) — G4 (`17 06`) ĐÃ ĐÓNG. Xem §0.1**
+
+---
+
+## 0.1 🔴 ROUND-4 REDUMP — `17 06` ĐÃ CÓ BODY, LAYOUT BYTE-EXACT
+
+### 0.1.1 G4 đóng — `func_0x0076B458` nay có `.c` + `.asm.txt`
+
+> §2.6 / §G4: *"`func_0x0076B458` **KHÔNG có file** trong `client_pseudo_c/`"*
+> *"cần redump `0x0076b458` để chốt byte-for-byte"*
+
+**ĐÃ ĐÓNG.** `ts_decompile/functions/0076b458_FUN_0076b458.{c,asm.txt}` tồn tại
+(HOLE `0x0076AF6A..0x0076B84C` = 2 274 B trước đây).
+
+### 0.1.2 ⭐ Wire layout `17 06` — byte-exact
+
+Dispatcher `case_020_007902FB_FUN_007902fb.c:50-51`:
+```c
+case 6: func_0x0076B458(*(undefined4 *)gvar_007DA0D0, *(undefined4 *)(unaff_EBP + -0xc)); break;
+```
+⇒ `RP` (chuỗi payload) **bắt đầu tại byte sub** ⇒ `RP[0] == 0x06`.
+
+Đọc tay ASM (`0076b458_FUN_0076b458.asm.txt`), quy ước `_LStrCopy(dst, k, n, src)` =
+Delphi 1-based ⇒ đọc `RP[k .. k+n-1]`:
+
+| ASM offset | Đọc | Giá trị |
+|---|---|---|
+| `0x76b4b2` `MOV ECX,0x2` / `0x76b4b7` `MOV EDX,0x2` → `_LStrCopy(_,2,2,_)` | `RP[2..3]` → `FUN_0077EB9C` | **`u16 LE` → `uVar6`** |
+| `0x76b4b9` `MOV ECX,0x2` (offset 4) | `RP[4..5]` → `FUN_0077EB9C` | `u16 LE` → `uVar7` |
+| `0x76b4d7` `MOV EAX,0x6` + bound check | `RP[5]` | `bVar1` |
+| `0x76b4f2` `MOV EAX,0x7` | `RP[6]` | `bVar3` |
+| `0x76b50d` `MOV EAX,0x8` | `RP[7]` | byte0 của `local_1c` |
+| `0x76b528` `MOV EAX,0x9` | `RP[8]` | byte3 — **bị `CONCAT31` ghi đè, không dùng** |
+| `0x76b547` `MOV ECX,0x4` / `0x76b54c` `MOV EDX,0xa` | `RP[10..13]` → `FUN_0077ED68` | **`u32 LE` → `local_20`** |
+
+Sau đó `FUN_0065B580(*gvar_007DA660, uVar6, 0, local_20)` tra 1 byte (`CMP EAX,0xFF; _BoundErr`)
+rồi `CONCAT31` thay byte3, và:
+```c
+FUN_0072B6C8(*gvar_007DA7BC, uVar6, uVar7, local_20, uVar9, bVar3, bVar4, bVar5, bVar1);
+```
+
+⇒ **Layout wire (`RP[0..13]`, tối thiểu 14 byte):**
+
+```
+RP[0]      = 0x06                      sub
+RP[1]      = ?                         KHONG doc
+RP[2..3]   = u16 LE                    item id  -> uVar6
+RP[4..5]   = u16 LE                    -> uVar7
+RP[5]      = u8                        -> bVar1 (trùng high byte của uVar7)
+RP[6]      = u8                        -> bVar3
+RP[7]      = u8                        -> byte0 local_1c
+RP[8]      = u8                        doc roi, BI ghi de  (nen co the = 0)
+RP[9]      = ?                         KHONG doc
+RP[10..13] = u32 LE                    texp
+```
+
+Frame đầy đủ = `F4 44 10 00 17 06 …` (payload **16 B**).
+
+### 0.1.3 ✅ `17 05` — record stride **12 byte** (đối chiếu)
+
+Handler `17 05` = `FUN_0076BFC8` (đã có sẵn body). ASM:
+
+```asm
+0076c035: MOV ECX,0xc / CDQ / IDIV ECX     ; <- STRIDE = 12, count = (len-1)/12
+...
+0076c0a2: MOV ECX,0x2  + base+1            ; u16 LE -> id
+0076c0b9: CALL 0x0077eb9c
+0076c182: MOV ECX,0x4  + base+8            ; u32 LE -> texp
+0076c199: CALL 0x0077ed68
+0076c1b2: CALL 0x0065b580                  ; cung tra byte, guard <= 0xFF
+```
+
+⇒ Record `17 05` = **`[slot:1][id:2][×5 byte][texp:4]` = 12 B**, và
+**`17 06` = byte `0x06` + chính record `17 05` đó** (`RP[1..13]`).
+
+> ⚠️ **Rust đang lệch.** `inventory.rs:69-84 item_added_frame` ghi
+> `"1706" + le16(id) + [count, doben, long, giatri+100, khang, le32(texp)]` = **11 B**,
+> đặt `id` ngay tại `RP[0..1]`. Client đọc `id` tại **`RP[2..3]`** và cần **≥14 B**.
+> ⇒ **Lệch 1 byte trên mọi field + thiếu byte `RP[1]` (slot) + thiếu `RP[9]`.**
+>
+> Cần một test round-trip: build `17 06` 14 byte theo layout §0.1.2 rồi đối chiếu
+> `FUN_0072B6C8` trong client.
+
+### 0.1.4 G11 đóng — `LAB_00644A18` nay có body
+
+`ts_decompile/functions/00644a18_*.{c,asm.txt}` tồn tại (HOLE `0x00644A16..0x00644B20`
+= 266 B trước đây).
+
+### 0.1.5 ⚠️ `FUN_0064DFA4` (`35 05` `acting()`) — ĐÃ CÓ BODY (ngược với `battle/01`)
+
+`battle/01_battle_start_scene.md:646` và `:706` (Gap #4) ghi
+*"`FUN_0064DFA4` không có body trong `client_pseudo_c/`"*.
+**SAI** — `0064dfa4_FUN_0064dfa4.{c,asm.txt}` đã tồn tại (và `battle/02:565` đã trích dẫn nó).
+
+⇒ **`35 05` layout `[row][col]` nay đã có cơ sở đọc trực tiếp** — xem
+`0064dfa4_FUN_0064dfa4.asm.txt`. Đây là việc đọc, không cần redump.
+
 ## 0. TIMELINE KẾT THÚC TRẬN (ASCII client ↔ server)
 
 ```

@@ -16,6 +16,22 @@ Ngày: 2026-10-01 · Nguồn chính: `client_pseudo_c/` (Ghidra pseudo-C + ASM +
 
 ---
 
+> **🔴 CẬP NHẬT 2026-10-02 (Round-4 redump)**
+
+---
+
+## 0.1 ROUND-4
+
+| Mục | Kết quả |
+|---|---|
+| §335 `17 06` — "chưa có đối chiếu client" (mức **C**) | ✅ **ĐÃ CHỐT byte-exact, mức A** — xem `battle/04_battle_end_rewards.md §0.1.2`. Layout **14 B**: `RP[1]=slot`, `RP[2..3]=id`, `RP[10..13]=texp` |
+| §368 handler `17 21` = `func_0x00610290` — "không có file `.c`/`.asm.txt`" | ✅ **ĐÃ ĐÓNG** — `00610290_FUN_00610290.{c,asm.txt}` tồn tại. Đọc `_LStrCopy(_, 2, 4, _)` ⇒ `RP[2..5]` |
+| §262-263 `PTR_DAT_007d9d60` / `PTR_DAT_007da7c4` | ✅ `GVAR` directive đã chạy — đọc `round3_report.txt` |
+| §265-266 `gvar_007DA2F8` / `gvar_007DA4F8` | ✅ `GVAR` đã chạy |
+
+⚠️ **Hệ quả cho `shops.rs:596-608`** (`purchase_item` gửi `17 06`): builder hiện tại
+sai layout — xem `battle/04 §0.1.3`.
+
 ## 0. KẾT LUẬN QUAN TRỌNG NHẤT (đọc trước mọi thứ khác)
 
 > ### Không tồn tại frame S→C nào mang DANH SÁCH HÀNG của shop NPC.

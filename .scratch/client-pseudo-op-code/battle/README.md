@@ -136,9 +136,10 @@ ASM `0077f414:800-843` và `00780920-007809AE` — builder `0x0B`:
 | `12`,`13` | (sub `08`) | `0064f60c`,`0064f6e4` |
 | `15` | (sub `0A`) | `0064f7bc` |
 
-> **⚠️ Chưa đóng:** byte bảng dispatch `0x0B` sub `00..04` tại `0x780440..0x780453` và vùng
-> builder `0x78048E..0x7807D0` **không có trong corpus** → chưa xác minh được frame lệnh
-> trận chi tiết. **Đây là thứ duy nhất cần redump.**
+> **✅ ĐÃ ĐÓNG (Round-4 2026-10-02):** byte bảng dispatch `0x0B` sub `00..04` tại
+> `0x780440..0x780453` và vùng builder `0x78048D..0x7807D0` **ĐÃ ĐƯỢC DUMP ĐẦY ĐỦ**
+> (`cs0b_780440_jmptbl_5xDWORD.hex` + `asm_cs0b_78048d_builders.asm.txt`, 836/836 B).
+> Layout byte + phân biệt sub 2 (9 B) / sub 8 (8 B): `03_skill_and_combo.md §0.1`.
 
 ### 2.4 Hệ quả với Rust
 
@@ -146,7 +147,10 @@ ASM `0077f414:800-843` và `00780920-007809AE` — builder `0x0B`:
 và `service.submit_command()`. Vì client không gửi `0x32`:
 
 - **Không có `BattleCommand` nào tới engine** → vòng lượt không chạy.
-- Cần viết lại handler theo `0x0B` sub `02`/`08`, và **redump** vùng ASM còn thiếu.
+- Cần viết lại handler theo `0x0B` sub `02`/`08`.
+- ✅ **Round-4:** vùng ASM còn thiếu **đã dump xong** → xem `03_skill_and_combo.md §0.1.2`.
+  Sub `2` = `[0B][02][b:1][u32 LE][u16 LE]` (9 B); sub `8` = `[0B][08][b:1][u32 LE][low8]` (8 B).
+- ⚠️ **Tập sub `0x0B` hợp lệ = `{0,1,2,3,4,6,7,8,9,0x0A,0xFA}`** — **chỉ sub `5` là no-op**.
 
 ---
 
@@ -326,11 +330,11 @@ Bằng chứng trực tiếp trong body `00730f4c_FUN_00730f4c.c:161-168`:
 
 | # | Ưu tiên | Việc | File Rust |
 |:-:|:--:|:--|:--|
-| 1 | 🔴 P0 | **Redump ASM vùng `0x780440..0x780453` + `0x78048E..0x7807D0`** — byte bảng dispatch `0B` sub `00..04` và builder lệnh trận. Không có bước này thì không thể viết đúng handler. | (decompile) |
+| 1 | ✅ XONG | ~~**Redump ASM `0x780440..0x780453` + `0x78048D..0x7807D0`**~~ — **Round-4 đã dump 836/836 B**. Xem `03_skill_and_combo.md §0.1`. | — |
 | 2 | 🔴 P0 | **Viết lại handler lệnh trận** theo `0x0B` sub `02`/`08` thay vì `0x32`. | `src/server/handlers/battle.rs:189-243` |
 | 3 | 🔴 P0 | **Thêm builder `35 07`** (di chuyển 6 byte) — sửa `cell+0x48/+0x4C`. | `src/battle/packets.rs` |
 | 4 | 🔴 P0 | **Thêm builder `33 01`** (record 7B: `row, col, propId, value u32`) để cập nhật HP. `propId==0x19` + `value>0` ⇒ hồi sinh có effect. | `src/battle/packets.rs` |
-| 5 | 🔴 P0 | **`apply_drop` phải gửi `17 06`.** | `src/battle/service.rs:157-178` |
+| 5 | 🔴 P0 | **`apply_drop` phải gửi `17 06`.** ⚠️ Round-4 đã xác định layout **`17 06` = 14 B** (`RP[1]=slot`, `RP[2..3]=id`, `RP[10..13]=texp`) — builder hiện tại chỉ 11 B, **lệch 1 byte mọi field**. Xem `04_battle_end_rewards.md §0.1.2`. | `src/battle/service.rs:157-178`, `src/server/handlers/inventory.rs:69-84` |
 | 6 | 🔴 P0 | **`apply_gold` phải gửi `1A 01`.** | `src/battle/service.rs:284-299` |
 | 7 | 🟠 P1 | Thêm frame **`05 0A <charId>`** LevelUP. | `src/battle/packets.rs` |
 | 8 | 🟠 P1 | Sửa `build_join_frame()` — hiện 22 byte, phải 24 (thiếu `row`/`col`). | `src/battle/service.rs:1108-1120` |
@@ -343,6 +347,9 @@ Bằng chứng trực tiếp trong body `00730f4c_FUN_00730f4c.c:161-168`:
 | 15 | 🟡 P2 | `handle_use_item` trừ item **trước** khi lệnh được chấp nhận → mất item nếu `owns_commandable_cell` từ chối. | `src/server/handlers/battle.rs:216-240` |
 | 16 | 🟡 P2 | Đối chiếu bảng exp Rust với client `FUN_0065b0dc`; đối chiếu hệ số MaxHP với `gvar_007DA6B8`. | `src/data/texps.rs`, `src/battle/engine.rs:100-111` |
 | 17 | 🟢 P3 | Capture thật `aLogin.exe` để chốt kind byte `0B FA` self + xác nhận `1A 01`. | — |
+| 18 | 🔴 P0 | **Sửa builder `17 06`** theo layout 14 B đã verify (`04_battle_end_rewards.md §0.1.2`) + test round-trip. | `src/server/handlers/inventory.rs:69-84` |
+| 19 | ✅ XONG | ~~Xác nhận sub `0x1C` nào tồn tại~~ — **Round-4 đã chốt**: bảng **7 entry**, `0`/`3` = epilogue, **gửi `01/02/04/05/06`**. Layout: `[1C][sub] ++ @LStrCat(field)`. Xem `light_dark_skill_unlock_gap.md §0.1.1b`. | `src/server/handlers/skills.rs` |
+| 20 | 🟠 P1 | Sửa Memory Map project Ghidra để đọc được `0x94B440` (cây kỹ năng 765 B) + `0x9AE128` — hiện **ngoài vùng map** (`> 0x7DA800`). | `light_dark_skill_unlock_gap.md §0.1.3` |
 
 ---
 

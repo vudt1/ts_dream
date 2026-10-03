@@ -9,6 +9,107 @@ Tài liệu nền: [`post_login_stats_inventory_flow.md`](./post_login_stats_inv
 dựa vào tài liệu cũ). Decoder VISCII dựng lại từ chính `src/encoding.rs::viscii_to_unicode`
 (+ fallback Latin-1 cho `0xA0..0xFF` đúng như hàm Rust).
 
+> **🔴 CẬP NHẬT 2026-10-02 (Round-4 redump) — §2.4 ĐÃ VERIFY BYTE-EXACT, framing ĐÃ CHỐT. Xem §0.1**
+
+---
+
+## 0.1 🔴 XÁC NHẬN SAU ROUND-4 REDUMP
+
+### 0.1.1 ✅ `0x45` C→S — **byte-exact, khớp tuyệt đối §2.4**
+
+Builder đọc tay từ `functions/0077f414_FUN_0077f414.asm.txt` (entry `0x00789DDB`):
+
+```
+00789ddb: MOV AL,[EBP + -0x6]        ; sub
+00789dde: DEC AL / JZ 0x00789def     ; sub 1
+00789de2: DEC AL / JZ 0x00789ebe     ; sub 2
+00789dea: JMP 0x0078a4f2             ; con lai -> KHONG GUI
+
+; --- sub 1 @ 0x00789DEF ---
+00789df5: MOV DL,[EBP + -0x5]        ; 0x45  -> ShortString{0x45, 0x01}
+00789dfe: MOV byte ptr [EAX], 0x1    ; do dai ShortString
+00789e18: MOV CL, 0x2                ; _PStrNCat cap=2  -> 2 byte "45 01"
+00789e2d: CALL 0x0040402c            ; @LStrFromString
+00789e40: MOV DX, word ptr [EAX+0x144]  ; *(gvar_007D9E3C)+0x144
+00789e4e: CALL 0x0077eb1c            ; u16 -> 2 byte LE          (PUSH)
+00789e67: MOV DL, byte ptr [EDX+0x158]  ; +0x158
+00789e6d: CALL 0x00403fa0            ; 1 raw byte                (PUSH)
+00789e86: MOV DL, byte ptr [EDX+0x146]  ; +0x146
+00789e8c: CALL 0x00403fa0            ; 1 raw byte                (PUSH)
+00789ea2: CALL 0x00404148            ; @LStrCatN cap=4
+00789eb4: CALL 0x0051633c            ; TForm1_CY_AddSedQueue
+
+; --- sub 2 @ 0x00789EBE ---
+... MOV DL,[EDX + 0x159] -> LStrFromChar   (PUSH)
+... MOV DL,[EDX + 0x146] -> LStrFromChar   (PUSH)
+00789f4d: MOV CL, 0x4 / CALL 0x404148  ; @LStrCatN cap=4
+```
+
+| Builder | Wire | §2.4 dự đoán | Kết quả |
+|---|---|---|:-:|
+| `0x00789DEF` | `[45][01]` + `u16 @+0x144` + `u8 @+0x158` + `u8 @+0x146` = **5 B** | giống hệt | ✅ **khớp tuyệt đối** |
+| `0x00789EBE` | `[45][02]` + `u8 @+0x159` + `u8 @+0x146` = **4 B** | giống hệt | ✅ **khớp tuyệt đối** |
+
+Ngoài ra xác nhận: `0x45` chỉ có **2 sub**; mọi sub khác rơi vào `JMP 0x0078A4F2` = **không gửi**.
+
+### 0.1.2 ✅ Câu hỏi framing `01 … 01 …` — **ĐÃ CHỐT: không có byte framing**
+
+§0 #4 nêu nghi vấn "byte `MOV [EAX],0x1` là độ dài ShortString chứ không phải byte wire".
+**Đúng như giả thuyết.** Bằng chứng mạnh nhất là chính builder `0x45` ở §0.1.1:
+`_PStrNCat(cap=2)` trên `ShortString{0x45, 0x01}` sinh ra **đúng 2 byte** `45 01`.
+
+Ba nguồn độc lập cùng kết luận:
+
+| Nguồn | Bằng chứng |
+|---|---|
+| `0x45` builder `0x789DEF` | `ShortString{45,01}` + `cap=2` ⇒ 2 byte `45 01` |
+| `0x0B` builder `0x780595` | `ShortString{0B,inner}` + `cap=3` ⇒ `[0B][inner]` |
+| `case_020_007902FB:51` | truyền thẳng `RP` (bắt đầu tại byte sub) cho handler |
+
+**`FUN_0040402C = @LStrFromString` nay ĐÃ CÓ BODY**
+(`ts_decompile/functions/0040402c__LStrFromString.c`) ⇒ §8 Q10 / framing không còn mở.
+
+⇒ **Header C→S = `[main][sub]`, không có byte `0x01` framing.** Đóng `guild §6 R5`.
+
+### 0.1.3 ✅ Byte-map `0x77F474` xác nhận
+
+`cs_bytemap_77f474_200B.hex` đọc trực tiếp: `byte[0x2D] = 0x2A` (42) ✓ và
+`byte[0x45] = 0x39` (57) ✓ — khớp §1.
+
+### 0.1.4 §6.2 (Q10) — **đóng một phần**
+
+`FUNC 0x00794977` (case 41) và `FUNC 0x00795F82` (case 61) **nay đã có `.c` + `.asm.txt`**
+(`ts_decompile/functions/00794977_*.{c,asm.txt}`, `00795f82_*`).
+→ **Không cần capture `aLogin.exe` để đọc ASM nữa**; chỉ cần capture để xác nhận
+*ngữ nghĩa* (`Q1`, `Q6`) chứ không phải *layout byte*.
+
+### 0.1.5 ⚠️ §6.2 (G24) — literal con cái đã dump
+
+| Nhóm | Địa chỉ | Trạng thái |
+|---|---|---|
+| 3 nhãn thuộc tính con **còn thiếu** | `0x7501CC`, `0x7501E4`, `0x7501F8` | ✅ đã dump hex |
+| hậu tố nối chuỗi | `0x75020C`, `0x750228` | ✅ |
+| 5 literal chat | `0x74FC88`, `0x74F4D0`, `0x74FDE4`, `0x74FE10`, `0x74FE3C` | ✅ |
+| `lit_74fdb8` (bị cắt) | `0x74FDB8..0x74FE0F` | ✅ đã dump rộng |
+| `Xoá kỹ năng thất bại` | `0x5E82F0` | ✅ |
+| `2D 0E` / `2D 0F` chat | `0x743AA4..0x743B04`, `0x74403C..0x744048` | ✅ |
+| `2D 0A` popup | `0x7988B8` | ✅ |
+
+**⇒ Dùng `tools_decode_literals.py` trên các file mới để đóng §4.3 + Q5 (token
+`Đời 2 võ tướng`) — không cần redump thêm.**
+
+### 0.1.6 §8 — cập nhật trạng thái câu hỏi
+
+| # | Câu hỏi | Trước | Sau Round-4 |
+|:-:|---|:-:|---|
+| Q2 | Ý nghĩa `2D 01`/`2D 02` C→S | ❓ | ✅ **ĐÃ ĐÓNG** — ASM đầy đủ trong `functions/0077f414_FUN_0077f414.asm.txt:3101-3229` |
+| Q8 | `2D 0E` gọi `FUN_0071DC74` | ❓ | ✅ **ĐÃ ĐÓNG** — `FUN_0071DC74` có body (`0071dc74_FUN_0071dc74.c`) |
+| Q9 | `2D 10` ghi vào `*(gvar_007DA600+0xE8)` | ❓ | ⚠️ vẫn cần đọc `FUN_005B1EE0` |
+| Q1 | `player+0x1450` là gì | ❓ | ❓ **vẫn mở** (cần capture) |
+| Q6 | `+0x151D == 2` là sống hay chết | ❓ | ❓ **vẫn mở** (mâu thuẫn nội tại client) |
+| Q3 | Ngưỡng đẳng cấp kết hôn | ❓ | ❓ vẫn mở — thiết kế |
+| Q4 | Có NPC hôn nhân không | ❓ | ❓ vẫn mở |
+
 ---
 
 ## 0. Kết luận điều hành
@@ -18,7 +119,7 @@ dựa vào tài liệu cũ). Decoder VISCII dựng lại từ chính `src/encodi
 | 1 | **`0x2D` là bus KẾT HÔN / LY HÔN / TẶNG LỄ KIM**, không phải "Reborn". `src/protocol/mod.rs:180` đang đặt tên sai (`OP_REBORN`). | ✅ |
 | 2 | **`0x45` là bus HỆ THỐNG CON CÁI.** Tên `OP_CHILD` trong `mod.rs:254` **đã đúng**. | ✅ |
 | 3 | **SỬA LỖI LỚN:** `opcode_2d.md:130` và `opcode_45.md:250` nói "client không bao giờ gửi `0x2D` / `0x45`" dựa trên `case 0x2d: break;` — **SAI.** Cả hai **có builder C→S thật**: `0x2D` → `0x0078896A` (4 sub-action), `0x45` → `0x00789DDB` (2 sub-action). | ✅ |
-| 4 | **SỬA LỖI framing:** byte `MOV [EAX],0x1` trong ASM builder **không phải byte wire** mà là **độ dài ShortString** Delphi. Header C→S là `[main][sub]` — **không** có byte `01` framing. | ✅ |
+| 4 | **SỬA LỖI framing:** byte `MOV [EAX],0x1` trong ASM builder **không phải byte wire** mà là **độ dài ShortString** Delphi. Header C→S là `[main][sub]` — **không** có byte `01` framing. | ✅ **Xác nhận Round-4, xem §0.1.2** |
 | 5 | **SỬA LỖI tên:** "6 slot trang bị" của `0x45` trong `mod.rs:254` sai — đó là **6 thuộc tính** con (INT/ATK/DEF/AGI/HP/SP), có kèm byte *grade*. Không có item-id lookup nào. | ✅ |
 | 6 | **SỬA LỖI tên:** `opcode_2d.md:189-202` gán sai 3 literal của sub `0x01` và 2 literal của sub `0x06`. Bảng đúng ở §3.3. | ✅ |
 | 7 | Server Rust **chưa có dòng code nào** cho `0x2D`/`0x45`: cả hai rơi vào `unimplemented::handle` (`dispatcher.rs:375,388`). Không có bảng DB quan hệ, không có field `Session`, không có frame trong Logined1. | ✅ |

@@ -31,6 +31,83 @@
 
 ---
 
+> **🔴 CẬP NHẬT 2026-10-02 (Round-4 redump) — §0.1 ĐÍNH CHÍNH 5 SAI LỆCH. Xem bên dưới**
+
+---
+
+## 0.1 🔴 ĐÍNH CHÍNH SAU ROUND-4 REDUMP
+
+### 0.1.1 ❌ §29 + §638 — *"13 file `functions/*.c` thiếu trong checkout"* — **SAI**
+
+> §29: *"`test/ts_decompile/functions/` + `test/ts_decompile/redump/` — cây decompile Ghidra đầy đủ"*
+> §638 (danh sách "missing files"): `005d6f7c`, `005d7000`, `005d6048`, `005d73c0`,
+> `005dc500`, `005dcce0`, `005dd000`, `005d7218`, `007746d4`, `007746ac`, `005efee8`,
+> `005e8534`, `0051189c`
+
+**SAI — tất cả 13 đều tồn tại.** `test/ts_decompile/functions/` có **13 218 file**
+sau Round-4 (13 176 trước đó). Tác giả đọc trên workspace khác.
+**⇒ Xoá toàn bộ mục "missing files" khỏi §638.** Không cần redump gì thêm cho 13 file này.
+
+### 0.1.2 ❌ §281 + §603 + §605 — **HOLE sai dải địa chỉ**
+
+| Tài liệu ghi | `index.csv` thật |
+|---|---|
+| HOLE `0x5DC96A … 0x5DCE0` | HOLE **`0x5DC98A … 0x5DCCDF`** |
+
+`FUN_005DC500` kết thúc tại `0x5DC98A` (size 1 162), `FUN_005DCCE0` bắt đầu tại `0x5DCCE0`.
+⇒ `LAB_005DCC5C` (btn_Sale) nằm trong khoảng trống **854 B** (`0x5DC98A..0x5DCCDF`),
+không phải `0x5DC96A..0x5DCE0`.
+
+**Round-4 đã dump:** `asm_hole_5dc98a_btnsale.asm.txt` (741 B / 852 B, 87%).
+HOLE còn lại 111 B — nhiều khả năng là 1 bảng data.
+
+Tương tự: HOLE btn_Buy `0x5D6A9B..0x5D6F7C` (1 249 B) **đúng**, dump 1 062 B (85%).
+
+### 0.1.3 ❌ §604 — *"`btn_Buy` **không có `.asm.txt`**"* — ĐÃ CÓ
+
+`asm_hole_5d6a9b_btnbuy.asm.txt` đã dump (1 062 B). Cần tìm `CALL 0x0077F414` với
+`DL=0x1B` trong file này để xác nhận call-site MUA.
+
+### 0.1.4 ❌ §608 — `DAT_005D75D0` chưa có hex → **ĐÃ CÓ**
+
+`lit_5d75d0_pool.hex` đã dump (`0x5D75D0..0x5D769F`). Dùng `tools_decode_literals.py`.
+
+### 0.1.5 ✅ §602-603 — index base `0` hay `1` cho `1B 01`/`1B 02`: ASM đã dump
+
+| File | Nội dung | Coverage |
+|---|---|---|
+| `asm_5d73c0_qtychange.asm.txt` | `btn_Buy` OnChange — writer của `TInterForm+0x152` | 163 B / 100% |
+| `asm_5dc500_saleform_ctor.asm.txt` | ctor `TThingSaleForm` | 1 167 B / 100% |
+
+⇒ **Đây là việc đọc file, không cần redump.**
+
+### 0.1.6 🔴 `17 06` — layout ĐÃ CHỐT, Rust ĐANG LỆCH
+
+Handler `17 06` = `FUN_0076B458` (nay có body). Layout **14 B**:
+
+```
+RP[0]      = 0x06          sub
+RP[1]      = slot          <-- byte Rust THIẾU
+RP[2..3]   = u16 LE        item id
+RP[4..5]   = u16 LE
+RP[6..8]   = u8 ×3
+RP[9]      = ?             <-- byte Rust THIẾU
+RP[10..13] = u32 LE        texp
+```
+
+`17 05` = record **12 B** `[slot:1][id:2][×5][texp:4]`, và `17 06` = `0x06` + record đó.
+
+⚠️ Rust `trade_storage.rs::transferred_item_wire` đặt `id` ngay `RP[0..1]` và tổng 12 B.
+Chi tiết + đề xuất sửa: `battle/04_battle_end_rewards.md §0.1.2-0.1.3`.
+
+### 0.1.7 ⚪ Những gì **vẫn** cần capture (không redump được)
+
+| # | Câu hỏi | Vì sao |
+|:-:|---|---|
+| §610 | thứ tự `1A 01` và `1A 04` khi bán | cần traffic thật |
+| §611 | client có gửi `1B 01 00` (inner = 0) không | cần traffic |
+| §638 (còn lại) | `005eb530`, `005efc24` | ✅ đã có body (kiểm chứng lại) |
+
 ## §0. Tóm tắt điều hành — 5 phát hiện lớn nhất
 
 | # | Phát hiện | Mức | Ảnh hưởng |
@@ -278,7 +355,7 @@ else if (iVar2 == 3) {
 | :-: | :-- | :-- |
 | `+0x9E0 + idx*4` (qua `LocalActor`) | 25 ô đồ trong túi | `functions/005dc500_FUN_005dc500.c:170-176` |
 | `+0x150` | Editor số lượng (MaxLength 2 ⇒ ≤ 50) | `…c:177-180` |
-| `+0x55` | `btn_Sale` (handler `LAB_005dcc5c`, nằm trong **HOLE** decompile) | `…c:200-202` |
+| `+0x55` | `btn_Sale` (handler `LAB_005dcc5c`, **HOLE `0x5DC98A..0x5DCCDF`**) | ✅ Round-4 đã dump: `asm_hole_5dc98a_btnsale.asm.txt` |
 | `+0x14C` | slot đang chọn | — |
 | `+0x160` | slot **gửi lên server** | đọc bởi builder `1B 02` (`asm:1890`) |
 | `+0x162` (Word) | số lượng **gửi lên server** | đọc bởi builder `1B 02` (`asm:1903`) |
@@ -600,12 +677,12 @@ chỉ khác điểm neo offset — **mức (B)** vì chưa đọc được thân
 | 3 | **Thân `func_0x0076ad78`** (handler `17 07`) | Không có trong dump; C# không dùng | Disassemble `VA 0x0076AD78` để xác định ý nghĩa (xóa ô / refresh ô) |
 | 4 | **Layout `17 08`** | Thân `func_0x0076974c` không có; layout lấy từ `TSItem.getSlotItemBytes` | Disassemble `VA 0x0076974C`; đối chiếu 12 byte |
 | 5 | **`index` của `1B 01` là 0-based hay 1-based?** | Chưa tìm được chỗ **client** gán `TInterForm+0x152` ngoài `FUN_005d73c0` (chỉ có `functions/005d73c0…c:103`, không đọc được vì file thiếu trong checkout) | Đọc `test/ts_decompile/functions/005d73c0_FUN_005d73c0.c` đầy đủ; đối chiếu `pageBase` (`rec+0x72`) — nghiêng về **0-based** trong list đang hiện |
-| 6 | **`slot` của `1B 02` là 0-based hay 1-based?** | `TThingSaleForm+0x160` — không có call-site ghi trong code decompiled | Đọc `functions/005dc500_FUN_005dc500.c` (`btn_Sale` `LAB_005dcc5c` **trong HOLE** `0x5DC96A..0x5DCE0`); C# dùng `items[index-1]` ⇒ nghiêng **1-based** (mức **B**) |
-| 7 | **Body `btn_Buy` (`LAB_005d6ecc`)** của `form_BuyQ_Npc` | HOLE decompile `0x5D6A9B..0x5D6F7C`, **không có `.asm.txt`** | Disassemble `0x005D6A9B..0x005D6F7C`; tìm `CALL 0x0077f414` với `DL=0x1b` (call-site MUA thứ 2 có thể tồn tại) |
-| 8 | **Body `btn_Sale` (`LAB_005dcc5c`)** | HOLE decompile `0x5DC96A..0x5DCE0` | Disassemble; xác nhận nó gán `+0x160`/`+0x162` rồi gọi `SendCommand(0x1B, 2, …)` |
+| 6 | **`slot` của `1B 02` là 0-based hay 1-based?** | C# dùng `items[index-1]` ⇒ nghiêng **1-based** (mức **B**) | ✅ **Round-4 đã dump** `asm_5dc500_saleform_ctor.asm.txt` (1 167 B) + `asm_hole_5dc98a_btnsale.asm.txt` (741 B, chứa `LAB_005DCC5C`) — **đọc 2 file này để chốt**, không cần redump |
+| 7 | **Body `btn_Buy` (`LAB_005d6ecc`)** của `form_BuyQ_Npc` | ~~không có `.asm.txt`~~ | ✅ **Round-4 đã dump** `asm_hole_5d6a9b_btnbuy.asm.txt` (1 062 B). Tìm `CALL 0x0077F414` với `DL=0x1B` trong file này |
+| 8 | **Body `btn_Sale` (`LAB_005dcc5c`)** | HOLE **`0x5DC98A..0x5DCCDF`** (tài liệu ghi sai `0x5DC96A..0x5DCE0`) | ✅ **Round-4 đã dump** `asm_hole_5dc98a_btnsale.asm.txt` (741 B). Xác nhận nó gán `+0x160`/`+0x162` rồi gọi `SendCommand(0x1B, 2, …)` |
 | 9 | **2 cặp `(map, shopId)` bị chặn** `{(0x2EE1,0x16), (0x2F1D,0x05)}` | `functions/005d6f7c…asm.txt:14-29` cho thấy client **không gửi** yêu cầu mua cho 2 shop này, nhưng không rõ server xử lý thay thế bằng cách gì | Đọc `functions/005eb530_FUN_005eb530.c:823-931` xem có nhánh UI riêng cho `mode == 2` hay không |
 | 10 | **`TThingBuyQForm` / `TThingSaleQForm`** (`form_BuyQuant_Npc`) | Không có bất kỳ call-site `Show`/`Hide` nào trong code decompiled — có thể là form legacy | Đọc ctor `functions/005d7674…c` / `functions/005dd794…c` và grep `VMT_5D55D4` / `VMT_5D5510` toàn bộ `.asm.txt` |
-| 11 | **Text của `DAT_005D75D0`** (toast client-side khi `price == 0`) | Chưa có hex dump (`lit_5d75*.hex` không tồn tại) | Dump `0x005D75D0` (pool literal) |
+| 11 | **Text của `DAT_005D75D0`** (toast client-side khi `price == 0`) | ~~Chưa có hex dump~~ | ✅ **Round-4 đã dump** `lit_5d75d0_pool.hex` (`0x5D75D0..0x5D769F`). Dùng `tools_decode_literals.py` |
 | 12 | **`TMoneyAccountForm+0x110`** (4 raw byte gửi kèm ở C→S `[1D][sub][4 B]`) | Không tìm ra chỗ ghi (`0077f414…asm.txt:1942-1951` đọc nó; grep `007da46c` không file nào ghi `+0x110`) | Đọc `functions/005d7d18_FUN_005d7d18.c` + ctor `functions/0051189c…c:1170-1180` |
 | 13 | **Thứ tự `1A 01` vs `1A 04` khi bán** | C# rõ ràng gọi `sendGold()` rồi `1A 01`, nhưng chưa chứng minh client "cộng hai lần" | Bắt traffic thật; hoặc đọc `FUN_0072c0f0` (gate hiển thị) để hiểu điều kiện chống spam |
 | 14 | **Có client nào thật sự gửi `1B 01 00` (inner = 0) không?** | `case_024…c` cho thấy nhánh đó **gán text rồi bỏ**, nên về mặt client là no-op | Chỉ an toàn nếu server C#/protocol khác xử lý; xem `HotelShopAndSaveMapEffectHandler.cs` và `DialogAndBattleEntryHandler.cs` xem có nhánh nào gửi `PacketCreator(27, 1/2)` kèm byte 0 không |

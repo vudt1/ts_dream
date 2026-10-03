@@ -9,6 +9,145 @@ Tài liệu nền: [`post_login_stats_inventory_flow.md`](./post_login_stats_inv
 > **Mức độ bằng chứng:** mọi claim ghi `✅ VERIFIED` đã đối chiếu ASM hoặc byte trong file `Data/`.
 > Claim ghi `⚠️ INFERRED` là suy luận từ 2 nguồn độc lập. Claim ghi `❓` là chưa đóng.
 
+> **🔴 CẬP NHẬT 2026-10-02 (Round-4 redump) — §2.1 SAI về danh sách sub `0x1C`. Xem §0.1**
+
+---
+
+## 0.1 🔴 ĐÍNH CHÍNH SAU ROUND-4 REDUMP
+
+### 0.1.1 §2.1 — ✅ ĐÚNG. Bảng `0x1C` có **7 entry**, không phải 5
+
+> ⚠️ **LƯU Ý ĐỌC LẠI 2026-10-02 (sau khi tìm ra `cs_op1c_dispatch_cases.asm.txt`):**
+> manifest Round-4 chỉ xin **5 dword** (`PTRTAB 0x00785DBB 5`), nên file
+> `cs1c_785dbb_jmptbl_5xDWORD.hex` **bị cắt cụt** và dễ đọc nhầm thành "bảng 5 entry".
+> Bảng thật là **7 entry**. Kết luận cũ trong bản đầu tiên của `§0.1` ("`0x1C` chỉ có
+> sub `01/02/04`") **SAI** — đã sửa ở đây.
+
+Dispatch head **đã có sẵn** trong `cs_op1c_dispatch_cases.asm.txt` (window
+`0x00785DA6..0x0078620B`) — **không cần redump thêm**:
+
+```asm
+00785da6: XOR  EAX,EAX
+00785da8: MOV  AL, byte ptr [EBP + -0x6]      ; sub
+00785dab: CMP  EAX, 0x6
+00785dae: JA   0x0078a4f2                      ; sub > 6 -> KHÔNG gửi
+00785db4: JMP  dword ptr [EAX*0x4 + 0x785dbb]  ; sub 0..6
+```
+
+`CMP EAX,0x6 / JA` ⇒ bảng **bắt buộc có 7 entry** (`0x00..0x06`). Đọc 28 B từ
+`cs_op1c_targets_0x785dbb.hex` (`0x00785DBB..0x00785DD6`):
+
+| Entry | Builder | Nghĩa |
+|:-:|:-:|---|
+| `[0]` | `0x0078A4F2` | epilogue — **sub `0` KHÔNG gửi** |
+| `[1]` | `0x00785DD7` | ✅ gửi |
+| `[2]` | `0x00785E45` | ✅ gửi |
+| `[3]` | `0x0078A4F2` | epilogue — **sub `3` KHÔNG gửi** |
+| `[4]` | `0x00785EB3` | ✅ gửi |
+| `[5]` | `0x00785F21` | ✅ gửi |
+| `[6]` | `0x00785F8F` | ✅ gửi |
+
+**⇒ `0x1C` có 7 sub hợp lệ (`0..6`), trong đó `0` và `3` là no-op ⇒ 5 sub thật sự gửi:
+`01`, `02`, `04`, `05`, `06`.** §2.1 **đã đúng từ đầu**.
+
+### 0.1.1b ⭐ Wire layout 5 sub gửi của `0x1C` — byte-verified
+
+Cả 5 builder dùng cùng một khuôn: `ShortString{main}` → `@PStrNCat` cap=2 (`"1C"`,
+**1 byte**) → `@LStrFromString` → `@LStrCat` (`0x00404090`) nối thêm chuỗi → `CY_AddSedQueue`.
+
+| Sub | Builder | Payload = `[1C][sub]` ++ | Field nguồn | Mức |
+|:-:|:-:|---|---|:-:|
+| `1` | `0x785DD7` | `<LStr>` | `(*gvar_007D9EB8) + 0x1A8` | **A** |
+| `2` | `0x785E45` | `<LStr>` | `(*gvar_007D9EB8) + 0x1A8` — **cùng nguồn sub 1** | **A** |
+| `4` | `0x785EB3` | `<LStr>` | `(*gvar_007D9E68) + 0x28C` | **A** |
+| `5` | `0x785F21` | `<LStr>` | `(*gvar_007D9E68) + 0x290` | **A** |
+| `6` | `0x785F8F` | `<LStr>` | `(*gvar_007DA114) + 0xE8` | **A** |
+
+ASM sub 5 (`cs_op1c_dispatch_cases.asm.txt`), bản mẫu:
+
+```asm
+00785f21: LEA  EAX,[EBP + -0x34]
+00785f24: MOV  DL, byte ptr [EBP + -0x5]     ; main = 0x1C
+00785f27: MOV  byte ptr [EAX + 0x1], DL
+00785f2a: MOV  byte ptr [EAX], 0x1           ; len ShortString (KHONG phai len wire)
+00785f4a: MOV  CL, 0x2
+00785f4c: CALL 0x00402b60                    ; @PStrNCat cap=2 -> "1C"  (1 BYTE)
+00785f5a: CALL 0x0040402c                    ; @LStrFromString
+00785f65: MOV  EDX,[0x007d9e68]
+00785f6b: MOV  EDX,[EDX]
+00785f6d: MOV  EDX,[EDX + 0x290]            ; field nguon
+00785f73: CALL 0x00404090                    ; @LStrCat  -> noi them chuoi
+00785f85: CALL 0x0051633c                    ; TForm1_CY_AddSedQueue  -> GUI
+```
+
+> **Độ dài thay đổi** theo `LStrLen(field)` — không phải record cố định. Đây là lý do
+> §2.4 ghi *"Nếu AnsiString đó đúng là blob record…"* là mức **B/C**: giờ đã xác nhận
+> nó **là chuỗi**, nên layout cố định phải suy ra từ dữ liệu, không từ builder.
+
+### 0.1.1c ⚠️ Code chết ngay sau builder sub `6` — đừng đọc nhầm
+
+Ngay sau lệnh gửi của sub `6` là `JMP 0x0078A4F2` (epilogue), rồi tới `0x00785FFD`
+xuất hiện một sub-dispatch `DEC AL / JZ / DEC AL / JZ` với **3 khối gửi nữa**:
+
+```asm
+00785ff3: CALL 0x0051633c      ; gửi packet
+00785ff8: JMP  0x0078a4f2      ; <-- epilogue: KHONG bao gio quay lai
+00785ffd: MOV  AL, byte ptr [EBP + -0x6]   ; (khong reachable tu 0x1C sub 6)
+00786000: DEC  AL / JZ 0x00786011
+00786004: DEC  AL / JZ 0x007860c8
+```
+
+⇒ **3 khối đó là dead code đối với `0x1C`** — chúng thuộc builder của opcode kế
+(khoảng `0x1D`), nằm giữa bảng `0x1C` và bảng `0x1E` (`0x00786221`).
+**Đừng tính 4 gói cho `1C 06`.** Chỉ **1** gói.
+> **⚠️ Hệ quả cho G-19:** `skills.rs:288-340` phân tích chi tiết `1C 05` ("skill reborn 2",
+> đọc `ball_point`) — **nếu `05` không tồn tại thì toàn bộ nhánh đó là code chết.**
+
+### 0.1.2 Builder `1C 01` đã dump đầy đủ
+
+`asm_cs1c_785dbb_jmptbl.asm.txt` (578 B, 100% coverage) chứa builder `0x00785DD7` (sub 1).
+Xác nhận `marriage §0 #4` / `guild R5`: `ShortString{[EBP-5]=0x1C, [EBP-6]=0x01}` →
+`_PStrNCat(cap=2)` → `_LStrFromString` → payload `1C 01` + `<AnsiString @gvar_007D9EB8+0x1A8>`.
+**Byte `0x01` là độ dài ShortString, không lên wire.** Framing = `[main][sub]`.
+
+### 0.1.3 🔴 BLOCKER — §6 #4 và §6 #5 KHÔNG THỂ LẤY
+
+| Mục | Địa chỉ | Kết quả Round-4 |
+|---|:-:|---|
+| §6 #4 `TSkillTreeRow` 765 B | `0x0094B440..0x0094B6A9` | ❌ **`readable 0`** — ngoài vùng memory đã map |
+| §6 #5 bảng `skillId → index` | `0x009AE128..0x009AE827` | ❌ **`readable 0`** |
+| §6 #10 caption tab `0x5A02DC..0x5A039B` | trong `.text` | ✅ ASM đã dump (`asm_5a02dc_5a0387.asm.txt`, 145 B) |
+
+**Biên memory đã map = `0x7DA800`** (đo từ `table_7da6dc_101DWORD.hex`: `0x7DA6DC` + 292 B
+= `0x7DA7FF`). Mọi địa chỉ ≥ `0x7DA800` đọc được 0 byte.
+
+Điều này **không phải lỗi script** — Round-3 đã gặp y hệt:
+`table_0x948DF8_200.hex`, `table_0x9490B0_200.hex`, `table_0x98BE04_200.hex` đều `readable 0`.
+
+**⇒ Cả 2 mục quan trọng nhất của §6 vẫn chưa lấy được.** Cần kiểm tra
+Window → Memory Map trong project Ghidra; nếu không có block phủ `0x94B440` thì phải
+re-import `aLogin.exe`. Đây là lý do §6 #4 từng được đánh dấu *"quan trọng nhất"* mà
+vẫn chưa ai lấy được.
+
+### 0.1.4 §6 — các mục đã đóng
+
+| # | Mục | Kết quả |
+|:-:|---|---|
+| 1 | `0x005987DB..0x005999F7` (builder payload dialog kỹ năng) | ⚠️ `SCAN` xong; `FUN_005980A0` đã có, `0x598944` gap 361 B còn lại |
+| 2 | `0x005B347D..0x005B37C7` (mẫu append record) | ⚠️ còn 843 B; đã có `asm_tfskill_accessors.asm.txt` (525 B) cho 8 accessor |
+| 3 | `CY_AddSedQueue @ 0x0051633C` | ✅ **đã có body** (`0051633c_TForm1.CY_AddSedQueue.c`) |
+| 6 | `.rodata` `0x5854E4`/`0x584384`/`LAB_0072A870`/`LAB_0072C665` | ✅ đã dump hex |
+| 7 | 5 method còn lại của form kỹ năng | ✅ đã dump (`asm_59c089_*`, `asm_59c61f_*`, `asm_59d750_*`, `asm_59efe3_*`, `asm_5a02dc_*`) |
+| 8 | `FUN_0076D578` gate element | ✅ **6 737 B / 6 844** đã dump (`asm_76d578_full.asm.txt`) |
+| 9 | `TFSkill`: `0x00759B2C`, `0x00759DF0`, `0x00759A8C`, 8 accessor | ✅ đã có body; 4 accessor còn lại nằm trong `0x0075A948`/`0x0075A9A0` → dùng `asm_tfskill_accessors.asm.txt` |
+| 10 | caption 5 tab | ⚠️ ASM có, **còn cần giải VISCII**; 3 tab chưa có `lit_*.hex` |
+
+### 0.1.5 G-26 — chốt offset `skill_type`
+
+`battle/03 §2.1` ghi `skill_type` ở record `+0x21`; ASM `FUN_0075A9F8` dùng hằng `0x25`.
+Round-4 đã dump đủ 8 accessor (`asm_tfskill_accessors.asm.txt`, `0x0075A948..0x0075AB54`)
+⇒ **đọc trực tiếp file này để chốt**, không cần redump thêm.
+
 ---
 
 ## 0. Kết luận điều hành
@@ -19,6 +158,7 @@ Tài liệu nền: [`post_login_stats_inventory_flow.md`](./post_login_stats_inv
 | 2 | Client **không hề gửi** byte hệ/hệ-số trong gói học kỹ năng. Toàn bộ quyết định thuộc server. | ✅ |
 | 3 | Gói C→S học kỹ năng là **`1C 01`** + record 3 byte `[level:1][skillId:2 LE]` × N. | ✅ frame / ⚠️ thứ tự byte |
 | 4 | `05 03` parser client là **`FUN_0072E9A0`** (không phải `FUN_0078C7DB`); header **113 byte**, skill list bắt đầu tại `payload[0x71]`, **không có count** — `N = (len − 0x71)/3`. | ✅ |
+| 4b | 🔴 **Mới (Round-4):** `0x1C` có **7 sub** (`0..6`) — sub `0` và `3` là epilogue (no-op), **5 sub thật sự gửi: `01`, `02`, `04`, `05`, `06`**. Layout: `[1C][sub]` ++ `@LStrCat` chuỗi tại field nguồn (độ dài **thay đổi**, không phải record cố định). Xem §0.1.1-0.1.1c. | ✅ |
 | 5 | **`src/server/spawn.rs:183` ghi 90 byte 0 thay vì 43** → skill list lệch **47 byte**, client không đọc được skill nào. Đây là lỗi chặn tuyệt đối. | ✅ |
 | 6 | Client lấy **cây kỹ năng từ bảng hard-code `0x94B440[5 tab][51 slot][3B]`**, chọn tab bằng byte `thuoctinh` trong `05 03`. **Server không bao giờ gửi định nghĩa cây kỹ năng.** | ✅ |
 | 7 | Server Bear **không có** hệ Quang/Ám; chỉ có `element` 0..5 với `5` = trung lập. Hệ Quang/Ám phải tự thiết kế. | ✅ |

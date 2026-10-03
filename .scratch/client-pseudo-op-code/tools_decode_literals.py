@@ -18,7 +18,20 @@ def load(p):
         d+=[int(x,16) for x in l.split()]
     return d
 IDX={}
-for p in sorted(glob.glob('/mnt/d/VUDT/GIT_PCC/ts_dream/client_pseudo_c/lit_*.hex')):
+# Hai corpus: ban goc (client_pseudo_c) va ban Round-4/5 (ts_decompile/redump).
+# 238 file trung ten da doi chieu byte-for-byte -> giong nhau, nen gop la an toan.
+# 75 file CHI co trong redump/ (lit_78A854, lit_796f*, lit_7980*, lit_799*, ...)
+# nen phai index ca hai neu muon doc literal moi.
+_CORPORA=[
+    '/mnt/d/VUDT/GIT_PCC/ts_dream/client_pseudo_c',
+    '/mnt/d/VUDT/GIT_PCC/test/ts_decompile/redump',
+]
+_paths=[]
+for _d in _CORPORA:
+    _paths += sorted(glob.glob(os.path.join(_d,'lit_*.hex')))
+# corpus moi thang cho cu (Round-4 la ban moi hon)
+_paths.sort(key=lambda p:(0 if 'ts_decompile' in p else 1, p))
+for p in _paths:
     hdr=open(p).readline()
     m=re.search(r'([0-9a-fA-F]{6,8})\.\.([0-9a-fA-F]{6,8})',hdr)
     d=load(p)

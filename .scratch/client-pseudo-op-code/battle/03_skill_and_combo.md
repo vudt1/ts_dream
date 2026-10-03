@@ -18,6 +18,154 @@ Ngày khảo sát: 2026-10-01 · Nguồn chính: `../../../../client_pseudo_c/` 
 
 ---
 
+> **🔴 CẬP NHẬT 2026-10-02 (Round-4 redump) — 5 sub `0..4` GAP nay ĐÃ ĐÓNG. Xem §0.1**
+
+---
+
+## 0.1 🔴 ROUND-4 REDUMP — ĐÃ ĐÓNG GAP CỦA §1.1(b)
+
+### 0.1.1 Đã thu hồi gì
+
+| Artifact | File | Coverage |
+|---|---|---|
+| Bảng 5 entry `0x780440` | `cs0b_780440_jmptbl_5xDWORD.hex` | 20 B / 20 B |
+| Builder `0x78048D..0x7807D0` | `asm_cs0b_78048d_builders.asm.txt` | **836 B / 836 B — 100%** |
+
+Nội dung bảng:
+
+```
+[0] 0x0078048D   [1] 0x00780511   [2] 0x00780595   [3] 0x00780671   [4] 0x00780721
+```
+
+⇒ §1.1(b) nâng từ *"mức A cho 6/9 sub; **GAP cho 0..4**"* → **mức A cho 11 sub**.
+
+### 0.1.2 Wire layout sub `0..4` — **(C) → (A) byte-verified**
+
+Mẫu chung (đọc từ `asm_cs0b_78048d_builders.asm.txt`):
+
+```asm
+LEA  EAX,[EBP + -0x34]
+MOV  DL, byte ptr [EBP + -0x5]      ; main opcode = 0x0B
+MOV  byte ptr [EAX + 0x1], DL
+MOV  byte ptr [EAX], 0x1            ; DO DAI ShortString -- KHONG len wire
+CALL 0x00402b90                     ; @LStrFromString -> ShortString{0x0B}
+MOV  CL, 0x2 / CALL 0x00402b60      ; @PStrNCat cap=2 -> "0B"  (1 byte)
+CALL 0x0040402c                     ; @LStrFromString
+...                                  ; @LStrCatN cap=N
+CALL 0x0051633c                     ; TForm1_CY_AddSedQueue
+```
+
+| Sub | Payload sau `[0B][sub]` | Tổng | Field nguồn | Mức |
+|:-:|---|--:|---|:-:|
+| `0` | `[b:1]` | **2 B** | `*(gvar_007DA5AC)+0x130` | **A** |
+| `1` | `[b:1]` | **2 B** | `*(gvar_007DA5AC)+0x130` (temp khác) | **A** |
+| **`2`** | **`[b:1]` + `u32 LE` + `u16 LE`** | **9 B** | `gvar_007D9CE4+0x24` / `+0x1E` (qua `FUN_0077EE84`) / `+0x22` (qua `FUN_0077EB1C`) | **A** |
+| `3` | `u32 LE` + `u16 LE` | **7 B** | `+0x1E`, `+0x22` | **A** |
+| `4` | `u32 LE` + `u16 LE` | **7 B** | `+0x1E`, `+0x22` | **A** |
+
+ASM `sub 2` (`asm_cs0b_78048d_builders.asm.txt:91-133`):
+
+```asm
+007805db: MOV DL, byte ptr [EDX + 0x24]     ; b  -> ShortString{0x0B, b}
+007805e0: MOV CL, 0x3 / CALL 0x00402b60     ; cap=3 -> 2 byte "0B<b>"
+007805fa: CALL 0x0040402c                  ; @LStrFromString
+00780612: MOV EDX, dword ptr [EDX + 0x1e]  ; u32
+0078061c: CALL 0x0077ee84                  ; u32 -> 4 byte LE
+00780634: MOV DX, word ptr [EDX + 0x22]    ; u16
+0078063f: CALL 0x0077eb1c                  ; u16 -> 2 byte LE   <<< 2 BYTE
+00780655: CALL 0x00404148                  ; @LStrCatN cap=3
+00780667: CALL 0x0051633c                  ; send
+```
+
+### 0.1.3 ⭐ Phân biệt sub `2` và sub `8` — dễ nhầm, KHÁC NHAU 1 byte
+
+| Sub | Builder | Cách đưa `TFightManage+0x22` vào gói | Tổng |
+|:-:|:-:|---|--:|
+| **`2`** | `0x780595` | `CALL 0x0077EB1C` = u16 → **2 byte LE** | **9 B** |
+| **`8`** | `0x7808E2` | `CALL 0x00403FA0` = `@LStrFromChar` → **chỉ low8** | **8 B** |
+
+ASM sub 8 (`0077f414_FUN_0077f414.asm.txt`):
+
+```asm
+00780982: MOV DX, word ptr [EDX + 0x22]
+00780986: CALL 0x00403fa0          ; @LStrFromChar -> 1 BYTE (low byte)
+00780997: MOV EDX, 0x3
+0078099c: CALL 0x00404148          ; @LStrCatN cap=3
+```
+
+> §1.1(b) dòng 142 và ghi chú `§147-149` **đã đúng** về sub 8. Nay có thêm xác nhận
+> sub 2 dùng **2 byte** ⇒ hai sub này *không* thể dùng chung một builder Rust.
+
+### 0.1.4 ✅ Đóng gap H-3 (`§448`) — Rust ĐÚNG, không off-by-one
+
+> §448 (mức 🟡 H-3, *"builder **chưa có byte** (GAP)"*)
+
+**ĐÃ VERIFY byte-level.** Rust không có off-by-one vì `dispatcher.rs:228` đặt
+`payload = decoded.get(6..)` — **đã bỏ qua `[main][sub]`**:
+
+| Wire | `payload` | Rust `battle.rs` | Khớp |
+|---|---|---|:-:|
+| `0B 02 <b> <u32> <u16>` | `[0]=b` | `:97  inner = payload.first()` | ✅ |
+| | `[1..5]=u32` | `:110 u32_le_slice(&payload[1..5])` | ✅ |
+| | `[5..7]=u16` | `:117 u16_le_slice(&payload[5..7])` | ✅ |
+
+⇒ **§448 nâng từ 🟡 lên (A). Không sửa code Rust cho sub 2.**
+
+### 0.1.5 ✅ Bảng dispatch `0x780440` nay có byte
+
+> §127: *"bảng 5 phần tử — **CHƯA CÓ BYTE**"* → ✅ **Đã có** (xem §0.1.1).
+
+### 0.1.6 ✅ Xác nhận §126 — chỉ sub `5` là no-op
+
+> §126: `CMP EAX,0x4 ; JA 0x78a4f2  ; *** sub 5 → NO-OP ***`
+
+**Đúng.** Đọc lại dispatch head từ `functions/0077f414_FUN_0077f414.asm.txt`:
+
+```asm
+00780420: XOR  EAX,EAX
+00780422: MOV  AL, byte ptr [EBP + -0x6]        ; sub
+00780425: CMP  EAX,0x6
+00780428: JG   0x00780454                       ; sub > 6 -> chuoi 0x780454
+0078042a: JZ   0x007807d1                       ; sub == 6 -> BUILDER (KHONG phai no-op)
+00780430: CMP  EAX,0x4
+00780433: JA   0x0078a4f2                       ; sub == 5 -> EPILOGUE = KHONG GUI
+00780439: JMP  dword ptr [EAX*0x4 + 0x780440]   ; sub 0..4
+00780454: CMP  EAX,0x9 / JZ 0x7809b8            ; sub 9
+0078045f: SUB  EAX,0x7 / JZ 0x780826            ; sub 7
+00780468: DEC  EAX     / JZ 0x7808e2            ; sub 8
+0078046f: JMP  0x0078a4f2                       ; sub 5,6 rơi tới day
+00780474: SUB  EAX,0xa   / JZ 0x780a0d          ; sub 0x0A
+0078047d: SUB  EAX,0xf0  / JZ 0x780abd          ; sub 0xFA
+00780488: JMP  0x0078a4f2
+```
+
+**Tập sub `0x0B` hợp lệ: `{0, 1, 2, 3, 4, 6, 7, 8, 9, 0x0A, 0xFA}`.**
+
+⚠️ **Chỉ sub `5` là no-op.** Sub `6` **CÓ** builder `0x007807D1` và **được gửi**:
+`ShortString{0x0B, 0x06}` → `@LStrFromString` → `CY_AddSedQueue` ⇒ payload
+`[0B][06]` = **2 byte, không body** — đúng như §1.1(b) dòng 140.
+
+> **Cảnh báo chống hiểu nhầm:** dễ tưởng *"sub 5 và 6 đều rơi vào
+> `0x0078046f: JMP 0x0078a4f2`"* ⇒ cả hai chết. **Sai** — `JG 0x780454` tại `0x780428`
+> rẽ cả `sub 5` lẫn `sub 6` xuống dưới, nhưng `JZ 0x7807d1` bắt `sub 6` trước.
+> Chỉ `sub 5` mới tới `0x780433: JA 0x78a4f2`.
+
+### 0.1.7 ❌ Đính chính §512 — `FUN_00654590` ĐÃ CÓ BODY
+
+> §5.1 mục 5 (🟡): *"`FUN_00654590` (callee OP 0x35 SubOp 4) — vẫn **không có body** trong corpus"*
+
+**SAI.** `ts_decompile/functions/00654590_FUN_00654590.c` + `.asm.txt` **đã tồn tại**
+(từ trước Round-4). `battle/02_battle_positions.md:552` và `battle/README.md:310`
+nói đúng — **`03` sai**. Xoá khỏi danh sách việc cần làm.
+
+### 0.1.8 §5.1 mục 6 — VMT đã có dữ liệu
+
+`PTR_PTR_00589708` / `PTR_PTR_00577938`: directive `VMT` đã chạy, kết quả nằm trong
+`ts_decompile/redump/round3_report.txt` (mục `VMT`). Đọc report để lấy class name —
+đây là việc đọc, **không cần redump thêm**.
+
+---
+
 ## 0. TIMELINE — người chơi bấm skill → frame nào
 
 ```
@@ -89,7 +237,7 @@ Bảng đích 7 phần tử tại `0x785DBB` (hex: `F2A47800 D75D7800 455E7800 F
 |:--:|:--|:--|:--|
 | `0` | `0x78A4F2` (epilogue) | **không gửi** | A |
 | `1` | `0x785DD7` | `[1C][01]` ++ AnsiString `[[*gvar_007D9EB8]+0x1A8]` | A |
-| `2` | `0x785E45` | `[1C][02]` ++ AnsiString `[[*gvar_007D9E68]+0x28C]` | A |
+| `2` | `0x785E45` | `[1C][02]` ++ AnsiString `[[*gvar_007D9EB8]+0x1A8]` — **cùng nguồn với sub 1** ✅ Round-4 | A |
 | `3` | `0x78A4F2` | **không gửi** | A |
 | `4` | `0x785EB3` | `[1C][04]` ++ AnsiString `[[*gvar_007D9E68]+0x28C]` | A |
 | `5` | `0x785F21` | `[1C][05]` ++ AnsiString `[[*gvar_007D9E68]+0x290]` | A |
@@ -114,28 +262,31 @@ TForm1.CY_AddSedQueue (0x0051633C)                                            (a
 > `{u16 skillId, u8 lv}` mà server Rust đang giả định.
 > Nội dung blob (VISCII text hay binary 3-byte record?) — **chưa kết luận được** (cần traffic).
 
-#### (b) MainOp `0x0B` — bản đồ sub → payload (mức A cho 6/9 sub; GAP cho 0..4)
+#### (b) MainOp `0x0B` — bản đồ sub → payload (🔴 **mức A cho 11/11 sub** — Round-4 đã đóng 5 GAP)
 
-Nguồn: `0077f414_FUN_0077F414.asm.txt:737-768` (dispatch) + các builder.
+> **Round-4:** 5 sub `0..4` trước đây là **GAP** nay đã **byte-verified**. Xem §0.1.2.
+> Tập sub hợp lệ = `{0,1,2,3,4,6,7,8,9,0x0A,0xFA}` — **chỉ sub `5` là no-op**. Xem §0.1.6.
+
+Nguồn: `0077f414_FUN_0077f414.asm.txt:737-768` (dispatch) + `asm_cs0b_78048d_builders.asm.txt` (builder `0..4`).
 Dispatcher:
 ```asm
 00780420: XOR EAX,EAX
 00780422: MOV AL,byte ptr [EBP + -0x6]    ; SubOp
 00780425: CMP EAX,0x6 ; JG 0x780454
-0078042a: JZ  0x7807d1                   ; sub 6
-00780430: CMP EAX,0x4 ; JA 0x78a4f2      ; *** sub 5 → NO-OP ***
-00780439: JMP dword ptr [EAX*0x4 + 0x780440]  ; sub 0..4  (bảng 5 phần tử — CHƯA CÓ BYTE)
+0078042a: JZ  0x7807d1                   ; sub 6  -> BUILDER (KHONG phai no-op)
+00780430: CMP EAX,0x4 ; JA 0x78a4f2      ; *** sub 5 -> NO-OP ***
+00780439: JMP dword ptr [EAX*0x4 + 0x780440]  ; sub 0..4  ✅ ĐÃ CÓ BYTE (Round-4)
 00780454: CMP EAX,0x9 ; JZ 0x7809b8 ; SUB EAX,7 → 0x780826 (7) ; DEC → 0x7808e2 (8)
 00780474: SUB EAX,0xa → 0x780a0d (0x0A) ; SUB EAX,0xf0 → 0x780abd (0xFA) ; else no-op
 ```
 
 | Sub | Payload plain | Nguồn asm | Mức |
 |:--:|:--|:--|:--|
-| `0` | `[0B][00]` ++ `<builder trong bảng>` | bảng `0x780440` | **GAP** |
-| `1` | `[0B][01]` ++ `<builder trong bảng>` | bảng `0x780440` | **GAP** |
-| **`2`** | `[0B][02]` ++ `<builder trong bảng>` — **đây là kênh lệnh trận** | bảng `0x780440` | **GAP** |
-| **`3`** | `[0B][03]` ++ `<builder trong bảng>` | bảng `0x780440` | **GAP** |
-| `4` | `[0B][04]` ++ `<builder trong bảng>` | bảng `0x780440` | **GAP** |
+| `0` | `[0B][00]` ++ `[b:1]` = `*(gvar_007DA5AC)+0x130` — **2 B** | `0x78048D` | **A** ✅ |
+| `1` | `[0B][01]` ++ `[b:1]` = `*(gvar_007DA5AC)+0x130` — **2 B** | `0x780511` | **A** ✅ |
+| **`2`** | `[0B][02]` ++ `[b:1]`(`+0x24`) ++ `u32LE`(`+0x1E`) ++ **`u16LE`**(`+0x22`) — **9 B** — **đây là kênh lệnh trận** | `0x780595` | **A** ✅ |
+| **`3`** | `[0B][03]` ++ `u32LE`(`+0x1E`) ++ **`u16LE`**(`+0x22`) — **7 B** | `0x780671` | **A** ✅ |
+| `4` | `[0B][04]` ++ `u32LE`(`+0x1E`) ++ **`u16LE`**(`+0x22`) — **7 B** | `0x780721` | **A** ✅ |
 | `5` | **KHÔNG GỬI** (`JA 0x78a4f2`, asm:743) | asm:742-743 | A |
 | `6` | `[0B][06]` (2 byte, không body) | asm:758-780 | A |
 | `7` | `[0B][07]` ++ `[PlayerRec+0x384]` ++ `[PlayerRec+0xE3]` | asm:781-829 (đọc ở `:802`) | A |
@@ -445,10 +596,10 @@ phải nhánh chính; đánh dấu **(B)**.
 | `handle_battle_command` sub 1 (`battle.rs:181-215`) | `payload[0]=row, [1]=col, [2]=row_attack, [3]=col_attack, [4..5]=skill_id LE16` | **ĐÚNG THỨ TỰ** so với builder 0x32 chết (chỉ thiếu 2 byte junk cuối) — **nhưng client build này không bao giờ gửi 0x32** | ⚠️ **H-1** |
 | `handle_battle_command` sub 2 (`battle.rs:222-247`) | `[0..1] row/col`, `[2..3] tgt`, `[4..5] item_id LE16`, gate `26001..=27165` | tương tự sub 1 nhưng đọc `unit+0x5AA`; gate của Rust là **suy đoán** | ⚠️ **H-2** |
 | `handle_battle` sub 8 (`battle.rs:35-46`) | `u32_le(payload[1..5])` = target id | **KHỚP CHÍNH XÁC** `[0B][08][kind][DWORD id][low byte]` | ✅ |
-| `handle_battle` sub 2 (`battle.rs:90-110`) | `payload[0]=inner (2/3/4/5)`, `[1..5]=u32 target`, `[5..7]=word ground` | builder **chưa có byte** (GAP); nhưng giá trị `inner` mà client đặt vào `TFightManage+0x24` đúng là `{2,3,4,5,9}` | 🟡 **H-3** |
-| `handle_battle` sub 5 | "flee battle" | **client builder 0x0B sub 5 là NO-OP** (`asm:742-743`); `FUN_00643470` gọi nó nhưng không gửi được gì | ⚠️ **H-4** |
+| `handle_battle` sub 2 (`battle.rs:90-110`) | `payload[0]=inner (2/3/4/5)`, `[1..5]=u32 target`, `[5..7]=word ground` | ✅ **Round-4 đã verify byte-level**: builder `0x780595` = `ShortString{0x0B,inner}` + `u32LE(+0x1E)` + **`u16LE(+0x22)`**. Xem §0.1.2/§0.1.4 | ✅ **H-3 ĐÃ ĐÓNG** |
+| `handle_battle` sub 5 | "flee battle" | **client builder `0x0B` sub `5` là NO-OP** (`asm:742-743`); `FUN_00643470` gọi nó nhưng không gửi được gì | ⚠️ **H-4** |
 | `handle_battle` sub 1 | "leave battle, `data[6]==3`" | `FUN_0064ED14`/`FUN_0064EA20` gửi sub 8 không phải sub 1 | 🟡 |
-| `handle_battle` sub 6 | broadcast `0B06 + id` | client **không** có builder 0x0B sub 6 có body (chỉ `[0B][06]` 2 byte) | 🟡 |
+| `handle_battle` sub 6 | broadcast `0B06 + id` | client **có** builder `0x0B` sub 6, nhưng payload chỉ `[0B][06]` = **2 byte, không body** ⇒ không mang id ⇒ Rust tự chế id | 🟡 **H-4b** |
 
 ### 4.2. `src/server/handlers/skills.rs` (MainOp 0x1C)
 
@@ -462,6 +613,28 @@ while idx + 2 < payload.len() {
 Client gửi `[1C][01] ++ <AnsiString field form>`. **Nếu** AnsiString đó đúng là blob 3-byte
 record thì layout khớp; nếu là text VISCII thì không. → **UNVERIFIED** (mức B/C).
 Rust **không** xử lý sub 4/5/6 (client có gửi sub 5 và 6).
+
+> ✅ **Round-4 ĐÃ CHỐT (2026-10-02).** Dispatch head **đã có sẵn** trong
+> `cs_op1c_dispatch_cases.asm.txt` (window `0x785DA6..0x78620B`) — **không cần redump**:
+>
+> ```asm
+> 00785da6: XOR EAX,EAX
+> 00785da8: MOV AL, byte ptr [EBP + -0x6]
+> 00785dab: CMP EAX, 0x6
+> 00785dae: JA  0x0078a4f2                     ; sub > 6 -> KHONG gui
+> 00785db4: JMP dword ptr [EAX*0x4 + 0x785dbb]
+> ```
+>
+> ⇒ bảng **7 entry** (`0x00..0x06`), sub `0` và `3` = epilogue.
+> **5 sub thật sự gửi: `01`, `02`, `04`, `05`, `06`** — dòng "client có gửi sub 5 và 6"
+> ở trên **đã được chứng minh**. §1.1(a) bảng 7 phần tử ngay phía trên **đã đúng từ đầu**.
+>
+> ⚠️ **Chi tiết đã sửa:** sub `2` đọc `[*gvar_007D9EB8]+0x1A8` (**cùng field với sub 1**),
+> không phải `[*gvar_007D9E68]+0x28C`. Layout đầy đủ 5 sub: `light_dark §0.1.1b`.
+>
+> ⚠️ **Độ dài thay đổi**: cả 5 sub đều là `[1C][sub] ++ @LStrCat(field)`, **không phải
+> record byte cố định**. Vì vậy mục `1C 01` ở §4.2 vẫn đúng là **B/C** — giờ đã biết chắc
+> nó là *chuỗi*, chỉ cần traffic thật để chốt nội dung.
 
 ### 4.3. Frame S→C `0x32` sub 1 — Rust **KHỚP**
 
@@ -483,10 +656,10 @@ ts.text9.push_str(&block);
 
 | # | Vấn đề | Mức |
 |:--|:--|:--|
-| **H-1** | Server Rust chờ `0x32 sub 1/2` để nhận lệnh dùng skill, nhưng **client build này không gửi `0x32`** — lệnh trận đi qua `0x0B sub 2/3`. Nếu bỏ qua GAP H-3 thì toàn bộ `BattleCommand` **không bao giờ** được nạp → trận không tiến được | **A** |
+| **H-1** | Server Rust chờ `0x32 sub 1/2` để nhận lệnh dùng skill, nhưng **client build này không gửi `0x32`** — lệnh trận đi qua `0x0B sub 2/8`. Frame đó nay đã xác minh byte-level (§0.1.2) nhưng **Rust vẫn chưa viết lại handler** | **A** |
 | **H-2** | Gate item `26001..=27165` là thuần contract Rust (C); client chỉ đọc `unit+0x5AA` | C |
-| **H-3** | Byte bảng dispatch 0x0B subs 0..4 tại `0x780440..0x780453` **và vùng builder `0x78048E..0x7807D0` không có trong corpus** ⇒ **không xác minh được** frame lệnh trận thật | **GAP** |
-| **H-4** | Server xử lý `0x0B sub 5` (flee) nhưng client không gửi được | A |
+| **H-3** | ~~Byte bảng dispatch `0x780440` + builder `0x78048D..0x7807D0` không có trong corpus~~ **→ ĐÃ ĐÓNG (Round-4)**: dump 836/836 B. Frame lệnh trận sub `2` = `[0B][02][b:1][u32 LE][u16 LE]` đã byte-verified. Rust đọc **đúng** offsets | ✅ **A** |
+| **H-4** | Server xử lý `0x0B sub 5` (flee) nhưng client **không gửi** (`JA 0x78a4f2`) ⇒ `battle.rs:26` là dead code. **Lưu ý: sub `6` thì CÓ được gửi** (2 byte, không body) — dễ nhầm | A |
 | **H-5** | `Skill.combo` (`tables.rs:91`) đọc từ `Skills.txt` — file **không có** trong `Data/` ⇒ `combo_field` luôn = 0; và biến này bị `let _ = (...)` bỏ qua (`runner.rs:1301`, `:1478`) | A |
 | **H-6** | `data.skills` (Skills.txt) rỗng ⇒ `skill_row = None` ⇒ `skill_type` chỉ lấy được từ `BinarySkillDef.kind` (`runner.rs:772-777`). Nhưng **`BinarySkillDef.kind` là `record+0x15` = `type`**, còn `skill_type` client-side là **`record+0x21`** (`FUN_0075A9F8`) — **hai field khác nhau**! `skill_pc.rs` map `skill_type → kind` | **A** |
 | **H-7** | `num34` server gửi ở `b2` = `fight_area` (`runner.rs:783-786`, fallback `sl_danh`) — client dùng `b2` làm tham số thứ 4 của `FUN_00648154(..., b2, code)`; ngữ nghĩa chưa rõ | B |
@@ -496,12 +669,21 @@ ts.text9.push_str(&block);
 
 ## 5. KHOẢNG TRỐNG / VIỆC CẦN LÀM
 
-1. **🔴 Redump `0x780440..0x780453` + `0x78048E..0x7807D0`** (bảng dispatch 5 entry và
-   thân builder subs 0..4 của OP 0x0B). Đây là **mảnh ghép duy nhất** để xác minh frame
-   lệnh trận thật sự. Đề xuất: `Round3Redump.java` — thêm window
-   `[0x78043C, 0x7807D4]`.
+1. **✅ ĐÃ XONG (Round-4 2026-10-02)** — Redump `0x780440..0x780453` + `0x78048D..0x7807D0`.
+   Artifact: `cs0b_780440_jmptbl_5xDWORD.hex` + `asm_cs0b_78048d_builders.asm.txt` (836/836 B).
+   Kết quả ở §0.1. **Xoá khỏi danh sách việc cần làm.**
+1b. **✅ ĐÃ XONG (2026-10-02)** — ~~dump `0x00785DA0..0x00785DBB` (dispatch head)~~.
+   Dispatch head **đã có sẵn** trong `cs_op1c_dispatch_cases.asm.txt:3-8`. Kết luận:
+   `0x1C` có **7 sub** (`0..6`), `0`/`3` = epilogue, **gửi thật: `01/02/04/05/06`**.
+   Xem `light_dark_skill_unlock_gap.md §0.1.1-0.1.1c`.
+1c. **🟠 Mới (Round-4)**: `0x94B440` (cây kỹ năng 765 B) và `0x9AE128` (bảng `skillId→index`)
+   **không đọc được** trong Ghidra — ngoài vùng memory đã map (`> 0x7DA800`).
+   **Đã có cách bypass không cần Ghidra:**
+   `python3 test/pe_dump.py <aLogin.exe> 0x94B440 0x765 -o skilltree_94b440_765B.hex`.
+   Xem `light_dark_skill_unlock_gap.md §0.1.3` và `ROUND4_UPDATE_INDEX.md`.
 2. **🔴 Traffic thật**: bắt 1 lượt đánh có dùng skill để đối chiếu
-   (a) `0x0B sub 2` layout thật, (b) nội dung AnsiString của `0x1C sub 1`.
+   (a) `0x0B sub 2` layout thật — **Round-4 đã verify byte-level, chỉ còn xác nhận
+   ngữ nghĩa `inner ∈ {2,3,4,5}`**, (b) nội dung AnsiString của `0x1C sub 1`.
 3. **🟡 Giải mã `Skill.Dat`**: `FUN_00759B2C` + `FUN_00759DF0` đã đủ để viết decoder;
    `skill_pc.rs` đã có nhưng cần đối chiếu từng field với accessor client
    (`+0x15 / +0x16 / +0x18 / +0x1A / +0x21 / +0x2A`) — đã khớp 6/6.
@@ -509,7 +691,8 @@ ts.text9.push_str(&block);
    không phân biệt được (`local_59[4]` + `auStack_55[7]` chồng nhau). Cần đọc ASM để chốt
    offset chính xác của từng item hit. Hiện đã chốt: `[0]=code u32`, `[4]=grp`, `[5]=slot`,
    `[8]=n`, `[57]=steps`; các offset còn lại đánh dấu (B).
-5. **🟡 `FUN_00654590`** (callee OP 0x35 SubOp 4) — vẫn **không có body** trong corpus.
+5. **✅ ĐÃ ĐÓNG (Round-4)** — ~~`FUN_00654590` vẫn **không có body** trong corpus~~
+   **SAI**: `00654590_FUN_00654590.c` + `.asm.txt` đã tồn tại từ trước. Xem §0.1.7.
 6. **🟡 Định danh `gvar_007D9EB8` / `gvar_007D9E68`**: VMT nằm sau 2 con trỏ gián tiếp
    (`PTR_PTR_00589708`, `PTR_PTR_00577938`) chưa có tên trong `index.csv`.
 7. **🟡 Điểm cấp phát `gvar_007DA51C`** — chỉ thấy 1 lần gán = 0

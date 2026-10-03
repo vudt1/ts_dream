@@ -9,6 +9,137 @@ Tài liệu nền: [`post_login_stats_inventory_flow.md`](./post_login_stats_inv
 > bằng cách decode trực tiếp `table_0x77F474_200B.hex` + `table_0x77F53C_dword200.hex`
 > và đọc tay ASM/C. Phần bị bác bỏ được ghi rõ ở §6.
 
+> **🔴 CẬP NHẬT 2026-10-02 (Round-4 redump) — mục §2.1 ĐÃ SAI, xem §0.1**
+> Toàn bộ kết luận dưới đây được giữ nguyên; phần đã bị bác bỏ được ghi ở §0.1 và §0.2.
+
+---
+
+## 0.1 🔴 ĐÍNH CHÍNH SAU ROUND-4 REDUMP
+
+> Nguồn: `test/round4/redump/asm_cs27_787362_builders.asm.txt` (3 756 B) +
+> `cs27_787362_jmptbl_57xDWORD.hex`. Đã merge vào `test/ts_decompile/redump/`.
+
+### 0.1.1 `0x27` C→S **CÓ** trong corpus — tuyên bố "lỗ hổng lớn nhất" SAI
+
+§2.1 ghi: *"🔴 `0x27` C→S: body 57 builder chưa có trong `client_pseudo_c/`"*.
+
+**Sai.** Body có đầy đủ — nằm trong khoảng `0x00787362..0x0078820E` (3 757 B) thuộc
+mega-function `FUN_0077F414`. Trước đây nó **chưa bao giờ được disassemble** (xem §0.3),
+nên `index.csv` báo "HOLE 26 682 B" và gây ấn tượng như thiếu hoàn toàn.
+
+ASM cũ chỉ ghi `0078734d:` rồi nhảy thẳng `0078820f:` — **3 757 B nằm im giữa**.
+
+### 0.1.2 Bảng dispatch 57 entry — GIẢI ĐƯỢC, nhưng chỉ **28/57 sub dùng được**
+
+`CMP EAX,0x38 / JA 0x0078A4F2` ⇒ biên `0x00..0x38` = **57 entry**, đúng như §2.1 dự đoán.
+
+| Nhóm sub | Đích | Số | Nghĩa |
+|---|---|--:|---|
+| `0x00` | `0x0078A4F2` epilogue | 1 | **không gửi** |
+| `0x01`–`0x13` | builder thật | **19** | gửi |
+| `0x14`–`0x1E` | `0x0078A4F2` epilogue | 11 | **không gửi** |
+| `0x1F`–`0x20` | builder thật | **2** | gửi |
+| `0x21`–`0x31` | `0x0078A4F2` epilogue | 17 | **không gửi** |
+| `0x32`–`0x38` | builder thật | **7** | gửi |
+
+Địa chỉ builder (đọc từ `cs27_787362_jmptbl_57xDWORD.hex`):
+
+```
+0x01 0x787446  0x02 0x7874BA  0x03 0x78753A  0x04 0x7875DF  0x05 0x7876A1
+0x06 0x787744  0x07 0x787799  0x08 0x787819  0x09 0x78786E  0x0A 0x7878E2
+0x0B 0x787962  0x0C 0x7879E2  0x0D 0x787A62  0x0E 0x787B07  0x0F 0x787BAC
+0x10 0x787C1A  0x11 0x787CF1  0x12 0x787D72  0x13 0x787DFB
+0x1F 0x787E69  0x20 0x787ED7
+0x32 0x787F2C  0x33 0x787F81  0x34 0x787FD6  0x35 0x788044  0x36 0x7880B2
+0x37 0x788107  0x38 0x78818B
+```
+
+> **⇒ 29 sub (`0x00`, `0x14..0x1E`, `0x21..0x31`) client KHÔNG BAO GIỜ gửi.**
+> Handler server cho các sub đó là dead code. Khi thiết kế `guild.rs`, chỉ cần
+> phục vụ 28 sub còn lại.
+
+### 0.1.3 R5 (`[main][sub]` hay `[sub][main]`) — **ĐÃ CHỐT: `[main][sub]`**
+
+Ba bằng chứng độc lập, tất cả từ ASM mới:
+
+1. **`0x45` builder `0x789DEF`** (`marriage_child_feature_flow.md §2.4`):
+   `ShortString{[EBP-5]=0x45, [EBP-6]=0x01}` → `_PStrNCat(cap=2)` → **đúng 2 byte `45 01`**.
+   Byte `0x01` là độ dài ShortString, không lên wire.
+2. **`0x0B` builder `0x780595`** (`battle/03`): `ShortString{0x0B, inner}` → `LStrCatN(cap=3)`
+   → `[0x0B][inner][u32LE][u16LE]`.
+3. `case_020_007902FB:51` truyền thẳng `RP` (bắt đầu tại byte sub) cho handler `17 06`.
+
+`FUN_0040402C = @LStrFromString` **đã có body** (`.scratch/…/ts_decompile/functions/0040402c__LStrFromString.c`)
+⇒ không còn là câu hỏi mở.
+
+### 0.1.4 Byte-map `0x77F474` — xác nhận
+
+`cs_bytemap_77f474_200B.hex` (200 B) đọc trực tiếp, khớp §2 và `marriage §1`:
+
+| main | `byte[0x77F474+main]` |
+|:-:|:-:|
+| `0x27` | `0x24` ✓ |
+| `0x2B` | `0x28` ✓ |
+| `0x2D` | `0x2A` (42) ✓ |
+| `0x45` | `0x39` (57) ✓ |
+
+### 0.1.5 §5.6(d) — đóng
+
+| # | Vấn đề | Kết luận Round-4 |
+|:-:|---|---|
+| d | *"Body 57 builder C→S của `0x27` không có trong corpus — cần redump"* | ✅ **ĐÃ CÓ** (§0.1.1). Không cần redump thêm. |
+
+---
+
+## 0.2 🔴 PHÁT HIỆN NỀN TẢNG — `FUN_0077F414` chỉ mới disassemble 42%
+
+Áp dụng cho **mọi** tài liệu trong `.scratch/client-pseudo-op-code/`.
+
+`index.csv` ghi `FUN_0077F414` có `size_bytes = 19534`. **Sai.** Span thật đo từ `.asm.txt`:
+
+```
+0x0077F414 .. 0x0078A817  =  46 084 B
+byte thật sự disassemble  =  19 534 B   (42%)
+byte CHƯA BAO GIỜ được disassemble = 26 550 B  (58%), 15 khoang rời rạc
+```
+
+15 khoang (đã thu hồi hết ở Round-4, xem `.scratch/…/REDUMP_ROUND4_RESULTS.md`):
+
+| Khoang | Size | Nội dung |
+|---|--:|---|
+| `0x00783405..0x00785225` | 7 713 B | C→S `0x17` túi đồ (61 sub) |
+| `0x00781A06..0x00782E8A` | 5 253 B | C→S `0x09`..`0x16` |
+| **`0x00787362..0x0078820E`** | **3 757 B** | **C→S `0x27` bang hội** |
+| `0x0078125D..0x007819F0` | 1 940 B | C→S `0x13`/`0x14` |
+| `0x007853E5..0x00785B4B` | 1 895 B | C→S `0x1F`/`0x20` |
+| `0x00780B87..0x00780FA4` | 1 054 B | C→S `0x0C`/`0x0D` |
+| `0x00786598..0x00786986` | 1 007 B | C→S `0x1E`/`0x1F` |
+| **`0x00786221..0x00786582`** | **866 B** | **bảng 9 nhánh C→S `0x1E`** |
+| **`0x0078048D..0x007807D0`** | **836 B** | **C→S lệnh trận `0x0B` sub `00..04`** |
+| `0x0077F883..0x0077FB47` | 709 B | C→S `0x01`/`0x02` |
+| `0x00785DBB..0x00785FFC` | 578 B | bảng 5 nhánh C→S `0x1C` |
+| `0x0078A157..0x0078A317` | 449 B | C→S `0x48`/`0xC7` |
+| `0x0077F474..0x0077F633` | 448 B | byte-map + case `0x00` |
+| `0x0077F771..0x0077F789` | 25 B | |
+| **`0x00780440..0x00780453`** | **20 B** | **bảng 5 entry C→S `0x0B`** |
+
+### ⚠️ Hệ quả: **đừng tin `size_bytes` của `index.csv` khi tra địa chỉ**
+
+Tra cứu bằng script trên `index.csv` sẽ báo **"HOLE 26 682 B"** cho *mọi* địa chỉ trong
+`0x00784062..0x0078A89C` — con số này sai. Dùng `.asm.txt` làm nguồn sự thật.
+
+## 0.3 ⚠️ BLOCKER — memory đã map chỉ tới `0x7DA800`
+
+Đo từ 2 dump đọc được một phần:
+
+| File | Bắt đầu | Đọc được | Kết thúc |
+|---|---|--:|---|
+| `lvlcoef_7da6b8_wide.hex` | `0x007DA6B8` | 328 B | `0x7DA7F7` |
+| `table_7da6dc_101DWORD.hex` | `0x007DA6DC` | 292 B | **`0x7DA7FF`** |
+
+Mọi địa chỉ ≥ `0x7DA800` trả **0 byte**. Đây là lý do `light_dark §6 #4/#5` để ngỏ từ đầu.
+Không phải lỗi script — Round-3 đã gặp y hệt (`table_0x948DF8/9490B0/98BE04` → `readable 0`).
+
 ---
 
 ## 1. Kết Luận Quan Trọng Nhất
@@ -47,7 +178,7 @@ Bảng builder: `byte_table[0x77F474][main]` → index → `dword_table[0x77F53C
 
 | Main | byte idx | Builder | Sub hỗ trợ | Bằng chứng |
 |:--:|:--:|---|---|---|
-| `0x27` | `0x24` (36) | **`0x0078734D`** | jump table **57 entry**, subsel `0x00..0x38` | ASM `0077f414_FUN_0077f414.asm.txt:2598-2602`; `0x00787362` |
+| `0x27` | `0x24` (36) | **`0x0078734D`** | jump table **57 entry**, subsel `0x00..0x38`; **chỉ 28 sub thật sự gửi** (xem §0.1.2) | ASM `0077f414_FUN_0077f414.asm.txt:2598-2602`; `0x00787362`; `cs27_787362_jmptbl_57xDWORD.hex` |
 | `0x2B` | `0x28` (40) | **`0x0078860B`** | **3 nhánh**: sub `1`, `2`, `3` | ASM `:2871-2879`, call `TForm1_CY_AddSedQueue` tại `:2896/2925/2955` |
 
 Layout `0x2B` C→S (đã đọc tay ASM `0x00788628`):
@@ -63,10 +194,12 @@ Layout `0x2B` C→S (đã đọc tay ASM `0x00788628`):
 > của Ghidra làm bằng chứng — đúng lỗi recovery đã được cảnh báo ở
 > `post_login_stats_inventory_flow.md:499-514`.
 
-> **🔴 `0x27` C→S: body 57 builder chưa có trong corpus.** Địa chỉ `0x0078734D` và
-> bảng con `0x00787362` (57×4 = 228 byte) **đã xác minh**, nhưng `index.csv`/`manifest.csv`
-> không có entry nào trong khoảng `0x007873xx..0x0078820E`, và không có
-> `table_0x787362*.hex`. **Đây là lỗ hổng lớn nhất của luồng C→S.**
+> **🔴 `0x27` C→S: body 57 builder ~~chưa có trong corpus~~ ĐÃ CÓ.** Địa chỉ `0x0078734D` và
+> bảng con `0x00787362` (57×4 = 228 byte) **đã xác minh**. ~~`index.csv`/`manifest.csv`
+> không có entry nào trong khoảng `0x007873xx..0x0078820E`~~ — **Sai lý do**: entry *có*,
+> nhưng `index.csv` ghi sai `size_bytes` nên mọi truy vấn trong dải đó báo "HOLE" giả.
+> Body nằm trong khoảng **chưa disassemble** `0x00787362..0x0078820E` của `FUN_0077F414`.
+> **ĐÃ THU HỒI** ở Round-4 — xem §0.1.1 và §0.1.2.
 
 ### 2.2 S→C (Server → Client)
 

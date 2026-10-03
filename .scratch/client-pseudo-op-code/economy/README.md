@@ -9,6 +9,68 @@ Tài liệu nền (nối tiếp): [`../post_login_stats_inventory_flow.md`](../p
 
 ---
 
+> **🔴 CẬP NHẬT 2026-10-02 (Round-4 redump) — U3/U4/U5 đóng, 1 blocker memory**
+
+---
+
+## 0.1 ROUND-4 REDUMP — ghi chú cho bộ tài liệu economy
+
+### 0.1.1 Những gì ĐÃ ĐÓNG (không cần redump thêm)
+
+| Mục | Kết quả |
+|---|---|
+| `05:493` (U9) — bảng 9 nhánh C→S `0x1E` | ✅ **866 B / 866 B.** `sub 0` = epilogue ⇒ **8 nhánh thật** |
+| `04:111-115` (U3/U4/U5/U14) — handler `17 1F`/`17 21`/`17 22` | ✅ đã có body |
+| `05:485` (U1) — `TFRollEgg` caller `0x00772788` | ✅ đã có body |
+| `04:536` (U11) — `FUN_0071E164` | ✅ đã có body (tài liệu ghi sai) |
+| `04:537` (U12) — 3 class vendor `0x0075C004`/`0x007716DC`/`0x00771728` | ✅ đã có body (tài liệu ghi sai) |
+| `02:29,638` — "13 file `functions/*.c` thiếu" | ❌ **SAI** — `ts_decompile/functions/` có **13 218 file** |
+| `03:684` (Undet.3b) — `LAB_00609218` | ✅ đã có body |
+| `03:646,694` (G9) — layout `17 06` | ✅ **14 B, byte-exact** |
+| `03:691,692` (Undet.9/10) — 15 literal `19 0B`/`19 02` | ✅ đã dump hex |
+| `02:608` — `DAT_005D75D0` | ✅ đã dump hex |
+
+### 0.1.2 🔴 BLOCKER duy nhất còn lại: memory ngoài `0x7DA800`
+
+Đo từ 2 dump đọc được một phần:
+
+| File | Bắt đầu | Đọc được | Kết thúc |
+|---|---|--:|---|
+| `lvlcoef_7da6b8_wide.hex` | `0x007DA6B8` | 328 B | `0x7DA7F7` |
+| `table_7da6dc_101DWORD.hex` | `0x007DA6DC` | 292 B | **`0x7DA7FF`** |
+
+⇒ **Toàn bộ địa chỉ ≥ `0x7DA800` đọc được 0 byte.** Bị chặn:
+
+| Mục | Địa chỉ |
+|---|---|
+| `05:486` (U2) — thang cược `RG.Dat` | `0x009D1610`, `0x009D1620` |
+| `light_dark §6 #4` — cây kỹ năng 765 B | `0x0094B440` |
+| `light_dark §6 #5` — bảng `skillId→index` | `0x009AE128` |
+| Round-3 §5.4 (cũ) | `0x948DF8`, `0x9490B0`, `0x98BE04` — đều `readable 0` |
+
+**Không phải lỗi script.** Cần kiểm tra Window → Memory Map của project Ghidra;
+nếu không có block phủ `0x94B440` thì phải **re-import `aLogin.exe`**.
+
+### 0.1.3 ⚠️ Sai lệch địa chỉ HOLE
+
+| Tài liệu | Ghi | Thật |
+|---|---|---|
+| `02:281,603,605` | HOLE `0x5DC96A..0x5DCE0` | **`0x5DC98A..0x5DCCDF`** (854 B) |
+| `README:243` | `0x784000..0x785000` ≈ "7 KB" | span đó chỉ **4 096 B**; 7 KB là `0x783403..0x785225` |
+
+### 0.1.4 ⚪ Không giải được bằng redump — cần traffic thật
+
+| # | Câu hỏi | Tài liệu |
+|:-:|---|---|
+| C1 | thứ tự `1A 01` / `1A 04` khi bán | `02:610` |
+| C2 | client có gửi `1B 01 00` không | `02:611` |
+| C3 | `17 20` có 1 byte pad thật không | `04:484` |
+| C4 | sub-op C→S thật của stall | `04:485` |
+| C5 | độ dài thật của prefix `17 21` | `04:486` |
+| C6 | tên nghiệp vụ tiền #2 (`+0x12FC`) | `05:495` |
+| C7 | `+0x1300` là tiền gì | `06:361` |
+| C8 | `shop_point` (`42 02`) có hiển thị không | `06:370` |
+
 ## 0. Cách đọc bộ tài liệu này
 
 | File | Nội dung |

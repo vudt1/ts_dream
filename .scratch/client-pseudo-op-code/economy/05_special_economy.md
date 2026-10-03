@@ -16,6 +16,87 @@ Trạng thái: **HOÀN TẤT v1** — mỗi claim layout đều gắn `file:line
 
 ---
 
+> **🔴 CẬP NHẬT 2026-10-02 (Round-4 redump) — U9 ĐÃ ĐÓNG, U3/U4/U5/U14 đã có body**
+
+---
+
+## 0.1 🔴 ROUND-4 REDUMP
+
+### 0.1.1 ✅ U9 đóng — bảng 9 nhánh C→S `0x1E`
+
+> §493 (U9): *"Body 9 nhánh của **C→S `0x1E`** — Jump table ở `0x00786221` bị Ghidra coi là
+> **data**, không có `.asm.txt` phía sau → Dredump `0x00786221–0x00786583`"*
+
+**ĐÃ ĐÓNG.** `asm_cs1e_786221_builders.asm.txt` (**866 B / 866 B — 100%**) +
+`cs1e_786221_jmptbl_9xDWORD.hex`.
+
+| Entry | Builder | Nghĩa |
+|:-:|:-:|---|
+| `[0]` | `0x0078A4F2` epilogue | **KHÔNG GỬI** |
+| `[1]` | `0x00786245` | gửi |
+| `[2]` | `0x007862B3` | gửi |
+| `[3]` | `0x00786321` | gửi |
+| `[4]` | `0x00786376` | gửi |
+| `[5]` | `0x007863E4` | gửi |
+| `[6]` | `0x00786452` | gửi |
+| `[7]` | `0x007864C0` | gửi |
+
+⇒ **`0x1E` C→S có đúng 8 nhánh thật** (sub `1..8`); sub `0` là no-op.
+Điều này **xác nhận** claim C của tài liệu rằng `case 0x1E:` rỗng trong Ghidra là
+recovery artifact, không phải bằng chứng client không gửi.
+
+⚠️ Bảng 9 entry cần 36 B; cửa sổ hex `0x786221..0x786242` chỉ đọc được 34 B
+(cắt 2 byte) — nhưng vì `[0]` là epilogue nên **8 nhánh là đủ**.
+
+### 0.1.2 ✅ U3/U4/U5/U14 đóng — 3 handler stall nay có body
+
+> §111-115: *"`17 1F` → `func_0x007311c8` — **không có body**"*
+> *"`17 21` → `func_0x00610290` — **không có body**"*
+> *"`17 22` → `func_0x0060e3cc` — **không có body**"*
+
+**ĐÃ ĐÓNG** (Round-4 tạo function trong các HOLE):
+
+| Handler | Frame | File |
+|---|---|---|
+| `FUN_007311C8` | `17 1F` | `007311c8_FUN_007311c8.{c,asm.txt}` |
+| `FUN_00610290` | `17 21` | `00610290_FUN_00610290.{c,asm.txt}` |
+| `FUN_0060E3CC` | `17 22` | `0060e3cc_FUN_0060e3cc.{c,asm.txt}` |
+
+Quan sát đầu tiên:
+
+- `0x00610290`: `_LStrCopy(_, 2, 4, _)` → đọc **4 byte tại `RP[2..5]`**
+- `0x0060E3CC`: bound check `MOV EAX,0x2` → đọc `RP[2]`
+
+⇒ **Đọc trực tiếp 3 file này để chốt layout byte.** Đây là việc đọc, không cần redump.
+
+### 0.1.3 ✅ U11 đóng — `TFRollEgg` caller đã có
+
+> §485 (U1): *"`TFRollEgg.Create` (`0x00772924`) chỉ được gọi từ `0x00772788`, thuộc hàm
+> **Ghidra không tạo function**"*
+
+**ĐÃ ĐÓNG.** `SCAN 0x007726F0 0x00772924` đã tạo `FUN_00772788` +
+`FUN_007726F0` (`.c` + `.asm.txt` tồn tại).
+
+### 0.1.4 ❌ U2 — `0x9D1610` / `0x9D1620` **KHÔNG ĐỌC ĐƯỢC**
+
+`rg_wager_9d1610.hex` và `rg_wager_9d1620.hex` đều trả **`readable 0`**.
+Địa chỉ nằm **ngoài vùng memory đã map** (biên `0x7DA800`) — xem
+`light_dark_skill_unlock_gap.md §0.1.3`. Cần sửa Memory Map của project Ghidra.
+
+### 0.1.5 ⚠️ U12 — `TLottoManager` (`VMT_54D580`) đã có dữ liệu
+
+`SCAN 0x0054D580 0x0054D700` + `VMT 0x0054D580 48` đã chạy; đọc
+`ts_decompile/redump/round3_report.txt` (mục `VMT` / `SCAN`) để lấy tên slot.
+
+### 0.1.6 ⚪ Vẫn cần traffic thật
+
+| # | Câu hỏi | Vì sao |
+|:-:|---|---|
+| §484 (G2) | `17 20` có thật sự 1 byte pad không | cần packet capture |
+| §485 (G3) | sub-op C→S thật của stall open/close/price | cần log thật |
+| §486 (G4) | độ dài thật của prefix `17 21` | cần capture |
+| §495 (U11) | tên nghiệp vụ tiền #2 (`+0x12FC`) | cần runtime / `.FLST` |
+
 ## 0. Bản đồ MainOp → handler S→C (tự dựng lại, ĐÃ ĐỐI CHIẾU 5 neo)
 
 Parse: `client_pseudo_c/jumptable_byte200_0x78A8EE.hex` (200 byte, 16/line, index = MainOp) →

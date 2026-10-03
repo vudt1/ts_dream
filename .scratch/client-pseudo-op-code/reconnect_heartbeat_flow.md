@@ -12,6 +12,185 @@ Source Rust: `src/` (dispatcher, handlers, web/server_control, protocol)
 
 ---
 
+> **🔴 CẬP NHẬT 2026-10-02 (Round-4 redump) — §3.2 ĐÃ BYTE-VERIFY. Xem §0.1**
+
+---
+
+## 0.1 🔴 ROUND-4 REDUMP
+
+### 0.1.1 ✅ §3.2 — hằng literal `0x78A834` ĐÃ BYTE-VERIFY ✅
+
+§3.2 là claim quan trọng nhất của tài liệu (payload 1 byte `0x00` ⇒ frame
+`F4 44 01 00 00`). Round-4 đã dump `cs_literal_78a818_78a8ed.hex` — **xác nhận 100%**:
+
+| Địa chỉ | Bytes | Giá trị | Nghĩa |
+|---|---|---|---|
+| `0x0078A82C` | `FF FF FF FF` | `0xFFFFFFFF` | refcount = −1 (hằng compile-time) ✓ |
+| `0x0078A830` | `01 00 00 00` | **1** | **length = 1** ✓ |
+| `0x0078A834` | `00` | **0** | **chars[0] = 0x00** ✓ |
+
+⇒ **`LStrLen(0x78A834) = 1`** ⇒ payload `00` 1 byte ⇒ length field `01 00` ⇒
+frame **`F4 44 01 00 00`** (XOR `0xAD`: `59 E9 AC AD AD`). **§3.3 chính xác.**
+
+Đối chiếu chéo — **vùng này là bộ hằng `StrToInt`/`Format` của Delphi**, không chỉ
+hằng ACK. Quy ước Delphi string literal: `ptr` trỏ vào `chars`, `ptr−4` = length,
+`ptr−8` = refcount (`0xFFFFFFFF` = hằng compile-time):
+
+| `ptr` (chars) | `ptr−4` length | `ptr−8` refcount | Nội dung | Nghĩa |
+|:--|:-:|:--:|---|---|
+| **`0x78A834`** | **`1`** | `0x78A82C` = `FFFFFFFF` | `\x00` | **payload frame ACK** ✓ |
+| `0x78A848` | `2` | `0x78A840` = `FFFFFFFF` | `"  "` (2 space) | tham số `StrToInt` |
+| `0x78A854` | `1` | `0x78A84C` = `FFFFFFFF` | `"0"` | tiền tố `StrToInt` |
+| `0x78A860` | `8` | `0x78A858` = `FFFFFFFF` | `"12345678"` | chuỗi test |
+| `0x78A890` | `10` | `0x78A888` = `FFFFFFFF` | `"1234567890"` | chuỗi test |
+
+⚠️ **Đính chính nhỏ (bản `§0.1` đầu tiên ghi sai):** con trỏ `chars` của `"0"` là
+**`0x78A854`**, không phải `0x78A850`. `0x78A850` là **trường length**. Sai lệch 4 byte.
+
+Ngoài ra trong cùng vùng:
+
+| Địa chỉ | Nội dung |
+|---|---|
+| `0x78A838` | `ShortString{len=6, "123123"}` — hằng shortstring nằm **giữa** 2 AnsiString |
+| `0x78A86D..0x78A887` | bảng `dword` = `{1,1} {1,2} {1,3} {1,4} {1,5} {1,6} {1,7}` — bảng chỉ mục 7 phần tử |
+| `0x78A89C` | code bắt đầu lại (`55 8B EC 51` = `PUSH EBP; MOV EBP,ESP; PUSH ECX`) |
+| `0x78A8D8` | `CMP EAX,0xC7` — hàm này còn dispatch opcode **`0xC7`** (khớp byte-map `0xC7→0x3D`) |
+
+Giải mã bằng `tools_decode_literals.py 78a818 78a8ed` (sau khi sửa glob như §0.1.8).
+
+### 0.1.2 ✅ §3.1 — byte-map `0x77F474` đã dump đầy đủ 200 B
+
+`cs_bytemap_77f474_200B.hex`. Xác nhận các claim đã có:
+
+| main | `byte[0x77F474+main]` | Tài liệu |
+|:-:|:-:|---|
+| `0x00` | `0x01` | ✓ `reconnect §3.1` |
+| `0x0B` | `0x0B` | ✓ |
+| `0x17` | `0x15` (21) | ✓ |
+| `0x1C` | `0x19` (25) | ✓ |
+| `0x1E` | `0x1C` (28) | ✓ |
+| `0x27` | `0x24` (36) | ✓ |
+| `0x2B` | `0x28` (40) | ✓ |
+| `0x2D` | `0x2A` (42) | ✓ |
+| `0x45` | `0x39` (57) | ✓ |
+| `0x48` | `0x3C` (60) | ✓ |
+| `0xC7` | `0x3D` (61) | ✓ |
+
+ASM `case 0` (`asm_cs0b_780440_…` không liên quan; xem
+`asm_bytemap_77f474.asm.txt`): `MOV EDX,0x78a834` ⇒ **`0x78A834` là payload của case 0** ✓
+
+### 0.1.3 ✅ §10.1 — vùng pump `0x514C62..0x516108` ĐÃ SCAN
+
+`SCAN 0x00514C62 0x00516108` (5 286 B) chạy xong. **Hai call-site đã có body:**
+
+| Call-site | File |
+|---|---|
+| `0x005157E6` → `CY_DelSedQueue` | `005157e6_FUN_005157e6.{c,asm.txt}` ✅ |
+| `0x005157EE` → `CY_DelRevQueue` | `005157ee_FUN_005157ee.{c,asm.txt}` ✅ |
+
+⇒ **§5.2 UNDETERMINED #1 (hàm sở hữu send/recv pump) — nay có ASM để đọc.**
+Việc này là **đọc file**, không cần redump thêm.
+
+### 0.1.4 ✅ `TAbstractSocket.Open` đã có body
+
+`§5.4` cần call-site đầy đủ của `CALL 0x0046C6B0` (`0x0046C6B0`).
+⇒ `0046c6b0_TAbstractSocket.Open.{c,asm.txt}` **nay tồn tại** (HOLE
+`0x0046C6A3..0x0046C7B0` = 269 B trước đây).
+
+### 0.1.5 ❌ `0x0050F4CE` — KHÔNG phải thiếu sót, VÀ SAI MỤC TIÊU
+
+```
+L369 FUNC 0x0050F4CE NO_FUNCTION (needs manual boundaries / disassembly in CodeBrowser)
+```
+
+**Hai kết luận, đều đã kiểm chứng:**
+
+**1) `FUNC` fail vì `0x0050F4CE` nằm *giữa* một function đã tồn tại** — không phải
+vì thiếu ranh giới:
+
+| Function | Entry | Span | Chứa `0x50F4CE`? |
+|---|---|---|:-:|
+| `TForm1.Transition` | `0x0050F4AC` | `0x0050F4AC..0x0050F4DF` (52 B) | ✅ **+34 B vào** |
+| `FUN_0050F2F8` | `0x0050F2F8` | `0x0050F2F8..0x0050F639` (834 B) | ✅ |
+| `FUN_0050DEBC` | `0x0050DEBC` | `0x0050DEBC..0x0051161D` (14 178 B) | ✅ |
+
+⇒ Ghidra không tạo được function mới vì đã có function bao trùm. **Đây là hành vi
+đúng, không phải lỗi.** (`REDUMP_ROUND4_RESULTS.md §8.2` trước đây ghi *"0x50F4CE là
+điểm kết thúc của TForm1.Transition"* — **SAI**, nó là **giữa**.)
+
+**2) Nhưng mục tiêu đặt ra hoàn toàn SAI.** Đọc `0050f4ac_TForm1.Transition.c` cho thấy
+đây là **máy trạng thái hiệu ứng chuyển cảnh màn hình**, không liên quan gì tới socket:
+
+* `switch (*(byte *)(param_1 + 0x450))` — `case 1 .. 0xE`
+* `TForm1.CopyBufToStillBuf`, `TForm1.CopyBufToGridBuf`, `TForm1.freeGridBuf`
+* `DAT_009264F8 = _GetMem(960000)` — buffer 960 000 B
+* `rodraw2.ro_Reduce_Blt`, `rodraw2.ro_Clipper_Blt`, `rodraw2.ro_Normal_Blt`
+* vòng lặp raster `for (uStack_c = 0; uStack_c < 0x14; …)` × `for (uStack_10 = 0; uStack_10 < 0xF; …)`
+  = **20 × 15 ô**, fade dần theo byte `+0x441`
+
+⇒ **Không có timer, không có `SetTimer`, không có socket.** `0x50F4CE` là **target sai**
+do Round-4 manifest tự đặt ra. **Xoá khỏi danh sách việc.**
+
+**3) Hướng đúng cho §5.2:** hai call-site thật của `TForm1.Transition` là `0x00515889`
+và `0x00515DB2` — **cả hai đều nằm trong cửa sổ `SCAN 0x00514C62..0x00516108`** đã chạy ở
+Round-4. Đó là vùng code *thật sự* liên quan tới vòng lặp sự kiện.
+⇒ Việc còn lại là **đọc** `functions/005157e6_*.c` (đã có) và truy ngược xem ai gọi
+`CY_DelSedQueue` / `CY_DelRevQueue` theo chu kỳ — **không cần disassemble thêm 27 KB**.
+
+### 0.1.6 ⚠️ §10.6-10.7 — 2 literal `0x796D38` / `0x796D10` đã dump
+
+`lit_796d10_796d78.hex` đã dump (`0x00796D10..0x00796D78`). Dùng
+`tools_decode_literals.py` để đóng §10.7.
+
+### 0.1.7 🟠 BLOCKER — memory ngoài `0x7DA800`
+
+Toàn bộ địa chỉ ≥ `0x7DA800` **không đọc được** (biên đo từ
+`table_7da6dc_101DWORD.hex`: `0x7DA6DC` + 292 B = `0x7DA7FF`).
+Bị chặn: `0x94B440` (cây kỹ năng 765 B), `0x9AE128` (bảng `skillId→index`),
+`0x9D1610`. Xem `light_dark_skill_unlock_gap.md §0.1.3`.
+
+> Hệ quả: §5.2 kết luận *"không có magic interval 30000/60000 trong binary"* **vẫn
+> đúng**, vì phần code đã dump nằm trong `.text` (`< 0x7DA800`) — nhưng nếu timer
+> nằm trong vùng data không map thì chưa thể loại trừ tuyệt đối.
+
+### 0.1.8 ✅ Đã sửa `tools_decode_literals.py` — giờ đọc được literal của Round-4
+
+**Tình huống:** nhiều mục ở `§0.1.1-0.1.8` bảo *"dùng `tools_decode_literals.py` để giải
+VISCII"*, nhưng khi chạy trên `0x78A818..0x78A8ED` nó trả về **rỗng**.
+
+**Nguyên nhân:** script chỉ glob `ts_dream/client_pseudo_c/lit_*.hex` (238 file, corpus
+gốc) mà **bỏ qua** `test/ts_decompile/redump/lit_*.hex` (313 file, trong đó có **75 file
+chỉ tồn tại ở corpus mới**: `lit_78A854`, `lit_796f*`, `lit_7980*`, `lit_799*`, …).
+
+**Đã sửa** — glob cả hai thư mục, ưu tiên corpus mới khi trùng tên.
+Kết quả ngay:
+
+```console
+$ python3 tools_decode_literals.py 78a818 78a8ed
+### range 0x0078A818..0x0078A8ED
+--- Delphi AnsiString consts (FF FF FF FF | len:4 | bytes | 00) ---
+0x0078A864 len=  8  12345678
+```
+
+**Kiểm chứng chéo an toàn:** 238 literal trùng tên giữa hai corpus được so sánh
+byte-for-byte — **100% giống nhau** (mọi khác biệt `diff` thuần là do ngắt dòng khác
+nhau, không phải nội dung). ⇒ hai corpus nhất quán, việc gộp là an toàn.
+
+> ⚠️ Bản `ROUND4_UPDATE_INDEX.md` đầu tiên ghi *"tool này hỏng vì thư mục đã đổi"* —
+> **SAI**. Thư mục `client_pseudo_c/` vẫn tồn tại và script vẫn chạy bình thường.
+> Vấn đề là **thiếu nguồn**, không phải hỏng.
+
+### 0.1.9 ⚪ Vẫn UNDETERMINED (cần runtime / traffic)
+
+| # | Mục | § |
+|:-:|---|---|
+| 1 | interval thật của send+recv pump | §10.1 — **đã có ASM** trong `functions/005157e6_*`; cần **đọc**, không cần redump. ~~`0x50F4CE` là target sai — xem §0.1.5~~ |
+| 2 | điều kiện sub-opcode kích hoạt `FUN_00509E84` | §10.2 |
+| 3 | ý nghĩa server-side `0x2E 01` | §10.3 |
+| 4 | `ClientSocket1Error` | §10.4 |
+| 5 | layout `0x2E 01` chi tiết (`FUN_00504CE4`) | §10.5 — ✅ đã có body |
+| 6 | 2 literal `0x796D38` / `0x796D10` | §10.6-10.7 — ✅ đã dump hex |
+
 ## 1. Kết Luận Quan Trọng Nhất (Đọc Trước)
 
 | # | Kết luận | Mức bằng chứng |

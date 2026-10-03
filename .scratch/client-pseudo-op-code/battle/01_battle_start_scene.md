@@ -27,6 +27,67 @@ Source Rust đối chiếu: `src/battle/packets.rs`, `src/battle/construction.rs
 
 ---
 
+> **🔴 CẬP NHẬT 2026-10-02 (Round-4 redump) — Gap #4 SAI. Xem §0.1**
+
+---
+
+## 0.1 🔴 ĐÍNH CHÍNH SAU ROUND-4 REDUMP
+
+### 0.1.1 ❌ Gap #4 (`§639-642, §646, §706`) — **`FUN_0064DFA4` ĐÃ CÓ BODY**
+
+> §639-642: *"14 handler `0x35` … chỉ `FUN_0064cfec` có body và **11 hàm còn lại chưa có body**"*
+> §646: *"`FUN_0064dfa4` **không có body** trong `client_pseudo_c/`"*
+
+**SAI.** Đối chiếu `ts_decompile/index.csv` (13 176 function): **cả 14 handler `0x35`
+đều có `.c` + `.asm.txt`**, gồm:
+
+```
+0064cd74 0064cfec 0064d128 0064dfa4 0064e064 0064e3e0 0064e8f4
+0064f9f0 0074789c 0075c518 0064faa8 0076a944 0064fbd8 0064fd34
+```
+
+Tài liệu còn **tự đếm sai**: bảng liệt kê 14 dòng nhưng lại viết "11 hàm còn lại"
+(thực ra là 13 dòng còn lại sau `FUN_0064cfec`).
+
+⇒ **`35 05` (`acting()`) layout `[row][col]` nay đọc được trực tiếp** từ
+`0064dfa4_FUN_0064dfa4.asm.txt`. Gap #4 **đóng**; đây là việc đọc, không cần redump.
+
+### 0.1.2 ✅ `LAB_00644A18` (Gap G11 của `battle/04`) đã có body
+
+`00644a18_*.{c,asm.txt}` tồn tại.
+
+### 0.1.3 ⭐ Tập sub `0x0B` — xác nhận đầy đủ
+
+Round-4 đã dump bảng dispatch `0x780440` + builder `0x78048D..0x7807D0`.
+Chi tiết ở `battle/03_skill_and_combo.md §0.1`.
+
+Điểm liên quan `§706` (Gap #1, kind byte) và `battle/05:373`:
+
+| Sub | Payload sau `[0B][sub]` | Tổng |
+|:-:|---|--:|
+| `0`,`1` | `[b:1]` | 2 B |
+| **`2`** | `[b:1]`(`TFightManage+0x24`) + `u32LE`(`+0x1E`) + `u16LE`(`+0x22`) | **9 B** |
+| `3`,`4` | `u32LE` + `u16LE` | 7 B |
+| `5` | **KHÔNG GỬI** (no-op) | — |
+| `6` | `[0B][06]` không body | 2 B |
+| `7`,`8`,`9`,`0x0A`,`0xFA` | xem `battle/03 §1.1(b)` | |
+
+### 0.1.4 ⚠️ Gap #9 (toast `0B 03`) — 4 literal đã dump hex
+
+> §711: *"`DAT_00644C7C/AC/F0/14` không có hex dump trong `client_pseudo_c/`"*
+
+✅ Đã dump: `lit_644cac.hex`, `lit_644cfc.hex`, `lit_644cf0.hex`, `lit_644d14.hex`
+(`lit_644c7c.hex` đã có từ trước). Dùng `tools_decode_literals.py` để giải VISCII.
+
+### 0.1.5 Còn lại — chưa đóng
+
+| Gap | Nội dung | Trạng thái |
+|:-:|---|---|
+| #1 (CAO) | kind byte record `0B FA` | ❓ **vẫn cần capture** — round-trip không thay được traffic thật |
+| #2, #6, #7, #8 | xem bảng gốc | ❓ chưa đóng |
+| #5 | `33 01` vs `0B 08` | ❓ vẫn cần capture |
+| #10 | `TFightField.Create` | ⚠️ **đã có body** — xem `battle/02 §0.1` |
+
 ## §0. Tổng quan timeline mở trận
 
 ```

@@ -18,6 +18,75 @@
 
 ---
 
+> **🔴 CẬP NHẬT 2026-10-02 (Round-4 redump) — Gap #3 ĐÃ ĐÓNG. Xem §0.1**
+
+---
+
+## 0.1 🔴 ROUND-4 REDUMP — `TFightField.Create` ĐÃ CÓ BODY
+
+### 0.1.1 Gap #3 đóng
+
+> §76-77, §158, §737: *"`TFightField.Create` @ `0x0063FADC` — **không có body** trong export"*
+> *"HOLE `0x0063F9F3 … 0x00640984` (3 985 B)"*
+
+**ĐÃ ĐÓNG.** `ts_decompile/functions/0063fadc_TFightField.Create.{c,asm.txt}` tồn tại
+(670 dòng ASM). Ghidra đã tạo function trong lần redump này.
+
+### 0.1.2 ⭐ Hằng số lưới — công thức pixel MỘT PHẦN đã lộ
+
+Đọc prologue constructor (`0063fadc_TFightField.Create.asm.txt:33-56`):
+
+| Offset | Lệnh | Ý nghĩa |
+|:-:|---|---|
+| `+0x08` | `MOV dword ptr [EAX+0x8], 0x340` | **832** = bề rộng canvas |
+| `+0x0C` | `MOV dword ptr [EAX+0xc], 0x280` | **640** = chiều cao canvas |
+| `+0x10` | `MOV dword ptr [EAX+0x10], EDX` | tham số (mode) |
+| `+0x14` | `MOV dword ptr [EAX+0x14], EDX` | tham số |
+| `+0x2C` | `MOV byte ptr [EAX+0x2c], 0x1` | cờ |
+| `+0x30` | `MOV dword ptr [EAX+0x30], 0x154` | **340** = bề rộng 1 ô |
+| `+0x34` | `MOV dword ptr [EAX+0x34], 0xb4` | **180** = chiều cao 1 ô |
+| `+0x38` | `MOV dword ptr [EAX+0x38], 0x2` | **2** |
+| `+0x3C` | `MOV dword ptr [EAX+0x3c], 0x5` | **5** |
+| `+0xE59` | `MOV byte ptr [EDX+0xe59], AL` | copy tham số byte |
+| `+0xE5B` | `MOV byte ptr [EAX+0xe5b], 0xff` | sentinel |
+
+**Bộ hằng lưới: canvas `832 × 640`, ô `340 × 180`, mặc định `2 × 5`.**
+(832 = `0x340`, 640 = `0x280`, 340 = `0x154`, 180 = `0xB4`.)
+
+⚠️ **Lưu ý trùng tên:** `0x340` vừa là giá trị ở `+0x08` vừa là hằng tại `+0x30` —
+đây là **nghịch lý giữa kích thước lưu trữ và giá trị**, cần đọc kỹ `.c` khi viết code.
+
+### 0.1.3 ❌ Chưa thu hồi đầy đủ — công thức `cell.X` / `cell.Y`
+
+Constructor **cấp phát và khởi tạo**, nhưng **không** chứa phép `IDIV` tính
+`cell.X`/`cell.Y`. Trong 670 dòng ASM chỉ có **một** `IDIV`, và nó không liên quan lưới:
+
+```asm
+0074035d: MOV ECX, 0x6
+00740362: CDQ
+00740363: IDIV ECX            ; toa do / 6  —  KHONG phai luoi tran
+```
+
+⇒ **Công thức ánh xạ pixel → ô vẫn chưa recover.** Việc này **không chặn** mock server
+(server không gửi pixel) nhưng vẫn chặn việc dựng lại lưới bằng toạ độ ngoài client thật.
+`VMT_63CC84_TFightField` cũng đã được resolve (xem `ts_decompile/redump/round3_report.txt`,
+mục `VMT`) — các method ảo sẽ chỉ ra chỗ tính toạ độ.
+
+### 0.1.4 Đối chiếu các gap khác
+
+| Gap | Nội dung | Trạng thái Round-4 |
+|:-:|---|---|
+| #1 | không có frame `35 07` (move cell) | ❓ **vẫn mở** — cần capture hoặc tìm call-site |
+| #3 | `TFightField.Create` | ✅ **đóng** (§0.1.1) |
+| #8 | FX ids `FUN_0066BF0C`… | ⚠️ ASM `0x0066BF0C..0x0066C258` đã dump (844 B / 100%) |
+| — | `FUN_00654590` | ✅ **đã có body từ trước** — `battle/03:512` sai (xem `battle/03 §0.1.7`) |
+
+### 0.1.5 ✅ Xác nhận `0x0B` sub 8 = **8 byte** (khác sub 2 = 9 byte)
+
+`battle/03 §0.1.3` chứng minh sub `2` dùng `FUN_0077EB1C` (u16 → **2 byte** cho
+`TFightManage+0x22`) còn sub `8` dùng `@LStrFromChar` (→ **1 byte**).
+⇒ `battle.rs:35-46` (`handle_battle` sub 8) đọc `payload[1..5]` là đúng.
+
 ## §0. Sơ đồ: client render grid từ data nào
 
 ```
