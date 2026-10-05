@@ -73,3 +73,27 @@
   OP_ASTROLABE        = $4E; // [0x4E] Astrolabe (Hệ thống Tinh Đồ / Chiêm Tinh Tướng Tinh)
   OP_GM_ANNOUNCE      = $C7; // [0xC7] GmAnnounce — GM chat announce (S->C, C->S không tồn tại)
 ```
+
+
+Đếm lại Logined1 (petless, questless):
+1. F44402001408 (login_start0)
+2. F4440300142100 (login_start1)
+3. 03 player_appear
+4. 05 03 stats
+5. 21 02 PK
+6. 17 05 homdo
+7. 1E 01 tientrang
+8. 17 2F tuideo
+9. 17 66 luulang
+10. 17 0B trangbi
+11. 1A 04 gold
+12. 27 09 server_name
+13. 05 04 + 0F 0A (GỘP 1 element)
+14. 0B 0B
+15. 1F 0F
+16. 02 0B time banner
+17. 02 0B welcome banner
+18. 28 01 hotkeys
+19. 23 04 god
+20. 23 04 hp_store
+21. 23 04 sp_store
