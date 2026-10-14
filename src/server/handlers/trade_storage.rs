@@ -171,8 +171,10 @@ fn pet_trade_settle(a: &mut Session, b: &mut Session) -> Result<(), &'static str
 }
 
 fn add_storage_item(storage: &mut Vec<InventoryItem>, mut item: InventoryItem) -> bool {
-    let Some(slot) = (1..=50).find(|slot| !storage.iter().any(|i| i.slot == *slot && i.id > 0))
-    else {
+    let Some(slot) = crate::server::inventory::free_slot_in(
+        storage,
+        crate::db::modern::model::StorageType::Bank.capacity(),
+    ) else {
         return false;
     };
     item.slot = slot;

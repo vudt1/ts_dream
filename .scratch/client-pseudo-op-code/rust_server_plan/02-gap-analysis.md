@@ -10,18 +10,18 @@
 | # | Hạng mục | Mức | Rust hiện tại | Chuẩn | Phase |
 |:-:|---|:-:|---|---|:-:|
 | G-01 | `17 0B` stride | 🔴 P0 | 12B + byte slot | **10B, không slot** | 2 |
-| G-02 | `17 66` layout | 🔴 P0 | giả định 12B | **không rõ** | 2 |
+| G-02 | `17 66` layout & size | 🔴 P0 | giả định 12B (25 ô) | **10 ô (`1..=10`), 12B có slot** (`FUN_0076a320`) | 2 |
 | G-03 | `load_items` cột DB | 🔴 P0 | 4/22 cột | 22 cột | 3 |
 | G-04 | `save` cột DB | 🔴 P0 | 6/22 cột | 22 cột | 3 |
 | G-05 | `recompute_stats` khi load | 🟠 P1 | không gọi | phải gọi | 3 |
-| G-06 | `08 01` prop codes | 🟠 P1 | lệch ngữ nghĩa | theo `TSConstants` | 2 |
-| G-07 | `05 03` tail | 🟠 P1 | `F401`×5 + 90 zero | `0x01F4`×5 + 43 zero + 32B | 2 |
-| G-08 | `1E 01` clear state | 🟠 P1 | không | `1E 08` | 2 |
-| G-09 | Sức chứa theo container | 🟠 P1 | `HOMDO_SLOTS=25` mọi nơi | 25/50/6 theo loại | 1 |
+| G-06 | `08 01` prop codes | 🟠 P1 | lệch ngữ nghĩa | chuẩn decompile `FUN_0078d125`/`FUN_00710ab0` | 2 |
+| G-07 | `05 03` tail | 🟠 P1 | `F401`×5 + 90 zero | `F401`×5 + **43 zero** + skill 3B (không block 32B) | 2 |
+| G-08 | `1E 01` clear state | 🟠 P1 | không | gửi `1E 08` trước khi dump | 2 |
+| G-09 | Sức chứa theo container | 🟠 P1 | `HOMDO_SLOTS=25` mọi nơi | 25 (homdo, tuideo), 50 (tientrang), **10 (luulang)**, 6 (trangbi) | 1 |
 | G-10 | Move/stack không persist | 🟠 P1 | không ghi DB | upsert | 3 |
-| G-11 | `17 1E` stall payload | 🟠 P1 | `le32(price)` | cần xác minh | 2 |
+| G-11 | `17 1E` stall payload | 🟠 P1 | `le32(price)` | đã xác minh: đúng `price: dword` | 2 |
 | G-12 | `17 20` stall uid lệch 1B | 🟠 P1 | thiếu padding | cần xác minh | 2 |
-| G-13 | `tuideo` không có handler | 🟡 P2 | `1706` lặp, không `172F` | `17 2F`/`17 31` | 4 |
+| G-13 | `tuideo` không có handler | 🟡 P2 | `1706` lặp, không `172F` | `17 2F` (dump), `17 30` (update), `17 31` (clear) | 4 |
 | G-14 | `pet_equip` không gắn item | 🟡 P2 | chỉ trừ homdo | ghi vào `trangbi` pet | 4 |
 | G-15 | Nhân bản mapping `storagetype` | 🟡 P2 | 6 nơi | 1 nguồn | 1 |
 | G-16 | `ThingData` 35B không dùng | 🟡 P2 | code chết | bỏ hoặc dùng | 3 |
@@ -145,7 +145,7 @@ pub fn dump_trangbi(&self) -> String {
 
 ---
 
-## 3. G-02 — `17 66` không có bằng chứng (P0)
+## 3. G-02 — `17 66` Đã giải mã: Kho xe/ngựa 10 ô, 12B stride (P0 — ĐÃ ĐÓNG)
 
 ### Hiện trạng
 
@@ -158,31 +158,27 @@ pub fn dump_luulang(&self) -> String {
 ```
 Được đẩy **mỗi lần login** tại `spawn.rs:555`.
 
-### Bằng chứng (không)
+### Bằng chứng giải mã từ `aLogin.exe`
 
 | Nguồn | Kết quả |
 |---|---|
-| `[C]` call-site | `0x00790D18: CALL 0x0076A320` — **có**, nhưng body `FUN_0076A320` không có trong dump |
-| `[C]` layout | ❌ không xác định được |
-| `[B]` Bear | ❌ Bear **không gửi** `17 66` ở bất kỳ đâu (đã grep toàn bộ 65 call-site `PacketCreator(23,n)`) |
-| `[D]` tài liệu | `post_login_stats_inventory_flow.md:213-214` ghi rõ *"layout client chưa được tách riêng"* |
+| `[C-verified]` Handler | `FUN_0076A320` (`0x0076A320`), gọi từ dispatcher `case 0x66` (`007902fb.c:523`) |
+| `[C-verified]` Mảng đích | `**player + 0xF74 + slot*4` — kho hàng xe/ngựa liên kết `form_Horse` (`0x0062F6FC`) |
+| `[C-verified]` Sức chứa | **Đúng 10 ô (`1..=10`)**; `if (10 < uVar8) _BoundErr` (`0076a320.c:185`) |
+| `[C-verified]` Layout | **12 bytes có byte slot** (`(Len - 1) / 12` tại `0076a320.c:81`) |
+| `[C-verified]` Clear pass | ❌ Không có clear pass tự động; xóa lẻ qua `17 68`, cập nhật lẻ qua `17 67` |
 
-### Rủi ro
+### Khoảng cách & Đánh giá
 
-Nếu `17 66` thực sự là container 51/26 ô với record 12B → layout Rust đúng. Nếu là format khác
-(10B như `17 0B`, hoặc record không có slot) → **mọi record lệch**, và client có thể hiển thị
-vật phẩm ở ô sai (không chỉ "không hiển thị").
+Rust hiện tại serialize đúng layout 12 bytes (`dump_table`), **nhưng sai về sức chứa**:
+Rust áp dụng `HOMDO_SLOTS=25` cho cả `luulang`. Nếu tài khoản có >10 ô lưu lãng, client sẽ văng lỗi `_BoundErr`.
 
-### Khuyến nghị
+### Cách sửa
 
-| Bước | Hành động |
-|---|---|
-| 1 | **Tạm dừng gửi `17 66`** trong Logined1 (feature flag) — gửi layout sai còn nguy hiểm hơn không gửi |
-| 2 | Capture `aLogin.exe` với `luulang` có dữ liệu → xác định layout thật |
-| 3 | Nếu xác nhận 12B → bật lại, đóng gap |
-| 4 | Nếu không xác nhận được → đổi mapping: dùng `1E 09` (51 ô, 12B, **đã có body**) cho chức năng lưu lãng, bỏ hẳn `17 66` |
-
-Xem `05-phased-roadmap.md` §3.2 cho quyết định nhánh.
+1. Giới hạn sức chứa của container `luulang` ở mức **10 ô** (`1..=10`).
+2. Giữ nguyên format 12 byte hiện tại của `dump_table`.
+3. Bổ sung handler xóa lẻ `17 68` (`[17][68][slot: 1B]`) và cập nhật lẻ `17 67`.
+4. Không cần tạm dừng gửi `17 66`, chỉ cần clamp `slots <= 10`. Gap G-02 chính thức được đóng.
 
 ---
 
@@ -424,9 +420,7 @@ Rồi burst equip gửi **10 frame** thay vì 8:
 `0x19`(hp) `0x1A`(sp) `0xD7`(hp_max) `0xD8`(sp_max) `0xCF`(hp2) `0xD0`(sp2) `0xD2`(atk2)
 `0xD3`(def2) `0xD4`(mag2) `0xD6`(agi2) `0xDA`(hpx2) `0xDB`(spx2) — thực ra 12 frame.
 
-⚠️ **Rủi ro:** bảng trên lấy từ Bear, **chưa** xác minh bằng client parser `08 01` S→C
-(`case 009` → `FUN_0078D125` chưa có body). Cần capture trước khi ship. Xem
-`06-tests-and-capture.md` §3.
+✅ **Đã xác minh client:** Bảng trên đã được đối chiếu khớp hoàn toàn với client parser `FUN_0078D125` (`case 9`) và stat setter `FUN_00710AB0` trong `client_pseudo_c/0078d125_FUN_0078d125.c` và tài liệu `opcode_08.md`. G-06 đã có bằng chứng byte-exact.
 
 ---
 
@@ -465,21 +459,24 @@ packetCreator.add16(sp4); ... (8 field)
 
 ### Khoảng cách
 
-| Phần | Rust | Bear | Ghi chú |
+| Phần | Rust | Bear | Chuẩn Client `aLogin.exe` (`FUN_0072E9A0`) |
 |---|---|---|---|
-| Header 5×u16 | `F401`×5 = 500×5 | `500`×5 | ✅ **khớp** (`F401` là LE của 0x01F4) |
-| Zero padding | **90 byte** | **43 byte** | ❌ lệch 47 byte |
-| Skill list | ✅ `le16(id) + u8(lv)` | ✅ tương đương | ✅ |
-| Block `_3` (16B) | ❌ thiếu | ✅ có | ❌ |
-| Block `_4` (16B) | ❌ thiếu | ✅ có | ❌ |
+| Header 5×u16 | `F401`×5 = 500×5 | `500`×5 | ✅ **khớp** (`F401` là LE của 0x01F4, offset `0x3C..0x45`) |
+| Zero padding | **90 byte** | **43 byte** | ✅ **ĐÚNG 43 BYTE** (offset `0x46..0x70`, bytes 70..112) |
+| Skill list | `le16(id) + u8(lv)` | tương đương | ✅ Bắt đầu tại byte 113 (`0x71`), mỗi skill 3B |
+| Block `_3` & `_4` (32B) | không có | 32 byte | ❌ **Client KHÔNG đọc**; đọc hết buffer là return UI |
 
-⚠️ Đính chính: `post_login_stats_inventory_flow.md:270` ghi Bear dùng "`500`×5" — đúng, và Rust
-ghi `F401` cũng là 500 LE. **Vấn đề chỉ nằm ở 43 vs 90 zero và 32 byte block thiếu.**
+**Hậu quả của 90 zero trong Rust:**
+Header cố định của client kết thúc ở byte 112. Việc Rust gửi 90 byte zero (thay vì 43 byte) khiến client bắt đầu vòng lặp skill ngay giữa 47 byte 0 thừa:
+$$47 \div 3 = 15\text{ skills rỗng } (\text{dư } 2\text{ bytes})$$
+2 byte dư làm **lệch dòng byte (off-by-two) của toàn bộ skill thực sự** phía sau!
 
-**Nếu client đọc fixed-offset**: sau skill list, Rust gửi 90 zero → client đọc block `_3` từ
-offset sai ⇒ 8 số HP3/SP3 sai. Nếu client đọc "tới hết buffer" → vô hại.
-
-⚠️ **Cần capture** để biết client parse thế nào. Xem `06-tests-and-capture.md` §2.
+**Cách sửa (ĐÃ ĐÓNG G-07):**
+Trong `src/server/spawn.rs:183`, sửa:
+```rust
+body.push_str(&"00".repeat(43)); // 43 zero bytes, KHÔNG phải 90
+```
+Không thêm 32 byte block `_3`/`_4`. Skill list nối ngay sau 43 zero bytes. G-07 được đóng trọn vẹn.
 
 ---
 

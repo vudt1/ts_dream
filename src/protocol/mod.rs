@@ -10,6 +10,9 @@ pub const XOR_KEY: u8 = 0xAD;
 /// Frame header magic `F4 44`.
 pub const HEADER_TS_MAGIC: [u8; 2] = [0xF4, 0x44];
 
+/// Frame header magic hex string `F444`.
+pub const TS_MAGIC_HEADER: &str = "F444";
+
 /// Minimum client version (§2.3.2). Below this the connection is shut down.
 pub const MIN_VERSION: u16 = 186;
 
@@ -21,6 +24,26 @@ pub const SERVER_NAME: &str = "TSVN";
 
 /// Maximum level.
 pub const MAX_LEVEL: i64 = 200;
+
+// Canonical hex string opcodes for Logined1 and storage containers
+pub const OPCODE_APPEAR: &str = "03";
+pub const OPCODE_STATS: &str = "0503";
+pub const OPCODE_PET_STATS: &str = "0F08";
+pub const OPCODE_PET_SLOTS: &str = "0F14";
+pub const OPCODE_PET_SUMMON: &str = "1301";
+pub const OPCODE_END_TALK: &str = "1408";
+pub const OPCODE_TALK_MARKER: &str = "1421";
+pub const OPCODE_HOMDO: &str = "1705";
+pub const OPCODE_TRANGBI: &str = "170B";
+pub const OPCODE_TUIDEO: &str = "172F";
+pub const OPCODE_LUULANG: &str = "1766";
+pub const OPCODE_GOLD: &str = "1A04";
+pub const OPCODE_TIENTRANG: &str = "1E01";
+pub const OPCODE_TIENTRANG_CLEAR: &str = "1E08";
+pub const OPCODE_PK_WAR: &str = "2102";
+pub const OPCODE_STORE: &str = "2304";
+pub const OPCODE_SERVER_NAME: &str = "2709";
+pub const OPCODE_HOTKEYS: &str = "2801";
 
 // ============================================================================
 // Server Main Opcodes
@@ -410,5 +433,5 @@ pub use writer::PacketWriter;
 /// so the seam between business logic and wire format stays in one module.
 pub fn frame(code: &str, body: &str) -> String {
     let total_len = (code.len() + body.len()) / 2;
-    format!("F444{}{code}{body}", encoder::le16(total_len as u16))
+    format!("{TS_MAGIC_HEADER}{}{code}{body}", encoder::le16(total_len as u16))
 }

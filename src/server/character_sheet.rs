@@ -30,7 +30,7 @@ impl GearBonuses {
     pub fn from_gear(trangbi: &[InventoryItem], player_element: u8) -> Self {
         let mut b = GearBonuses::default();
         for item in trangbi {
-            if item.id == 0 {
+            if item.id == 0 || !(1..=6).contains(&item.slot) {
                 continue;
             }
             b.int2 += item.int1.max(0) as u32 + item.int2.max(0) as u32;

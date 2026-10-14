@@ -4,9 +4,9 @@
 //! Network/account ids remain in `Session.id`; the normalized database primary
 //! key is carried by `Session.db_character_id`.
 
-use crate::db::modern::model::PetStorageType;
+use crate::db::modern::model::{PetStorageType, StorageType};
 use crate::db::pool::DbPool;
-use crate::server::session::{InventoryItem, PetState, Session};
+use crate::server::session::{HotkeySlot, InventoryItem, PetState, Session};
 use sqlx::Row;
 
 pub struct SqliteSessionRepository<'a> {
@@ -22,6 +22,7 @@ impl SqliteSessionRepository<'_> {
                     c.rebornstage AS reborn, c.curhp AS hp, c.maxhp AS hp_max, c.cursp AS sp, c.maxsp AS sp_max,
                     c.freepoints AS stat_point, c.skillpoint AS skill_point, c.baseint AS int_attr,
                     c.baseatk AS atk, c.basedef AS def, c.basehpx AS hpx, basespx AS spx, c.baseagi AS agi,
+                    c.reputation,
                     c.mapid AS map_id, c.mapx AS map_x, c.mapy AS map_y,
                     c.pk, c.curexp AS texp,
                     COALESCE(m.gold, 0) AS gold, COALESCE(m.bankgold, 0) AS bank_gold,
@@ -59,6 +60,7 @@ impl SqliteSessionRepository<'_> {
         session.hpx = clamp_u16(row.get("hpx"));
         session.spx = clamp_u16(row.get("spx"));
         session.agi = clamp_u16(row.get("agi"));
+        session.tiengtam = clamp_u16(row.get("reputation"));
         session.map_id = clamp_u16(row.get("map_id"));
         session.map_x = clamp_u16(row.get("map_x"));
         session.map_y = clamp_u16(row.get("map_y"));
@@ -69,11 +71,11 @@ impl SqliteSessionRepository<'_> {
         session.shop_point = row.get::<i64, _>("shop_point") as u32;
         session.newbie = row.get::<i64, _>("newbie") as u32;
 
-        session.homdo = self.load_items(session.db_character_id, 1).await?;
-        session.tientrang = self.load_items(session.db_character_id, 2).await?;
-        session.tuideo = self.load_items(session.db_character_id, 4).await?;
-        session.trangbi = self.load_items(session.db_character_id, 8).await?;
-        session.luulang = self.load_items(session.db_character_id, 16).await?;
+        session.homdo = self.load_items(session.db_character_id, StorageType::Bag).await?;
+        session.tientrang = self.load_items(session.db_character_id, StorageType::Bank).await?;
+        session.tuideo = self.load_items(session.db_character_id, StorageType::Secondary).await?;
+        session.trangbi = self.load_items(session.db_character_id, StorageType::Equip).await?;
+        session.luulang = self.load_items(session.db_character_id, StorageType::Warehouse).await?;
         session.active_pet_stt = 0;
         session.pets = self
             .load_pets(session.db_character_id, &mut session.active_pet_stt)
@@ -87,16 +89,24 @@ impl SqliteSessionRepository<'_> {
         .into_iter()
         .map(|r| (clamp_u16(r.get("skill_id")), clamp_u8(r.get("level"))))
         .collect();
-        session.hotkeys = [0; 11];
+        session.hotkeys = [HotkeySlot::empty(); 11];
         for row in
-            sqlx::query("SELECT slot, skillid AS skill_id FROM character_hotkeys WHERE playerid = ?")
+            sqlx::query("SELECT slot, kind, skillid AS skill_id FROM character_hotkeys WHERE playerid = ?")
                 .bind(session.db_character_id)
                 .fetch_all(&self.pool.read)
                 .await?
         {
             let slot = row.get::<i64, _>("slot");
             if (1..=10).contains(&slot) {
-                session.hotkeys[slot as usize] = clamp_u16(row.get("skill_id"));
+                let skill_id = clamp_u16(row.get("skill_id"));
+                let mut kind = clamp_u8(row.get("kind"));
+                if kind == 0 && skill_id > 0 {
+                    kind = 2;
+                }
+                session.hotkeys[slot as usize] = HotkeySlot {
+                    kind,
+                    id: skill_id,
+                };
             }
         }
         // CP6: quest-log / Eve state is best-effort — a database whose
@@ -173,19 +183,20 @@ impl SqliteSessionRepository<'_> {
         Ok(())
     }
 
-    async fn load_items(
+    pub async fn load_items(
         &self,
         character_id: i64,
-        storage_type: u8,
+        storage: StorageType,
     ) -> Result<Vec<InventoryItem>, sqlx::Error> {
-        let rows = sqlx::query(
-            "SELECT slot, itemid AS item_id, quantity, damage
-             FROM inventories WHERE playerid = ? AND storagetype = ? AND itemid > 0 ORDER BY slot",
-        )
-        .bind(character_id)
-        .bind(storage_type)
-        .fetch_all(&self.pool.read)
-        .await?;
+        let sql = format!(
+            "SELECT {} FROM inventories WHERE playerid = ? AND storagetype = ? AND itemid > 0 ORDER BY slot",
+            crate::db::modern::sqlite::inventories::SELECT_COLUMNS
+        );
+        let rows = sqlx::query(&sql)
+            .bind(character_id)
+            .bind(storage.value())
+            .fetch_all(&self.pool.read)
+            .await?;
         Ok(rows
             .into_iter()
             .map(|r| InventoryItem {
@@ -193,6 +204,10 @@ impl SqliteSessionRepository<'_> {
                 id: clamp_u16(r.get("item_id")),
                 count: clamp_u8(r.get("quantity")),
                 doben: clamp_u8(r.get("damage")),
+                long_val: clamp_u8(r.get("element")),
+                giatri_long: clamp_u8(r.get("element_value")),
+                khang: clamp_u8(r.get("proof_kind")),
+                texp: r.get::<i64, _>("grow_exp") as u32,
                 ..Default::default()
             })
             .collect())
@@ -283,14 +298,14 @@ impl SqliteSessionRepository<'_> {
         let mut tx = self.pool.write.begin().await?;
         sqlx::query(
             "UPDATE characters SET level=?, jobtype=?, gender=?, hair=?, element=?, rebornstage=?, curhp=?, maxhp=?, cursp=?, maxsp=?,
-             freepoints=?, skillpoint=?, baseint=?, baseatk=?, basedef=?, basehpx=?, basespx=?, baseagi=?, mapid=?, mapx=?, mapy=?,
+             freepoints=?, skillpoint=?, baseint=?, baseatk=?, basedef=?, basehpx=?, basespx=?, baseagi=?, reputation=?, mapid=?, mapx=?, mapy=?,
              pk=?, curexp=?, newbie=? WHERE playerid=?",
         )
         .bind(i64::from(session.level)).bind(i64::from(session.job)).bind(i64::from(session.sex)).bind(i64::from(session.hair))
         .bind(i64::from(session.thuoctinh)).bind(i64::from(session.reborn)).bind(i64::from(session.hp)).bind(i64::from(session.hp_max))
         .bind(i64::from(session.sp)).bind(i64::from(session.sp_max)).bind(i64::from(session.point)).bind(i64::from(session.skill_point))
         .bind(i64::from(session.int1)).bind(i64::from(session.atk)).bind(i64::from(session.def)).bind(i64::from(session.hpx))
-        .bind(i64::from(session.spx)).bind(i64::from(session.agi)).bind(i64::from(session.map_id)).bind(i64::from(session.map_x))
+        .bind(i64::from(session.spx)).bind(i64::from(session.agi)).bind(i64::from(session.tiengtam)).bind(i64::from(session.map_id)).bind(i64::from(session.map_x))
         .bind(i64::from(session.map_y)).bind(i64::from(session.pk)).bind(i64::from(session.texp)).bind(i64::from(session.newbie))
         .bind(character_id).execute(&mut *tx).await?;
         sqlx::query("INSERT INTO character_money (playerid, gold, bankgold, shoppoint) VALUES (?, ?, ?, ?) ON CONFLICT(playerid) DO UPDATE SET gold=excluded.gold, bankgold=excluded.bankgold, shoppoint=excluded.shoppoint")
@@ -300,16 +315,39 @@ impl SqliteSessionRepository<'_> {
             .bind(character_id)
             .execute(&mut *tx)
             .await?;
-        for (storage, items) in [
-            (1u8, &session.homdo),
-            (2, &session.tientrang),
-            (4, &session.tuideo),
-            (8, &session.trangbi),
-            (16, &session.luulang),
-        ] {
+        let insert_inventory_sql = format!(
+            "INSERT INTO inventories ({}) VALUES ({})",
+            crate::db::modern::sqlite::inventories::INVENTORY_COLUMNS,
+            crate::db::modern::sqlite::inventories::inventory_placeholders(23),
+        );
+        for (storage, items) in session.containers() {
             for item in items.iter().filter(|i| i.id > 0) {
-                sqlx::query("INSERT INTO inventories (playerid, storagetype, slot, itemid, quantity, damage) VALUES (?, ?, ?, ?, ?, ?)")
-                    .bind(character_id).bind(storage).bind(i64::from(item.slot)).bind(i64::from(item.id)).bind(i64::from(item.count)).bind(i64::from(item.doben)).execute(&mut *tx).await?;
+                sqlx::query(&insert_inventory_sql)
+                    .bind(character_id)
+                    .bind(i64::from(storage.value()))
+                    .bind(i64::from(item.slot))
+                    .bind(i64::from(item.id))
+                    .bind(i64::from(item.count))
+                    .bind(i64::from(item.doben))
+                    .bind(i64::from(item.long_val))
+                    .bind(i64::from(item.giatri_long))
+                    .bind(i64::from(item.khang))
+                    .bind(0i64) // growlevel
+                    .bind(i64::from(item.texp))
+                    .bind(0i64) // specialkind
+                    .bind(0i64) // stoneattr
+                    .bind(0i64) // stonelevel
+                    .bind(0i64) // enhancelevel
+                    .bind(0.0f64) // deletetime
+                    .bind(0i64) // damageditemid
+                    .bind(0i64) // islocked
+                    .bind(0i64) // reinforced
+                    .bind(0i64) // affix1
+                    .bind(0i64) // affix2
+                    .bind(0i64) // affix3
+                    .bind(0i64) // stylelevel
+                    .execute(&mut *tx)
+                    .await?;
             }
         }
         sqlx::query("DELETE FROM character_pets WHERE playerid = ?")
@@ -343,15 +381,18 @@ impl SqliteSessionRepository<'_> {
             .bind(character_id)
             .execute(&mut *tx)
             .await?;
-        for (slot, skill) in session.hotkeys.iter().enumerate().skip(1) {
-            sqlx::query(
-                "INSERT INTO character_hotkeys (playerid, slot, skillid) VALUES (?, ?, ?)",
-            )
-            .bind(character_id)
-            .bind(slot as i64)
-            .bind(i64::from(*skill))
-            .execute(&mut *tx)
-            .await?;
+        for (slot, entry) in session.hotkeys.iter().enumerate().skip(1) {
+            if entry.kind > 0 && entry.id > 0 {
+                sqlx::query(
+                    "INSERT INTO character_hotkeys (playerid, slot, kind, skillid) VALUES (?, ?, ?, ?)",
+                )
+                .bind(character_id)
+                .bind(slot as i64)
+                .bind(i64::from(entry.kind))
+                .bind(i64::from(entry.id))
+                .execute(&mut *tx)
+                .await?;
+            }
         }
         tx.commit().await?;
         // CP6: quest/Eve state commits in its **own** transaction after the
@@ -497,8 +538,8 @@ impl SqliteSessionRepository<'_> {
             "INSERT INTO characters (playerid, name, level, gender, hair, element,
              rebornstage, curhp, maxhp, cursp, maxsp, curexp, nextexp, freepoints, skillpoint,
              baseint, baseatk, basedef, basehpx, basespx, baseagi,
-             fai, pk, mapid, mapx, mapy, jobtype, newbie)
-             VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, 0, 0)",
+             fai, reputation, pk, mapid, mapx, mapy, jobtype, newbie)
+             VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, 0, ?, 0, ?, ?, ?, 0, 0)",
         )
         .bind(account_id).bind(name)
         .bind(seed.level).bind(seed.sex).bind(seed.hair)
@@ -508,6 +549,7 @@ impl SqliteSessionRepository<'_> {
         .bind(i64::from(session.texp))
         .bind(i64::from(session.int1)).bind(i64::from(session.atk)).bind(i64::from(session.def))
         .bind(i64::from(session.hpx)).bind(i64::from(session.spx)).bind(i64::from(session.agi))
+        .bind(i64::from(session.tiengtam))
         .bind(i64::from(session.map_id)).bind(i64::from(session.map_x)).bind(i64::from(session.map_y))
         .execute(&mut *tx).await?;
         // 2. Money ledger.
@@ -538,16 +580,39 @@ impl SqliteSessionRepository<'_> {
         }
         // 4. Starter inventories (type 1 Homdo/bag: 32012×4; type 8 Trangbi:
         //    19737) — taken from `session`, committed in the same Tx.
-        for (storage, items) in [
-            (1u8, &session.homdo),
-            (2, &session.tientrang),
-            (4, &session.tuideo),
-            (8, &session.trangbi),
-            (16, &session.luulang),
-        ] {
+        let insert_inventory_sql = format!(
+            "INSERT INTO inventories ({}) VALUES ({})",
+            crate::db::modern::sqlite::inventories::INVENTORY_COLUMNS,
+            crate::db::modern::sqlite::inventories::inventory_placeholders(23),
+        );
+        for (storage, items) in session.containers() {
             for item in items.iter().filter(|i| i.id > 0) {
-                sqlx::query("INSERT INTO inventories (playerid, storagetype, slot, itemid, quantity, damage) VALUES (?, ?, ?, ?, ?, ?)")
-                    .bind(account_id).bind(storage).bind(i64::from(item.slot)).bind(i64::from(item.id)).bind(i64::from(item.count)).bind(i64::from(item.doben)).execute(&mut *tx).await?;
+                sqlx::query(&insert_inventory_sql)
+                    .bind(account_id)
+                    .bind(i64::from(storage.value()))
+                    .bind(i64::from(item.slot))
+                    .bind(i64::from(item.id))
+                    .bind(i64::from(item.count))
+                    .bind(i64::from(item.doben))
+                    .bind(i64::from(item.long_val))
+                    .bind(i64::from(item.giatri_long))
+                    .bind(i64::from(item.khang))
+                    .bind(0i64) // growlevel
+                    .bind(i64::from(item.texp))
+                    .bind(0i64) // specialkind
+                    .bind(0i64) // stoneattr
+                    .bind(0i64) // stonelevel
+                    .bind(0i64) // enhancelevel
+                    .bind(0.0f64) // deletetime
+                    .bind(0i64) // damageditemid
+                    .bind(0i64) // islocked
+                    .bind(0i64) // reinforced
+                    .bind(0i64) // affix1
+                    .bind(0i64) // affix2
+                    .bind(0i64) // affix3
+                    .bind(0i64) // stylelevel
+                    .execute(&mut *tx)
+                    .await?;
             }
         }
         tx.commit().await?;

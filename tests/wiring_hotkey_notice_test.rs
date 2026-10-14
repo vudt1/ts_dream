@@ -7,12 +7,12 @@
 
 use ts_dream::server::dispatcher::{dispatch, ServerEnv};
 use ts_dream::server::handlers::stats::handle_hotkey;
-use ts_dream::server::session::Conn;
+use ts_dream::server::session::{Conn, HotkeySlot};
 use ts_dream::server::spawn;
 use ts_dream::server::dispatcher::OpcodeCtx;
 
 /// Drive one handler directly with a stub env.
-async fn run_hotkey(sub: u8, payload: &[u8], hotkeys: [u16; 11]) -> [u16; 11] {
+async fn run_hotkey(sub: u8, payload: &[u8], hotkeys: [HotkeySlot; 11]) -> [HotkeySlot; 11] {
     let mut conn = Conn::default();
     conn.session.hotkeys = hotkeys;
     let data = ts_dream::data::loader::GameData::default();
@@ -46,31 +46,53 @@ async fn dispatch_frame(decoded: &[u8]) -> ts_dream::server::dispatcher::HandleO
 #[tokio::test]
 async fn test_hotkey_assign_kind2() {
     // payload = [kind=2][skill LE16][slot]: skill 0x1234 into slot 5.
-    let hotkeys = run_hotkey(1, &[2, 0x34, 0x12, 5], [0; 11]).await;
-    assert_eq!(hotkeys[5], 0x1234);
+    let hotkeys = run_hotkey(1, &[2, 0x34, 0x12, 5], [HotkeySlot::default(); 11]).await;
+    assert_eq!(hotkeys[5], HotkeySlot::skill(0x1234));
+}
+
+#[tokio::test]
+async fn test_hotkey_assign_kind1() {
+    // payload = [kind=1][item LE16][slot]: item 0x1234 into slot 5.
+    let hotkeys = run_hotkey(1, &[1, 0x34, 0x12, 5], [HotkeySlot::default(); 11]).await;
+    assert_eq!(hotkeys[5], HotkeySlot::item(0x1234));
 }
 
 #[tokio::test]
 async fn test_hotkey_clear_kind0() {
-    let mut initial = [0u16; 11];
-    initial[3] = 0x2222;
+    let mut initial = [HotkeySlot::default(); 11];
+    initial[3] = HotkeySlot::skill(0x2222);
     let hotkeys = run_hotkey(1, &[0, 0, 0, 3], initial).await;
-    assert_eq!(hotkeys[3], 0);
-    assert_eq!(hotkeys[5], 0);
+    assert_eq!(hotkeys[3], HotkeySlot::empty());
+    assert_eq!(hotkeys[5], HotkeySlot::empty());
 }
 
 #[tokio::test]
 async fn test_hotkey_guards() {
     // sub != 1 (Bear logs "unknown subcode").
-    assert_eq!(run_hotkey(2, &[2, 0x34, 0x12, 5], [0; 11]).await, [0; 11]);
-    // Unknown kind ignored (Bear only handles 0/2).
-    assert_eq!(run_hotkey(1, &[1, 0x34, 0x12, 5], [0; 11]).await, [0; 11]);
+    assert_eq!(
+        run_hotkey(2, &[2, 0x34, 0x12, 5], [HotkeySlot::default(); 11]).await,
+        [HotkeySlot::default(); 11]
+    );
+    // Unknown kind (3) ignored.
+    assert_eq!(
+        run_hotkey(1, &[3, 0x34, 0x12, 5], [HotkeySlot::default(); 11]).await,
+        [HotkeySlot::default(); 11]
+    );
     // Slot 0 rejected (Bear would index -1 and crash; must not touch [0]).
-    assert_eq!(run_hotkey(1, &[2, 0x34, 0x12, 0], [0; 11]).await, [0; 11]);
+    assert_eq!(
+        run_hotkey(1, &[2, 0x34, 0x12, 0], [HotkeySlot::default(); 11]).await,
+        [HotkeySlot::default(); 11]
+    );
     // Slot 11 out of range.
-    assert_eq!(run_hotkey(1, &[2, 0x34, 0x12, 11], [0; 11]).await, [0; 11]);
+    assert_eq!(
+        run_hotkey(1, &[2, 0x34, 0x12, 11], [HotkeySlot::default(); 11]).await,
+        [HotkeySlot::default(); 11]
+    );
     // Short payload.
-    assert_eq!(run_hotkey(1, &[2, 0x34], [0; 11]).await, [0; 11]);
+    assert_eq!(
+        run_hotkey(1, &[2, 0x34], [HotkeySlot::default(); 11]).await,
+        [HotkeySlot::default(); 11]
+    );
 }
 
 #[tokio::test]

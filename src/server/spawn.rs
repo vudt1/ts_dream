@@ -59,6 +59,25 @@ pub const DOUBLE_LOGIN: &str = "F44402000013";
 /// Payload 3 bytes: 01 09 5A -> Frame: F444030001095A.
 pub const LOGIN_SCENE_GREETING: &str = "F444030001095A";
 
+pub use crate::protocol::{
+    OPCODE_APPEAR, OPCODE_END_TALK, OPCODE_GOLD, OPCODE_HOMDO, OPCODE_HOTKEYS, OPCODE_LUULANG,
+    OPCODE_PET_SLOTS, OPCODE_PET_STATS, OPCODE_PET_SUMMON, OPCODE_PK_WAR, OPCODE_SERVER_NAME,
+    OPCODE_STATS, OPCODE_STORE, OPCODE_TALK_MARKER, OPCODE_TIENTRANG, OPCODE_TIENTRANG_CLEAR,
+    OPCODE_TRANGBI, OPCODE_TUIDEO, TS_MAGIC_HEADER,
+};
+
+pub const FRAME_LOGIN_TERMINATOR_MOVE: &str = "F44402000504";
+pub const FRAME_LOGIN_TERMINATOR_PET: &str = "F44402000F0A";
+pub const FRAME_LOGIN_TERMINATOR: &str = "F44402000504F44402000F0A";
+pub const FRAME_LOGIN_BATTLE_LITERAL: &str = "F4440A000B0B0000000000002040";
+pub const FRAME_LOGIN_CLOSE: &str = "F44402001F0F";
+
+/// Tiền trang clear frame (`1E 08`): sent immediately before `1E 01` so client
+/// clears bank slots prior to receiving entries.
+pub fn clear_tientrang_frame() -> String {
+    crate::protocol::frame(OPCODE_TIENTRANG_CLEAR, "")
+}
+
 /// Character creation responses (op 0x09).
 /// Op 0x09 Sub 0x03 ss 0x00 — Tên nhân vật hợp lệ và khả dụng (kích hoạt state-machine client).
 pub const CHAR_NAME_AVAILABLE: &str = "F4440300090300";
@@ -71,7 +90,10 @@ pub const CHAR_CREATE_SUCCESS: &str = "F44402000901";
 
 /// Step 1 of Logined: end-talk + the `F4440300142100` marker.
 pub fn login_start() -> Vec<String> {
-    vec!["F44402001408".to_string(), "F4440300142100".to_string()]
+    vec![
+        crate::protocol::frame(OPCODE_END_TALK, ""),
+        crate::protocol::frame(OPCODE_TALK_MARKER, "00"),
+    ]
 }
 
 /// Player self-appear frame — op 0x03 sub 0x03 (Logined  step 2).
@@ -116,7 +138,7 @@ pub fn player_appear(
     // Frame: F444 + len + 03 + body. A single opcode byte `03` is emitted
     // (no sub byte), so len counts 1 + body_len,
     // i.e. `33 + equipped*2 + nameLen` (§2.4.1 step 2).
-    crate::protocol::frame("03", &body)
+    crate::protocol::frame(OPCODE_APPEAR, &body)
 }
 
 /// Stats frame — op 0x05 sub 0x03 (Logined  step 3). `skills_hex` = the
@@ -183,7 +205,7 @@ pub fn stats(
     body.push_str(&"00".repeat(90));
     body.push_str(skills_hex);
 
-    crate::protocol::frame("0503", &body)
+    crate::protocol::frame(OPCODE_STATS, &body)
 }
 /// Build the skill-list hex from (skillId, level) pairs used in the stats
 /// frame: each entry is `le16(skillId)` + `lv`.
@@ -310,7 +332,7 @@ pub fn server_name_frame(id: u32, server_name: &str) -> String {
     body.push_str("C4000000");
     body.push_str(&format!("{:02X}", name_len));
     body.push_str(&encoder::strhex(&visc));
-    crate::protocol::frame("2709", &body)
+    crate::protocol::frame(OPCODE_SERVER_NAME, &body)
 }
 
 /// World-hide broadcast frame emitted when a logged-in session disconnects
@@ -326,7 +348,7 @@ pub fn store_frame(point: u32) -> String {
     let mut body = String::new();
     body.push_str(&encoder::le32(point));
     body.push_str(&"00".repeat(12));
-    crate::protocol::frame("2304", &body)
+    crate::protocol::frame(OPCODE_STORE, &body)
 }
 
 /// Client-verified S→C notice frames (aLogin bus semantics, see
@@ -382,9 +404,9 @@ pub fn pet_summary(s: &Session) -> Vec<String> {
     let slots: String = active.iter().map(|p| pet_slot_entry(p)).collect();
 
     vec![
-        crate::protocol::frame("0F08", &stats),
-        crate::protocol::frame("0F14", &slots),
-        "F44402000F0A".to_string(),
+        crate::protocol::frame(OPCODE_PET_STATS, &stats),
+        crate::protocol::frame(OPCODE_PET_SLOTS, &slots),
+        FRAME_LOGIN_TERMINATOR_PET.to_string(),
         "F44405000F12010000".to_string(),
         "F44405000F12020000".to_string(),
         "F44405000F12030000".to_string(),
@@ -469,6 +491,13 @@ pub fn pet_status_single(s: &Session, stt: u8) -> Vec<String> {
 /// sourced from the session's actual state (props, stats, inventory, gold,
 /// hotkeys, stores) so it reproduces the canonical Logined1 byte stream.
 pub fn build_logined_sequence_session(s: &Session) -> Vec<String> {
+    build_logined_sequence_session_ext(s)
+}
+
+/// Extended `Logined1` builder. Sends `17 66` (`s.dump_luulang()`) if the session has
+/// any luulang items (`s.luulang.iter().any(|i| i.id > 0)`).
+/// Sends `clear_tientrang_frame()` (`1E 08`) immediately before `dump_tientrang()`.
+pub fn build_logined_sequence_session_ext(s: &Session) -> Vec<String> {
     let mut frames = Vec::new();
 
     // 1. Step 1: end-talk + marker
@@ -537,7 +566,7 @@ pub fn build_logined_sequence_session(s: &Session) -> Vec<String> {
     if (1..=4).contains(&s.active_pet_stt) {
         if let Some(pet) = s.pets.iter().find(|p| p.stt == s.active_pet_stt) {
             frames.push(crate::protocol::frame(
-                "1301",
+                OPCODE_PET_SUMMON,
                 &encoder::le32(u32::from(pet.id)),
             ));
         }
@@ -546,13 +575,19 @@ pub fn build_logined_sequence_session(s: &Session) -> Vec<String> {
     // 8. Step 8: Pet stat recompute (no packet).
 
     // 9. Step 9: PK / war state
-    frames.push(format!("F44404002102{:02X}{:02X}", s.pk, s.tham_chien));
+    frames.push(crate::protocol::frame(
+        OPCODE_PK_WAR,
+        &format!("{:02X}{:02X}", s.pk, s.tham_chien),
+    ));
 
-    // 10. Step 10: Inventory dumps (Homdo, TienTrang, Tuideo, LuuLang)
+    // 10. Step 10: Inventory dumps (Homdo, Clear TienTrang, TienTrang, Tuideo, LuuLang)
     frames.push(s.dump_homdo());
+    frames.push(clear_tientrang_frame());
     frames.push(s.dump_tientrang());
     frames.push(s.dump_tuideo());
-    frames.push(s.dump_luulang());
+    if s.luulang.iter().any(|i| i.id > 0) {
+        frames.push(s.dump_luulang());
+    }
 
     // 11. Step 11: Equipped
     frames.push(s.dump_trangbi());
@@ -561,19 +596,19 @@ pub fn build_logined_sequence_session(s: &Session) -> Vec<String> {
     let mut gold_body = String::new();
     gold_body.push_str(&encoder::le32(s.gold));
     gold_body.push_str("00000000");
-    frames.push(crate::protocol::frame("1A04", &gold_body));
+    frames.push(crate::protocol::frame(OPCODE_GOLD, &gold_body));
 
     // 13. Step 13: Server name ("TSVN")
     frames.push(server_name_frame(s.id, "TSVN"));
 
     // 14. Step 14: Terminator
-    frames.push("F44402000504F44402000F0A".to_string());
+    frames.push(FRAME_LOGIN_TERMINATOR.to_string());
 
     // 15. Step 15: Literal
-    frames.push("F4440A000B0B0000000000002040".to_string());
+    frames.push(FRAME_LOGIN_BATTLE_LITERAL.to_string());
 
     // 16. Step 16: Stable close
-    frames.push("F44402001F0F".to_string());
+    frames.push(FRAME_LOGIN_CLOSE.to_string());
 
     // 17. Step 17: Empty send (omitted)
 

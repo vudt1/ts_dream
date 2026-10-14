@@ -41,13 +41,15 @@ fn move_pet_slot(conn: &mut Conn, from: u8, to: u8) {
     }
     for sub in 1..=6u16 {
         let src_slot = from as u16 * 10 + sub;
-        if let Some(pos) = conn
-            .session
-            .trangbi
-            .iter()
-            .position(|i| u16::from(i.slot) == src_slot)
-        {
-            conn.session.trangbi[pos].slot = to;
+        if let Ok(dst) = u8::try_from(to as u16 * 10 + sub) {
+            if let Some(pos) = conn
+                .session
+                .trangbi
+                .iter()
+                .position(|i| u16::from(i.slot) == src_slot)
+            {
+                conn.session.trangbi[pos].slot = dst;
+            }
         }
     }
 }
@@ -93,8 +95,16 @@ fn swap_pet_slots(conn: &mut Conn, a: u8, b: u8) {
                 conn.session.trangbi[ia].slot = conn.session.trangbi[ib].slot;
                 conn.session.trangbi[ib].slot = s;
             }
-            (Some(ia), None) => conn.session.trangbi[ia].slot = tb as u8,
-            (None, Some(ib)) => conn.session.trangbi[ib].slot = ta as u8,
+            (Some(ia), None) => {
+                if let Ok(slot_b) = u8::try_from(tb) {
+                    conn.session.trangbi[ia].slot = slot_b;
+                }
+            }
+            (None, Some(ib)) => {
+                if let Ok(slot_a) = u8::try_from(ta) {
+                    conn.session.trangbi[ib].slot = slot_a;
+                }
+            }
             (None, None) => {}
         }
     }

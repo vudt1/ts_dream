@@ -3,7 +3,7 @@ use ts_dream::db::modern::traits::{CharacterRepository, CharacterSeed, QuestRepo
 use ts_dream::db::pool::{bootstrap, DbPool};
 use ts_dream::server::dispatcher::{HandleOutcome, OpcodeCtx, ServerEnv};
 use ts_dream::server::handlers::login::handle_login;
-use ts_dream::server::session::{Conn, InventoryItem, PetState, Session};
+use ts_dream::server::session::{Conn, HotkeySlot, InventoryItem, PetState, Session};
 use ts_dream::server::spawn;
 
 async fn setup_test_db() -> DbPool {
@@ -248,7 +248,19 @@ async fn test_session_load_and_save() {
         savemap: 10817,
         color: String::new(),
         skills: vec![(10001, 3), (10002, 1)],
-        hotkeys: [0, 10001, 10002, 0, 0, 0, 0, 0, 0, 0, 0],
+        hotkeys: [
+            HotkeySlot::empty(),
+            HotkeySlot::skill(10001),
+            HotkeySlot::skill(10002),
+            HotkeySlot::empty(),
+            HotkeySlot::empty(),
+            HotkeySlot::empty(),
+            HotkeySlot::empty(),
+            HotkeySlot::empty(),
+            HotkeySlot::empty(),
+            HotkeySlot::empty(),
+            HotkeySlot::empty(),
+        ],
         homdo: vec![InventoryItem {
             slot: 1,
             id: 10001,
@@ -374,7 +386,7 @@ async fn test_session_load_and_save() {
         savemap: 0,
         color: String::new(),
         skills: vec![],
-        hotkeys: [0; 11],
+        hotkeys: [HotkeySlot::empty(); 11],
         homdo: vec![],
         trangbi: vec![],
         tientrang: vec![],
@@ -448,8 +460,8 @@ async fn test_session_load_and_save() {
     assert_eq!(loaded_session.skills, vec![(10001, 3), (10002, 1)]);
 
     // Hotkeys
-    assert_eq!(loaded_session.hotkeys[1], 10001);
-    assert_eq!(loaded_session.hotkeys[2], 10002);
+    assert_eq!(loaded_session.hotkeys[1], HotkeySlot::skill(10001));
+    assert_eq!(loaded_session.hotkeys[2], HotkeySlot::skill(10002));
 
     // Pets
     assert_eq!(loaded_session.pets.len(), 1);
@@ -738,7 +750,7 @@ async fn test_nonexistent_and_edge_cases() {
         savemap: 0,
         color: String::new(),
         skills: vec![],
-        hotkeys: [0; 11],
+        hotkeys: [HotkeySlot::empty(); 11],
         homdo: vec![],
         trangbi: vec![],
         tientrang: vec![],

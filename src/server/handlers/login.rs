@@ -6,12 +6,26 @@
 //! (golden replay) the handlers run in-memory over the seeded session.
 //! All SQL lives in the `db` repository layer, never inline here.
 
+use crate::data::loader::GameData;
 use crate::protocol::encoder;
 use crate::protocol::{ID_PREFIX, MIN_VERSION};
 use crate::server::dispatcher::{HandleOutcome, OpcodeCtx};
 use crate::server::session::Conn;
 use crate::server::spawn;
 use crate::web::server_control::{ClientSender, ServerControl};
+
+/// Helper function to emit the canonical Logined1 sequence for an authenticated session.
+pub fn send_logined_sequence(conn: &mut Conn, out: &mut HandleOutcome) {
+    conn.session.logined = true;
+    if conn.session.name.is_empty() && !conn.session.pending_new_char_name.is_empty() {
+        conn.session.name = conn.session.pending_new_char_name.clone();
+    }
+    let seq = spawn::build_logined_sequence_session_ext(&conn.session);
+    out.outgoing.extend(
+        seq.into_iter()
+            .map(crate::server::dispatcher::OutFrame::new),
+    );
+}
 
 /// Op 0x01 — Login (version check >= 186, auth & session initialization).
 pub async fn handle_login(ctx: &mut OpcodeCtx<'_>) {
@@ -50,7 +64,7 @@ pub async fn handle_login(ctx: &mut OpcodeCtx<'_>) {
     match ctx.env.pool {
         Some(_) => {
             if let Some(repos) = ctx.env.repos {
-                if login_db(conn, out, repos, ctx.env.hub, ctx.env.sender, password)
+                if login_db(conn, out, repos, ctx.env.hub, ctx.env.sender, password, ctx.data)
                     .await
                     .is_err()
                 {
@@ -70,15 +84,8 @@ pub async fn handle_login(ctx: &mut OpcodeCtx<'_>) {
                 out.send(spawn::LOGIN_CREATE_CHAR);
             } else {
                 conn.session.authed = true;
-                conn.session.logined = true;
-                if conn.session.name.is_empty() {
-                    conn.session.name = conn.session.pending_new_char_name.clone();
-                }
-                let seq = spawn::build_logined_sequence_session(&conn.session);
-                out.outgoing.extend(
-                    seq.into_iter()
-                        .map(crate::server::dispatcher::OutFrame::new),
-                );
+                conn.session.hydrate_templates(ctx.data);
+                send_logined_sequence(conn, out);
             }
         }
     }
@@ -113,6 +120,7 @@ pub async fn handle_enter_game(ctx: &mut OpcodeCtx<'_>) {
                         return;
                     }
                     Ok(true) => {
+                        conn.session.hydrate_templates(ctx.data);
                         if let (Some(hub), Some(sender)) = (ctx.env.hub, ctx.env.sender) {
                             if !hub.login_register(conn.session.id, sender).await {
                                 out.send(spawn::DOUBLE_LOGIN);
@@ -120,12 +128,7 @@ pub async fn handle_enter_game(ctx: &mut OpcodeCtx<'_>) {
                                 return;
                             }
                         }
-                        conn.session.logined = true;
-                        let seq = spawn::build_logined_sequence_session(&conn.session);
-                        out.outgoing.extend(
-                            seq.into_iter()
-                                .map(crate::server::dispatcher::OutFrame::new),
-                        );
+                        send_logined_sequence(conn, out);
                         return;
                     }
                     Err(_) => {
@@ -136,7 +139,7 @@ pub async fn handle_enter_game(ctx: &mut OpcodeCtx<'_>) {
             }
             let pass = conn.session.pending_pass.clone();
             if let Some(repos) = ctx.env.repos {
-                if login_db(conn, out, repos, ctx.env.hub, ctx.env.sender, &pass)
+                if login_db(conn, out, repos, ctx.env.hub, ctx.env.sender, &pass, ctx.data)
                     .await
                     .is_err()
                 {
@@ -150,15 +153,8 @@ pub async fn handle_enter_game(ctx: &mut OpcodeCtx<'_>) {
             if conn.session.name.is_empty() && conn.session.pending_new_char_name.is_empty() {
                 out.send(spawn::ENTER_GAME_CREATE);
             } else {
-                conn.session.logined = true;
-                if conn.session.name.is_empty() {
-                    conn.session.name = conn.session.pending_new_char_name.clone();
-                }
-                let seq = spawn::build_logined_sequence_session(&conn.session);
-                out.outgoing.extend(
-                    seq.into_iter()
-                        .map(crate::server::dispatcher::OutFrame::new),
-                );
+                conn.session.hydrate_templates(ctx.data);
+                send_logined_sequence(conn, out);
             }
         }
     }
@@ -173,6 +169,7 @@ async fn login_db(
     hub: Option<&ServerControl>,
     sender: Option<&ClientSender>,
     password: &[u8],
+    data: &GameData,
 ) -> Result<(), sqlx::Error> {
     let id = i64::from(conn.session.id);
 
@@ -208,6 +205,7 @@ async fn login_db(
         out.send(spawn::LOGIN_CREATE_CHAR);
         return Ok(());
     }
+    conn.session.hydrate_templates(data);
 
     // Double-login guard: the check+register is one atomic lock so concurrent
     // logins cannot race. The Bear `[00][19]` frame goes first so the client
@@ -220,12 +218,7 @@ async fn login_db(
         }
     }
 
-    conn.session.logined = true;
-    let seq = spawn::build_logined_sequence_session(&conn.session);
-    out.outgoing.extend(
-        seq.into_iter()
-            .map(crate::server::dispatcher::OutFrame::new),
-    );
+    send_logined_sequence(conn, out);
     // The legacy login tail purged the basic `Skill` rows (Id 0..9); the
     // shared schema requires the `player_id` predicate (§5.4 note 2). This
     // would run after the stats frame so the skill list still matches the

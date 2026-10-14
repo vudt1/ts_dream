@@ -220,13 +220,9 @@ pub fn clear_tientrang_frame() -> String {
 
 ### 4.3 `17 2F` và `17 66` có cần clear không?
 
-**Chưa biết** — cần body `FUN_00769B68` / `FUN_0076A320`. Nếu chúng không có clear pass tương
-tự `FUN_0076BFC8`, thì:
-- `17 2F` cần một frame clear tương đương — Bear không có ⇒ có thể phải dùng `17 09` (decrement)
-  cho từng ô, hoặc chấp nhận giới hạn.
-- `17 66` đã tạm dừng nên không cần.
-
-Ghi vào backlog. Xem `06-tests-and-capture.md` §4.
+✅ **Đã giải mã từ `aLogin.exe`**: Cả hai hàm `FUN_00769B68` (`17 2F`) và `FUN_0076A320` (`17 66`) **đều KHÔNG có clear pass tự động** trước khi ghi dữ liệu.
+- `17 2F` (Túi đeo): Xóa 1 ô chỉ định bằng subop `17 31` (`[17][31][slot: 1B]`, client `FUN_0076AECC` gọi `VMT+8` tại `player+0xF0C[slot]`). Cập nhật 1 ô qua `17 30`.
+- `17 66` (Lưu lãng): Xóa 1 ô chỉ định bằng subop `17 68` (`[17][68][slot: 1B]`, client `FUN_0076AF6C` gọi `VMT+8` tại `player+0xF74[slot]`). Cập nhật 1 ô qua `17 67`.
 
 ---
 
@@ -328,18 +324,19 @@ packetCreator.add16(hpx4); packetCreator.add16(spx4);
 Block `_3` và `_4`: 8 × u16 mỗi block. Bear không có field nào tên ý nghĩa rõ — có thể là
 thống kê `_3`/`_4` của item system (đồng bộ với `_1`/`_2` mà `InventoryItem` đang giữ).
 
-### 6.3 Quyết định
+### 6.3 Quyết định & Đặc tả chuẩn (ĐÃ ĐÓNG G-07)
 
-| Bước | Hành động |
-|---|---|
-| 1 | **GIỮ NGUYÊN** `90` byte zero + không có block `_3`/`_4` cho tới khi có capture |
-| 2 | Capture `05 03` từ `aLogin.exe` (server Bear nếu có, hoặc so sánh 2 server) |
-| 3 | Đọc client parser `05` S→C (`case_005` → `FUN_0078C7DB`) để biết đọc fixed hay tới-cuối |
-| 4 | Nếu fixed-offset → sửa thành `43` + thêm 32 byte `_3`/`_4` (giá trị 0 trước) |
-| 5 | Nếu tới-cuối → giữ nguyên, ghi chú "90 zero là padding vô hại" |
-
-⚠️ **Không tự sửa theo Bear** khi chưa biết client parse thế nào. `post_login_stats_inventory_flow.md`
-§5.2 gap #4 đã cảnh báo đúng điều này.
+`[C-verified]` Từ kết quả dịch ngược client `FUN_0072E9A0` (`0072e9a0_FUN_0072e9a0.c:310-420`):
+1. **Zero padding**: Đúng **43 byte zero** (`&"00".repeat(43)`), kéo dài từ byte 70 (`0x46`) đến byte 112 (`0x70`) của RestPayload.
+2. **Skill list**: Bắt đầu tại byte 113 (`0x71`). Mỗi skill gồm 3 byte: `le16(skill_id)` + `u8(level)`.
+3. **Block `_3`/`_4`**: **KHÔNG CÓ**. Client tính `(Len(RP) - 0x70) / 3` skill rồi kết thúc gọi hàm vẽ UI.
+4. **Hành động code trong `spawn.rs:180-186`**:
+   ```rust
+   body.push_str("F401F401F401F401F401");   // 5 × u16 = 500 (offset 0x3C..0x45)
+   body.push_str(&"00".repeat(43));         // ĐÚNG 43 byte zero (offset 0x46..0x70)
+   body.push_str(skills_hex);               // (le16 id + u8 lv) × N bắt đầu từ byte 113
+   ```
+   Việc loại bỏ 47 byte 0 dư thừa này lập tức khôi phục đúng dòng byte cho danh sách kỹ năng trên client. G-07 đã đóng 100%.
 
 ---
 

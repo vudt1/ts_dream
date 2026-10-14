@@ -2,6 +2,7 @@
 //! and holds per-connection player state.
 
 use crate::battle::engine::{get_hp_max, get_sp_max};
+use crate::db::modern::model::{EntryLayout, StorageType};
 use crate::protocol::encoder;
 use crate::protocol::frame::Decoder;
 
@@ -66,11 +67,33 @@ impl InventoryItem {
             spx2: def.spx2 as i16,
             agi2: def.agi2 as i16,
             fai2: def.fai2 as i16,
+            item_hp: def.hp as i16,
+            item_sp: def.sp as i16,
             loai: def.loai as u8,
             thuoctinh: def.thuoctinh as u8,
             giatri_thuoctinh: def.value as u8,
             ..Default::default()
         }
+    }
+}
+
+/// One hotkey bar slot (1..=10).
+/// `kind`: 0 = empty, 1 = item quickslot, 2 = skill.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct HotkeySlot {
+    pub kind: u8,
+    pub id: u16,
+}
+
+impl HotkeySlot {
+    pub const fn empty() -> Self {
+        Self { kind: 0, id: 0 }
+    }
+    pub const fn item(id: u16) -> Self {
+        Self { kind: 1, id }
+    }
+    pub const fn skill(id: u16) -> Self {
+        Self { kind: 2, id }
     }
 }
 
@@ -208,7 +231,7 @@ pub struct Session {
     // Skills: list of (skill_id, level)
     pub skills: Vec<(u16, u8)>,
     // Hotkeys: 1..10
-    pub hotkeys: [u16; 11],
+    pub hotkeys: [HotkeySlot; 11],
 
     // Inventory tables (by slot)
     pub homdo: Vec<InventoryItem>,
@@ -350,7 +373,7 @@ impl Default for Session {
             color: "0000000000000000".to_string(),
 
             skills: Vec::new(),
-            hotkeys: [0; 11],
+            hotkeys: [HotkeySlot::empty(); 11],
 
             homdo: Vec::new(),
             trangbi: Vec::new(),
@@ -421,57 +444,104 @@ impl Session {
         }
     }
 
+    /// 5 container theo thứ tự `StorageType` — nguồn duy nhất cho load / save / seed,
+    /// thay cho các tuple literal rời rạc.
+    pub fn containers(&self) -> [(StorageType, &[InventoryItem]); 5] {
+        [
+            (StorageType::Bag, &self.homdo),
+            (StorageType::Bank, &self.tientrang),
+            (StorageType::Secondary, &self.tuideo),
+            (StorageType::Equip, &self.trangbi),
+            (StorageType::Warehouse, &self.luulang),
+        ]
+    }
+
+    pub fn containers_mut(&mut self) -> [(StorageType, &mut Vec<InventoryItem>); 5] {
+        [
+            (StorageType::Bag, &mut self.homdo),
+            (StorageType::Bank, &mut self.tientrang),
+            (StorageType::Secondary, &mut self.tuideo),
+            (StorageType::Equip, &mut self.trangbi),
+            (StorageType::Warehouse, &mut self.luulang),
+        ]
+    }
+
+    /// Hydrate toàn bộ template field (`lv`, `int1..fai2`, `loai`, `thuoctinh`, …)
+    /// cho mọi item trong 5 container từ `Item.dat`, rồi recompute chỉ số.
+    ///
+    /// Instance field (`slot`, `id`, `count`, `doben`, `long_val`, `giatri_long`,
+    /// `khang`, `texp`) **không** bị ghi đè — chúng đến từ DB.
+    pub fn hydrate_templates(&mut self, data: &crate::data::loader::GameData) {
+        for (_, bag) in self.containers_mut() {
+            for item in bag.iter_mut() {
+                if item.id == 0 {
+                    continue;
+                }
+                let Some(def) = data.items.get(&i64::from(item.id)) else {
+                    continue;
+                };
+                let tpl = InventoryItem::from_template(def, item.count);
+                item.lv = tpl.lv;
+                item.int1 = tpl.int1;
+                item.atk1 = tpl.atk1;
+                item.def1 = tpl.def1;
+                item.hpx1 = tpl.hpx1;
+                item.spx1 = tpl.spx1;
+                item.agi1 = tpl.agi1;
+                item.fai1 = tpl.fai1;
+                item.int2 = tpl.int2;
+                item.atk2 = tpl.atk2;
+                item.def2 = tpl.def2;
+                item.hpx2 = tpl.hpx2;
+                item.spx2 = tpl.spx2;
+                item.agi2 = tpl.agi2;
+                item.fai2 = tpl.fai2;
+                item.item_hp = tpl.item_hp;
+                item.item_sp = tpl.item_sp;
+                item.loai = tpl.loai;
+                item.thuoctinh = tpl.thuoctinh;
+                item.giatri_thuoctinh = tpl.giatri_thuoctinh;
+            }
+        }
+        self.recompute_stats();
+    }
+
     /// Dump Homdo inventory frame (`F444` + len + `1705` + entries).
     pub fn dump_homdo(&self) -> String {
-        self.dump_table(&self.homdo, "1705")
+        dump_container(&self.homdo, StorageType::Bag)
     }
 
     /// Dump Trangbi equipment frame (`F444` + len + `170B` + entries).
+    ///
+    /// **10 byte/record, KHÔNG byte slot.** Client `FUN_0077CC2C` chia `IDIV 0xA`;
+    /// Bear `TSCharacter.sendEquip()` cũng ghi `add16+add8×4+add32` (10B).
+    /// Thứ tự record **bắt buộc** theo `slot` tăng dần vì client định tuyến bằng
+    /// body position trong `Item.dat`, không đọc byte slot.
     pub fn dump_trangbi(&self) -> String {
-        self.dump_table(&self.trangbi, "170B")
+        dump_container(&self.trangbi, StorageType::Equip)
     }
 
     /// Dump TienTrang storage frame (`F444` + len + `1E01` + entries).
     pub fn dump_tientrang(&self) -> String {
-        self.dump_table(&self.tientrang, "1E01")
+        dump_container(&self.tientrang, StorageType::Bank)
     }
 
     /// Dump Tuideo pouch frame (`F444` + len + `172F` + entries).
     pub fn dump_tuideo(&self) -> String {
-        self.dump_table(&self.tuideo, "172F")
+        dump_container(&self.tuideo, StorageType::Secondary)
     }
 
     /// Dump LuuLang storage frame (`F444` + len + `1766` + entries).
     pub fn dump_luulang(&self) -> String {
-        self.dump_table(&self.luulang, "1766")
-    }
-
-    /// Serialise one inventory table into a frame (`F444` + len + `code` + entries).
-    fn dump_table(&self, items: &[InventoryItem], code: &str) -> String {
-        let mut entries = String::new();
-        for item in items {
-            if item.id > 0 {
-                entries.push_str(&format!(
-                    "{:02X}{}{:02X}{:02X}{:02X}{:02X}{:02X}{}",
-                    item.slot,
-                    encoder::le16(item.id),
-                    item.count,
-                    item.doben,
-                    item.long_val,
-                    (item.giatri_long as u16 + 100) as u8,
-                    item.khang,
-                    encoder::le32(item.texp)
-                ));
-            }
-        }
-        crate::protocol::frame(code, &entries)
+        dump_container(&self.luulang, StorageType::Warehouse)
     }
 
     /// Equipped item ids by slot (used in the self-appear frame, `_My_Color` side).
+    /// Giới hạn ở slot trang bị người chơi (1..=6); không để lọt trang bị tướng/pet (11..=46).
     pub fn equipped_ids(&self) -> Vec<u16> {
         self.trangbi
             .iter()
-            .filter(|i| i.id > 0)
+            .filter(|i| i.id > 0 && (1..=6).contains(&i.slot))
             .map(|i| i.id)
             .collect()
     }
@@ -480,17 +550,81 @@ impl Session {
     pub fn dump_hotkeys(&self) -> String {
         let mut entries = String::new();
         for slot in 1..=10 {
-            let skill_id = self.hotkeys.get(slot as usize).copied().unwrap_or(0);
-            if skill_id > 0 {
-                entries.push_str(&format!("02{}{:02X}", encoder::le16(skill_id), slot));
+            let entry = self.hotkeys.get(slot as usize).copied().unwrap_or_default();
+            if entry.kind > 0 && entry.id > 0 {
+                entries.push_str(&format!(
+                    "{:02X}{}{:02X}",
+                    entry.kind,
+                    encoder::le16(entry.id),
+                    slot
+                ));
             }
         }
         if entries.is_empty() {
-            "F4440300280102".to_string()
+            crate::protocol::frame(crate::protocol::OPCODE_HOTKEYS, "02")
         } else {
-            crate::protocol::frame("2801", &entries)
+            crate::protocol::frame(crate::protocol::OPCODE_HOTKEYS, &entries)
         }
     }
+}
+
+/// Encode 1 record format 12B (slot-led): `17 05`, `1E 01`, `17 2F`, `17 66`.
+/// Client chia `IDIV 0xC`. Thứ tự record KHÔNG quan trọng (có byte slot).
+pub fn encode_entry_12(item: &InventoryItem) -> String {
+    format!(
+        "{:02X}{}{:02X}{:02X}{:02X}{:02X}{:02X}{}",
+        item.slot,
+        encoder::le16(item.id),
+        item.count,
+        item.doben,
+        item.long_val,
+        crate::server::inventory::biased_giatri_long(item.giatri_long),
+        item.khang,
+        encoder::le32(item.texp)
+    )
+}
+
+/// Encode 1 record format 10B (không slot): `17 0B`.
+/// Client chia `IDIV 0xA` và tự định tuyến theo body position.
+/// TODO(capture): doben (độ bền) không có mặt trên wire 10B; cần capture để xác nhận nếu client nhận qua frame khác.
+pub fn encode_entry_10(item: &InventoryItem) -> String {
+    format!(
+        "{}{:02X}{:02X}{:02X}{:02X}{}",
+        encoder::le16(item.id),
+        item.count,
+        item.long_val,
+        crate::server::inventory::biased_giatri_long(item.giatri_long),
+        item.khang,
+        encoder::le32(item.texp)
+    )
+}
+
+/// Serialize container ra frame dump, chọn layout theo `StorageType`.
+pub fn dump_container(items: &[InventoryItem], storage: StorageType) -> String {
+    let code = storage.dump_code();
+    match storage.entry_layout() {
+        EntryLayout::SlotLed12 => {
+            let entries: String = items
+                .iter()
+                .filter(|i| i.id > 0)
+                .map(encode_entry_12)
+                .collect();
+            crate::protocol::frame(code, &entries)
+        }
+        EntryLayout::Slotless10 => {
+            // Giới hạn ở 6 slot trang bị người chơi (1..=6); không xuất trang bị pet (11..46) vào frame 17 0B.
+            let mut sorted: Vec<&InventoryItem> = items
+                .iter()
+                .filter(|i| i.id > 0 && (1..=6).contains(&i.slot))
+                .collect();
+            sorted.sort_by_key(|i| i.slot); // bắt buộc: định tuyến theo thứ tự slot tăng dần
+            let entries: String = sorted.iter().map(|i| encode_entry_10(i)).collect();
+            crate::protocol::frame(code, &entries)
+        }
+    }
+}
+
+impl Session {
 
     /// Add an item to Homdo. Returns the slot(s) written (a capped merge can touch
     /// two slots); empty when the bag is full.

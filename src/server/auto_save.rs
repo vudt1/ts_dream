@@ -52,17 +52,21 @@ pub fn fingerprint(s: &Session) -> u64 {
     mix(&mut h, u64::from(s.god));
     mix(&mut h, u64::from(s.shop_point));
     mix(&mut h, u64::from(s.savemap));
-    for item in s.homdo.iter().chain(s.trangbi.iter()) {
-        if item.id == 0 {
-            continue;
+    for (stype, container) in s.containers() {
+        mix_i64(&mut h, i64::from(stype as u8));
+        for item in container {
+            if item.id == 0 {
+                continue;
+            }
+            mix_i64(&mut h, i64::from(item.slot));
+            mix_i64(&mut h, i64::from(item.id));
+            mix_i64(&mut h, i64::from(item.count));
+            mix_i64(&mut h, i64::from(item.doben));
+            mix_i64(&mut h, i64::from(item.long_val));
+            mix_i64(&mut h, i64::from(item.giatri_long));
+            mix_i64(&mut h, i64::from(item.khang));
+            mix(&mut h, u64::from(item.texp));
         }
-        mix_i64(&mut h, i64::from(item.slot));
-        mix_i64(&mut h, i64::from(item.id));
-        mix_i64(&mut h, i64::from(item.count));
-        mix_i64(&mut h, i64::from(item.doben));
-        mix_i64(&mut h, i64::from(item.long_val));
-        mix_i64(&mut h, i64::from(item.khang));
-        mix(&mut h, u64::from(item.texp));
     }
     for pet in &s.pets {
         if pet.id == 0 {

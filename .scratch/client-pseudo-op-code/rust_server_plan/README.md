@@ -29,25 +29,26 @@ Bảy phát hiện quan trọng nhất, xếp theo mức độ:
 
 | # | Mức | Phát hiện | Nguồn |
 |:-:|:--:|---|---|
-| 1 | 🔴 **P0** | `17 0B` (trang bị) đang serialize **12 byte**, client chỉ đọc **10 byte** và **không có byte slot**. Mọi equipment record từ thứ 2 trở đi đều lệch. | `[C]` `IDIV 0x0A` tại `0x0077CC6E`; `[B]` `TSCharacter.cs:5283-5295` |
-| 2 | 🔴 **P0** | `17 66` (lưu lang) **không có bất kỳ bằng chứng nào** — không có body client, Bear không hề gửi frame này. Rust vẫn đẩy nó mỗi lần login bằng layout 12B giả định. | `[C]` chỉ có call-site `0x00790D18`; `[B]` grep 65 `PacketCreator(23,n)` không có 102 |
+| 1 | 🔴 **P0** | `17 0B` (trang bị) đang serialize **12 byte**, client chỉ đọc **10 byte** và **không có byte slot**. Mọi equipment record từ thứ 2 trở đi đều lệch. | `[C-verified]` `IDIV 0x0A` tại `0x0077CC6E`; `[B]` `TSCharacter.cs:5283-5295` |
+| 2 | 🔴 **P0** | `17 66` (lưu lang / kho ngựa `form_Horse`) **đã được giải mã**: trỏ vào `player+0xF74`, sức chứa **10 ô** (`1..=10`, `_BoundErr` nếu > 10), stride **12 byte**, **có byte slot**, không clear pass. Sub `17 67` cập nhật 1 ô, `17 68` xóa 1 ô. | `[C-verified]` `FUN_0076a320` (`0x0076A320`), `0x0062F6FC`, `0x0076AF6C` |
 | 3 | 🔴 **P0** | `load_items` chỉ đọc **4/22 cột** DB, `save` chỉ ghi **6/22 cột** rồi `DELETE` toàn bảng ⇒ **16 cột affix/enhance/lock mất mỗi lần auto-save**. | `[R]` `sqlite/session.rs:176-199`, `:299-314` |
 | 4 | 🟠 **P1** | Template field (`loai`, `lv`, `int1..fai2`) **không được hydrate** khi load ⇒ sau relog không mặc được đồ (`loai = 0`, gate `1..=6` fail) và gear bonus = 0. Đây là nguyên nhân gốc, không chỉ là thiếu `recompute_stats()`. | `[R]` `load_items` không gọi `from_template`; `handlers/inventory.rs:292` |
-| 5 | 🟠 **P1** | `08 01` prop-code mapping **lệch ngữ nghĩa**: Rust gửi `hp_max` vào `0x19`/`0x1A` (Bear quy = hp/sp **hiện tại**), và `hpx2`/`spx2` vào `0xCF`/`0xD0` (Bear quy = `hp2`/`sp2` phẳng). `0xDA`/`0xDB` đúng nghĩa chưa từng được gửi. | `[B]` `TSConstants.cs:5-67` |
-| 6 | 🟠 **P1** | `1E 01` parser **không có clear pass** (khác `17 05`) ⇒ ô cũ không tự xoá sau khi rút bớt item. Cần frame `1E 08`. | `[C]` `0076BFC8` có clear loop, `007707A0` không |
-| 7 | 🟠 **P1** | `05 03` tail: Rust `F401`×5 + **90 zero** + skill list; Bear `500`×5 + **43 zero** + skill list + **32 byte** block `_3`/`_4`. | `[B]` `TSCharacter.cs:5072-5098` |
-| 8 | 🟡 **P2** | Mapping `storagetype` bị **nhân bản 6 nơi**; sức chứa `HOMDO_SLOTS=25` bị dùng cho cả túi 50 ô. | `[R]` `model.rs`, `persist.rs`, `sqlite/session.rs`×3 |
+| 5 | 🟠 **P1** | `08 01` prop-code mapping **đã được xác minh qua client**: `0x19`/`0x1A` = HP/SP hiện tại, `0xCD`/`0xCE` = MaxHP/MaxSP ghi đè trực tiếp, `0xCF`/`0xD0` = HP2/SP2 bonus phẳng, `0x1F`/`0x20` = HPX/SPX bonus điểm. | `[C-verified]` `FUN_0078d125` & `FUN_00710ab0`; `[B]` `TSConstants.cs:5-67` |
+| 6 | 🟠 **P1** | `1E 01` parser **không có clear pass** (khác `17 05`) ⇒ ô cũ không tự xoá sau khi rút bớt item. Cần gửi frame `1E 08` để mass-clear trước khi dump. | `[C-verified]` `0076BFC8` có clear loop, `007707A0` không |
+| 7 | 🟠 **P1** | `05 03` tail **đã làm rõ nguyên nhân lệch skill**: header cố định đúng 112 byte (chứa 5×500 + **đúng 43 byte zero**). Skill 3B bắt đầu từ byte 113. Rust gửi 90 byte zero (dư 47 byte) làm client parse lệch off-by-two toàn bộ skill list. Không có block 32B cuối. | `[C-verified]` `FUN_0072e9a0` (`0072e9a0_FUN_0072e9a0.c:310-420`) |
+| 8 | 🟡 **P2** | Mapping `storagetype` bị **nhân bản 6 nơi**; sức chứa `HOMDO_SLOTS=25` bị dùng cho cả túi 50 ô và kho lưu lãng 10 ô. | `[R]` `model.rs`, `persist.rs`, `sqlite/session.rs`×3 |
 
 **Đánh giá tổng:** kiến trúc hiện tại **đúng về hình dạng** (một bảng `inventories`, 5 `storagetype`,
 `dump_*` tách bạch) nhưng **sai về byte và độ tròn đầy**.
 
-- ✅ **`17 05`** và **`1E 01`** — hai container lớn nhất — **đúng byte-for-byte**.
-- 🟡 **`17 2F`** — giả định 12B có cơ sở (Bear dùng chung hàm `sendItems`).
-- 🔴 **`17 0B`** — sai stride.
-- 🔴 **`17 66`** — không xác minh được.
+- ✅ **`17 05`** — Hòm đồ: 25 ô, 12B, có slot byte, có clear loop.
+- ✅ **`1E 01`** — Tiền trang: 50 ô, 12B, có slot byte, clear bằng `1E 08`.
+- ✅ **`17 2F`** — Túi đeo: **Đã xác minh** (`FUN_00769b68`), mảng `player+0xF0C`, 25 ô, 12B, có slot byte, xóa lẻ bằng `17 31`.
+- 🔴 **`17 0B`** — Trang bị: sai stride (phải là 10B, KHÔNG có byte slot).
+- ✅ **`17 66`** — Lưu lãng: **Đã xác minh** (`FUN_0076a320`), mảng `player+0xF74`, 10 ô, 12B, có slot byte, xóa lẻ bằng `17 68`.
 
 **Lộ trình tối thiểu đóng P0: 2-4 ngày, KHÔNG cần capture** (Phase 1 + 2A + 3).
-Ba gap (G-02, G-06, G-07) chỉ đóng được bằng capture client thật.
+Toàn bộ 3 gap từng gắn nhãn "cần capture" (G-02, G-06, G-07) nay **đều đã được giải quyết trực tiếp qua decompile binary `aLogin.exe`**.
 
 ---
 
@@ -82,16 +83,15 @@ Mỗi claim trong bộ tài liệu đều gắn nhãn:
 
 ---
 
-## 5. Ba gap chỉ đóng được bằng capture
+## 5. Ba gap trước đây tưởng phải capture — Nay đã đóng bằng Decompile Client
 
-| Gap | Vì sao không giải bằng đọc code |
-|---|---|
-| **G-02** `17 66` | Thiếu body `FUN_0076A320`; Bear không gửi frame này |
-| **G-06** `08 01` prop code | Chưa có client parser `FUN_0078D125`; bảng lấy từ Bear |
-| **G-07** `05 03` tail | Chưa biết client đọc fixed-offset hay tới-cuối buffer |
+| Gap | Trạng thái cũ | Kết quả giải mã từ `aLogin.exe` |
+|---|---|---|
+| **G-02** `17 66` | Thiếu body `FUN_0076A320` | ✅ `FUN_0076A320` (`0x0076A320`) kết nối `form_Horse`: kho xe/ngựa 10 ô (`player+0xF74`), 12B stride, có slot byte. Xóa lẻ qua `17 68`. |
+| **G-06** `08 01` prop code | Chưa có client parser `FUN_0078D125` | ✅ `FUN_0078D125` + `FUN_00710AB0`: xác nhận bảng mã prop code chính xác 100%. `0x19`/`0x1A` = HP/SP hiện tại, `0xCD`/`0xCE` = MaxHP/MaxSP, `0xCF`/`0xD0` = HP2/SP2 bonus phẳng. |
+| **G-07** `05 03` tail | Chưa biết client đọc fixed hay tới cuối | ✅ `FUN_0072E9A0`: header cố định đúng 112 bytes (chứa 43 zero bytes), skill bắt đầu tại byte 113 (3B/skill). Client đọc tới cuối buffer, không có block 32B cuối. |
 
-Nếu không có `aLogin.exe` chạy được ⇒ dùng **phương án an toàn** cho cả ba:
-tạm dừng `17 66`, giữ `05 03` hiện tại, giữ `08 01` hiện tại (đánh dấu "unresolved").
+Toàn bộ thông tin cần thiết để viết wire codecs chuẩn đã đầy đủ mà không cần chờ capture từ server sống.
 
 ---
 

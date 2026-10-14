@@ -9,10 +9,10 @@
 
 | # | Khái niệm (tiếng Việt) | Tên Rust | `storagetype` | Opcode dump S→C | Sức chứa thực tế | Bằng chứng layout |
 |:-:|---|---|:-:|:--:|---|---|
-| 1 | **Hòm đồ** (túi chính, hành trang) | `homdo` | `1` | `17 05` | 25 ô (`1..=25`) | ✅ `[C-verified]` stride 12B, có byte slot |
-| 2 | **Tiền trang** (rương kho) | `tientrang` | `2` | `1E 01` | 50 ô (`1..=50`) | ✅ `[C-verified]` stride 12B, có byte slot |
-| 3 | **Túi đeo** (túi phụ) | `tuideo` | `4` | `17 2F` | 25 ô | ⚠️ `[C-call-only]` + `[B-verified]` (Bear dùng cùng `sendItems`) |
-| 4 | **Lưu lang** (kho lưu lãng) | `luulang` | `16` | `17 66` | ❓ **chưa biết** | ❌ **KHÔNG có bằng chứng** — xem §5 |
+| 1 | **Hòm đồ** (túi chính, hành trang) | `homdo` | `1` | `17 05` | 25 ô (`1..=25`) | ✅ `[C-verified]` stride 12B, có byte slot, có clear loop |
+| 2 | **Tiền trang** (rương kho) | `tientrang` | `2` | `1E 01` | 50 ô (`1..=50`) | ✅ `[C-verified]` stride 12B, có byte slot, clear bằng `1E 08` |
+| 3 | **Túi đeo** (túi phụ) | `tuideo` | `4` | `17 2F` | 25 ô (`1..=25`) | ✅ `[C-verified]` stride 12B, có byte slot, mảng `player+0xF0C` |
+| 4 | **Lưu lang** (kho xe / túi yên ngựa) | `luulang` | `16` | `17 66` | **10 ô** (`1..=10`) | ✅ `[C-verified]` stride 12B, có byte slot, mảng `player+0xF74` (`form_Horse`) |
 | 5 | **Trang bị** (đang mặc) | `trangbi` | `8` | `17 0B` | 6 ô (`1..=6`) | ✅ `[C-verified]` stride **10B, KHÔNG byte slot** |
 
 ---
@@ -61,36 +61,43 @@
 
 | Thuộc tính | Giá trị | Bằng chứng |
 |---|---|---|
-| Handler client | `FUN_00769B68` | `[C-call-only]` chỉ có call-site, **thiếu body** |
+| Handler client | `FUN_00769B68` | `[C-verified]` `0x00769B68` |
 | Call-site xác nhận | `0x00790A1F: CALL 0x00769B68` với `gvar_007DA0D0` | `[C-verified]` `007902fb_FUN_007902fb.asm.txt:346` |
-| Mảng đích client | ❓ chưa rõ | — |
-| Guard slot | ❓ chưa rõ | — |
+| Mảng đích client | `**player + 0xF0C + slot*4` | `[C-verified]` `0x00769D63: MOV EAX,[EDX + EAX*4 + 0xf0c]` |
+| Guard slot | `slot <= 0x19` (25) | `[C-verified]` `0x00769D51: CMP EAX, 0x19` → `_BoundErr` |
+| Công thức số record | `n = (Len(P) - 2) / 12` | `[C-verified]` `0x00769BA9: IDIV 0xC` (stride 12B, có byte slot) |
+| Clear pass | ❌ **KHÔNG có** (xóa lẻ qua subop `17 31`) | `[C-verified]` `00769B68` không có loop clear |
 | Bear tương đương | `bag.sendItems(23, 47)` = `17 2F` | `[B-verified]` `TSCharacter.cs:1104` |
 | Sức chứa Bear | `new TSItemContainer(this, 25)` | `[B-verified]` `TSCharacter.cs:366` |
 | Emitter Rust | `Session::dump_tuideo()` | `[R]` `session.rs:440-442` |
-| Trạng thái | 🟡 **layout 12B giả định** (hợp lý vì Bear dùng chung `sendItems`) | — |
+| Trạng thái | ✅ **ĐÃ XÁC MINH: 12B, 25 ô** | — |
 
-> Bear gọi **cùng một hàm** `sendItems(op, sub)` cho cả `17 05` và `17 2F`
-> (`TSItemContainer.cs:138-164`), nên **stride 12B cho `17 2F` là giả định có cơ sở mạnh** —
-> khác hẳn `17 66`. Xem `06-tests-and-capture.md` §4 để đóng nốt.
+> **Cập nhật & xóa 1 ô:**
+> - `17 30` (`FUN_007699D4`): Cập nhật 1 ô trong túi đeo.
+> - `17 31` (`FUN_0076AECC`): Xóa 1 ô trong túi đeo (`[17][31][slot: 1B]`, gọi `VMT+8` tại `player+0xF0C[slot]`).
 
 ---
 
-### 2.4 LƯU LANG — `storagetype = 16` — opcode `17 66` ⚠️ **GAP NGHIÊM TRỌNG**
+### 2.4 LƯU LANG — `storagetype = 16` — opcode `17 66`
 
 | Thuộc tính | Giá trị | Bằng chứng |
 |---|---|---|
-| Handler client | `FUN_0076A320` | `[C-call-only]` chỉ có call-site |
+| Handler client | `FUN_0076A320` | `[C-verified]` `0076a320_FUN_0076a320.c` tại `0x0076A320` |
 | Call-site xác nhận | `0x00790D18: CALL 0x0076A320` với `gvar_007DA0D0` | `[C-verified]` `007902fb_FUN_007902fb.asm.txt:537` |
-| Layout record | ❓ **KHÔNG RÕ** — có thể 12B, có thể 10B, có thể format khác | — |
-| Mảng đích client | ❓ chưa rõ | — |
-| Bear tương đương | ❌ **KHÔNG TỒN TẠI** — Bear không gửi `17 66` ở đâu cả | `[B]` grep toàn bộ 65 call-site `PacketCreator(23, n)` |
+| Mảng đích client | `**player + 0xF74 + slot*4` (`form_Horse`) | `[C-verified]` `0x0076A51B`, `0x0062F6FC` (kho hàng xe/ngựa) |
+| Guard slot | **`slot <= 0x0A` (10 ô)** | `[C-verified]` `0076a320.c:185: if (10 < uVar8) _BoundErr` |
+| Công thức số record | `n = (Len(P) - 2) / 12` | `[C-verified]` `0076a320.c:81: uVar2 = (int)uVar2 / 0xc` |
+| Clear pass | ❌ **KHÔNG có** (xóa lẻ qua subop `17 68`) | `[C-verified]` không có clear loop |
+| Layout record | **12 bytes có byte slot** (`slot:1B, id:2B, b1..b5:5B, texp:4B`) | `[C-verified]` `0076a320.c:89-192` |
+| Bear tương đương | ❌ Bear không dùng chức năng này | `[B]` Bear dùng storage mở rộng khác |
 | Emitter Rust | `Session::dump_luulang()` | `[R]` `session.rs:445-447` |
-| Trạng thái | 🔴 **giả định không có đối chứng** | — |
+| Trạng thái | ✅ **ĐÃ XÁC MINH: 12B, 10 Ô** (Cần sửa sức chứa 10 ô) | — |
 
-**Hệ quả:** `17 66` là frame mà Rust **đẩy lên client mỗi lần login** (`spawn.rs:555`) với layout
-12B **hoàn toàn không có bằng chứng**. Nếu client thực sự parse nó, mọi record đang được hiểu
-sai từ byte thứ 2 trở đi.
+> **Cập nhật & xóa 1 ô:**
+> - `17 67` (`FUN_0076A18C`): Cập nhật 1 ô trong Lưu lãng.
+> - `17 68` (`FUN_0076AF6C`): Xóa 1 ô trong Lưu lãng (`[17][68][slot: 1B]`, gọi `VMT+8` tại `player+0xF74[slot]`).
+
+**Kết luận:** Client thực sự parse `17 66` với layout 12B có byte slot, nhưng sức chứa giới hạn cứng là **10 ô**. Server chỉ cần giới hạn số ô `luulang <= 10` là an toàn tuyệt đối.
 
 ---
 
@@ -147,11 +154,11 @@ container bằng **field C# nào giữ dữ liệu** (`inventory` / `bag` / `sto
 
 | `storagetype` | Tên Rust | `StorageType` | Opcode dump | Handler client | Layout |
 |:-:|---|---|:--:|---|---|
-| `1` | `homdo` | `Bag` | `17 05` | `FUN_0076BFC8` | 12B slot-led |
-| `2` | `tientrang` | `Bank` | `1E 01` | `FUN_007707A0` | 12B slot-led |
-| `4` | `tuideo` | `Secondary` | `17 2F` | `FUN_00769B68` ⚠️ | 12B slot-led `[ASSUMPTION]` |
-| `8` | `trangbi` | `Equip` | `17 0B` | `FUN_0077CC2C` | **10B không slot** |
-| `16` | `luulang` | `Warehouse` | `17 66` | `FUN_0076A320` ❓ | ❓ **chưa biết** |
+| `1` | `homdo` | `Bag` | `17 05` | `FUN_0076BFC8` | 12B slot-led (25 ô, có clear pass) |
+| `2` | `tientrang` | `Bank` | `1E 01` | `FUN_007707A0` | 12B slot-led (50 ô, clear bằng `1E 08`) |
+| `4` | `tuideo` | `Secondary` | `17 2F` | `FUN_00769B68` | 12B slot-led (25 ô, xóa lẻ `17 31`) |
+| `8` | `trangbi` | `Equip` | `17 0B` | `FUN_0077CC2C` | **10B không slot** (6 ô) |
+| `16` | `luulang` | `Warehouse` | `17 66` | `FUN_0076A320` | **12B slot-led** (10 ô, xóa lẻ `17 68`) |
 
 ### 3.3 Nơi ánh xạ này đang bị **nhân bản** (code smell)
 

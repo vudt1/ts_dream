@@ -156,10 +156,11 @@ pub async fn handle_hotkey(ctx: &mut OpcodeCtx<'_>) {
         return;
     }
     match kind {
-        0 => conn.session.hotkeys[slot as usize] = 0,
-        2 => conn.session.hotkeys[slot as usize] = skill_id,
+        0 => conn.session.hotkeys[slot as usize] = crate::server::session::HotkeySlot::empty(),
+        1 => conn.session.hotkeys[slot as usize] = crate::server::session::HotkeySlot::item(skill_id),
+        2 => conn.session.hotkeys[slot as usize] = crate::server::session::HotkeySlot::skill(skill_id),
         _ => return,
     }
-    persist::update_skillsave(pool, conn.session.id, slot, conn.session.hotkeys[slot as usize])
-        .await;
+    let cur = conn.session.hotkeys[slot as usize];
+    persist::update_skillsave(pool, conn.session.id, slot, cur.kind, cur.id).await;
 }

@@ -12,6 +12,16 @@ pub const HOMDO_SLOTS: u8 = 25;
 /// add/move rules).
 pub const STACK_CAP: u16 = 50;
 
+/// Bias +100 theo giao thức (`TSItemContainer.sendItems`). Giá trị > 155
+/// sẽ tràn u8 — chặn ở nguồn thay vì đổi công thức wire (Bear cũng tràn).
+pub const GIA_TRI_LONG_BIAS: u16 = 100;
+pub const GIA_TRI_LONG_MAX: u8 = 155;
+
+pub fn biased_giatri_long(raw: u8) -> u8 {
+    let clamped = raw.min(GIA_TRI_LONG_MAX);
+    ((u16::from(clamped) + GIA_TRI_LONG_BIAS) & 0xFF) as u8
+}
+
 /// Build an inventory item from its static template (`Data.Item`), carrying the
 /// base `_1`/`_2` stats, element and elemental bonus. Falls back to a bare
 /// id/count item when the id is not in the static table.
@@ -26,9 +36,16 @@ pub fn from_template(data: &crate::data::loader::GameData, id: u16, count: u8) -
         })
 }
 
+/// Find the first free slot in `1..=capacity`, or `None` when full.
+pub fn free_slot_in(bag: &[InventoryItem], capacity: u16) -> Option<u8> {
+    (1..=capacity)
+        .find(|slot| !bag.iter().any(|i| u16::from(i.slot) == *slot && i.id > 0))
+        .and_then(|s| u8::try_from(s).ok())
+}
+
 /// Find the first free slot in `1..=HOMDO_SLOTS`, or `None` when full.
 pub fn free_slot(bag: &[InventoryItem]) -> Option<u8> {
-    (1..=HOMDO_SLOTS).find(|slot| !bag.iter().any(|i| i.slot == *slot && i.id > 0))
+    free_slot_in(bag, u16::from(HOMDO_SLOTS))
 }
 
 /// Add `item` to a homdo-style bag, stacking onto existing non-full slots when

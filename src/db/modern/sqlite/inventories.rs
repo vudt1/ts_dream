@@ -13,11 +13,19 @@ pub struct SqliteInventoryRepository<'a> {
     pub pool: &'a DbPool,
 }
 
-const SELECT_COLUMNS: &str = "storagetype AS storage_type, slot, itemid AS item_id, quantity, damage, element, \
+pub const SELECT_COLUMNS: &str = "storagetype AS storage_type, slot, itemid AS item_id, quantity, damage, element, \
      elementvalue AS element_value, proofkind AS proof_kind, growlevel AS grow_level, growexp AS grow_exp, \
      specialkind AS special_kind, stoneattr AS stone_attr, stonelevel AS stone_level, \
      enhancelevel AS enhance_level, deletetime AS delete_time, damageditemid AS damaged_item_id, \
      islocked AS is_locked, reinforced, affix1, affix2, affix3, stylelevel AS style_level";
+
+pub const INVENTORY_COLUMNS: &str = "playerid, storagetype, slot, itemid, quantity, damage, \
+     element, elementvalue, proofkind, growlevel, growexp, specialkind, stoneattr, stonelevel, \
+     enhancelevel, deletetime, damageditemid, islocked, reinforced, affix1, affix2, affix3, stylelevel";
+
+pub fn inventory_placeholders(n: usize) -> String {
+    vec!["?"; n].join(", ")
+}
 
 impl InventoryRepository for SqliteInventoryRepository<'_> {
     async fn load_storage(

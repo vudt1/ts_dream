@@ -4,6 +4,7 @@
 //! targets the normalized 0001 tables. `player_id` is the shared PK
 //! `accounts.player_id = characters.character_id` (1:1).
 
+use crate::db::modern::model::StorageType;
 use crate::db::pool::DbPool;
 use crate::server::session::{InventoryItem, PetState, Session};
 use sqlx::{Sqlite, Transaction};
@@ -35,6 +36,7 @@ fn character_column(column: &str) -> Option<&'static str> {
         "Hpx" | "basehpx" => "basehpx",
         "Spx" | "basespx" => "basespx",
         "Agi" | "baseagi" => "baseagi",
+        "TiengTam" | "tiengtam" | "reputation" | "honor" => "reputation",
         "Pk" | "pk" => "pk",
         "Texp" | "Exp" | "texp" | "exp" => "curexp",
         "Newbie" | "newbie" => "newbie",
@@ -115,15 +117,16 @@ pub async fn update_player(pool: Option<&DbPool>, player_id: u32, column: &str, 
 }
 
 /// Update the normalized hotkey row formerly stored in `skillsave`.
-pub async fn update_skillsave(pool: Option<&DbPool>, player_id: u32, slot: u8, skill: u16) {
+pub async fn update_skillsave(pool: Option<&DbPool>, player_id: u32, slot: u8, kind: u8, skill: u16) {
     let Some(pool) = pool else { return };
     let result = sqlx::query(
-        "INSERT INTO character_hotkeys (playerid, slot, skillid)
-         VALUES (?, ?, ?)
-         ON CONFLICT(playerid, slot) DO UPDATE SET skillid = excluded.skillid",
+        "INSERT INTO character_hotkeys (playerid, slot, kind, skillid)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(playerid, slot) DO UPDATE SET kind = excluded.kind, skillid = excluded.skillid",
     )
     .bind(i64::from(player_id))
     .bind(i64::from(slot))
+    .bind(i64::from(kind))
     .bind(i64::from(skill))
     .execute(&pool.write)
     .await;
@@ -133,29 +136,26 @@ pub async fn update_skillsave(pool: Option<&DbPool>, player_id: u32, slot: u8, s
 }
 
 fn storage_type(table: &str) -> Option<u8> {
-    Some(match table {
-        "homdo" => 1,
-        "tientrang" => 2,
-        "trangbi" => 8,
-        "tuideo" => 4,
-        "luulang" => 16,
-        _ => return None,
-    })
+    crate::db::modern::model::StorageType::from_table_name(table).map(|s| s.value())
 }
 
 pub async fn clear_items(pool: Option<&DbPool>, player_id: u32, table: &str) {
-    let Some(pool) = pool else { return };
-    let Some(storage) = storage_type(table) else {
+    let Some(storage) = StorageType::from_table_name(table) else {
         return;
     };
+    clear_storage_items(pool, player_id, storage).await;
+}
+
+pub async fn clear_storage_items(pool: Option<&DbPool>, player_id: u32, storage: StorageType) {
+    let Some(pool) = pool else { return };
     let sql = "DELETE FROM inventories WHERE playerid = ? AND storagetype = ?";
     if let Err(e) = sqlx::query(sql)
         .bind(i64::from(player_id))
-        .bind(storage)
+        .bind(storage.value())
         .execute(&pool.write)
         .await
     {
-        tracing::warn!("clear_items({table}) failed: {e}");
+        tracing::warn!("clear_storage_items({:?}) failed: {e}", storage);
     }
 }
 
@@ -217,10 +217,41 @@ async fn upsert_inventory_tx(
     let Some(id) = character_id_tx(tx, account_id).await? else {
         return Ok(());
     };
-    let _ = item;
-    sqlx::query("INSERT INTO inventories (playerid, storagetype, slot, itemid, quantity, damage) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(playerid, storagetype, slot) DO UPDATE SET itemid=excluded.itemid, quantity=excluded.quantity, damage=excluded.damage")
-        .bind(id).bind(storage).bind(i64::from(item.slot)).bind(i64::from(item.id)).bind(i64::from(item.count)).bind(i64::from(item.doben))
-        .execute(&mut **tx).await?;
+    let sql = format!(
+        "INSERT INTO inventories ({}) VALUES ({})
+         ON CONFLICT(playerid, storagetype, slot) DO UPDATE SET
+         itemid=excluded.itemid, quantity=excluded.quantity, damage=excluded.damage,
+         element=excluded.element, elementvalue=excluded.elementvalue, proofkind=excluded.proofkind,
+         growexp=excluded.growexp",
+        crate::db::modern::sqlite::inventories::INVENTORY_COLUMNS,
+        crate::db::modern::sqlite::inventories::inventory_placeholders(23),
+    );
+    sqlx::query(&sql)
+        .bind(id)
+        .bind(i64::from(storage))
+        .bind(i64::from(item.slot))
+        .bind(i64::from(item.id))
+        .bind(i64::from(item.count))
+        .bind(i64::from(item.doben))
+        .bind(i64::from(item.long_val))
+        .bind(i64::from(item.giatri_long))
+        .bind(i64::from(item.khang))
+        .bind(0i64) // growlevel
+        .bind(i64::from(item.texp))
+        .bind(0i64) // specialkind
+        .bind(0i64) // stoneattr
+        .bind(0i64) // stonelevel
+        .bind(0i64) // enhancelevel
+        .bind(0.0f64) // deletetime
+        .bind(0i64) // damageditemid
+        .bind(0i64) // islocked
+        .bind(0i64) // reinforced
+        .bind(0i64) // affix1
+        .bind(0i64) // affix2
+        .bind(0i64) // affix3
+        .bind(0i64) // stylelevel
+        .execute(&mut **tx)
+        .await?;
     Ok(())
 }
 
@@ -243,10 +274,10 @@ pub async fn persist_shop_transaction(
     };
     let result = async {
         update_money_tx(&mut tx, i64::from(buyer_id), "gold", i64::from(buyer_gold)).await?;
-        replace_inventory_tx(&mut tx, i64::from(buyer_id), 1, buyer_items).await?;
+        replace_inventory_tx(&mut tx, i64::from(buyer_id), StorageType::Bag, buyer_items).await?;
         if let (Some(id), Some(gold), Some(items)) = (seller_id, seller_gold, seller_items) {
             update_money_tx(&mut tx, i64::from(id), "gold", i64::from(gold)).await?;
-            replace_inventory_tx(&mut tx, i64::from(id), 1, items).await?;
+            replace_inventory_tx(&mut tx, i64::from(id), StorageType::Bag, items).await?;
         }
         Ok::<(), sqlx::Error>(())
     }
@@ -280,7 +311,7 @@ pub async fn persist_sessions_transaction(
 async fn replace_inventory_tx(
     tx: &mut SqliteTx<'_>,
     account_id: i64,
-    storage: u8,
+    storage: StorageType,
     items: &[InventoryItem],
 ) -> Result<(), sqlx::Error> {
     let Some(id) = character_id_tx(tx, account_id).await? else {
@@ -288,11 +319,11 @@ async fn replace_inventory_tx(
     };
     sqlx::query("DELETE FROM inventories WHERE playerid = ? AND storagetype = ?")
         .bind(id)
-        .bind(storage)
+        .bind(storage.value())
         .execute(&mut **tx)
         .await?;
     for item in items.iter().filter(|i| i.id > 0 && i.count > 0) {
-        upsert_inventory_tx(tx, account_id, storage, item).await?;
+        upsert_inventory_tx(tx, account_id, storage.value(), item).await?;
     }
     Ok(())
 }

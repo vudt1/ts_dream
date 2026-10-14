@@ -8,9 +8,6 @@
 use crate::protocol::codecs::thing_data::ThingData;
 
 /// Item storage container selector (`inventories.storage_type`).
-///
-/// Bit values match the Kotlin reference so containers can be addressed by
-/// mask as well as by variant.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum StorageType {
     Bag = 1,
@@ -20,11 +17,65 @@ pub enum StorageType {
     Warehouse = 16,
 }
 
+/// Format record inventory trên wire.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EntryLayout {
+    /// 12 byte, byte slot đầu — `17 05`, `1E 01`, `17 2F`, `17 66`.
+    SlotLed12,
+    /// 10 byte, **không** byte slot — `17 0B` (client `IDIV 0x0A`).
+    Slotless10,
+}
+
 impl StorageType {
     /// Numeric value stored in `inventories.storage_type`.
     #[inline]
-    pub fn value(self) -> u8 {
+    pub const fn value(self) -> u8 {
         self as u8
+    }
+
+    /// Tên Rust của container (khớp key trong `persist::storage_type`).
+    pub const fn table_name(self) -> &'static str {
+        match self {
+            Self::Bag => "homdo",
+            Self::Bank => "tientrang",
+            Self::Secondary => "tuideo",
+            Self::Equip => "trangbi",
+            Self::Warehouse => "luulang",
+        }
+    }
+
+    /// Frame dump S->C (hex opcode 2 byte) của container này.
+    pub const fn dump_code(self) -> &'static str {
+        match self {
+            Self::Bag => crate::protocol::OPCODE_HOMDO,
+            Self::Bank => crate::protocol::OPCODE_TIENTRANG,
+            Self::Secondary => crate::protocol::OPCODE_TUIDEO,
+            Self::Equip => crate::protocol::OPCODE_TRANGBI,
+            Self::Warehouse => crate::protocol::OPCODE_LUULANG,
+        }
+    }
+
+    /// Sức chứa thực tế theo guard của client parser:
+    /// - Bag (HomDo): 25 ô (1..=25)
+    /// - Bank (TienTrang): 50 ô (1..=50)
+    /// - Secondary (TuiDeo): 25 ô (1..=25)
+    /// - Equip (TrangBi): 6 ô (1..=6)
+    /// - Warehouse (LuuLang / form_Horse): 10 ô (1..=10)
+    pub const fn capacity(self) -> u16 {
+        match self {
+            Self::Bag | Self::Secondary => 25,
+            Self::Bank => 50,
+            Self::Warehouse => 10,
+            Self::Equip => 6,
+        }
+    }
+
+    /// Format record trên wire.
+    pub const fn entry_layout(self) -> EntryLayout {
+        match self {
+            Self::Equip => EntryLayout::Slotless10,
+            _ => EntryLayout::SlotLed12,
+        }
     }
 
     /// Parses the raw column value. Legacy clients may send any of the five
@@ -36,6 +87,18 @@ impl StorageType {
             4 => Some(Self::Secondary),
             8 => Some(Self::Equip),
             16 => Some(Self::Warehouse),
+            _ => None,
+        }
+    }
+
+    /// Parse từ tên bảng (`persist::storage_type`).
+    pub fn from_table_name(name: &str) -> Option<Self> {
+        match name {
+            "homdo" => Some(Self::Bag),
+            "tientrang" => Some(Self::Bank),
+            "tuideo" => Some(Self::Secondary),
+            "trangbi" => Some(Self::Equip),
+            "luulang" => Some(Self::Warehouse),
             _ => None,
         }
     }

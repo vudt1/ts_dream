@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS characters (
     equiphpx    INTEGER DEFAULT 0,              -- Máu cộng thêm từ trang bị mang trên người
     equipspx    INTEGER DEFAULT 0,              -- Mana cộng thêm từ trang bị mang trên người
     fai         INTEGER DEFAULT 0,              -- Điểm trung thành / Tâm tính người chơi (0..100)
+    reputation  INTEGER DEFAULT 0,              -- Điểm tiếng tăm / danh vọng của nhân vật (tiengtam / honor)
     pk          INTEGER DEFAULT 0,              -- Điểm sát khí / Tội ác PK khi giết người chơi khác
     mapid       INTEGER DEFAULT 0,              -- Mã bản đồ hiện tại nhân vật đang đứng (theo Warp.Dat / CityEx.Dat)
     mapx        INTEGER DEFAULT 0,              -- Tọa độ trục X của nhân vật trên bản đồ hiện tại
@@ -189,7 +190,8 @@ CREATE TABLE IF NOT EXISTS character_skills (
 CREATE TABLE IF NOT EXISTS character_hotkeys (
     playerid INTEGER NOT NULL,          -- Mã ID nhân vật người chơi
     slot     INTEGER NOT NULL,          -- Vị trí ô phím tắt nhanh trên thanh hotbar (1..10)
-    skillid  INTEGER DEFAULT 0,         -- Mã ID kỹ năng hoặc biểu cảm gán vào ô phím tắt (0 = để trống)
+    kind     INTEGER DEFAULT 2,         -- Loại phím tắt: 0=Rỗng, 1=Vật phẩm (Item), 2=Kỹ năng (Skill)
+    skillid  INTEGER DEFAULT 0,         -- Mã ID kỹ năng hoặc vật phẩm gán vào ô phím tắt (0 = để trống)
     PRIMARY KEY (playerid, slot)
 );
 
