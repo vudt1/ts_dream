@@ -190,35 +190,26 @@ Xem §3 và §4 bên dưới.
 
 ---
 
-## 3. Capture: `05 03` (đóng G-07)
+## 3. Capture: `05 03` (ĐÃ ĐÓNG G-07 — Xác minh 100% qua decompile `aLogin.exe`)
 
-### Cách thu
+> ✅ **Trạng thái: ĐÃ ĐÓNG (Resolved 100%)** — Không cần capture động nữa.
+> Phân tích dịch ngược binary client `aLogin.exe` tại `FUN_0072E9A0` (@`0x0072E9A0`, Case 6 `FUN_0078ca56` SubOp 3) đã giải mã chính xác cấu trúc wire.
 
-1. Chạy server `ts_dream` + client `aLogin.exe` thật
-2. Chặn traffic: `tshark -i lo -f "tcp port 6414" -w login.pcap`
-3. Hoặc dùng `harness.rs` + log hex thô từ server
-4. Login nhân vật **có trang bị và skill** để `05 03` có dữ liệu khác 0
-5. Tìm frame bắt đầu bằng `F4 44` … XOR `0xAD` → `05 03`
+### Bằng chứng từ decompile `aLogin.exe` (`FUN_0072E9A0`)
 
-### Phân tích
+1. **Header cố định**: Đúng 112 bytes `RestPayload` (từ byte 1 đến byte 112, tức index `0x01..0x70`).
+   - Cụm `F401` × 5 (5 × u16 = 500) nằm tại offset `0x3C..0x45` (bytes 60..69).
+   - Vùng padding phía sau (`0x46..0x70`, bytes 70..112) gồm các thuộc tính mở rộng, dài **đúng 43 bytes 0x00** (không phải 90 bytes).
+2. **Danh sách kỹ năng (Skills list)**: Bắt đầu tại byte 113 (`0x71`). Client tính:
+   $$\text{Count} = \frac{\text{Length}(\text{RestPayload}) - 112}{3}$$
+   Và lặp đọc `[skill_id: Word LE][skill_level: Byte]` cho đến hết buffer.
+3. **Đuôi packet (Tail)**: **KHÔNG CÓ block 32 byte `_3`/`_4`**. Client thoát vòng lặp là gọi UI refresh rồi return ngay.
+4. **Hậu quả của 90 zero cũ trong Rust**: Dư 47 bytes zero $\implies$ client tính ra 15 skill rỗng (45 bytes) và dư 2 bytes ($47 \pmod 3 = 2$). 2 byte dư này làm lệch pha dòng byte của toàn bộ skill thật phía sau.
 
-| Bước | Việc |
-|:-:|---|
-| A | Giải XOR, tách `len`, opcode `05 03` |
-| B | Xác định offset cuối skill list |
-| C | Đếm byte còn lại sau skill list |
-| D | So với Rust (90 zero) và Bear (43 zero + 32 byte) |
-| E | Đọc `case_005` → `FUN_0078C7DB` để biết client parse thế nào |
+### Hành động đã thực hiện
 
-### Kết quả mong đợi
-
-Một trong ba:
-
-| Kết quả | Hành động |
-|---|---|
-| Client đọc tới-cuối buffer | Giữ Rust hiện tại; ghi chú "padding vô hại" |
-| Client đọc fixed 43 zero | Sửa thành 43; thêm 32 byte `_3`/`_4` = 0 |
-| Client đọc fixed 90 zero | Giữ Rust; Bear sai |
+- Sửa `src/server/spawn.rs`: Đổi `&"00".repeat(90)` $\to$ `&"00".repeat(43)`.
+- Bổ sung unit test: `test_stats_frame_layout_and_g07_tail` trong `tests/login_char_flow_test.rs` kiểm tra độ dài 113B (payload không skill) và stride 3B/skill. G-07 đã đóng 100%.
 
 ---
 
@@ -335,7 +326,7 @@ cargo clippy --all-targets -- --deny warnings
 | G-04 `save` 6 cột | `inventory_roundtrip` (2-7) | T2 |
 | G-05 `recompute` khi load | `inventory_gear_bonus` (2c-2) | T2c |
 | G-06 `08 01` codes | **chỉ** capture | T5 |
-| G-07 `05 03` tail | **chỉ** capture | T5 |
+| G-07 `05 03` tail | `test_stats_frame_layout_and_g07_tail` (decompile `FUN_0072E9A0`) | T1/T3 (ĐÃ ĐÓNG) |
 | G-08 `1E 01` clear | `login_char_flow` (3-2) + capture | T3+T5 |
 | G-09 sức chứa | `storage_flow` (3s-3) | T3 |
 | G-10 move persist | `inventory_move_persist_test` | T2 |
@@ -344,7 +335,7 @@ cargo clippy --all-targets -- --deny warnings
 | G-15 nhân bản mapping | `inventory_storage_type` (1b-5) | T1b |
 | G-18 field RAM-only | `session_persist_test` | T2 |
 
-⚠️ **3 gap chỉ đóng được bằng capture**: G-02, G-06, G-07.
+⚠️ **2 gap còn lại cần capture**: G-02, G-06. (G-07 đã được đóng 100% qua decompile binary `aLogin.exe` `FUN_0072E9A0` và test suite).
 Nếu không có client thật ⇒ ghi "unresolved" trong `02-gap-analysis.md` và dùng phương án an toàn.
 
 ---

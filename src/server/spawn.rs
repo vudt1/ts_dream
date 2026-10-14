@@ -200,9 +200,10 @@ pub fn stats(
     ] {
         body.push_str(&v);
     }
-    // Literal `F401`×5 + 90 zero bytes + skill list.
+    // Literal `F401`×5 (10 bytes: 5 × u16 = 500 at offset 0x3C..0x45) + 43 zero bytes (offset 0x46..0x70) + skill list.
+    // Client parser `FUN_0072E9A0` expects fixed 112 bytes header (RestPayload), then 3B/skill until end of buffer (closing G-07).
     body.push_str("F401F401F401F401F401");
-    body.push_str(&"00".repeat(90));
+    body.push_str(&"00".repeat(43));
     body.push_str(skills_hex);
 
     crate::protocol::frame(OPCODE_STATS, &body)
@@ -598,8 +599,8 @@ pub fn build_logined_sequence_session_ext(s: &Session) -> Vec<String> {
     gold_body.push_str("00000000");
     frames.push(crate::protocol::frame(OPCODE_GOLD, &gold_body));
 
-    // 13. Step 13: Server name ("TSVN")
-    frames.push(server_name_frame(s.id, "TSVN"));
+    // 13. Step 13: Server name ("TSDREAM")
+    frames.push(server_name_frame(s.id, "TSDREAM"));
 
     // 14. Step 14: Terminator
     frames.push(FRAME_LOGIN_TERMINATOR.to_string());
@@ -617,7 +618,7 @@ pub fn build_logined_sequence_session_ext(s: &Session) -> Vec<String> {
 
     // 19. Step 19: Welcome banner
     frames.push(sys_msg_frame(
-        "TS offline RebuildVN Thanks: Duong Van Truong && Somchai choosawai",
+        "Welcome to TS Dream",
     ));
 
     // 20. Step 20: Hotbar

@@ -351,3 +351,56 @@ async fn test_character_creation_edge_cases() {
     assert!(conn.session.logined, "Empty 09 01 must delegate to enter game");
     assert_eq!(out.outgoing.len(), 21, "Must emit full Logined1 sequence");
 }
+
+#[test]
+fn test_stats_frame_layout_and_g07_tail() {
+    // Test empty skill list
+    let empty_frame = spawn::stats(
+        1, 100, 50, 10, 15, 12, 14, 8, 7, // attrs
+        1, 0, 0, 0, 0, // lv, texp, skill_pt, pt, tiengtam
+        100, 50, // hp_max, sp_max
+        15, 12, 10, 14, 8, 7, // atk2..spx2
+        "",
+    );
+    assert!(empty_frame.starts_with("F444"));
+    let raw_bytes = hex::decode(&empty_frame).expect("valid hex");
+    let payload_len = u16::from_le_bytes([raw_bytes[2], raw_bytes[3]]) as usize;
+    // Payload consists of 2B opcode (05 03) + 111B body = 113B total
+    assert_eq!(payload_len, 113, "Stats payload length without skills must be exactly 113 bytes");
+    assert_eq!(raw_bytes.len(), 4 + 113);
+    assert_eq!(raw_bytes[4], 0x05);
+    assert_eq!(raw_bytes[5], 0x03);
+
+    // RestPayload as seen by client FUN_0072E9A0 starts at raw_bytes[5] (subop 0x03), length = 112 bytes
+    let rest_payload = &raw_bytes[5..];
+    assert_eq!(rest_payload.len(), 112);
+    // Offset 0x3C..0x45 (indices 59..68 in 0-based RestPayload, bytes 60..69) is 5 × u16 = 500 (0x01F4 LE = F4 01)
+    for i in 0..5 {
+        assert_eq!(rest_payload[59 + i * 2], 0xF4);
+        assert_eq!(rest_payload[59 + i * 2 + 1], 0x01);
+    }
+    // Offset 0x46..0x70 (indices 69..111 in 0-based RestPayload, bytes 70..112) is EXACTLY 43 zero bytes
+    let zero_padding = &rest_payload[69..112];
+    assert_eq!(zero_padding.len(), 43, "Fixed zero padding must be exactly 43 bytes (closing G-07)");
+    assert!(zero_padding.iter().all(|&b| b == 0));
+
+    // Test with skills: each skill adds exactly 3 bytes (le16 id + u8 lv)
+    let skills = vec![(10001, 5), (10002, 1)];
+    let skills_hex = spawn::skill_list(&skills);
+    let with_skills_frame = spawn::stats(
+        1, 100, 50, 10, 15, 12, 14, 8, 7,
+        1, 0, 0, 0, 0,
+        100, 50,
+        15, 12, 10, 14, 8, 7,
+        &skills_hex,
+    );
+    let with_skills_bytes = hex::decode(&with_skills_frame).expect("valid hex");
+    let with_skills_payload_len = u16::from_le_bytes([with_skills_bytes[2], with_skills_bytes[3]]) as usize;
+    assert_eq!(with_skills_payload_len, 113 + 2 * 3);
+    assert_eq!(
+        (with_skills_payload_len - 113) % 3,
+        0,
+        "Skills list stride must be 3 bytes per skill without trailing blocks"
+    );
+}
+
