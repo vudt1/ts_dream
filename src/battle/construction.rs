@@ -172,10 +172,10 @@ impl Battle {
             cell.thuoctinh = pet.thuoctinh as i64;
             cell.leader_id = leader_id;
             cell.team = team;
-            cell.int1 = pet.int1 as i64;
-            cell.atk = pet.atk as i64;
-            cell.def = pet.def as i64;
-            cell.agi = pet.agi as i64;
+            cell.int1 = pet.int1 as i64 + pet.int2 as i64;
+            cell.atk = pet.atk as i64 + pet.atk2 as i64;
+            cell.def = pet.def as i64 + pet.def2 as i64;
+            cell.agi = pet.agi as i64 + pet.agi2 as i64;
             cell.reborn = pet.reborn as i64;
             cell.row = pet_row;
             cell.col = col;

@@ -361,3 +361,249 @@ async fn test_pet_equip_bounds_and_player_equip_persist() {
     let reloaded_eq = repos.sessions().load_items(acc_id, ts_dream::db::modern::model::StorageType::Equip).await.unwrap();
     assert!(reloaded_eq.is_empty(), "trangbi must not contain unequipped item in DB");
 }
+
+#[test]
+fn test_pet_stat_recompute_and_elemental_affinity() {
+    let mut session = Session {
+        level: 30,
+        thuoctinh: 1, // Earth
+        pets: vec![
+            PetState {
+                stt: 1,
+                id: 11001,
+                level: 20,
+                thuoctinh: 3, // Fire
+                hpx: 25,
+                spx: 15,
+                atk: 50,
+                def: 40,
+                int1: 30,
+                agi: 20,
+                ..Default::default()
+            },
+            PetState {
+                stt: 2,
+                id: 11002,
+                level: 20,
+                thuoctinh: 2, // Water
+                hpx: 25,
+                spx: 15,
+                atk: 50,
+                def: 40,
+                int1: 30,
+                agi: 20,
+                ..Default::default()
+            },
+        ],
+        ..Default::default()
+    };
+
+    // Slot 11: Fire weapon for Pet 1 (Fire element 3 matches item element 3)
+    // atk1 = 20, atk2 = 5, thuoctinh = 3, giatri_thuoctinh = 10 -> each nonzero field gets +10!
+    // atk2 bonus = (20 + 5) + 10 (for atk1) + 10 (for atk2) = 45!
+    session.trangbi.push(InventoryItem {
+        slot: 11,
+        id: 5001,
+        count: 1,
+        atk1: 20,
+        atk2: 5,
+        thuoctinh: 3,
+        giatri_thuoctinh: 10,
+        ..Default::default()
+    });
+
+    // Slot 21: Same weapon type for Pet 2 (Water element 2 does NOT match item element 3)
+    // atk2 bonus = 20 + 5 = 25 (no elemental affinity bonus)
+    session.trangbi.push(InventoryItem {
+        slot: 21,
+        id: 5002,
+        count: 1,
+        atk1: 20,
+        atk2: 5,
+        thuoctinh: 3,
+        giatri_thuoctinh: 10,
+        ..Default::default()
+    });
+
+    session.recompute_stats();
+
+    let pet1 = session.pets.iter().find(|p| p.stt == 1).unwrap();
+    assert_eq!(pet1.atk2, 45, "Pet 1 (Fire) should receive elemental affinity bonus");
+
+    let pet2 = session.pets.iter().find(|p| p.stt == 2).unwrap();
+    assert_eq!(pet2.atk2, 25, "Pet 2 (Water) should NOT receive affinity bonus from Fire gear");
+
+    // Player stats should remain 0 bonus
+    assert_eq!(session.atk2, 0, "Player stats must remain unaffected by pet equipment");
+}
+
+#[test]
+fn test_pet_battle_grid_includes_equipment_bonus() {
+    use ts_dream::battle::construction::Battle;
+
+    let mut battle = Battle::new(1001, 10817);
+    let pet = PetState {
+        stt: 1,
+        id: 12001,
+        level: 25,
+        thuoctinh: 1,
+        hp: 300,
+        hp_max: 300,
+        sp: 150,
+        sp_max: 150,
+        int1: 20,
+        int2: 10,
+        atk: 60,
+        atk2: 35,
+        def: 50,
+        def2: 25,
+        agi: 30,
+        agi2: 15,
+        ..Default::default()
+    };
+
+    battle.add_pet(&pet, 1001, 1001, 0, 0, 1);
+
+    let cell = battle.cell(1, 0).expect("Pet cell should exist at row 1, col 0");
+    assert_eq!(cell.typ, 4);
+    assert_eq!(cell.int1, 20 + 10, "Battle cell INT must equal base + bonus");
+    assert_eq!(cell.atk, 60 + 35, "Battle cell ATK must equal base + bonus");
+    assert_eq!(cell.def, 50 + 25, "Battle cell DEF must equal base + bonus");
+    assert_eq!(cell.agi, 30 + 15, "Battle cell AGI must equal base + bonus");
+}
+
+#[tokio::test]
+async fn test_live_pet_equip_unequip_recomputes_session_stats() {
+    let pool = setup_test_db().await;
+    let repos = SqliteRepositories::new(pool.clone());
+
+    let acc_id = ts_dream::db::accounts::create(&pool, "live_trainer", "pass123")
+        .await
+        .expect("create account");
+
+    let seed = ts_dream::db::modern::traits::CharacterSeed {
+        level: 10,
+        sex: 1,
+        hair: 1,
+        element: 1,
+        map_id: 10817,
+        map_x: 100,
+        map_y: 100,
+    };
+    repos.characters().create(acc_id, b"LiveTrainer", &seed).await.expect("create char");
+
+    let mut session = Session {
+        id: acc_id as u32,
+        db_character_id: acc_id,
+        name: b"LiveTrainer".to_vec(),
+        pets: vec![PetState {
+            stt: 1,
+            id: 11005,
+            level: 30,
+            thuoctinh: 1,
+            hp: 200,
+            hp_max: 200,
+            sp: 100,
+            sp_max: 100,
+            atk: 40,
+            ..Default::default()
+        }],
+        homdo: vec![InventoryItem {
+            slot: 1,
+            id: 6001,
+            count: 1,
+            loai: 1, // weapon
+            lv: 20,
+            atk1: 30,
+            atk2: 10,
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    session.recompute_stats();
+    assert_eq!(session.pets[0].atk2, 0, "Initial pet bonus should be 0");
+
+    let mut conn = Conn::default();
+    conn.session = session;
+    let data = ts_dream::data::loader::GameData::default();
+    let service = ts_dream::battle::service::BattleService::default();
+    let mut out = HandleOutcome::default();
+    let env = ServerEnv {
+        pool: Some(&pool),
+        repos: Some(&repos),
+        hub: None,
+        sender: None,
+    };
+
+    // Equip item to Pet 1
+    let payload_equip = [0x01, 0x01];
+    let mut ctx_eq = OpcodeCtx {
+        conn: &mut conn,
+        out: &mut out,
+        env,
+        data: &data,
+        service: &service,
+        decoded: &[],
+        opcode: 0x17,
+        sub: 17,
+        payload: &payload_equip,
+    };
+    handle_inventory(&mut ctx_eq).await;
+
+    let pet_after_eq = conn.session.pets.iter().find(|p| p.stt == 1).unwrap();
+    assert_eq!(pet_after_eq.atk2, 40, "Pet atk2 should be recomputed to 40 (30 + 10)");
+
+    // Unequip item from Pet 1
+    let payload_unequip = [0x01, 0x01, 0x01];
+    let mut ctx_uneq = OpcodeCtx {
+        conn: &mut conn,
+        out: &mut out,
+        env,
+        data: &data,
+        service: &service,
+        decoded: &[],
+        opcode: 0x17,
+        sub: 18,
+        payload: &payload_unequip,
+    };
+    handle_inventory(&mut ctx_uneq).await;
+
+    let pet_after_uneq = conn.session.pets.iter().find(|p| p.stt == 1).unwrap();
+    assert_eq!(pet_after_uneq.atk2, 0, "Pet atk2 should reset back to 0 after unequip");
+}
+
+#[test]
+fn test_pet_summary_wire_format_includes_10_byte_equipment() {
+    let session = Session {
+        id: 1,
+        pets: vec![PetState {
+            stt: 1,
+            id: 11001,
+            name: b"Pikachu".to_vec(),
+            level: 15,
+            ..Default::default()
+        }],
+        trangbi: vec![InventoryItem {
+            slot: 11, // pet 1 weapon
+            id: 5001,
+            count: 1,
+            doben: 80,
+            thuoctinh: 2,
+            giatri_thuoctinh: 15,
+            khang: 5,
+            texp: 1234,
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+
+    let summary_frames = ts_dream::server::spawn::pet_summary(&session);
+    assert!(!summary_frames.is_empty());
+    let stat_frame = &summary_frames[0];
+    assert!(stat_frame.starts_with("F444"));
+    assert!(stat_frame.contains("0F08"));
+
+    // Verify item 5001 (0x1389 -> 8913 in LE) is encoded
+    assert!(stat_frame.contains("8913"), "Pet equipment item ID must be present in 0F08 frame");
+}
+

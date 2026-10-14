@@ -660,6 +660,12 @@ async fn handle_pet_equip(
     conn.session.trangbi.push(equipped.clone());
     persist::upsert_item(pool, conn.session.id, "trangbi", &equipped).await;
 
+    conn.session.recompute_pet_stats();
+    if let Some(pet) = conn.session.pets.iter().find(|p| p.stt == pet_stt) {
+        let pet_snap = pet.clone();
+        persist::upsert_pet(pool, conn.session.id, &pet_snap).await;
+    }
+
     // TODO(capture): Confirm pet equip reply frame layout against live client capture.
     out.send(format!("F44404001711{:02X}{:02X}", pet_stt, item_slot));
 }
@@ -718,6 +724,12 @@ async fn handle_pet_unequip(
     };
     persist::upsert_item(pool, conn.session.id, "trangbi", &empty_trangbi).await;
     persist::upsert_item(pool, conn.session.id, "homdo", &item).await;
+
+    conn.session.recompute_pet_stats();
+    if let Some(pet) = conn.session.pets.iter().find(|p| p.stt == pet_stt) {
+        let pet_snap = pet.clone();
+        persist::upsert_pet(pool, conn.session.id, &pet_snap).await;
+    }
 
     // TODO(capture): Confirm pet unequip reply frame layout against live client capture.
     out.send(format!(

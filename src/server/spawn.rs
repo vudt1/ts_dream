@@ -450,14 +450,11 @@ fn pet_stat_entry(s: &Session, p: &crate::server::session::PetState) -> String {
     ));
     for sub in 1..=6u16 {
         let slot = (stt as u16) * 10 + sub;
-        let eq_id = s
-            .trangbi
-            .iter()
-            .find(|i| u16::from(i.slot) == slot)
-            .map(|i| i.id)
-            .unwrap_or(0);
-        stats.push_str(&encoder::le32(u32::from(eq_id)));
-        stats.push_str("000000000000");
+        if let Some(item) = s.trangbi.iter().find(|i| u16::from(i.slot) == slot && i.id > 0) {
+            stats.push_str(&crate::server::session::encode_entry_10(item));
+        } else {
+            stats.push_str("00000000000000000000");
+        }
     }
     stats.push_str("00000000000000"); // 7 reserved bytes
     stats.push_str(&format!("{:02X}", lv_skill[3]));
@@ -574,6 +571,10 @@ pub fn build_logined_sequence_session_ext(s: &Session) -> Vec<String> {
     }
 
     // 8. Step 8: Pet stat recompute (no packet).
+    // Note: Pet gear bonuses (atk2, def2, int2, agi2, hp_max, sp_max) are maintained
+    // in-memory on the Session (recomputed on template hydration & equip/unequip events).
+    // The client derives equipment stats from the 0F08 pet equipment frames, so no
+    // outgoing wire packet is emitted here.
 
     // 9. Step 9: PK / war state
     frames.push(crate::protocol::frame(

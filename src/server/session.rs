@@ -130,6 +130,38 @@ pub struct PetState {
     pub skills: [(u16, u8); 4],
 }
 
+impl PetState {
+    /// Recompute bonus stats (`int2..agi2`, `hp_max`, `sp_max`) from equipped gear.
+    pub fn recompute_stats(&mut self, trangbi: &[InventoryItem]) {
+        let sheet = crate::server::character_sheet::PetSheet::recompute(
+            self.reborn,
+            self.level,
+            self.hpx,
+            self.spx,
+            self.hp_max,
+            self.sp_max,
+            self.stt,
+            self.thuoctinh,
+            trangbi,
+        );
+        self.hp_max = sheet.hp_max;
+        self.sp_max = sheet.sp_max;
+        self.int2 = sheet.gear.int2.min(u16::MAX as u32) as u16;
+        self.atk2 = sheet.gear.atk2.min(u16::MAX as u32) as u16;
+        self.def2 = sheet.gear.def2.min(u16::MAX as u32) as u16;
+        self.hpx2 = sheet.gear.hpx2.min(u16::MAX as u32) as u16;
+        self.spx2 = sheet.gear.spx2.min(u16::MAX as u32) as u16;
+        self.agi2 = sheet.gear.agi2.min(u16::MAX as u32) as u16;
+
+        if self.hp > self.hp_max {
+            self.hp = self.hp_max;
+        }
+        if self.sp > self.sp_max {
+            self.sp = self.sp_max;
+        }
+    }
+}
+
 /// An item listed in player shop.
 #[derive(Debug, Clone, Default)]
 pub struct ShopItem {
@@ -441,6 +473,17 @@ impl Session {
         }
         if self.sp > self.sp_max {
             self.sp = self.sp_max;
+        }
+
+        self.recompute_pet_stats();
+    }
+
+    /// Recompute bonus stats for all active carried pets (stt 1..=4).
+    pub fn recompute_pet_stats(&mut self) {
+        for pet in self.pets.iter_mut() {
+            if (1..=4).contains(&pet.stt) && pet.id > 0 {
+                pet.recompute_stats(&self.trangbi);
+            }
         }
     }
 

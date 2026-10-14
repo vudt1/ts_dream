@@ -28,9 +28,29 @@ impl GearBonuses {
     /// This doubles the bonus when both the `_X1` and `_X2` components are
     /// nonzero (each nonzero field receives it once).
     pub fn from_gear(trangbi: &[InventoryItem], player_element: u8) -> Self {
+        Self::from_gear_range(trangbi, player_element, 1, 6)
+    }
+
+    /// Aggregate gear bonuses for a pet in active roster slot `pet_stt` (1..=4).
+    ///
+    /// Equipment slots for pet `stt` map to `(stt * 10 + 1)..=(stt * 10 + 6)`.
+    pub fn from_pet_gear(trangbi: &[InventoryItem], pet_stt: u8, pet_element: u8) -> Self {
+        let min_slot = pet_stt.saturating_mul(10).saturating_add(1);
+        let max_slot = pet_stt.saturating_mul(10).saturating_add(6);
+        Self::from_gear_range(trangbi, pet_element, min_slot, max_slot)
+    }
+
+    /// Sum the flat stat bonuses of every equipped item in `[min_slot..=max_slot]`,
+    /// including elemental `_2` fields and elemental affinity / dragon feather bonuses.
+    pub fn from_gear_range(
+        trangbi: &[InventoryItem],
+        element: u8,
+        min_slot: u8,
+        max_slot: u8,
+    ) -> Self {
         let mut b = GearBonuses::default();
         for item in trangbi {
-            if item.id == 0 || !(1..=6).contains(&item.slot) {
+            if item.id == 0 || !(min_slot..=max_slot).contains(&item.slot) {
                 continue;
             }
             b.int2 += item.int1.max(0) as u32 + item.int2.max(0) as u32;
@@ -39,12 +59,12 @@ impl GearBonuses {
             b.hpx2 += item.hpx1.max(0) as u32 + item.hpx2.max(0) as u32;
             b.spx2 += item.spx1.max(0) as u32 + item.spx2.max(0) as u32;
             b.agi2 += item.agi1.max(0) as u32 + item.agi2.max(0) as u32;
-            let thuoctinh_bonus = if item.thuoctinh == player_element || item.thuoctinh == 5 {
+            let thuoctinh_bonus = if item.thuoctinh == element || item.thuoctinh == 5 {
                 u32::from(item.giatri_thuoctinh)
             } else {
                 0
             };
-            let long_bonus = if item.long_val == player_element || item.long_val == 5 {
+            let long_bonus = if item.long_val == element || item.long_val == 5 {
                 u32::from(item.giatri_long)
             } else {
                 0
@@ -88,6 +108,58 @@ impl CharacterSheet {
         let hp_max = get_hp_max(reborn, job, level, hpx) as u16 + gear.hpx2 as u16;
         let sp_max = get_sp_max(reborn, job, level, spx) as u16 + gear.spx2 as u16;
         CharacterSheet {
+            hp_max,
+            sp_max,
+            gear,
+        }
+    }
+}
+
+/// The derived values for a pet: max HP/SP plus gear bonuses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PetSheet {
+    pub hp_max: u16,
+    pub sp_max: u16,
+    pub gear: GearBonuses,
+}
+
+impl PetSheet {
+    /// Recompute the derived values for a pet from base stats and equipped gear.
+    pub fn recompute(
+        reborn: u8,
+        level: u8,
+        hpx: u16,
+        spx: u16,
+        base_hp_max: u16,
+        base_sp_max: u16,
+        pet_stt: u8,
+        pet_element: u8,
+        trangbi: &[InventoryItem],
+    ) -> Self {
+        let gear = GearBonuses::from_pet_gear(trangbi, pet_stt, pet_element);
+        let hp_max = if hpx > 0 {
+            (get_hp_max(i64::from(reborn), 0, i64::from(level), i64::from(hpx)) as u32
+                + gear.hpx2)
+                .min(u16::MAX as u32) as u16
+        } else if base_hp_max > 0 {
+            (base_hp_max as u32 + gear.hpx2).min(u16::MAX as u32) as u16
+        } else {
+            (get_hp_max(i64::from(reborn), 0, i64::from(level), 0) as u32 + gear.hpx2)
+                .min(u16::MAX as u32) as u16
+        };
+
+        let sp_max = if spx > 0 {
+            (get_sp_max(i64::from(reborn), 0, i64::from(level), i64::from(spx)) as u32
+                + gear.spx2)
+                .min(u16::MAX as u32) as u16
+        } else if base_sp_max > 0 {
+            (base_sp_max as u32 + gear.spx2).min(u16::MAX as u32) as u16
+        } else {
+            (get_sp_max(i64::from(reborn), 0, i64::from(level), 0) as u32 + gear.spx2)
+                .min(u16::MAX as u32) as u16
+        };
+
+        PetSheet {
             hp_max,
             sp_max,
             gear,
