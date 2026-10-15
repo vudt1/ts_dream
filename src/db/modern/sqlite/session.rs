@@ -538,8 +538,8 @@ impl SqliteSessionRepository<'_> {
             "INSERT INTO characters (playerid, name, level, gender, hair, element,
              rebornstage, curhp, maxhp, cursp, maxsp, curexp, nextexp, freepoints, skillpoint,
              baseint, baseatk, basedef, basehpx, basespx, baseagi,
-             fai, reputation, pk, mapid, mapx, mapy, jobtype, newbie)
-             VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, 0, ?, 0, ?, ?, ?, 0, 0)",
+             reputation, pk, mapid, mapx, mapy, jobtype, newbie)
+             VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 0, 0)",
         )
         .bind(account_id).bind(name)
         .bind(seed.level).bind(seed.sex).bind(seed.hair)

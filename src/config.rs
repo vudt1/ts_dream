@@ -21,6 +21,12 @@ pub struct Config {
     pub wal_checkpoint_interval_secs: u64,
     /// SQLite cache size in KiB per connection (default: 64000 KiB / 64 MB).
     pub sqlite_cache_size_kb: i64,
+    /// Idle timeout in seconds before a silent connection is dropped
+    /// (default: 300s; env `TS_IDLE_TIMEOUT_SECS`).
+    pub idle_timeout_secs: u64,
+    /// Capacity of the outbound frame channel for each client connection
+    /// (default: 1024 frames; env `TS_OUTBOUND_QUEUE_CAPACITY`).
+    pub outbound_queue_capacity: usize,
 }
 
 impl Default for Config {
@@ -34,6 +40,8 @@ impl Default for Config {
             db_auto_create: true,
             wal_checkpoint_interval_secs: 300,
             sqlite_cache_size_kb: 64000,
+            idle_timeout_secs: 300,
+            outbound_queue_capacity: 1024,
         }
     }
 }
@@ -52,6 +60,11 @@ fn parse_u64(s: &str) -> std::result::Result<u64, String> {
     s.trim()
         .parse::<u64>()
         .map_err(|e| format!("invalid u64: {e}"))
+}
+pub fn parse_usize(s: &str) -> std::result::Result<usize, String> {
+    s.trim()
+        .parse::<usize>()
+        .map_err(|e| format!("invalid usize: {e}"))
 }
 pub fn parse_i64(s: &str) -> std::result::Result<i64, String> {
     s.trim()
@@ -108,6 +121,14 @@ impl Config {
             parse_i64,
         )
         .map_err(|e| TsError::Config(format!("TS_SQLITE_CACHE_SIZE_KB: {e}")))?;
+        cfg.idle_timeout_secs = env_override("TS_IDLE_TIMEOUT_SECS", cfg.idle_timeout_secs, parse_u64)
+            .map_err(|e| TsError::Config(format!("TS_IDLE_TIMEOUT_SECS: {e}")))?;
+        cfg.outbound_queue_capacity = env_override(
+            "TS_OUTBOUND_QUEUE_CAPACITY",
+            cfg.outbound_queue_capacity,
+            parse_usize,
+        )
+        .map_err(|e| TsError::Config(format!("TS_OUTBOUND_QUEUE_CAPACITY: {e}")))?;
         if let Ok(raw) = std::env::var("TS_DATA_DIR") {
             cfg.data_dir = PathBuf::from(raw);
         }

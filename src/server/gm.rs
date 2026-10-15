@@ -406,6 +406,11 @@ pub async fn handle(
             }
             hub.send_to(target, &spawn::sys_msg_frame("Ban da bi GM ngat ket noi."))
                 .await;
+            hub.send_to(
+                target,
+                &crate::protocol::SystemAlertReason::ProtectionDisconnect.to_hex(),
+            )
+            .await;
             hub.disconnect_player(target).await;
             audit(
                 pool,

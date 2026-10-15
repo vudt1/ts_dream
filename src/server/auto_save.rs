@@ -193,15 +193,29 @@ pub async fn save_all_dirty(pool: &DbPool) -> usize {
     }
 }
 
+static GLOBAL_SAVE_LEDGER: std::sync::OnceLock<std::sync::Arc<SaveLedger>> =
+    std::sync::OnceLock::new();
+
+pub fn global_ledger() -> &'static std::sync::Arc<SaveLedger> {
+    GLOBAL_SAVE_LEDGER.get_or_init(|| std::sync::Arc::new(SaveLedger::default()))
+}
+
 /// Forget a player's ledger entry (disconnect path keeps the map bounded).
 pub fn forget(ledger: &SaveLedger, player_id: u32) {
     ledger.lock().unwrap().remove(&player_id);
 }
 
+/// Forget a player from the global ledger on disconnect.
+pub fn forget_player(player_id: u32) {
+    if let Some(ledger) = GLOBAL_SAVE_LEDGER.get() {
+        ledger.lock().unwrap().remove(&player_id);
+    }
+}
+
 /// Spawn the recurring background task. Called once at server boot with the
 /// live pool; the task lives for the process lifetime.
 pub fn spawn(pool: DbPool) {
-    let ledger: std::sync::Arc<SaveLedger> = std::sync::Arc::default();
+    let ledger = global_ledger().clone();
     tokio::spawn(async move {
         let mut ticker = tokio::time::interval(AUTO_SAVE_INTERVAL);
         ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);

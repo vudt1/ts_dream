@@ -180,7 +180,7 @@ async fn index(State(s): State<WebState>) -> Response {
     let app_guard = s.app.read().await;
     let running = app_guard.running;
     let perexp = app_guard.perexp;
-    let online_list = app_guard.online.clone();
+    let online_list = current_online_entries(&app_guard.online);
     let initial_logs: Vec<LogEvent> = app_guard.log_buffer.iter().cloned().collect();
     drop(app_guard);
 
@@ -442,9 +442,27 @@ async fn list_npcs(State(s): State<WebState>) -> Json<Vec<NpcRow>> {
     Json(npcs)
 }
 
+fn current_online_entries(fallback: &[OnlineEntry]) -> Vec<OnlineEntry> {
+    let sessions = crate::server::session::lock_online_sessions();
+    let dynamic: Vec<OnlineEntry> = sessions
+        .values()
+        .filter(|sess| sess.authed && sess.id > 0)
+        .map(|sess| OnlineEntry {
+            id: sess.id,
+            name: crate::encoding::viscii_decode(&sess.name),
+            ip: String::new(),
+        })
+        .collect();
+    if dynamic.is_empty() {
+        fallback.to_vec()
+    } else {
+        dynamic
+    }
+}
+
 async fn list_online(State(s): State<WebState>) -> Json<Vec<OnlineEntry>> {
-    let online = s.app.read().await.online.clone();
-    Json(online)
+    let fallback = s.app.read().await.online.clone();
+    Json(current_online_entries(&fallback))
 }
 
 async fn log_stream(State(s): State<WebState>) -> Response {

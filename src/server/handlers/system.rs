@@ -16,6 +16,14 @@ fn shop_points_frame(points: u32) -> String {
     crate::protocol::frame("4202", &body)
 }
 
+/// Handle Opcode 0x00 (OP_SYSTEM_ALERT) from the client — the liveness ACK
+/// `F444010000`. The client sends it to signal it is still alive; the server
+/// refreshes `last_seen` and sends no response.
+pub fn handle_system_alert(ctx: &mut OpcodeCtx<'_>) {
+    ctx.conn.last_seen = std::time::Instant::now();
+    tracing::trace!(peer_ip = %ctx.conn.peer_ip, "client liveness ACK (op 0x00)");
+}
+
 /// Handle Opcode 0x21 (OP_PK_SWITCH) — PK/Jam switch (§2.3.22).
 ///
 /// Only flags `0` and `1` are accepted; anything else is silently ignored.

@@ -686,6 +686,8 @@ pub struct Conn {
     pub decoder: Decoder,
     pub session: Session,
     pub peer_ip: String,
+    /// Last instant any byte was read from this socket (liveness / idle timeout).
+    pub last_seen: std::time::Instant,
 }
 
 /// Online session registry: authoritative per-player session snapshots, synced
@@ -743,6 +745,7 @@ impl Conn {
             decoder: Decoder::new(),
             session: Session::new(),
             peer_ip: String::new(),
+            last_seen: std::time::Instant::now(),
         }
     }
 
@@ -751,6 +754,7 @@ impl Conn {
             decoder: Decoder::new(),
             session: Session::new(),
             peer_ip: peer_ip.into(),
+            last_seen: std::time::Instant::now(),
         }
     }
 }

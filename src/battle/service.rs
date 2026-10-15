@@ -37,7 +37,7 @@ use tokio::sync::mpsc;
 /// A registered online player: their shared session + frame channel.
 pub struct OnlinePlayer {
     pub session: Arc<tokio::sync::RwLock<Session>>,
-    pub frames: mpsc::UnboundedSender<String>,
+    pub frames: mpsc::Sender<String>,
 }
 
 impl std::fmt::Debug for OnlinePlayer {
@@ -113,7 +113,7 @@ impl BattleSink for BattleSinkImpl {
         if let Some(online) = try_read_online_with_retry(&self.online, 10, std::time::Duration::from_millis(2)) {
             for (id, p) in online.iter() {
                 if *id != player {
-                    let _ = p.frames.send(frame.clone());
+                    let _ = p.frames.try_send(frame.clone());
                 }
             }
         }
@@ -336,7 +336,7 @@ impl BattleSink for BattleSinkImpl {
                                     self.data.as_ref(),
                                 );
                             for f in &eve_frames {
-                                let _ = p.frames.send(f.clone());
+                                let _ = p.frames.try_send(f.clone());
                             }
                             if let Some((fight_id, diahinh)) = next_battle {
                                 eve_followups.push((*id, s.clone(), fight_id, diahinh));
@@ -414,7 +414,7 @@ impl BattleSink for BattleSinkImpl {
                             &mut frames,
                         );
                         for f in frames {
-                            let _ = p.frames.send(f);
+                            let _ = p.frames.try_send(f);
                         }
                     }
                 }
@@ -445,7 +445,7 @@ impl BattleSink for BattleSinkImpl {
                         &mut member,
                     );
                     for f in frames {
-                        let _ = p.frames.send(f);
+                        let _ = p.frames.try_send(f);
                     }
                     // Persist the quest-step + item mutations arising from OnWin
                     // (scoped by player_id) so a crash after battle never loses
@@ -474,7 +474,7 @@ impl BattleSink for BattleSinkImpl {
 fn push(online: &tokio::sync::RwLock<OnlineMap>, player: i64, frame: String) {
     if let Some(online) = try_read_online_with_retry(online, 10, std::time::Duration::from_millis(2)) {
         if let Some(p) = online.get(&player) {
-            let _ = p.frames.send(frame);
+            let _ = p.frames.try_send(frame);
         }
     }
 }
@@ -487,7 +487,7 @@ fn send_to_map(online: &tokio::sync::RwLock<OnlineMap>, map_id: i64, frame: Stri
         for (id, p) in online.iter() {
             if let Ok(s) = p.session.try_read() {
                 if i64::from(s.map_id) == map_id {
-                    let _ = p.frames.send(frame.clone());
+                    let _ = p.frames.try_send(frame.clone());
                 }
             }
             let _ = id;
@@ -504,7 +504,7 @@ fn apply_db_update(online: &OnlineMap, update: DbUpdate) {
                 if let Some(mut s) = try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2)) {
                     let frame = apply_player_stat(&mut s, update.stat, update.value);
                     if let Some(f) = frame {
-                        let _ = p.frames.send(f);
+                        let _ = p.frames.try_send(f);
                     }
                 }
             }
@@ -659,8 +659,8 @@ impl BattleService {
         &self,
         player: i64,
         session: Arc<tokio::sync::RwLock<Session>>,
-    ) -> mpsc::UnboundedReceiver<String> {
-        let (tx, rx) = mpsc::unbounded_channel();
+    ) -> mpsc::Receiver<String> {
+        let (tx, rx) = mpsc::channel(1024);
         if let Ok(mut online) = self.online.try_write() {
             online.insert(
                 player,
@@ -674,21 +674,27 @@ impl BattleService {
     }
 
     /// Register an online player with a pre-existing frame sender channel.
+    /// If the player is already registered (e.g. in battle during relogin),
+    /// redirects the frame sender while preserving their in-battle session state.
     pub fn register_sender(
         &self,
         player: i64,
         session: Arc<tokio::sync::RwLock<Session>>,
-        frames: mpsc::UnboundedSender<String>,
+        frames: mpsc::Sender<String>,
     ) {
         for attempt in 0..10 {
             if let Ok(mut online) = self.online.try_write() {
-                online.insert(
-                    player,
-                    OnlinePlayer {
-                        session,
-                        frames,
-                    },
-                );
+                if let Some(existing) = online.get_mut(&player) {
+                    existing.frames = frames;
+                } else {
+                    online.insert(
+                        player,
+                        OnlinePlayer {
+                            session,
+                            frames,
+                        },
+                    );
+                }
                 break;
             }
             if attempt + 1 < 10 {

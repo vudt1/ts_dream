@@ -9,6 +9,7 @@ use crate::db::modern::sqlite::SqliteRepositories;
 use crate::db::pool::DbPool;
 use crate::protocol::encoder;
 use crate::protocol::frame;
+use crate::protocol::SystemAlertReason;
 use crate::server::dispatcher::{self, ServerEnv};
 use crate::server::session::{lock_online_sessions, Conn};
 use crate::server::spawn::announce_frame;
@@ -22,7 +23,7 @@ use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 use tokio::time::{sleep, Duration};
 
 /// Handles sending packets to a connected client session.
-pub type ClientSender = mpsc::UnboundedSender<String>;
+pub type ClientSender = mpsc::Sender<String>;
 
 #[derive(Clone)]
 pub struct ServerControl {
@@ -31,11 +32,21 @@ pub struct ServerControl {
     pub data: Option<Arc<GameData>>,
     pub pool: Option<DbPool>,
     pub clients: Arc<Mutex<HashMap<u32, ClientSender>>>,
+    pub client_activity: Arc<Mutex<HashMap<u32, std::time::Instant>>>,
     pub battle_service: Arc<BattleService>,
     /// Shutdown signal for the accept loop (`Some` while listening). Exposed
     /// so lifecycle owners (and tests) can halt the listener without the 5s
     /// countdown performed by [`ServerControl::stop`].
     pub shutdown_tx: Arc<Mutex<Option<broadcast::Sender<()>>>>,
+    /// Broadcast channel signalling all active client connections to close immediately.
+    pub conn_shutdown_tx: broadcast::Sender<()>,
+    /// Broadcast channel signalling a specific player connection to close (GM kick / dead eviction).
+    pub player_disconnect_tx: broadcast::Sender<u32>,
+    /// Silent-connection idle timeout (ticket 02). Defaults to
+    /// `Config::default().idle_timeout_secs`; `main` overrides it from config.
+    pub idle_timeout: Duration,
+    /// Bounded queue capacity for per-client outbound frames (ticket 03).
+    pub outbound_queue_capacity: usize,
 }
 
 impl ServerControl {
@@ -54,15 +65,34 @@ impl ServerControl {
         // CP6 #4: let `battle_ended` start a chained Eve battle through the
         // weak back-reference (the sink has no spawn machinery of its own).
         BattleService::install_eve_backref(&battle_service);
+        let (conn_shutdown_tx, _) = broadcast::channel(16);
+        let (player_disconnect_tx, _) = broadcast::channel(64);
         Self {
             game_port,
             app,
             data,
             pool,
             clients: Arc::new(Mutex::new(HashMap::new())),
+            client_activity: Arc::new(Mutex::new(HashMap::new())),
             battle_service,
             shutdown_tx: Arc::new(Mutex::new(None)),
+            conn_shutdown_tx,
+            player_disconnect_tx,
+            idle_timeout: Duration::from_secs(crate::config::Config::default().idle_timeout_secs),
+            outbound_queue_capacity: crate::config::Config::default().outbound_queue_capacity,
         }
+    }
+
+    /// Override the idle timeout (used by config wiring and tests).
+    pub fn with_idle_timeout(mut self, idle: Duration) -> Self {
+        self.idle_timeout = idle;
+        self
+    }
+
+    /// Override the outbound frame queue capacity (used by config wiring and tests).
+    pub fn with_outbound_queue_capacity(mut self, cap: usize) -> Self {
+        self.outbound_queue_capacity = cap;
+        self
     }
 
     pub async fn is_running(&self) -> bool {
@@ -72,12 +102,38 @@ impl ServerControl {
     /// Register a connected client sender.
     pub async fn register_client(&self, player_id: u32, sender: ClientSender) {
         self.clients.lock().await.insert(player_id, sender);
+        self.client_activity
+            .lock()
+            .await
+            .insert(player_id, std::time::Instant::now());
     }
 
     /// Unregister a client sender.
     pub async fn unregister_client(&self, player_id: u32) {
         self.clients.lock().await.remove(&player_id);
+        self.client_activity.lock().await.remove(&player_id);
         self.battle_service.unregister(i64::from(player_id));
+    }
+
+    /// Touch a client's last active time.
+    pub async fn touch_client(&self, player_id: u32) {
+        self.client_activity
+            .lock()
+            .await
+            .insert(player_id, std::time::Instant::now());
+    }
+
+    /// Check if a registered client is still live (not exceeded idle timeout).
+    pub async fn is_client_live(&self, player_id: u32) -> bool {
+        let clients = self.clients.lock().await;
+        if !clients.contains_key(&player_id) {
+            return false;
+        }
+        let activity = self.client_activity.lock().await;
+        match activity.get(&player_id) {
+            Some(last_seen) => last_seen.elapsed() < self.idle_timeout,
+            None => false,
+        }
     }
 
     /// Start the game server listener on `game_port`.
@@ -124,6 +180,8 @@ impl ServerControl {
         let data_clone = self.data.clone();
         let pool_clone = self.pool.clone();
         let control_clone = self.clone();
+        let idle = self.idle_timeout;
+        let cap = self.outbound_queue_capacity;
         let mut shutdown_rx = shutdown_sender.subscribe();
 
         tokio::spawn(async move {
@@ -132,12 +190,15 @@ impl ServerControl {
                     accept_res = listener.accept() => {
                         match accept_res {
                             Ok((stream, peer)) => {
+                                if let Err(e) = stream.set_nodelay(true) {
+                                    tracing::debug!(peer_ip = %peer, "failed to set TCP_NODELAY: {e}");
+                                }
                                 let app = app_clone.clone();
                                 let data = data_clone.clone();
                                 let pool = pool_clone.clone();
                                 let control = control_clone.clone();
                                 tokio::spawn(async move {
-                                    handle_client_connection(stream, peer, app, data, pool, control).await;
+                                    handle_client_connection(stream, peer, app, data, pool, control, idle, cap).await;
                                 });
                             }
                             Err(e) => {
@@ -156,20 +217,12 @@ impl ServerControl {
         Ok(true)
     }
 
-    /// Stop the game server with 5s 020C countdown, kicking all clients & closing listener.
-    /// Returns 409 Conflict if server is not running.
-    pub async fn stop(&self) -> Result<bool, (StatusCode, String)> {
+    /// Immediately stop server: shuts listener, sends close to connection handlers,
+    /// disconnects & persists all sessions, checkpoints WAL, and clears online state.
+    pub async fn stop_immediate(&self) -> Result<bool, (StatusCode, String)> {
         let is_running = self.app.read().await.running;
         if !is_running {
             return Err((StatusCode::CONFLICT, "server not running".to_string()));
-        }
-
-        // 5-second countdown broadcasting 020C
-        for count in (1..=5).rev() {
-            let msg = format!("Server will be closed in {} second(s)", count);
-            self.broadcast_packet(&announce_frame(&msg)).await;
-            self.app.write().await.push_log("system", msg);
-            sleep(Duration::from_secs(1)).await;
         }
 
         // Send shutdown signal to listener
@@ -177,10 +230,21 @@ impl ServerControl {
             let _ = tx.send(());
         }
 
-        // Disconnect all clients
-        let mut clients = self.clients.lock().await;
-        clients.clear();
-        drop(clients);
+        // Broadcast shutdown to all active connection handlers
+        let _ = self.conn_shutdown_tx.send(());
+
+        // Disconnect and persist all registered players
+        let player_ids: Vec<u32> = {
+            let clients = self.clients.lock().await;
+            clients.keys().copied().collect()
+        };
+        for pid in player_ids {
+            self.disconnect_player(pid).await;
+        }
+
+        self.clients.lock().await.clear();
+        self.client_activity.lock().await.clear();
+        crate::server::session::lock_online_sessions().clear();
 
         if let Some(pool) = self.pool.as_ref() {
             let saved = crate::server::auto_save::save_all_dirty(pool).await;
@@ -200,6 +264,25 @@ impl ServerControl {
         app.push_log("system", "Game server stopped".to_string());
 
         Ok(false)
+    }
+
+    /// Stop the game server with 5s 020C countdown, kicking all clients & closing listener.
+    /// Returns 409 Conflict if server is not running.
+    pub async fn stop(&self) -> Result<bool, (StatusCode, String)> {
+        let is_running = self.app.read().await.running;
+        if !is_running {
+            return Err((StatusCode::CONFLICT, "server not running".to_string()));
+        }
+
+        // 5-second countdown broadcasting 020C
+        for count in (1..=5).rev() {
+            let msg = format!("Server will be closed in {} second(s)", count);
+            self.broadcast_packet(&announce_frame(&msg)).await;
+            self.app.write().await.push_log("system", msg);
+            sleep(Duration::from_secs(1)).await;
+        }
+
+        self.stop_immediate().await
     }
 
     /// Broadcast announcement opcode 0x02 sub 0x0C to all connected clients.
@@ -224,7 +307,7 @@ impl ServerControl {
     pub async fn broadcast_packet(&self, hex_frame: &str) {
         let clients = self.clients.lock().await;
         for (player_id, tx) in clients.iter() {
-            if tx.send(hex_frame.to_string()).is_err() {
+            if tx.try_send(hex_frame.to_string()).is_err() {
                 tracing::debug!("Failed to send broadcast to player {player_id}");
             }
         }
@@ -233,24 +316,43 @@ impl ServerControl {
     /// Register a freshly-authenticated connection under `player_id`, atomically
     /// with the double-login check. Returns `false` (and keeps the map untouched)
     /// when the id is already online — the login must then be shut down.
+    /// If the incumbent connection is dead (idle timeout elapsed), it is evicted.
     pub async fn login_register(&self, player_id: u32, sender: &ClientSender) -> bool {
         let mut clients = self.clients.lock().await;
         if clients.contains_key(&player_id) {
-            return false;
+            let is_dead = {
+                let activity = self.client_activity.lock().await;
+                match activity.get(&player_id) {
+                    Some(last_seen) => last_seen.elapsed() >= self.idle_timeout,
+                    None => true,
+                }
+            };
+            if !is_dead {
+                return false;
+            }
+            tracing::info!(
+                player_id,
+                "evicting dead incumbent session exceeding idle timeout"
+            );
+            drop(clients);
+            self.disconnect_player(player_id).await;
+            clients = self.clients.lock().await;
+            if clients.contains_key(&player_id) {
+                return false;
+            }
         }
         clients.insert(player_id, sender.clone());
-        let sess = lock_online_sessions()
-            .get(&player_id)
-            .cloned()
-            .unwrap_or_else(|| crate::server::session::Session {
-                id: player_id,
-                ..Default::default()
-            });
-        self.battle_service.register_sender(
-            i64::from(player_id),
-            Arc::new(tokio::sync::RwLock::new(sess)),
-            sender.clone(),
-        );
+        self.client_activity
+            .lock()
+            .await
+            .insert(player_id, std::time::Instant::now());
+        if let Some(sess) = lock_online_sessions().get(&player_id).cloned() {
+            self.battle_service.register_sender(
+                i64::from(player_id),
+                Arc::new(tokio::sync::RwLock::new(sess)),
+                sender.clone(),
+            );
+        }
         true
     }
 
@@ -259,23 +361,13 @@ impl ServerControl {
     pub async fn broadcast_except(&self, from_id: u32, hex_frame: &str) {
         let clients = self.clients.lock().await;
         for (player_id, tx) in clients.iter() {
-            if *player_id != from_id && tx.send(hex_frame.to_string()).is_err() {
+            if *player_id != from_id && tx.try_send(hex_frame.to_string()).is_err() {
                 tracing::debug!("Failed to send broadcast to player {player_id}");
             }
         }
     }
 
     /// Map-scoped fan-out for move/expression frames.
-    ///
-    /// Every `MapBroadcast` is delivered to each registered client on the same
-    /// map as `from_id` whose id differs from the broadcast's `subject`, so:
-    /// - the origin never receives its own walk/expression (P1),
-    /// - a party member never receives the walk addressed to itself (P2),
-    /// - players on other maps receive nothing (P3).
-    ///
-    /// Scope keys on the origin's map (not each subject's map): in the party
-    /// follow flow members are co-located with the leader, so the two sets are
-    /// identical; a member warped to another map leaves the party.
     pub async fn broadcast_map(&self, from_id: u32, frames: &[dispatcher::MapBroadcast]) {
         let targets: Vec<(u32, String)> = {
             let sessions = lock_online_sessions();
@@ -299,7 +391,7 @@ impl ServerControl {
         let clients = self.clients.lock().await;
         for (pid, frame) in targets {
             if let Some(tx) = clients.get(&pid) {
-                if tx.send(frame).is_err() {
+                if tx.try_send(frame).is_err() {
                     tracing::debug!("Failed to send map broadcast to player {pid}");
                 }
             }
@@ -311,7 +403,7 @@ impl ServerControl {
     pub async fn send_to(&self, player_id: u32, hex_frame: &str) {
         let clients = self.clients.lock().await;
         if let Some(tx) = clients.get(&player_id) {
-            if tx.send(hex_frame.to_string()).is_err() {
+            if tx.try_send(hex_frame.to_string()).is_err() {
                 tracing::debug!("Failed to send to player {player_id}");
             }
         }
@@ -321,9 +413,11 @@ impl ServerControl {
     /// leave-battle / offline hide frame to peers, persist state to database,
     /// then drop the client registration and the online-session snapshot.
     pub async fn disconnect_player(&self, player_id: u32) {
+        let _ = self.player_disconnect_tx.send(player_id);
         let hide = crate::server::spawn::session_offline_frame(player_id);
         self.broadcast_except(player_id, &hide).await;
         self.unregister_client(player_id).await;
+        crate::server::auto_save::forget_player(player_id);
         let session_opt = lock_online_sessions().remove(&player_id);
         if let Some(session) = session_opt {
             if session.authed && session.id > 0 {
@@ -333,6 +427,22 @@ impl ServerControl {
                     &["stats", "homdo", "trangbi", "quest", "pet"],
                 )
                 .await;
+            }
+        }
+    }
+}
+
+/// Write every frame already queued on `rx` to `write_half`, in order. Used
+/// before a deliberate close so queued frames (e.g. the kick alert) reach the
+/// socket instead of being dropped with the channel.
+async fn drain_outbound(
+    rx: &mut mpsc::Receiver<String>,
+    write_half: &mut tokio::net::tcp::OwnedWriteHalf,
+) {
+    while let Ok(frame_hex) = rx.try_recv() {
+        if let Ok(wire) = frame::encode_to_wire(&frame_hex) {
+            if write_half.write_all(&wire).await.is_err() {
+                break;
             }
         }
     }
@@ -348,6 +458,8 @@ async fn handle_client_connection(
     data: Option<Arc<GameData>>,
     pool: Option<DbPool>,
     control: ServerControl,
+    idle: Duration,
+    outbound_capacity: usize,
 ) {
     let peer_ip = peer.to_string();
     app.write()
@@ -361,7 +473,9 @@ async fn handle_client_connection(
     let service = Arc::clone(&control.battle_service);
 
     let (mut read_half, mut write_half) = stream.into_split();
-    let (tx, mut rx) = mpsc::unbounded_channel::<String>();
+    let (tx, mut rx) = mpsc::channel::<String>(outbound_capacity);
+    let mut conn_shutdown_rx = control.conn_shutdown_tx.subscribe();
+    let mut player_disc_rx = control.player_disconnect_tx.subscribe();
 
     let mut conn = Conn::with_peer_ip(peer.ip().to_string());
     let mut buf = vec![0u8; 8192];
@@ -369,17 +483,51 @@ async fn handle_client_connection(
 
     // TS Online Client (aLogin.exe) hoàn toàn thụ động chờ Server gửi gói tin đầu tiên.
     // Gửi ngay gói tin chào mừng chuyển sang Login Scene (Op 0x01, Sub 0x09, Scene 90 / 0x5A).
-    let _ = tx.send(crate::server::spawn::LOGIN_SCENE_GREETING.to_string());
+    let _ = tx.try_send(crate::server::spawn::LOGIN_SCENE_GREETING.to_string());
 
     // One teardown path for every exit (peer close, read error, handler
     // shutdown, write error): set `close` and break, then run the cleanup once.
+    // Idle deadline (ticket 02): pinned outside the loop so the timer survives
+    // across `select!` iterations; reset on every inbound byte.
+    let idle_timer = sleep(idle);
+    tokio::pin!(idle_timer);
+
     let mut close = false;
     while !close {
         tokio::select! {
+            _ = conn_shutdown_rx.recv() => {
+                tracing::debug!(peer_ip = %peer_ip, "server stopping: closing connection");
+                close = true;
+            }
+            disc_res = player_disc_rx.recv() => {
+                match disc_res {
+                    Ok(disc_id) => {
+                        if logined_id > 0 && disc_id == logined_id {
+                            tracing::debug!(peer_ip = %peer_ip, player_id = disc_id, "player kicked/evicted: closing connection");
+                            close = true;
+                        }
+                    }
+                    Err(broadcast::error::RecvError::Lagged(_)) => {
+                        if logined_id > 0 && !control.clients.lock().await.contains_key(&logined_id) {
+                            tracing::debug!(peer_ip = %peer_ip, player_id = logined_id, "player missing from clients after lag: closing connection");
+                            close = true;
+                        }
+                    }
+                    Err(broadcast::error::RecvError::Closed) => {
+                        close = true;
+                    }
+                }
+            }
             read_res = read_half.read(&mut buf) => {
                 match read_res {
                     Ok(0) => close = true, // Peer closed (0-byte receive → shutdown)
                     Ok(n) => {
+                        // Liveness: any byte read from the socket counts as activity.
+                        conn.last_seen = std::time::Instant::now();
+                        idle_timer.as_mut().reset(tokio::time::Instant::now() + idle);
+                        if logined_id > 0 {
+                            control.touch_client(logined_id).await;
+                        }
                         for frame_hex in conn.decoder.feed(&buf[..n]) {
                             let Some(decoded) = encoder::bytes(&frame_hex) else {
                                 continue;
@@ -425,6 +573,11 @@ async fn handle_client_connection(
                             if logined_id > 0 {
                                 lock_online_sessions()
                                     .insert(logined_id, conn.session.clone());
+                                service.register_sender(
+                                    i64::from(logined_id),
+                                    Arc::new(tokio::sync::RwLock::new(conn.session.clone())),
+                                    tx.clone(),
+                                );
                             }
                             for frame in &out.outgoing {
                                 // Dialog fragments are paced (500 ms between
@@ -434,7 +587,24 @@ async fn handle_client_connection(
                                     tokio::time::sleep(Duration::from_millis(frame.delay_ms))
                                         .await;
                                 }
-                                let _ = tx.send(frame.frame.clone());
+                                match tx.try_send(frame.frame.clone()) {
+                                    Ok(()) => {}
+                                    Err(mpsc::error::TrySendError::Full(_)) => {
+                                        tracing::warn!(
+                                            peer_ip = %peer_ip,
+                                            "client outbound queue full, disconnecting client"
+                                        );
+                                        close = true;
+                                        break;
+                                    }
+                                    Err(mpsc::error::TrySendError::Closed(_)) => {
+                                        close = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if close {
+                                break;
                             }
                             // CP6 #3: a scripted Eve battle starts only after
                             // this outcome's own frames are queued — the
@@ -446,6 +616,11 @@ async fn handle_client_connection(
                                 if logined_id > 0 {
                                     lock_online_sessions()
                                         .insert(logined_id, conn.session.clone());
+                                    service.register_sender(
+                                        i64::from(logined_id),
+                                        Arc::new(tokio::sync::RwLock::new(conn.session.clone())),
+                                        tx.clone(),
+                                    );
                                 }
                             }
                             if !out.map_broadcast.is_empty() {
@@ -464,12 +639,17 @@ async fn handle_client_connection(
                                     "system",
                                     format!("Shutting down connection from {peer_ip}"),
                                 );
+                                drain_outbound(&mut rx, &mut write_half).await;
+                                let _ = write_half.shutdown().await;
                                 close = true;
                                 break;
                             }
                         }
                     }
-                    Err(_) => close = true,
+                    Err(e) => {
+                        tracing::debug!(peer_ip = %peer_ip, "socket read error, closing: {e}");
+                        close = true;
+                    }
                 }
             }
             Some(frame_hex) = rx.recv() => {
@@ -479,8 +659,28 @@ async fn handle_client_connection(
                     }
                 }
             }
+            () = &mut idle_timer => {
+                // Idle timeout: tell the client why, flush the alert onto the
+                // socket, then close so the normal teardown below runs.
+                let _ = tx.try_send(SystemAlertReason::ConnectionLost.to_hex());
+                drain_outbound(&mut rx, &mut write_half).await;
+                let _ = write_half.shutdown().await;
+                tracing::warn!(
+                    peer_ip = %peer_ip,
+                    idle_timeout_secs = idle.as_secs(),
+                    "idle timeout: closing silent connection"
+                );
+                app.write().await.push_log(
+                    "warn",
+                    format!("Idle timeout ({}s) from {peer_ip}; connection closed", idle.as_secs()),
+                );
+                close = true;
+            }
         }
     }
+
+    drain_outbound(&mut rx, &mut write_half).await;
+    let _ = write_half.shutdown().await;
 
     if logined_id > 0 {
         let _operation_guards = crate::server::session::lock_player_operations([logined_id]).await;

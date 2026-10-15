@@ -16,6 +16,7 @@ use crate::web::server_control::{ClientSender, ServerControl};
 
 /// Helper function to emit the canonical Logined1 sequence for an authenticated session.
 pub fn send_logined_sequence(conn: &mut Conn, out: &mut HandleOutcome) {
+    conn.session.recompute_stats();
     conn.session.logined = true;
     if conn.session.name.is_empty() && !conn.session.pending_new_char_name.is_empty() {
         conn.session.name = conn.session.pending_new_char_name.clone();
@@ -42,6 +43,7 @@ pub async fn handle_login(ctx: &mut OpcodeCtx<'_>) {
     }
     let version = encoder::u16_le(payload[6], payload[7]);
     if version < MIN_VERSION {
+        out.send_system_alert(crate::protocol::SystemAlertReason::VersionMismatch);
         out.shutdown = true; // Version gate < 186 -> disconnect
         return;
     }
@@ -60,6 +62,8 @@ pub async fn handle_login(ctx: &mut OpcodeCtx<'_>) {
     // account / double-login gates (a failed or partial login must not leave a
     // connection in an authenticated state).
     conn.session.authed = false;
+    conn.session.logined = false;
+    conn.session.in_world = false;
 
     match ctx.env.pool {
         Some(_) => {
@@ -184,9 +188,7 @@ async fn login_db(
     };
     let now_ms = chrono::Utc::now().timestamp_millis();
     if crate::db::modern::sqlite::accounts::SqliteAccountRepository::is_suspended(&access, now_ms) {
-        // No verified PC/aLogin suspended-account opcode exists in the supplied
-        // corpus, so do not emit a mobile numeric response on the PC dialect.
-        out.send(spawn::sys_msg_frame("Tai khoan dang bi tam khoa."));
+        out.send_system_alert(crate::protocol::SystemAlertReason::AccountLocked);
         out.shutdown = true;
         return Ok(());
     }

@@ -139,13 +139,16 @@ async fn main() -> anyhow::Result<()> {
     // they are pickable on map load.
     seed_static_drops(&data);
 
-    // 5. ServerControl handle
-    let server_control = Arc::new(ServerControl::new(
-        cfg.game_port,
-        app_state.clone(),
-        Some(data.clone()),
-        Some(pool.clone()),
-    ));
+    let server_control = Arc::new(
+        ServerControl::new(
+            cfg.game_port,
+            app_state.clone(),
+            Some(data.clone()),
+            Some(pool.clone()),
+        )
+        .with_idle_timeout(std::time::Duration::from_secs(cfg.idle_timeout_secs))
+        .with_outbound_queue_capacity(cfg.outbound_queue_capacity),
+    );
 
     // 6. Spawn web server (always up once DB is reachable).
     let web_state = WebState {

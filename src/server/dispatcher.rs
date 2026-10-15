@@ -20,8 +20,8 @@ use crate::protocol::{
     OP_MONEY_SYNC, OP_MOVE, OP_NAVAL_COMBAT, OP_NPC_EVENT, OP_NPC_SHOP, OP_PET, OP_PET_HOTEL,
     OP_PK_SWITCH, OP_PLAYER_UPDATE, OP_QUEST, OP_RANK_ANNOUNCE, OP_REBORN, OP_REBORN_PET,
     OP_RECOMMEND, OP_RELOCATE, OP_RESERVED_44, OP_RESET, OP_SERVER_STATUS, OP_SERVER_SWITCH, OP_SKILL_CS,
-    OP_SLOT_MACHINE, OP_SPORT_FORM, OP_STAT_UPDATE, OP_STORAGE, OP_TRADE, OP_WORLD_OBJECT,
-    OP_ZM_CHESS,
+    OP_SLOT_MACHINE, OP_SPORT_FORM, OP_STAT_UPDATE, OP_STORAGE, OP_SYSTEM_ALERT, OP_TRADE,
+    OP_WORLD_OBJECT, OP_ZM_CHESS,
 };
 use crate::server::handlers::{
     battle, character, chat, expressions, inventory, login, movement, npc_event, party,
@@ -328,6 +328,9 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
 
         // OP_EXPRESS (0x20) — Expressions
         OP_EXPRESS => expressions::handle_expressions(ctx),
+
+        // OP_SYSTEM_ALERT (0x00) — client liveness ACK (no response)
+        OP_SYSTEM_ALERT => system::handle_system_alert(ctx),
 
         // OP_PK_SWITCH (0x21) — PK/Jam switch
         OP_PK_SWITCH => system::handle_pk_war(ctx).await,
