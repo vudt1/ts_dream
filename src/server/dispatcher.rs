@@ -304,11 +304,10 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         // as its 0x19 toast/gift bus — see opcode_19.md).
         OP_TRADE => trade_storage::handle_trade(ctx).await,
 
-        // OP_NPC_SHOP (0x1B) — NPC shop buy/sell (Bear NpcShopsHandler dialect).
-        // aLogin never sends 0x1B (SendCommand case 0x1b is empty —
-        // opcode_1b.md §6: 0x1B is S→C toast bus on aLogin), so this path is
-        // Bear-dialect only. S→C replies here are client-safe (020B banner,
-        // 1A04 money sync).
+        // OP_NPC_SHOP (0x1B) — NPC shop buy/sell. Reverse engineering client aLogin.exe
+        // confirmed jump table at 0x00785FFD (0077f414_FUN_0077f414.asm.txt:1815-1917)
+        // dispatches C->S 0x1B 01 (Buy) and 0x1B 02 (Sell). S->C replies follow VISCII
+        // result codes (1B 01/02 xx), 1A 01/02 money delta, and 1A 04 absolute balance.
         OP_NPC_SHOP => shops::handle_npc_shop(ctx).await,
 
         // OP_SKILL_CS (0x1C) — Learn / upgrade skills

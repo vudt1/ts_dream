@@ -470,7 +470,7 @@ fn execute_action_result(
                         out.send(build_stat_update(0x26, i32::from(session.point)));
                     } else {
                         session.gold = session.gold.saturating_add(amount as u32);
-                        out.send(gold_frame(session.gold));
+                        out.send(gold_frame(session.gold, session.shop_point));
                     }
                 }
                 // Type 2 (Bear `GoldEffectHandler`): deduct gold from player
@@ -479,7 +479,7 @@ fn execute_action_result(
                     if amount > 0 {
                         session.gold = session.gold.saturating_sub(amount as u32);
                     }
-                    out.send(gold_frame(session.gold));
+                    out.send(gold_frame(session.gold, session.shop_point));
                 }
                 other => {
                     tracing::debug!(
@@ -497,6 +497,11 @@ fn execute_action_result(
             // from the current map.
             if result.parameter_style == 1 {
                 crate::server::handlers::quest::save_map(session);
+            }
+            // parameter 3: open NPC shop form (Bear HotelShopAndSaveMapEffectHandler.cs:13-15).
+            // Eve effect 7 with param 3 directly triggers the NPC shop dialogue interface.
+            if result.parameter == 3 {
+                out.send(crate::server::handlers::shops::open_npc_shop_frame());
             }
             match result.parameter {
                 // parameter 1 (Bear `GetSttBonus`): type = parameter_style,
@@ -729,7 +734,10 @@ async fn handle_talk_continue(
     // Inn / hotel NPCs.
     if matches!(template, 15002 | 16001 | 16016 | 15118) {
         match conn.session.select_menu {
-            30 => out.send("F44411001401000000010603010000000000000100"),
+            30 => {
+                out.send(crate::server::handlers::shops::open_npc_shop_frame());
+                out.send("F44411001401000000010603010000000000000100");
+            }
             31 => {
                 conn.session.hp = conn.session.hp_max;
                 conn.session.sp = conn.session.sp_max;
@@ -737,7 +745,10 @@ async fn handle_talk_continue(
                 out.send(build_stat_update(0x1A, conn.session.sp as i32));
                 end_talk(conn, out);
             }
-            32 => out.send("F44411001401000000010603010000000000000100"),
+            32 => {
+                out.send(crate::server::handlers::shops::open_npc_shop_frame());
+                out.send("F44411001401000000010603010000000000000100");
+            }
             33 => {
                 crate::server::handlers::quest::save_map(&mut conn.session);
                 let item = crate::server::inventory::from_template(data, 46016, 2);
@@ -754,7 +765,10 @@ async fn handle_talk_continue(
     // NPC 16015 — inn + gift item x2.
     if template == 16015 {
         match conn.session.select_menu {
-            30 => out.send("F44411001401000000010603010000000000000200"),
+            30 => {
+                out.send(crate::server::handlers::shops::open_npc_shop_frame());
+                out.send("F44411001401000000010603010000000000000200");
+            }
             31 => {
                 conn.session.hp = conn.session.hp_max;
                 conn.session.sp = conn.session.sp_max;
@@ -762,7 +776,10 @@ async fn handle_talk_continue(
                 out.send(build_stat_update(0x1A, conn.session.sp as i32));
                 end_talk(conn, out);
             }
-            32 => out.send("F44411001401000000010603010000000000000200"),
+            32 => {
+                out.send(crate::server::handlers::shops::open_npc_shop_frame());
+                out.send("F44411001401000000010603010000000000000200");
+            }
             33 => {
                 crate::server::handlers::quest::save_map(&mut conn.session);
                 let item = crate::server::inventory::from_template(data, 46016, 2);

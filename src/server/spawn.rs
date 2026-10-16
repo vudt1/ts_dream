@@ -6,6 +6,7 @@
 use crate::protocol::encoder;
 use crate::protocol::{
     CHAT_SUB_BROADCAST, CHAT_SUB_INPUT_FLAG, CHAT_SUB_LOCAL, CHAT_SUB_MEMO, CHAT_SUB_SYSTEM,
+    GOLD_CAP,
 };
 use crate::server::dispatcher::HandleOutcome;
 use crate::server::session::Session;
@@ -594,11 +595,14 @@ pub fn build_logined_sequence_session_ext(s: &Session) -> Vec<String> {
     // 11. Step 11: Equipped
     frames.push(s.dump_trangbi());
 
-    // 12. Step 12: Gold
+    // 12. Step 12: Gold & Bank Gold
     let mut gold_body = String::new();
-    gold_body.push_str(&encoder::le32(s.gold));
-    gold_body.push_str("00000000");
+    gold_body.push_str(&encoder::le32(s.gold.min(GOLD_CAP)));
+    gold_body.push_str(&encoder::le32(s.shop_point));
     frames.push(crate::protocol::frame(OPCODE_GOLD, &gold_body));
+
+    // Bank gold sync: 1D 04 <bank_gold: u32 LE> (unconditionally sent on login)
+    frames.push(format!("F44406001D04{}", encoder::le32(s.bank_gold.min(GOLD_CAP))));
 
     // 13. Step 13: Server name ("TSDREAM")
     frames.push(server_name_frame(s.id, "TSDREAM"));

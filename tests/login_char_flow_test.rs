@@ -227,12 +227,16 @@ async fn test_character_creation_and_enter_game_flow() {
     };
     handle_enter_game(&mut ctx).await;
 
-    // Must emit full Logined1 sequence (21 frames for petless session)
+    // Must emit full Logined1 sequence (22 frames for petless session, including unconditional 1D 04 bank gold sync)
     assert!(conn.session.logined, "Session must be marked as logined");
     assert_eq!(
         out.outgoing.len(),
-        21,
-        "Logined1 sequence without pets must contain exactly 21 frames"
+        22,
+        "Logined1 sequence without pets must contain exactly 22 frames"
+    );
+    assert!(
+        out.outgoing.iter().any(|f| f.frame == "F44406001D0400000000"),
+        "Logined1 sequence must contain unconditional 1D 04 bank sync frame"
     );
 
     // First frame must be login_start
@@ -349,7 +353,11 @@ async fn test_character_creation_edge_cases() {
     };
     handle_character(&mut ctx).await;
     assert!(conn.session.logined, "Empty 09 01 must delegate to enter game");
-    assert_eq!(out.outgoing.len(), 21, "Must emit full Logined1 sequence");
+    assert_eq!(out.outgoing.len(), 22, "Must emit full Logined1 sequence");
+    assert!(
+        out.outgoing.iter().any(|f| f.frame == "F44406001D0400000000"),
+        "Must contain unconditional 1D 04 bank sync frame"
+    );
 }
 
 #[test]

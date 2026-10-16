@@ -195,15 +195,16 @@ fn test_send_logined_sequence_luulang_behavior() {
     use ts_dream::server::handlers::login::send_logined_sequence;
     use ts_dream::server::session::Conn;
 
-    // 1. Without luulang items
+    // 1. Without luulang items (22 frames including unconditional 1D 04 bank sync)
     let mut conn = Conn::default();
     let mut out = HandleOutcome::default();
     send_logined_sequence(&mut conn, &mut out);
     assert!(conn.session.logined);
-    assert_eq!(out.outgoing.len(), 21);
+    assert_eq!(out.outgoing.len(), 22);
+    assert!(out.outgoing.iter().any(|f| f.frame == "F44406001D0400000000"));
     assert!(out.outgoing.iter().all(|f| !f.frame.starts_with("F44402001766") && !f.frame.starts_with("F44403001766")));
 
-    // 2. With luulang items (id > 0)
+    // 2. With luulang items (id > 0) (23 frames)
     let mut conn_with_items = Conn::default();
     conn_with_items.session.luulang.push(ts_dream::server::session::InventoryItem {
         id: 11001,
@@ -214,7 +215,8 @@ fn test_send_logined_sequence_luulang_behavior() {
     let mut out_with_items = HandleOutcome::default();
     send_logined_sequence(&mut conn_with_items, &mut out_with_items);
     assert!(conn_with_items.session.logined);
-    assert_eq!(out_with_items.outgoing.len(), 22);
+    assert_eq!(out_with_items.outgoing.len(), 23);
+    assert!(out_with_items.outgoing.iter().any(|f| f.frame == "F44406001D0400000000"));
     assert!(out_with_items.outgoing.iter().any(|f| f.frame == conn_with_items.session.dump_luulang()));
 }
 

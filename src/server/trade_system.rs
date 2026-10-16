@@ -14,8 +14,7 @@ use crate::server::session::{
     lock_online_sessions, lock_player_operations, InventoryItem, PetState, Session, TradeState,
 };
 
-/// Maximum gold either side may hold after a trade settles.
-pub(crate) const GOLD_CAP: u32 = 9_999_999;
+use crate::protocol::GOLD_CAP;
 
 /// Remove every offered item from `s`'s bag. Verifies each offer still exists
 /// in sufficient quantity first; any missing offer fails the whole removal

@@ -344,7 +344,7 @@ fn action_class5_gold_type1_points_then_gold() {
     let mut out = HandleOutcome::default();
     execute_event_step(&mut session, &data, &mut out);
     assert_eq!(session.gold, 1700);
-    assert_eq!(out.outgoing[0].frame, gold_frame(1700));
+    assert_eq!(out.outgoing[0].frame, gold_frame(1700, session.shop_point));
     assert_eq!(session.point, 0);
 
     // Type 2: deduct gold with saturating_sub (Task 2.1).
@@ -355,7 +355,7 @@ fn action_class5_gold_type1_points_then_gold() {
     execute_event_step(&mut session, &data, &mut out);
     assert_eq!(session.gold, 7);
     assert_eq!(session.point, 7);
-    assert_eq!(out.outgoing[0].frame, gold_frame(7));
+    assert_eq!(out.outgoing[0].frame, gold_frame(7, session.shop_point));
 
     // Type 2 saturating at 0 when amount exceeds owned gold:
     let mut session = session_with_event(SOURCE_MAP, vec![gold_action(2, 999)]);
@@ -363,7 +363,7 @@ fn action_class5_gold_type1_points_then_gold() {
     let mut out = HandleOutcome::default();
     execute_event_step(&mut session, &data, &mut out);
     assert_eq!(session.gold, 0);
-    assert_eq!(out.outgoing[0].frame, gold_frame(0));
+    assert_eq!(out.outgoing[0].frame, gold_frame(0, session.shop_point));
 }
 
 #[test]

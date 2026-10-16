@@ -118,7 +118,7 @@ fn test_class5_gold_type1_and_type2_deduction() {
     let mut out = HandleOutcome::default();
     execute_event_step(&mut session, &data, &mut out);
     assert_eq!(session.gold, 2500);
-    assert_eq!(out.outgoing[0].frame, gold_frame(2500));
+    assert_eq!(out.outgoing[0].frame, gold_frame(2500, session.shop_point));
 
     // Type 2: deduct gold (saturating_sub)
     let action_sub_gold = EveResult {
@@ -133,7 +133,7 @@ fn test_class5_gold_type1_and_type2_deduction() {
     let mut out = HandleOutcome::default();
     execute_event_step(&mut session, &data, &mut out);
     assert_eq!(session.gold, 700);
-    assert_eq!(out.outgoing[0].frame, gold_frame(700));
+    assert_eq!(out.outgoing[0].frame, gold_frame(700, session.shop_point));
 
     // Type 2: deduct gold more than owned -> saturates at 0 without panic or overflow
     let action_sub_overflow = EveResult {
@@ -148,7 +148,7 @@ fn test_class5_gold_type1_and_type2_deduction() {
     let mut out = HandleOutcome::default();
     execute_event_step(&mut session, &data, &mut out);
     assert_eq!(session.gold, 0);
-    assert_eq!(out.outgoing[0].frame, gold_frame(0));
+    assert_eq!(out.outgoing[0].frame, gold_frame(0, session.shop_point));
 }
 
 #[test]

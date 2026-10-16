@@ -335,6 +335,7 @@ pub struct TradeState {
     pub gold: u32,
     pub items: Vec<InventoryItem>,
     pub pets: Vec<u8>,
+    pub started_at_ms: u64,
 }
 
 impl Default for Session {

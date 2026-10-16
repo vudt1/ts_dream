@@ -1,49 +1,43 @@
 //! NPC shop buy/sell (Opcode 0x1B) & Player shop (Opcode 0x17 subs 30–33) handlers.
 
 use crate::db::persist;
-use crate::protocol::encoder;
+use crate::protocol::{encoder, GOLD_CAP};
 use crate::server::dispatcher::OpcodeCtx;
 use crate::server::session::{Conn, InventoryItem};
 
-/// `F4440A001A04` + gold + `00000000` — the gold-update frame sent after
+/// `F4440A001A04` + gold + shop_point — the gold-update frame sent after
 /// every successful shop transaction (also used by the Eve gold action in
-/// `handlers::talk`).
-pub fn gold_frame(gold: u32) -> String {
-    format!("F4440A001A04{}00000000", encoder::le32(gold))
+/// `handlers::talk`). Gold is clamped to GOLD_CAP (9,999,999) to prevent client desync.
+pub fn gold_frame(gold: u32, shop_point: u32) -> String {
+    let clamped_gold = gold.min(GOLD_CAP);
+    format!(
+        "F4440A001A04{}{}",
+        encoder::le32(clamped_gold),
+        encoder::le32(shop_point)
+    )
+}
+
+/// Helper building S->C `1B 03` frame opening the NPC shop dialogue form.
+pub fn open_npc_shop_frame() -> &'static str {
+    "F44402001B03"
+}
+
+/// Helper building NPC shop Buy result packet S->C `1B 01 <code>`.
+pub fn npc_shop_buy_result(code: u8) -> String {
+    format!("F44403001B01{:02X}", code)
+}
+
+/// Helper building NPC shop Sell result packet S->C `1B 02 <code>`.
+pub fn npc_shop_sell_result(code: u8) -> String {
+    format!("F44403001B02{:02X}", code)
 }
 
 /// VISCII-encoded red message frame (`F444 + len + 020B + 00000000 + msg`).
-/// Proper-Unicode Vietnamese text is VISCII-mapped (§4.4 item 3) so ư/ờ/đ
-/// survive as single-byte VISCII instead of collapsing to `'?'`.
+/// Kept for backward compatibility with player shop toasts.
 fn red_message(msg: &str) -> String {
     let visc = crate::encoding::viscii_encode(msg);
     let body = format!("00000000{}", encoder::strhex(&visc));
     crate::protocol::frame("020B", &body)
-}
-
-/// Sell the first item in `item_range` present in inventory: remove up to
-/// `count` of it and credit that many gold. Returns true when something was
-/// sold.
-fn try_sell_range(conn: &mut Conn, item_range: std::ops::RangeInclusive<u16>, count: u8) -> bool {
-    if count == 0 {
-        return false;
-    }
-    for item_id in item_range {
-        if conn
-            .session
-            .homdo
-            .iter()
-            .filter(|i| i.id == item_id)
-            .map(|i| u32::from(i.count))
-            .sum::<u32>()
-            >= u32::from(count)
-        {
-            let removed = conn.session.remove_homdo_item(item_id, u32::from(count));
-            conn.session.gold = conn.session.gold.saturating_add(u32::from(count));
-            return removed == u32::from(count);
-        }
-    }
-    false
 }
 
 /// Lookup NPC shop entry by (idtalking, map_id, menu) → (item_id, price).
@@ -159,92 +153,107 @@ pub fn get_npc_shop_price(idtalking: i32, map_id: u16, menu: u8) -> Option<(u16,
     Some(price)
 }
 
+/// Resolve NPC shop entry by querying `scene_eve_data` SurfaceData or falling back to `get_npc_shop_price`.
+/// Lookup is strictly narrowed to the interacting NPC's surface (`last_surface_id` or `idtalking`)
+/// to prevent crosstalk between different shops on the same map.
+pub fn resolve_npc_shop_item(
+    data: &crate::data::loader::GameData,
+    conn: &Conn,
+    map_id: u16,
+    idtalking: i32,
+    item_index: u8,
+) -> Option<(u16, u32)> {
+    // 1. Check scene_eve_data surface data for the interacting NPC
+    if let Some(scene) = data.scene_eve_data.get(&u32::from(map_id)) {
+        let surface_id = conn
+            .session
+            .current_event_session
+            .as_ref()
+            .and_then(|ev| if ev.last_surface_id >= 0 { Some(ev.last_surface_id as u16) } else { None })
+            .or_else(|| if idtalking > 0 { Some(idtalking as u16) } else { None });
+
+        if let Some(sid) = surface_id {
+            if let Some(surface) = scene.surface_datas.get(&sid) {
+                if let Some(sentence) = surface.sentences.get(&item_index) {
+                    let item_id = sentence.data_id;
+                    let price = data.item_defs.get(&item_id).map(|d| d.price as u32).unwrap_or(0);
+                    if price > 0 {
+                        return Some((item_id, price));
+                    }
+                }
+            }
+        }
+    }
+    // 2. Fallback to transcribed price list
+    if let Some((item_id, fallback_price)) = get_npc_shop_price(idtalking, map_id, item_index) {
+        let price = data.item_defs.get(&item_id).map(|d| d.price as u32).filter(|&p| p > 0).unwrap_or(fallback_price);
+        return Some((item_id, price));
+    }
+    None
+}
+
 /// Handle Opcode 0x1B — NPC shop buy/sell.
-/// The branch is selected by `idtalking` (sell NPCs scan an item-id range; buy
-/// NPCs use the transcribed `(map, menu)` price table; `(7, 9999)` grants the
-/// free starter bundle).
+///
+/// Dispatches on `ctx.sub`:
+/// - `NPC_SHOP_SUB_BUY` (1): Buy item. Reads `item_index: u8` and `count: u16 LE`.
+///   Resolves item/price from `scene_eve_data` and `item_defs`, deducting gold and sending
+///   `1A 02`, `1A 04`, `17 06`, and `1B 01 00`.
+/// - `NPC_SHOP_SUB_SELL` (2): Sell item. Reads `slot: u8` and `qty: u8`.
+///   Credits gold based on `qty * sell_price` (clamped to 9,999,999) and sends
+///   `1A 01`, `1A 04`, `17 09`, and `1B 02 00`.
+///
+/// NOTE: The starter bundle branch for NPC ID 7 on Map 9999 is retained as an intentional
+/// developer/testing and local newbie convenience fallback when NPC 7 does not have
+/// surface entries in `eve.emg`.
 pub async fn handle_npc_shop(ctx: &mut OpcodeCtx<'_>) {
+    let sub = ctx.sub;
+    let payload = ctx.payload;
     let conn = &mut ctx.conn;
     let out = &mut ctx.out;
     let pool = ctx.env.pool;
     let data = ctx.data;
-    // payload[0] = menu, payload[1] = sell count.
-    let menu = ctx.payload.first().copied().unwrap_or(0);
-    let count = ctx.payload.get(1).copied().unwrap_or(0);
     let idtalking = conn.session.idtalking;
-    let idnpctalking = conn.session.idnpctalking;
     let map_id = conn.session.map_id;
 
-    let before_sell = conn.session.clone();
-    let sold = if map_id > 10000 && (idnpctalking == 16005 || idnpctalking == 99999) {
-        try_sell_range(conn, 26001..=26455, count)
-    } else if map_id > 10000 && (idnpctalking == 16002 || idnpctalking == 99999) {
-        try_sell_range(conn, 27001..=27165, count)
-    } else {
-        false
-    };
-    if sold {
-        let persisted = persist::persist_shop_transaction(
-            pool,
-            conn.session.id,
-            conn.session.gold,
-            &conn.session.homdo,
-            None,
-            None,
-            None,
-        )
-        .await;
-        if !persisted {
-            conn.session = before_sell;
-            tracing::warn!("NPC sell persistence failed for player {}", conn.session.id);
-        } else {
-            out.send(red_message("Khách quan bán hàng thành công"));
-            out.send(gold_frame(conn.session.gold));
-        }
+    if payload.is_empty() {
         return;
     }
 
-    // Free starter bundle (idtalking == 7 && map == 9999).
-    if idtalking == 7 && map_id == 9999 {
-        let before = conn.session.clone();
-        for (item_id, n) in [(18001u16, 1u8), (27156, 50), (52015, 50)] {
-            let item = crate::server::inventory::from_template(data, item_id, n);
-            if !crate::server::inventory::can_add_item(&conn.session.homdo, &item)
-                || conn.session.add_homdo_item(item).is_empty()
-            {
-                conn.session = before;
+    match sub {
+        crate::protocol::NPC_SHOP_SUB_BUY => {
+            let item_index = payload.first().copied().unwrap_or(0);
+            let count = if payload.len() >= 3 {
+                encoder::u16_le(payload[1], payload[2])
+            } else {
+                payload.get(1).copied().unwrap_or(1) as u16
+            };
+            if count == 0 {
+                out.send(npc_shop_buy_result(crate::protocol::NPC_SHOP_BUY_DISRUPTED));
                 return;
             }
-        }
-        if !persist::persist_shop_transaction(
-            pool,
-            conn.session.id,
-            conn.session.gold,
-            &conn.session.homdo,
-            None,
-            None,
-            None,
-        )
-        .await
-        {
-            conn.session = before;
-            return;
-        }
-        out.send(red_message("Khách quan mua hàng thành công"));
-        return;
-    }
 
-    // Buy from the transcribed (map, menu) shelf.
-    if let Some((item_id, price)) = get_npc_shop_price(idtalking, map_id, menu) {
-        if conn.session.gold >= price {
-            let item = crate::server::inventory::from_template(data, item_id, 1);
-            if !crate::server::inventory::can_add_item(&conn.session.homdo, &item) {
+            if count > 255 {
+                out.send(npc_shop_buy_result(crate::protocol::NPC_SHOP_BUY_QTY_FULL));
                 return;
             }
-            let before = conn.session.clone();
-            conn.session.gold -= price;
-            if conn.session.add_homdo_item(item).is_empty()
-                || !persist::persist_shop_transaction(
+
+            // Free starter bundle fallback (idtalking == 7 && map == 9999).
+            // Retained for local testing/dev environments when NPC 7 on map 9999 lacks surface data.
+            if idtalking == 7 && map_id == 9999 {
+                let before = conn.session.clone();
+                let mut granted_items = Vec::new();
+                for (item_id, n) in [(18001u16, 1u8), (27156, 50), (52015, 50)] {
+                    let item = crate::server::inventory::from_template(data, item_id, n);
+                    if !crate::server::inventory::can_add_item(&conn.session.homdo, &item)
+                        || conn.session.add_homdo_item(item.clone()).is_empty()
+                    {
+                        conn.session = before;
+                        out.send(npc_shop_buy_result(crate::protocol::NPC_SHOP_BUY_BAG_FULL));
+                        return;
+                    }
+                    granted_items.push(item);
+                }
+                if !persist::persist_shop_transaction(
                     pool,
                     conn.session.id,
                     conn.session.gold,
@@ -254,39 +263,166 @@ pub async fn handle_npc_shop(ctx: &mut OpcodeCtx<'_>) {
                     None,
                 )
                 .await
-            {
-                conn.session = before;
+                {
+                    conn.session = before;
+                    out.send(npc_shop_buy_result(crate::protocol::NPC_SHOP_BUY_DISRUPTED));
+                    return;
+                }
+                for item in &granted_items {
+                    out.send(equip_item_frame(item));
+                }
+                out.send(gold_frame(conn.session.gold, conn.session.shop_point));
+                out.send(npc_shop_buy_result(crate::protocol::NPC_SHOP_BUY_SUCCESS));
                 return;
             }
-            out.send(red_message("Khách quan mua hàng thành công"));
-            out.send(gold_frame(conn.session.gold));
+
+            let item_opt = resolve_npc_shop_item(data, conn, map_id, idtalking, item_index);
+            let Some((item_id, unit_price)) = item_opt else {
+                out.send(npc_shop_buy_result(crate::protocol::NPC_SHOP_BUY_DISRUPTED));
+                return;
+            };
+
+            let total_cost = (unit_price as u64).saturating_mul(u64::from(count));
+            if total_cost > u64::from(u32::MAX) || (conn.session.gold as u64) < total_cost {
+                out.send(npc_shop_buy_result(crate::protocol::NPC_SHOP_BUY_INSUFFICIENT_GOLD));
+                return;
+            }
+            let total_cost = total_cost as u32;
+
+            let buy_count = count.min(255) as u8;
+            let item = crate::server::inventory::from_template(data, item_id, buy_count);
+            if !crate::server::inventory::can_add_item(&conn.session.homdo, &item) {
+                out.send(npc_shop_buy_result(crate::protocol::NPC_SHOP_BUY_BAG_FULL));
+                return;
+            }
+
+            let before = conn.session.clone();
+            conn.session.gold -= total_cost;
+            let added_slots = conn.session.add_homdo_item(item.clone());
+            if added_slots.is_empty() {
+                conn.session = before;
+                out.send(npc_shop_buy_result(crate::protocol::NPC_SHOP_BUY_BAG_FULL));
+                return;
+            }
+
+            if !persist::persist_shop_transaction(
+                pool,
+                conn.session.id,
+                conn.session.gold,
+                &conn.session.homdo,
+                None,
+                None,
+                None,
+            )
+            .await
+            {
+                conn.session = before;
+                out.send(npc_shop_buy_result(crate::protocol::NPC_SHOP_BUY_DISRUPTED));
+                return;
+            }
+
+            // Wire sequence: 1A 02 -> 1A 04 -> 17 06 -> 1B 01 00
+            out.send(format!("F44406001A02{}", encoder::le32(total_cost)));
+            out.send(gold_frame(conn.session.gold, conn.session.shop_point));
+            out.send(equip_item_frame(&item));
+            out.send(npc_shop_buy_result(crate::protocol::NPC_SHOP_BUY_SUCCESS));
         }
+        crate::protocol::NPC_SHOP_SUB_SELL => {
+            let slot = payload.first().copied().unwrap_or(0);
+            let qty = payload.get(1).copied().unwrap_or(0);
+            if slot == 0 || qty == 0 {
+                return;
+            }
+
+            let Some(pos) = conn
+                .session
+                .homdo
+                .iter()
+                .position(|i| i.slot == slot && i.id > 0)
+            else {
+                out.send(npc_shop_sell_result(crate::protocol::NPC_SHOP_SELL_ITEM_NOT_FOUND));
+                return;
+            };
+
+            let item = conn.session.homdo[pos].clone();
+            if item.count < qty {
+                out.send(npc_shop_sell_result(crate::protocol::NPC_SHOP_SELL_QTY_NOT_ENOUGH));
+                return;
+            }
+
+            let unit_sell_price = data
+                .item_defs
+                .get(&item.id)
+                .map(|d| d.sell_price as u32)
+                .unwrap_or(1);
+            let revenue = (unit_sell_price as u64).saturating_mul(u64::from(qty));
+            if (u64::from(conn.session.gold)).saturating_add(revenue) > u64::from(GOLD_CAP) {
+                out.send(npc_shop_sell_result(crate::protocol::NPC_SHOP_SELL_GOLD_FULL_ALT));
+                return;
+            }
+            let revenue = revenue as u32;
+
+            let before = conn.session.clone();
+            conn.session.gold = (conn.session.gold.saturating_add(revenue)).min(GOLD_CAP);
+            if conn.session.homdo[pos].count == qty {
+                conn.session.homdo.remove(pos);
+            } else {
+                conn.session.homdo[pos].count -= qty;
+            }
+
+            if !persist::persist_shop_transaction(
+                pool,
+                conn.session.id,
+                conn.session.gold,
+                &conn.session.homdo,
+                None,
+                None,
+                None,
+            )
+            .await
+            {
+                conn.session = before;
+                out.send(npc_shop_sell_result(crate::protocol::NPC_SHOP_SELL_DISRUPTED));
+                return;
+            }
+
+            // Wire sequence: 1A 01 -> 1A 04 -> 17 09 -> 1B 02 00
+            out.send(format!("F44406001A01{}", encoder::le32(revenue)));
+            out.send(gold_frame(conn.session.gold, conn.session.shop_point));
+            out.send(format!("F44404001709{:02X}{:02X}", slot, qty));
+            out.send(npc_shop_sell_result(crate::protocol::NPC_SHOP_SELL_SUCCESS));
+        }
+        _ => {}
     }
 }
 
 /// Player shop catalog frame `1721`:
-/// 17 zero bytes + per listed item `id2 count2 price4 long giatri khang texp4 idx`.
+/// Header (17 bytes - 0x11): SubOp 0x21 (1B) + seller_id (4B LE) + 12 zero bytes.
+/// Entries: up to 10 items, each 16 bytes:
+/// slot (1B), itemId (2B LE), count (1B), long_val (1B), price (4B LE),
+/// giatri_long (1B), khang (1B), pad (1B), texp (4B LE).
 pub fn player_shop_catalog_frame(seller: &crate::server::session::Session) -> String {
-    let mut body = "0".repeat(34);
+    let mut body = format!("{}{}", encoder::le32(seller.id), "00".repeat(12));
     let mut idx = 1u8;
-    for listing in &seller.shop.items {
+    for listing in seller.shop.items.iter().take(10) {
         let item = seller
             .homdo
             .iter()
             .find(|i| i.slot == listing.slot && i.id > 0)
             .cloned()
             .unwrap_or_default();
+        body.push_str(&format!("{:02X}", idx));
         body.push_str(&encoder::le16(item.id));
-        body.push_str(&encoder::le16(u16::from(item.count)));
-        body.push_str(&encoder::le32(listing.price));
+        body.push_str(&format!("{:02X}", item.count));
         body.push_str(&format!("{:02X}", item.long_val));
+        body.push_str(&encoder::le32(listing.price));
         body.push_str(&format!(
             "{:02X}",
-            (100u16.wrapping_add(u16::from(item.giatri_long))) & 0xFF
+            crate::server::inventory::biased_giatri_long(item.giatri_long)
         ));
         body.push_str(&format!("{:02X}", item.khang));
+        body.push_str("00");
         body.push_str(&encoder::le32(item.texp));
-        body.push_str(&format!("{:02X}", idx));
         idx = idx.wrapping_add(1);
     }
     crate::protocol::frame("1721", &body)
@@ -300,10 +436,11 @@ pub enum ShopBuyError {
     NotEnoughStock,
     NotEnoughGold { total: u32 },
     NoFreeSlot,
+    SellerGoldFull,
 }
 
 /// Outcome of a completed player-shop purchase.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShopBuyResult {
     pub total: u32,
     pub count: u8,
@@ -313,6 +450,7 @@ pub struct ShopBuyResult {
 
 /// Perform a player-shop purchase between two in-memory sessions.
 /// Validates before mutating so a failed buy leaves both sides untouched.
+/// `shop_index` is 1-based (1..10) matching the client UI catalog echo.
 /// Seller gold is capped at 9,999,999.
 pub fn complete_shop_buy(
     buyer: &mut crate::server::session::Session,
@@ -323,10 +461,13 @@ pub fn complete_shop_buy(
     if !seller.shop.active || seller.shop.items.is_empty() {
         return Err(ShopBuyError::ShopClosed);
     }
+    let actual_idx = shop_index
+        .checked_sub(1)
+        .ok_or(ShopBuyError::InvalidIndex)?;
     let listing = seller
         .shop
         .items
-        .get(shop_index)
+        .get(actual_idx)
         .cloned()
         .ok_or(ShopBuyError::InvalidIndex)?;
     if count == 0 {
@@ -352,6 +493,11 @@ pub fn complete_shop_buy(
         return Err(ShopBuyError::NotEnoughGold { total });
     }
 
+    let seller_gold_total = u64::from(seller.gold).saturating_add(u64::from(total));
+    if seller_gold_total > u64::from(GOLD_CAP) {
+        return Err(ShopBuyError::SellerGoldFull);
+    }
+
     let equip = (1..=6).contains(&seller_item.loai);
     let mut purchase_item = seller_item.clone();
     purchase_item.count = count;
@@ -363,7 +509,7 @@ pub fn complete_shop_buy(
 
     // Apply the swap.
     buyer.gold -= total;
-    seller.gold = (u64::from(seller.gold).saturating_add(u64::from(total))).min(9_999_999) as u32;
+    seller.gold = (u64::from(seller.gold).saturating_add(u64::from(total))).min(u64::from(GOLD_CAP)) as u32;
 
     let seller_pos = seller
         .homdo
@@ -388,20 +534,23 @@ pub fn complete_shop_buy(
         let _ = crate::server::inventory::add_item(&mut buyer.homdo, copy);
     }
 
-    // Drop the listing when the seller's slot is sold out.
+    // Drop the listing when the seller's slot is sold out or listing count is exhausted.
     let still_has = seller
         .homdo
         .iter()
         .any(|i| i.slot == listing.slot && i.id > 0 && i.count > 0);
-    if !still_has {
-        seller.shop.items.remove(shop_index);
+    let new_listing_count = seller.shop.items[actual_idx].count.saturating_sub(count);
+    if !still_has || new_listing_count == 0 {
+        seller.shop.items.remove(actual_idx);
+    } else {
+        seller.shop.items[actual_idx].count = new_listing_count;
     }
 
     Ok(ShopBuyResult {
         total,
         count: moved,
         equip,
-        item: seller_item,
+        item: purchase_item,
     })
 }
 
@@ -420,7 +569,7 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
 
     match sub {
         // Sub 30: Open player shop — parse name + (slot, price) listings.
-        30 => {
+        crate::protocol::ITEM_SUB_STALL_OPEN => {
             let Some(name_len) = payload.first().copied().map(usize::from) else {
                 return;
             };
@@ -493,7 +642,7 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
             out.broadcast(id, bcast);
         }
         // Sub 31: Close player shop — self + broadcast 1720.
-        31 => {
+        crate::protocol::ITEM_SUB_STALL_CLOSE => {
             conn.session.shop.active = false;
             conn.session.shop.name.clear();
             conn.session.shop.items.clear();
@@ -502,7 +651,7 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
             out.broadcast(id, close);
         }
         // Sub 32: View another player's shop catalog.
-        32 => {
+        crate::protocol::ITEM_SUB_STALL_VIEW => {
             if payload.len() >= 4 {
                 let target = encoder::u32_le(payload[0], payload[1], payload[2], payload[3]);
                 let seller = crate::server::session::online_sessions()
@@ -521,11 +670,16 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
             }
         }
         // Sub 33: Buy from the shop opened by sub 32.
-        33 => {
+        crate::protocol::ITEM_SUB_STALL_BUY => {
             if payload.len() < 6 {
                 return;
             }
-            let seller_id = conn.session.open_shop_id;
+            let seller_id_wire = encoder::u32_le(payload[0], payload[1], payload[2], payload[3]);
+            let seller_id = if conn.session.open_shop_id != 0 {
+                conn.session.open_shop_id
+            } else {
+                seller_id_wire
+            };
             if seller_id == 0 || seller_id == id {
                 out.send(red_message("Không thể mua từ cửa hàng này"));
                 return;
@@ -565,20 +719,23 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
                         .lock()
                         .unwrap()
                         .insert(seller_id, seller_session.clone());
-                    out.send(gold_frame(conn.session.gold));
+                    out.send(gold_frame(conn.session.gold, conn.session.shop_point));
                     // Refresh the buyer's view of the seller's catalog.
                     out.send(player_shop_catalog_frame(&seller_session));
-                    if res.equip {
-                        out.send(equip_item_frame(&res.item));
-                    }
+                    out.send(equip_item_frame(&res.item));
                     if let Some(hub) = hub {
                         // Notify the seller of the gold received.
-                        let seller_gold = gold_frame(seller_session.gold);
+                        let seller_gold = gold_frame(seller_session.gold, seller_session.shop_point);
                         hub.send_to(seller_id, &seller_gold).await;
+                        // Gói gỡ/trừ đồ trên quầy
+                        hub.send_to(seller_id, &format!("F44404001709{:02X}{:02X}", res.item.slot, res.count)).await;
                     }
                 }
                 Err(ShopBuyError::NotEnoughGold { total }) => {
                     out.send(red_message(&format!("Không đủ vàng để mua, cần {}", total)));
+                }
+                Err(ShopBuyError::SellerGoldFull) => {
+                    out.send(red_message("Vàng của người bán đã đầy"));
                 }
                 Err(ShopBuyError::NotEnoughStock) => {
                     out.send(red_message("Người bán không đủ hàng"));
@@ -601,7 +758,7 @@ fn equip_item_frame(item: &InventoryItem) -> String {
         encoder::le16(item.id),
         item.count,
         item.long_val,
-        (100u16.wrapping_add(u16::from(item.giatri_long))) & 0xFF,
+        crate::server::inventory::biased_giatri_long(item.giatri_long),
         item.khang,
         encoder::le32(item.texp)
     );

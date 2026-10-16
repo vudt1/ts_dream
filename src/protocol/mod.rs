@@ -25,6 +25,9 @@ pub const SERVER_NAME: &str = "TSVN";
 /// Maximum level.
 pub const MAX_LEVEL: i64 = 200;
 
+/// Maximum gold capacity on player / bank (9,999,999).
+pub const GOLD_CAP: u32 = 9_999_999;
+
 // Canonical hex string opcodes for Logined1 and storage containers
 pub const OPCODE_APPEAR: &str = "03";
 pub const OPCODE_STATS: &str = "0503";
@@ -143,20 +146,99 @@ pub const OP_ITEM_INFO: u8 = 0x18;
 pub const OP_TRADE: u8 = 0x19;
 #[deprecated(note = "renamed to OP_TRADE, see .scratch/opcode-rename/spec.md")]
 pub const OP_SCENE_MANAGE: u8 = OP_TRADE;
+
+/// Trade sub-opcodes (opcode `0x19`).
+pub const TRADE_SUB_REQUEST: u8 = 0x01;
+pub const TRADE_SUB_OFFER_CS: u8 = 0x02;
+pub const TRADE_SUB_CONFIRM_CS: u8 = 0x03;
+pub const TRADE_SUB_STATUS: u8 = 0x02;
+pub const TRADE_SUB_OFFER: u8 = 0x03;
+pub const TRADE_SUB_PET_REQUEST: u8 = 0x0A;
+pub const TRADE_SUB_PET_OFFER_CS: u8 = 0x0B;
+pub const TRADE_SUB_PET_CONFIRM_CS: u8 = 0x0C;
+pub const TRADE_SUB_PET_STATUS: u8 = 0x0B;
+pub const TRADE_SUB_PET_DETAIL: u8 = 0x0C;
+pub const TRADE_SUB_TRANSFER_ITEM: u8 = 0x14;
+
 /// [0x1A] MoneySync — đồng bộ tiền/bộ đếm/banner (S->C)
 pub const OP_MONEY_SYNC: u8 = 0x1A;
 #[deprecated(note = "renamed to OP_MONEY_SYNC, see .scratch/opcode-rename/spec.md")]
 pub const OP_TALK: u8 = OP_MONEY_SYNC;
+
+/// MoneySync sub-opcodes (opcode `0x1A`).
+pub const MONEY_SUB_ADD_GOLD: u8 = 0x01;
+pub const MONEY_SUB_SUB_GOLD: u8 = 0x02;
+pub const MONEY_SUB_CAPACITY_FULL: u8 = 0x03;
+pub const MONEY_SUB_SYNC_BALANCE: u8 = 0x04;
+pub const MONEY_SUB_ADD_POINTS: u8 = 0x05;
+pub const MONEY_SUB_SUB_POINTS: u8 = 0x06;
+pub const MONEY_SUB_BANNER: u8 = 0x07;
+
 /// [0x1B] NpcShop — mua/bán NPC (Shared)
 /// NOTE (opcode-rename #03): identifier OP_NPC_SHOP rotated from 0x1F to 0x1B;
 /// old OP_NPC_SHOP (0x1F) callers must switch to OP_PET_HOTEL.
 pub const OP_NPC_SHOP: u8 = 0x1B;
+
+/// NPC Shop sub-opcodes (opcode `0x1B`).
+pub const NPC_SHOP_SUB_BUY: u8 = 0x01;
+pub const NPC_SHOP_SUB_SELL: u8 = 0x02;
+pub const NPC_SHOP_SUB_OPEN: u8 = 0x03;
+
+/// NPC Shop Buy result codes (S->C `1B 01 <code>`).
+pub const NPC_SHOP_BUY_SUCCESS: u8 = 0x00;
+pub const NPC_SHOP_BUY_INSUFFICIENT_GOLD: u8 = 0x01;
+pub const NPC_SHOP_BUY_BAG_FULL: u8 = 0x02;
+pub const NPC_SHOP_BUY_QTY_FULL: u8 = 0x03;
+pub const NPC_SHOP_BUY_DISRUPTED: u8 = 0x04;
+pub const NPC_SHOP_BUY_GOLD_FULL: u8 = 0x06;
+
+/// NPC Shop Sell result codes (S->C `1B 02 <code>`).
+pub const NPC_SHOP_SELL_SUCCESS: u8 = 0x00;
+pub const NPC_SHOP_SELL_GOLD_FULL: u8 = 0x01;
+pub const NPC_SHOP_SELL_ITEM_NOT_FOUND: u8 = 0x02;
+pub const NPC_SHOP_SELL_QTY_NOT_ENOUGH: u8 = 0x03;
+pub const NPC_SHOP_SELL_DISRUPTED: u8 = 0x04;
+pub const NPC_SHOP_SELL_GOLD_FULL_ALT: u8 = 0x06;
+
 /// [0x1C] Skill (Client gửi yêu cầu thi triển/học kỹ năng lên Server)
 pub const OP_SKILL_CS: u8 = 0x1C;
+
 /// [0x1D] Bank (Tiền trang / Gửi rút ngân lượng) 
 pub const OP_BANK: u8 = 0x1D;
+
+/// Bank sub-opcodes (opcode `0x1D`).
+pub const BANK_SUB_WITHDRAW: u8 = 0x01;
+pub const BANK_SUB_DEPOSIT: u8 = 0x02;
+pub const BANK_SUB_INSUFFICIENT_CAPACITY: u8 = 0x03;
+pub const BANK_SUB_SYNC_BALANCE: u8 = 0x04;
+pub const BANK_SUB_OPEN_FORM: u8 = 0x05;
+pub const BANK_SUB_CLOSE_FORM: u8 = 0x06;
+
 /// [0x1E] Storage (Rương Nhà Trọ & Ba Đậu Yêu Balo) 
 pub const OP_STORAGE: u8 = 0x1E;
+
+/// Storage sub-opcodes (opcode `0x1E`).
+pub const STORAGE_SUB_WITHDRAW: u8 = 0x01;
+pub const STORAGE_SUB_DEPOSIT: u8 = 0x02;
+pub const STORAGE_SUB_ITEM_ADD: u8 = 0x04;
+pub const STORAGE_SUB_ITEM_REMOVE: u8 = 0x05;
+pub const STORAGE_SUB_CLEAR: u8 = 0x08;
+
+/// Item & Inventory sub-opcodes (opcode `0x17`).
+pub const ITEM_SUB_ADD: u8 = 0x06;
+pub const ITEM_SUB_REFRESH_SLOT: u8 = 0x08;
+pub const ITEM_SUB_REMOVE: u8 = 0x09;
+pub const ITEM_SUB_STALL_OPEN: u8 = 0x1E;      // 30
+pub const ITEM_SUB_STALL_CLOSE: u8 = 0x1F;     // 31
+pub const ITEM_SUB_STALL_VIEW: u8 = 0x20;      // 32
+pub const ITEM_SUB_STALL_BUY: u8 = 0x21;       // 33
+pub const ITEM_SUB_STALL_REFRESH: u8 = 0x22;   // 34
+pub const ITEM_SUB_ACTION_FINISH: u8 = 0x32;   // 50
+pub const ITEM_SUB_WAREHOUSE_DEPOSIT: u8 = 0x33; // 51
+pub const ITEM_SUB_WAREHOUSE_WITHDRAW: u8 = 0x34;// 52
+pub const ITEM_SUB_CLOSE_TRADE_FORM: u8 = 0x3B;// 59
+pub const ITEM_SUB_WAREHOUSE_ITEM_ADD: u8 = 0x66;
+pub const ITEM_SUB_WAREHOUSE_ITEM_REMOVE: u8 = 0x68;
 /// [0x1F] PetHotel — khách điếm pet (Shared)
 pub const OP_PET_HOTEL: u8 = 0x1F;
 /// [0x20] Express (Chuyển phát nhanh bưu kiện) 

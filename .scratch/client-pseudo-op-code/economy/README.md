@@ -300,13 +300,30 @@ R11 `db/pool.rs::migrate()` là no-op · R12 test DB có thể đụng productio
 
 ---
 
-## 8. Việc còn mở
+## 8. Việc còn mở & Kết quả giải mã
 
-1. **Body builder `0x17` sub `0x21`/`0x22`** không có trong dump (`0x007840A7` / `0x0078418C`) — cần
-   redump ~7 KB ASM `0x00784000–0x00785000` để chốt layout mua từ stall.
-2. **`func_0x00610290`** (`TCY_BuyVenderMenu`) không có body ⇒ layout `17 21` mới ở mức **B**.
-3. **Sub `1D 01` = nộp hay rút?** Đã rõ chiều S→C nhưng chưa map được sub C→S.
-4. **Vòng quay / Trân Bảo Các**: `TFBlissBag`, `TFRollEgg`, `TFWheel` đã định danh form nhưng **chưa**
-   tìm thấy opcode điều khiển ⇒ xem `05_special_economy.md` §Undetermined.
-5. **Toàn bộ frame `1E 01..0D`** có layout nhưng Rust chỉ implement `1E 01` (storagetype 2).
-6. **Chưa chạy end-to-end với `aLogin.exe` thật** — mọi layout ở đây là từ decompile, chưa có capture.
+1. ~~**Body builder `0x17` sub `0x21`/`0x22`**~~ — **ĐÃ GIẢI MÃ (Level A)**:
+   - Tháo mã jump table `0x00783405` và các target builder:
+     - `17 1E` (`0x007840A7`): Mở quầy (`17 1E <len:u8><name><stall_id:u8><items>`).
+     - `17 1F` (`0x0078418C`): Đóng quầy (`17 1F`, 2B).
+     - `17 20` (`0x007841E1`): Xem quầy người khác (`17 20 <vendor_uid:u32 LE>`, 6B).
+     - `17 21` (`0x00784261`): Mua từ quầy (`17 21 <vendor_uid:u32 LE> <slot:u8> <count:u8>`, 8B).
+     - `17 22` (`0x0078434F`): Refresh quầy của mình (`17 22 <stall_id:u8>`).
+2. ~~**`func_0x00610290` (`TCY_BuyVenderMenu`)**~~ — **ĐÃ GIẢI MÃ (Level A)**:
+   - Tìm thấy decompiled body tại `test/ts_decompile/functions/00610290_FUN_00610290.c` (3656 bytes).
+   - Layout byte-exact: Header 17B (`17 21` + `vendor_uid:u32 LE` + 3x4B zero pad) + n×16B records (`slot:u8`, `itemId:u16 LE`, `count:u8`, `long:u8`, `price:u32 LE`, `giatri_long:u8`, `khang:u8`, `pad:0`, `texp:u32 LE`).
+3. ~~**Sub `1D 01` = nộp hay rút?**~~ — **ĐÃ GIẢI MÃ (Level A)**:
+   - Tháo mã Delphi button handlers trong `aLogin.exe`:
+     - `btn_Bank_Gold_R` (`0x005D85C4`): Mũi tên PHẢI (Bank → Túi) => **C→S `1D 01` = RÚT TIỀN**.
+     - `btn_Bank_Gold_L` (`0x005D87B4`): Mũi tên TRÁI (Túi → Bank) => **C→S `1D 02` = NỘP TIỀN**.
+   - S→C phản hồi: `1D 01 <Δ:u32>` (cộng bank), `1D 02 <Δ:u32>` (trừ bank), `1D 03` (lỗi bank đầy/không đủ), `1D 04 <val:u32>` (set bank gold), `1D 05` (mở `TMoneyAccountForm`).
+4. ~~**Vòng quay / Trân Bảo Các** (`TFBlissBag`, `TFRollEgg`, `TFWheel`)~~ — **ĐÃ LÀM RÕ (Level A)**:
+   - `TFWheel`: Animation sprite chiêu thức bánh xe lửa trong chiến đấu, không phải casino.
+   - `TFBlissBag`: Data loader đọc `Data\BlissBag.Dat` hiển thị preview túi may mắn (`17 15`).
+   - `TFRollEgg`: Loader nạp `Data\RG.Dat` vào `DAT_009d13d0` rồi tự hủy.
+   - Hệ thống cờ bạc mạng thực tế quản lý bởi `TSportManage` qua Opcode `0x39`: Panel 1=Tài Xỉu (`0x3A`), Panel 2=Domino (`0x3B`), Panel 3=Cờ tướng (`0x3C`), Panel 4=Lotto (`0x36`), Panel 6=Slot machine (`0x36`).
+5. ~~**Toàn bộ frame `1E 01..0D`**~~ — **ĐÃ GIẢI MÃ (Level A)**:
+   - Client có 3 container: Bank 1 (`+0xA48`, 51 slot), Bank 2 (`+0xB14`, 51 slot), Thủy binh (`+0xDC0`, 26 slot).
+   - Layout: `1E 01` (batch 12B records), `1E 04` (add 12B), `1E 05 <slot><count>` (remove), `1E 08` (clear), `1E 0C` (Thủy binh 14B), `1E 0D <slot><count>` (Thủy binh remove).
+   - Phát hiện bug trong Rust `trade_storage.rs`: Đang hardcode số lượng `0x32` thay vì `item.count`.
+6. **Chưa chạy end-to-end với `aLogin.exe` thật** — Cần test kết nối sau khi hoàn thiện code server theo kế hoạch.
