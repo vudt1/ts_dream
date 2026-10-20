@@ -93,7 +93,7 @@ ts_dream/
     │       ├── mod.rs          # Export codecs
     │       ├── thing_data.rs   # ThingDataCodec (35-byte item struct chuẩn hóa)
     │       ├── player_info.rs  # PlayerCard (15B + name) & FriendExtra (20B)
-    │       └── battle_role.rs  # BattleRoleSerializer (42B base header combatants)
+    │       └── ehuman.rs       # Bảng hằng ehuman (mã loại entity: EHuman, dùng cho record 0B FA / 0B 05)
     ├── eve/                    # 4-Tier Eve Script Engine (Động cơ sự kiện kịch bản)
     │   ├── mod.rs              # Export Eve Engine modules
     │   ├── state.rs            # PlayerEventState snapshot & EveStateBuilder
