@@ -82,31 +82,6 @@ fn item_wire(item: &InventoryItem) -> String {
     )
 }
 
-fn normal_trade_add_wire(item: &InventoryItem) -> String {
-    format!(
-        "{}{:02X}0000{:02X}{:02X}{:02X}{}",
-        encoder::le16(item.id),
-        item.count,
-        item.long_val,
-        inventory::biased_giatri_long(item.giatri_long),
-        item.khang,
-        encoder::le32(item.texp)
-    )
-}
-
-fn transferred_item_wire(item: &InventoryItem) -> String {
-    format!(
-        "{}{:02X}00{:02X}{:02X}{:02X}{:02X}{}",
-        encoder::le16(item.id),
-        item.count,
-        item.doben,
-        item.long_val,
-        inventory::biased_giatri_long(item.giatri_long),
-        item.khang,
-        encoder::le32(item.texp)
-    )
-}
-
 fn storage_entry(item: &InventoryItem) -> String {
     format!(
         "{:02X}{}{:02X}{:02X}{:02X}{:02X}{:02X}{}",
@@ -431,7 +406,7 @@ pub async fn handle_trade(ctx: &mut OpcodeCtx<'_>) {
                         ctx.conn.session.shop_point,
                     ));
                     for item in &incoming {
-                        ctx.out.send(frame("1706", &normal_trade_add_wire(item)));
+                        ctx.out.send(crate::server::inventory::item_added_frame(item));
                     }
                     ctx.out.send("F4440300190204");
                     if let Some(hub) = ctx.env.hub {
@@ -441,8 +416,11 @@ pub async fn handle_trade(ctx: &mut OpcodeCtx<'_>) {
                         )
                         .await;
                         for item in &partner_incoming {
-                            hub.send_to(partner_id, &frame("1706", &normal_trade_add_wire(item)))
-                                .await;
+                            hub.send_to(
+                                partner_id,
+                                &crate::server::inventory::item_added_frame(item),
+                            )
+                            .await;
                         }
                         hub.send_to(partner_id, "F4440300190204").await;
                     }
@@ -666,7 +644,7 @@ async fn transfer_item(ctx: &mut OpcodeCtx<'_>) {
     registry_put(target.clone());
     if let Some(hub) = ctx.env.hub {
         for item in &moved_items {
-            hub.send_to(recipient, &frame("1706", &transferred_item_wire(item)))
+            hub.send_to(recipient, &crate::server::inventory::item_added_frame(item))
                 .await;
         }
     }

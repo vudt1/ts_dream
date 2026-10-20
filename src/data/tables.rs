@@ -324,11 +324,12 @@ pub struct QuestResult {
 }
 
 /// `Data_Texps` — computed cumulative EXP thresholds (no file). Indexed by
-/// level (0..MaxLevel-1); each has reborn 0/1/2 thresholds.
+/// level (0..MaxLevel-1); each has reborn 0..3 thresholds (`k = {2.9, 3.0,
+/// 3.05, 3.0}` — reborn 3 is a distinct column, see [`crate::data::texps`]).
 #[derive(Debug, Clone, Default)]
 pub struct TexpRow {
     pub lv: i64,
-    pub reborn: [i64; 3],
+    pub reborn: [i64; 4],
 }
 
 /// A map NPC spawn entry (NpcOnMap.txt).

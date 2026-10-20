@@ -22,6 +22,31 @@ pub fn biased_giatri_long(raw: u8) -> u8 {
     ((u16::from(clamped) + GIA_TRI_LONG_BIAS) & 0xFF) as u8
 }
 
+/// The single `17 06` "item added" frame builder (S→C).
+///
+/// Wire layout (content, 0-based, `LEN = 0x0E`):
+/// `17 06 | id:u16 | count:u16 | doben | long | giatri+100 | khang | texp:u32`.
+/// The client reader `FUN_0076b458` reads `id@content[2..3]`,
+/// `count@content[4..5]`, the four attribute bytes at `[6..9]` and
+/// `texp@content[10..13]` (`HANDOFF-client-reverse.md` §4, G4).
+///
+/// Every add-item call-site (map pickup, NPC/player shops, trade, storage
+/// withdrawal, item-use rewards, GM grants and post-battle drops) must route
+/// through this one builder — do not hand-roll the byte layout elsewhere.
+pub fn item_added_frame(item: &InventoryItem) -> String {
+    let body = format!(
+        "{}{:02X}00{:02X}{:02X}{:02X}{:02X}{}",
+        crate::protocol::encoder::le16(item.id),
+        item.count,
+        item.doben,
+        item.long_val,
+        biased_giatri_long(item.giatri_long),
+        item.khang,
+        crate::protocol::encoder::le32(item.texp)
+    );
+    crate::protocol::frame("1706", &body)
+}
+
 /// Build an inventory item from its static template (`Data.Item`), carrying the
 /// base `_1`/`_2` stats, element and elemental bonus. Falls back to a bare
 /// id/count item when the id is not in the static table.

@@ -7,7 +7,7 @@
 //!
 //! P1:
 //! - Pet width: Mount horse (0x0F sub 4) & Summon (0x13 sub 1) allow 2-byte payload
-//! - Battle control 0x0B: Spectate & Jam under sub 2, ground parsing, sub 8 direct PvP
+//! - Battle control 0x0B: Spectate & Jam under sub 2, ground parsing, sub 8 is a no-op map click
 //! - Shop image (0x17 sub 30) and Reborn colors 2x u32 LE (0x17 sub 46)
 //!
 //! P2:
@@ -219,7 +219,8 @@ async fn test_p1_battle_control_inner_subs_and_sub_8() {
     battle::handle_battle(&mut ctx);
     assert_ne!(conn.session.battle_id, 0, "NPC battle should start");
 
-    // 2. Sub 8 direct PvP
+    // 2. Sub 8 is a map/PK click (`kind + u32 + index`) and must NOT open a
+    // battle directly (ticket 01).
     let mut conn2 = Conn::default();
     conn2.session.id = 20;
     let mut out2 = HandleOutcome::default();
@@ -227,8 +228,11 @@ async fn test_p1_battle_control_inner_subs_and_sub_8() {
     payload8.extend_from_slice(&99u32.to_le_bytes());
     let mut ctx2 = test_ctx(&mut conn2, &data, &service, &mut out2, 0x0B, 8, &payload8);
     battle::handle_battle(&mut ctx2);
-    // target 99 is not online, so start_pk_battle safely returns 0
-    assert_eq!(conn2.session.battle_id, 0);
+    assert_eq!(
+        conn2.session.battle_id, 0,
+        "sub 8 must never auto-open a battle from its kind"
+    );
+    assert!(out2.outgoing.is_empty());
 }
 
 #[tokio::test]

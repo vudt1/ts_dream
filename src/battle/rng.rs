@@ -115,7 +115,7 @@ impl DotNetRandom {
     }
 }
 
-/// The three battle RNG streams (§6.0).
+/// The battle RNG streams (§6.0).
 #[derive(Debug, Clone)]
 pub struct BattleRng {
     /// Stream 0: drop rolls, skill pick, RandomizeArrayWithPercent.
@@ -128,10 +128,16 @@ pub struct BattleRng {
     /// (see `battle/combat_formula.rs`). Keeping it separate preserves existing
     /// drop and NPC-AI draw ordering.
     pub random_damage: DotNetRandom,
+    /// Dedicated stream for the legacy Type15-in-`Type1`/`Type2` damage roll
+    /// (attacker buffed by skills 10016..10019, ticket 10). It is a battle-owned
+    /// deterministic stream initialised from the battle seed so seeded replay
+    /// stays byte-identical; it is separate from every other stream so the
+    /// drop/AI/damage draw order is untouched.
+    pub random_skill: DotNetRandom,
 }
 
 impl BattleRng {
-    /// Create three independent time-seeded streams.
+    /// Create independent time-seeded streams (production init).
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
@@ -139,6 +145,7 @@ impl BattleRng {
             random_1: DotNetRandom::time_seeded(),
             random_2: DotNetRandom::time_seeded(),
             random_damage: DotNetRandom::time_seeded(),
+            random_skill: DotNetRandom::time_seeded(),
         }
     }
 
@@ -149,6 +156,9 @@ impl BattleRng {
             random_1: DotNetRandom::new(s1),
             random_2: DotNetRandom::new(s2),
             random_damage: DotNetRandom::new(s0.wrapping_add(7_919)),
+            // Derived from `s0` so it is deterministic while remaining disjoint
+            // from the other streams; it never shares draws with them.
+            random_skill: DotNetRandom::new(s0.wrapping_add(12_953)),
         }
     }
 }

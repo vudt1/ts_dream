@@ -1,6 +1,6 @@
 //! Battle manager (Chapter 1 §1.4, Chapter 6) — registry + async per-battle tasks.
 //!
-//! One battle runs on its own `tokio::spawn` task. Player commands (op 0x32)
+//! One battle runs on its own `tokio::spawn` task. Player commands (op 0x0B)
 //! arrive through a per-battle `mpsc` channel; the task collects them each turn
 //! (with a per-turn timeout, default 20 s, ported from the Kotlin/mobile
 //! `BattleConstants.COUNTDOWN_NORMAL`), runs `Battle::run_turn`, and dispatches
@@ -254,7 +254,7 @@ fn fill_timeout_commands(
 ) {
     // Mobile auto-confirms a basic attack for every living, non-stunned
     // player-controlled fighter that timed out. The command still uses the
-    // unchanged PC 0x32 source/target fields.
+    // unchanged grid source/target fields (op 0x0B sub 3/4).
     for &(row, col) in waiting_cells {
         if commands.contains_key(&(row, col)) {
             continue;

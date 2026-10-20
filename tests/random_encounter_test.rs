@@ -1,4 +1,4 @@
-//! Unit and integration tests for Wild Random Encounter (eve.emg, Opcode 0x06, 0x0B, 0x32).
+//! Unit and integration tests for Wild Random Encounter (eve.emg, Opcode 0x06, 0x0B).
 
 use std::fs;
 use std::path::PathBuf;
@@ -977,12 +977,12 @@ async fn test_battle_rewards_and_drops_synchronize_to_online_sessions() {
     lock_online_sessions().remove(&7002);
 }
 
-/// 10. Test Opcode 0x0B Sub 0x05 (PlayerFled client packet):
-/// Verifies that when the client sends Opcode 0x0B Sub 0x05, the server cleanly
-/// clears battle_id, sets last_battle_end_ms, resets encounter_steps, syncs online_sessions,
-/// and responds with battle exit move (0504) and talk (1408) frames.
+/// 10. Opcode 0x0B Sub 0x05 is **not** a flee branch (ticket 01).
+/// The client builder for sub 5 is a no-op (`JA 0x78a4f2`), so a sub 5 frame
+/// must leave the session untouched: no battle teardown, no exit frames, no
+/// clear-battle-smoke broadcast.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_opcode_0b_sub_5_flee_battle() {
+async fn test_opcode_0b_sub_5_is_not_flee() {
     let data = GameData::default();
     let service = BattleService::new(Arc::new(data.clone()));
 
@@ -995,7 +995,7 @@ async fn test_opcode_0b_sub_5_flee_battle() {
         ..Default::default()
     }));
 
-    // Register a peer on the same map to verify clear_battle_smoke broadcast
+    // Register a peer on the same map to prove no clear_battle_smoke is emitted.
     let peer_sess = Arc::new(RwLock::new(Session {
         id: 8002,
         map_id: 12001,
@@ -1025,35 +1025,24 @@ async fn test_opcode_0b_sub_5_flee_battle() {
 
     ts_dream::server::handlers::battle::handle_battle(&mut ctx);
 
-    // Verify session in ctx.conn was cleaned up
-    assert_eq!(ctx.conn.session.battle_id, 0);
-    assert!(ctx.conn.session.last_battle_end_ms > 0);
-    assert_eq!(ctx.conn.session.encounter_steps, 0);
+    // The session must be completely untouched.
+    assert_eq!(ctx.conn.session.battle_id, 99);
+    assert_eq!(ctx.conn.session.last_battle_end_ms, 0);
+    assert_eq!(ctx.conn.session.encounter_steps, 18);
 
-    // Verify global online_sessions was updated
     let map = lock_online_sessions();
     let online = map.get(&8001).unwrap();
-    assert_eq!(online.battle_id, 0);
-    assert!(online.last_battle_end_ms > 0);
-    assert_eq!(online.encounter_steps, 0);
+    assert_eq!(online.battle_id, 99);
+    assert_eq!(online.last_battle_end_ms, 0);
+    assert_eq!(online.encounter_steps, 18);
     drop(map);
 
-    // Verify out received exit move (0504) and talk (1408) frames and 0B00 hide frame
-    assert!(out.outgoing.iter().any(|f| f.frame.contains("0504")));
-    assert!(out.outgoing.iter().any(|f| f.frame.contains("1408")));
-    assert!(out.outgoing.iter().any(|f| f.frame.contains("0B00")));
-
-    // Verify peer on the map received ClearBattleSmoke frame (0B00)
-    let mut peer_received_smoke_clear = false;
-    while let Ok(frame) = rx_peer.try_recv() {
-        if frame.contains("0B00") {
-            peer_received_smoke_clear = true;
-            break;
-        }
-    }
+    // No exit frames, no clear-battle-smoke to anyone.
+    assert!(out.outgoing.is_empty());
+    assert!(out.map_broadcast.is_empty());
     assert!(
-        peer_received_smoke_clear,
-        "Peer on map must receive ClearBattleSmoke frame (0B00) when player flees"
+        rx_peer.try_recv().is_err(),
+        "peer must not receive a clear-battle-smoke frame on sub 5"
     );
 
     lock_online_sessions().remove(&8001);

@@ -11,7 +11,7 @@
 //! - `start_npc_battle` / `start_pk_battle` / `start_teamdef_battle` build the
 //!   grid, `manager.spawn` it, register the participants, and push the
 //!   `0BFA` start frames.
-//! - op 0x32 handlers call `submit_command`.
+//! - op 0x0B sub 3/4 handlers call `submit_command`.
 //! - when the task ends, `battle_ended` runs the quest-win progression for the leader if
 //!   a quest talk is pending and the players won, then cleans up.
 
@@ -26,7 +26,7 @@ use crate::battle::runner::{
 };
 use crate::data::loader::GameData;
 use crate::data::tables::TexpRow;
-use crate::protocol::encoder;
+use crate::protocol::{encoder, GOLD_CAP};
 use crate::server::handlers::quest::BattleTrigger;
 use crate::server::session::Session;
 use std::collections::{HashMap, HashSet};
@@ -163,6 +163,9 @@ impl BattleSink for BattleSinkImpl {
                 doben: 100,
                 ..Default::default()
             };
+            // The dropped item must actually reach the client bag: build the
+            // single shared `17 06` add-item frame and send it to the owner.
+            let frame = crate::server::inventory::item_added_frame(&item);
             if let Some(online) = try_read_online_with_retry(&self.online, 10, std::time::Duration::from_millis(2)) {
                 if let Some(p) = online.get(&owner) {
                     if let Some(mut s) = try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2)) {
@@ -174,6 +177,7 @@ impl BattleSink for BattleSinkImpl {
             if let Some(s) = map.get_mut(&(owner as u32)) {
                 s.add_homdo_item(item);
             }
+            self.send_to(owner, frame);
         }
     }
 
@@ -264,11 +268,18 @@ impl BattleSink for BattleSinkImpl {
     }
 
     fn apply_pet_exp(&self, owner: i64, stt: i64, exp: i64) {
+        // Ticket 07: the client only learns a pet's new EXP from the `0F 08`
+        // record (reader `007a5010`), so build it while the updated session is
+        // still in hand and push it to the owner afterwards.
+        let mut frame: Option<String> = None;
         if let Some(online) = try_read_online_with_retry(&self.online, 10, std::time::Duration::from_millis(2)) {
             if let Some(p) = online.get(&owner) {
                 if let Some(mut s) = try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2)) {
                     if let Some(pet) = s.pets.iter_mut().find(|p| i64::from(p.stt) == stt) {
                         pet.texp = pet.texp.saturating_add(exp as u32);
+                    }
+                    if let Some(pet) = s.pets.iter().find(|p| i64::from(p.stt) == stt) {
+                        frame = Some(crate::server::spawn::pet_stat_frame(&s, pet));
                     }
                 }
             }
@@ -278,6 +289,15 @@ impl BattleSink for BattleSinkImpl {
             if let Some(pet) = s.pets.iter_mut().find(|p| i64::from(p.stt) == stt) {
                 pet.texp = pet.texp.saturating_add(exp as u32);
             }
+            if frame.is_none() {
+                if let Some(pet) = s.pets.iter().find(|p| i64::from(p.stt) == stt) {
+                    frame = Some(crate::server::spawn::pet_stat_frame(s, pet));
+                }
+            }
+        }
+        drop(map);
+        if let Some(frame) = frame {
+            self.send_to(owner, frame);
         }
     }
 
@@ -285,16 +305,32 @@ impl BattleSink for BattleSinkImpl {
         if amount <= 0 {
             return;
         }
+        let grant = amount as u32;
+        // The `1A 01` frame must carry the *actually credited* delta, so track
+        // the pre/post balance and clamp to the client gold cap (9,999,999).
+        let mut delta: u32 = 0;
         if let Some(online) = try_read_online_with_retry(&self.online, 10, std::time::Duration::from_millis(2)) {
             if let Some(p) = online.get(&owner) {
                 if let Some(mut s) = try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2)) {
-                    s.gold = s.gold.saturating_add(amount as u32);
+                    let before = s.gold;
+                    s.gold = s.gold.saturating_add(grant).min(GOLD_CAP);
+                    delta = s.gold - before;
                 }
             }
         }
         let mut map = crate::server::session::lock_online_sessions();
         if let Some(s) = map.get_mut(&(owner as u32)) {
-            s.gold = s.gold.saturating_add(amount as u32);
+            let before = s.gold;
+            s.gold = s.gold.saturating_add(grant).min(GOLD_CAP);
+            if delta == 0 {
+                delta = s.gold - before;
+            }
+        }
+        drop(map);
+        // The client learns about the balance change from this frame alone
+        // (`F44406001A01{le32(delta)}`); the session balance was updated above.
+        if delta > 0 {
+            self.send_to(owner, packets::gold_gain(delta));
         }
     }
 
@@ -495,8 +531,11 @@ fn send_to_map(online: &tokio::sync::RwLock<OnlineMap>, map_id: i64, frame: Stri
     }
 }
 
-/// Apply a battle DB write to the shared session and (for player targets with a
-/// status byte) push the `F4440C000801` status frame. Hpmax/Spmax mutate only.
+/// Apply a battle DB write to the shared session and, for player targets,
+/// push the matching `F4440C000801` status frame. `Hpmax`/`Spmax` lock the
+/// client's `+0x404`/`+0x406` with attr `0xCD`/`0xCE`
+/// (`04_battle_end_rewards.md §2.4`) so the client stops recomputing its own
+/// maxima from the `0x23` level byte.
 fn apply_db_update(online: &OnlineMap, update: DbUpdate) {
     match update.target {
         DbTarget::Player(id) => {
@@ -547,8 +586,11 @@ fn apply_player_stat(s: &mut Session, stat: Stat, value: i64) -> Option<String> 
             s.texp = v.clamp(0, u32::MAX as i64) as u32
         }),
         Stat::Lv => (Some(0x23), |s, v| s.level = v.clamp(0, 0xFF) as u8),
-        Stat::Hpmax => (None, |s, v| s.hp_max = clamp_u16(v)),
-        Stat::Spmax => (None, |s, v| s.sp_max = clamp_u16(v)),
+        // MaxHP/MaxSP: attr `0xCD`/`0xCE` write `+0x404`/`+0x406`, locking the
+        // server-computed values after the client's own recompute on `0x23`
+        // (`04_battle_end_rewards.md §2.4`).
+        Stat::Hpmax => (Some(0xCD), |s, v| s.hp_max = clamp_u16(v)),
+        Stat::Spmax => (Some(0xCE), |s, v| s.sp_max = clamp_u16(v)),
         Stat::Point => (Some(0x26), |s, v| s.point = clamp_u16(v)),
         Stat::SkillPoint => (Some(0x25), |s, v| s.skill_point = clamp_u16(v)),
         Stat::Fai => (Some(0x40), |s, v| s.tiengtam = clamp_u16(v)),
@@ -577,7 +619,7 @@ pub struct BattleService {
     pool: Option<Arc<tokio::sync::RwLock<Option<crate::db::pool::DbPool>>>>,
     /// The shared map-NPC world (ticket 20 G1/G2), built from `npcs_on_map`.
     world: Option<Arc<std::sync::RwLock<NpcWorld>>>,
-    /// Synchronous handle registry for sync handler access (op 0x32, join).
+    /// Synchronous handle registry for sync handler access (op 0x0B, join).
     handles: Mutex<HashMap<i32, BattleHandle>>,
     /// Pre-rendered join cell records per battle id (the grid lives in the
     /// async task, so we capture it at spawn).
@@ -1160,7 +1202,7 @@ impl BattleService {
         }
     }
 
-    /// Submit an op 0x32 command to the player's battle.
+    /// Submit an op 0x0B battle command to the player's battle.
     pub fn submit_command(&self, session: &Session, cmd: BattleCommand) -> bool {
         if session.battle_id == 0 {
             return false;

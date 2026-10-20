@@ -66,24 +66,6 @@ pub async fn handle_inventory(ctx: &mut OpcodeCtx<'_>) {
     }
 }
 
-/// Build the `1706` add-item frame.
-fn item_added_frame(item: &InventoryItem) -> String {
-    // F4440E001706 + le16(id) + count + 00 + doben + long + (giatriLong+100) + khang + le32(texp)
-    let body = format!(
-        "{:02X}00{:02X}{:02X}{:02X}{:02X}{}",
-        item.count,
-        item.doben,
-        item.long_val,
-        (item.giatri_long as u16 + 100) as u8,
-        item.khang,
-        encoder::le32(item.texp)
-    );
-    let mut full = String::from("1706");
-    full.push_str(&encoder::le16(item.id));
-    full.push_str(&body);
-    crate::protocol::frame("1706", &full[4..])
-}
-
 async fn handle_pickup(
     conn: &mut Conn,
     payload: &[u8],
@@ -133,7 +115,7 @@ async fn handle_pickup(
         // Pickup acks: 1702 (2-byte LE slot) + 1706 to the picker,
         // and a `04001702` removal broadcast to the map. No dump is emitted.
         out.send(format!("F44405001702{}01", encoder::le16(u16::from(slot))));
-        out.send(item_added_frame(&drop.item));
+        out.send(crate::server::inventory::item_added_frame(&drop.item));
         if let Some(hub) = hub {
             hub.broadcast_except(
                 conn.session.id,
@@ -756,7 +738,7 @@ async fn handle_auxiliary_bag(
 ) {
     for item in &conn.session.tuideo {
         if item.id > 0 {
-            out.send(item_added_frame(item));
+            out.send(crate::server::inventory::item_added_frame(item));
         }
     }
 }

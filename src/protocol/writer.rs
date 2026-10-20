@@ -145,15 +145,6 @@ impl PacketWriter {
         self
     }
 
-    /// Write a `BattleRoleData` struct.
-    pub fn write_battle_role(
-        &mut self,
-        role: &crate::protocol::codecs::BattleRoleData,
-    ) -> &mut Self {
-        role.encode(self);
-        self
-    }
-
     /// Write a 14-byte `EveResult` struct to the buffer.
     pub fn write_eve_result(
         &mut self,

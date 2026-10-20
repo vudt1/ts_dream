@@ -160,11 +160,6 @@ impl<'a> PacketReader<'a> {
         crate::protocol::codecs::FriendExtra::decode(self)
     }
 
-    /// Read a `BattleRoleData` struct from the stream.
-    pub fn read_battle_role(&mut self) -> Result<crate::protocol::codecs::BattleRoleData> {
-        crate::protocol::codecs::BattleRoleData::decode(self)
-    }
-
     /// Read an `EveResult` 14-byte struct from the stream.
     pub fn read_eve_result(&mut self) -> Result<crate::data::loaders::EveResult> {
         crate::protocol::codecs::NpcTalkCodec::decode_eve_result(self)

@@ -12,13 +12,12 @@ use crate::battle::combat_formula::{self, SkillFormulaInput};
 use crate::battle::npc_world::NpcWorld;
 use crate::battle::packets;
 use crate::battle::packets::{attack_status, miss_status, troi_byte, troi_end_byte};
-use crate::battle::rng::DotNetRandom;
 use crate::battle::targeting::{self, CellInfo, GridPos};
 use crate::data::tables::{BinarySkillDef, Item, Npc, Skill};
 use crate::protocol::encoder;
 use std::collections::HashMap;
 
-/// One player-submitted battle command (op 0x32 sub 1 / sub 2).
+/// One player-submitted battle command (op 0x0B sub 3 skill / sub 4 item).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BattleCommand {
     /// The grid cell being commanded (player's own cell or their pet cell).
@@ -28,14 +27,14 @@ pub struct BattleCommand {
     pub skill_lv: i64,
     pub row_attack: u8,
     pub col_attack: u8,
-    /// Op 0x32 sub 2: use-an-item command. `0` = normal skill command; a
+    /// Op 0x0B sub 4: use-an-item command. `0` = normal skill command; a
     /// potion id in `26001..=27165` heals the target cell + the owner's pet.
     pub use_item: i64,
 }
 
 /// Commands collected for one round, keyed by the commanded source cell.
 ///
-/// The source coordinates are already part of the PC `0x32` payload. Keying by
+/// The source coordinates are already part of the op `0x0B` payload. Keying by
 /// cell preserves separate actions for a player and that player's follow-NPC /
 /// pet instead of allowing one owner-keyed command to overwrite the other.
 pub type BattleCommands = HashMap<(u8, u8), BattleCommand>;
@@ -46,7 +45,7 @@ pub struct BattleData<'a> {
     pub skills: &'a HashMap<i64, Skill>,
     /// Optional binary skill catalog (PC `Skill.Dat` or mobile `Skill_C.dat`).
     pub binary_skills: Option<&'a HashMap<u16, BinarySkillDef>>,
-    /// Item records — used by in-battle use-item (op 0x32 sub 2) heals.
+    /// Item records — used by in-battle use-item (op 0x0B sub 4) heals.
     pub items: &'a HashMap<i64, Item>,
     /// Per-player pet slot ids `[stt1..stt4]` (0 = empty), used by catch.
     pub pet_slots: &'a HashMap<i64, [i64; 4]>,
@@ -507,22 +506,9 @@ impl Battle {
     /// Apply HP loss with the standard DB-write rules (players/pets get a clamped
     /// DB write; npc types 3/7 just subtract).
     fn apply_hp_loss(&self, c: &mut WarInfo, dmg: i64, out: &mut Vec<Out>) {
-        if !matches!(c.typ, 3 | 7) {
-            let target = if c.id_char == 0 {
-                DbTarget::Player(c.id)
-            } else {
-                DbTarget::Pet {
-                    owner: c.id_char,
-                    stt: c.id_npc_on_map,
-                }
-            };
-            out.push(Out::Db(DbUpdate {
-                target,
-                stat: Stat::Hp,
-                value: (c.hp - dmg).max(0),
-            }));
-        }
+        let value = (c.hp - dmg).max(0);
         c.hp -= dmg;
+        self.write_hp(c, value, out);
     }
 
     // ---- Phase 2: input / auto actions -----------------------------------
@@ -543,7 +529,7 @@ impl Battle {
                     c.attacked = true;
                 }
 
-                // Apply a submitted player command (op 0x32 sub 1 / sub 2).
+                // Apply a submitted player command (op 0x0B sub 3 / sub 4).
                 if let Some(cmd) = commands.get(&(c.row, c.col)) {
                     if !c.attacked && c.row == cmd.row && c.col == cmd.col {
                         if cmd.use_item > 0 {
@@ -564,11 +550,11 @@ impl Battle {
         }
     }
 
-    /// Op 0x32 sub 2 — use a potion in battle.
+    /// Op 0x0B sub 4 — use a potion in battle.
     ///
     /// Heals the target cell's `_Hp`/`_Sp` (capped to its max) plus the active
     /// pet of the owner, both via the item record's `_Hp`/`_Sp`. Inventory
-    /// removal happens synchronously in the op 0x32 handler.
+    /// removal happens in the op 0x0B sub 4 handler, after engine acceptance.
     fn apply_use_item(&self, data: &BattleData, c: &mut WarInfo, item_id: i64, out: &mut Vec<Out>) {
         let (hp, sp) = data
             .items
@@ -720,21 +706,7 @@ impl Battle {
         if attacker.type3_id == 0 && attacker.attacked {
             let cost = skill_sp(data, skill);
             if attacker.sp >= cost {
-                if !matches!(attacker.typ, 3 | 7) {
-                    let target = if attacker.id_char == 0 {
-                        DbTarget::Player(attacker.id)
-                    } else {
-                        DbTarget::Pet {
-                            owner: attacker.id_char,
-                            stt: attacker.id_npc_on_map,
-                        }
-                    };
-                    out.push(Out::Db(DbUpdate {
-                        target,
-                        stat: Stat::Sp,
-                        value: attacker.sp - cost,
-                    }));
-                }
+                self.write_sp(&attacker, attacker.sp - cost, out);
                 attacker.sp -= cost;
             } else {
                 // Not enough SP → basic attack fallback.
@@ -1338,8 +1310,10 @@ impl Battle {
                 hit = miss_status::MISS as i64;
             }
             if matches!(attacker.type15_id, 10016..=10019) {
-                let mut fresh = DotNetRandom::time_seeded();
-                if fresh.next_range(1, 3) == 1 {
+                // Ticket 10: draw from the battle-owned deterministic
+                // `random_skill` stream (seeded from the battle seed) instead of
+                // a fresh time-seeded RNG, so seeded replay is byte-identical.
+                if self.rng.random_skill.next_range(1, 3) == 1 {
                     *num36 = 0;
                     adl = attack_status::LANTRANH;
                 } else {
@@ -1407,21 +1381,8 @@ impl Battle {
 
     fn apply_reflect(&self, attacker: &mut WarInfo, ts: &mut TurnState, out: &mut Vec<Out>) {
         let dmg = ts.reflect;
-        if !matches!(attacker.typ, 3 | 7) {
-            let target = if attacker.id_char == 0 {
-                DbTarget::Player(attacker.id)
-            } else {
-                DbTarget::Pet {
-                    owner: attacker.id_char,
-                    stt: attacker.id_npc_on_map,
-                }
-            };
-            out.push(Out::Db(DbUpdate {
-                target,
-                stat: Stat::Hp,
-                value: (attacker.hp - dmg).max(0),
-            }));
-        }
+        let value = (attacker.hp - dmg).max(0);
+        self.write_hp(attacker, value, out);
         attacker.hp -= dmg;
         let text15 = format!(
             "{:02X}{:02X}{}0101{}",
@@ -1564,8 +1525,8 @@ impl Battle {
         );
         *num36 = attack.damage;
         if matches!(attacker.type15_id, 10016..=10019) {
-            let mut fresh = DotNetRandom::time_seeded();
-            if fresh.next_range(1, 3) == 1 {
+            // Ticket 10: same battle-owned deterministic stream as `apply_physical`.
+            if self.rng.random_skill.next_range(1, 3) == 1 {
                 *num36 = 0;
             } else {
                 *num36 = (*num36 / 10).max(1);
@@ -1701,36 +1662,15 @@ impl Battle {
                     // SP drain + caster heal.
                     let drain = skill_lv * 30;
                     ts.heal += drain;
-                    if !matches!(target.typ, 3 | 7) {
-                        let t = pet_target(target);
-                        out.push(Out::Db(DbUpdate {
-                            target: t,
-                            stat: Stat::Sp,
-                            value: (target.sp - drain).max(0),
-                        }));
-                    }
                     target.sp = (target.sp - drain).max(0);
+                    self.write_sp(target, target.sp, out);
                     if attacker.hp + ts.heal > attacker.hp_max {
                         ts.heal = attacker.hp_max - attacker.hp;
-                        if !matches!(attacker.typ, 3 | 7) {
-                            let t = pet_target(attacker);
-                            out.push(Out::Db(DbUpdate {
-                                target: t,
-                                stat: Stat::Hp,
-                                value: attacker.hp_max,
-                            }));
-                        }
                         attacker.hp = attacker.hp_max;
+                        self.write_hp(attacker, attacker.hp_max, out);
                     } else {
-                        if !matches!(attacker.typ, 3 | 7) {
-                            let t = pet_target(attacker);
-                            out.push(Out::Db(DbUpdate {
-                                target: t,
-                                stat: Stat::Hp,
-                                value: attacker.hp + ts.heal,
-                            }));
-                        }
                         attacker.hp += ts.heal;
+                        self.write_hp(attacker, attacker.hp, out);
                     }
                     target.type3_id = status_id;
                     target.type3_lv = skill_lv;
@@ -2137,10 +2077,12 @@ impl Battle {
             let mut frames = String::new();
             frames.push_str(&packets::acting(r, c));
             frames.push_str(&packets::acting(pr, c));
-            frames.push_str(&packets::clear_pet_cell(r, c));
-            frames.push_str(&packets::clear_pet_cell(pr, c));
+            // Reset both occupied cells (pet row `pr`, player row `r`); the old
+            // `reposition` frame reset the player cell a second time.
+            frames.push_str(&packets::reset_cell(pr, c));
+            frames.push_str(&packets::reset_cell(r, c));
             frames.push_str(&packets::hide_from_map(player as u32));
-            frames.push_str(&packets::reposition(r, c));
+            frames.push_str(&packets::reset_cell(r, c));
             out.push(Out::Broadcast(frames));
             out.push(Out::MapBroadcast {
                 player,
@@ -2592,6 +2534,11 @@ impl Battle {
                 value,
             }));
         }
+        // `33 01` propId `0x19` — the only frame that refreshes an in-battle
+        // unit's HP bar (and triggers the revive effect when `value > 0` on a
+        // dead unit). Broadcast for every unit, including NPCs (which never get
+        // a DB row). `02_battle_positions.md §2.5`.
+        out.push(Out::Broadcast(packets::set_hp(c.row, c.col, value)));
     }
 
     fn write_sp(&self, c: &WarInfo, value: i64, out: &mut Vec<Out>) {
@@ -2602,6 +2549,8 @@ impl Battle {
                 value,
             }));
         }
+        // `33 01` propId `0x1A` — in-battle SP refresh. See `write_hp`.
+        out.push(Out::Broadcast(packets::set_sp(c.row, c.col, value)));
     }
 
     fn apply_target_hp(&self, target: &mut WarInfo, dmg: i64, out: &mut Vec<Out>) {
@@ -2774,9 +2723,16 @@ impl Battle {
     /// End-of-battle: player rewards + cleanup packets (§3.8).
     ///
     /// `per_exp` = `Server.PerEXP` (usually 1). `fled` suppresses exp. Emits the
-    /// hide/reposition frames, battle-exit UI packets, player exp Db writes
+    /// hide/cell-reset frames, battle-exit UI packets, player exp Db writes
     /// (with level-up side effects), and `Out::PetExp` for the active pets.
     /// `won` gates the win-path map-npc respawn (win + flee respawn; lose not).
+    ///
+    /// The grid is scanned by each cell's actual `typ`/`team` rather than by the
+    /// old hardcoded "player = row 3, leader pet = row 2": every player cell of
+    /// our side (team 1, rows 2 and 3 per `team_for_row`) is rewarded, and each
+    /// pet's exp follows its own owner (`id_char`), so a player seated in row 2
+    /// is no longer skipped and no pet exp is double-awarded. `keys` preserves
+    /// the (row, col) creation order so the frame sequence stays deterministic.
     pub fn finish(
         &mut self,
         data: &BattleData,
@@ -2786,11 +2742,11 @@ impl Battle {
         out: &mut Vec<Out>,
     ) {
         let mut text9 = String::new();
-        for col in 0..5u8 {
-            let Some(cell) = self.cell(3, col).cloned() else {
+        for key in self.keys.clone() {
+            let Some(cell) = self.list_war.get(&key).cloned() else {
                 continue;
             };
-            if cell.id <= 0 || cell.typ != 2 {
+            if cell.id <= 0 || cell.typ != 2 || cell.team != 1 {
                 continue;
             }
             let player = cell.id;
@@ -2823,58 +2779,29 @@ impl Battle {
                     let new_sp_max =
                         crate::battle::engine::get_sp_max(cell.reborn, snap.job, new_lv, snap.spx)
                             + snap.spx2;
-                    out.push(Out::Db(DbUpdate {
-                        target: DbTarget::Player(player),
-                        stat: Stat::Lv,
-                        value: new_lv,
-                    }));
-                    out.push(Out::Db(DbUpdate {
-                        target: DbTarget::Player(player),
-                        stat: Stat::Hpmax,
-                        value: new_hp_max,
-                    }));
-                    out.push(Out::Db(DbUpdate {
-                        target: DbTarget::Player(player),
-                        stat: Stat::Hp,
-                        value: new_hp_max,
-                    }));
-                    out.push(Out::Db(DbUpdate {
-                        target: DbTarget::Player(player),
-                        stat: Stat::Spmax,
-                        value: new_sp_max,
-                    }));
-                    out.push(Out::Db(DbUpdate {
-                        target: DbTarget::Player(player),
-                        stat: Stat::Sp,
-                        value: new_sp_max,
-                    }));
-                    out.push(Out::Db(DbUpdate {
-                        target: DbTarget::Player(player),
-                        stat: Stat::Point,
-                        value: 2 * lv_ups,
-                    }));
-                    out.push(Out::Db(DbUpdate {
-                        target: DbTarget::Player(player),
-                        stat: Stat::SkillPoint,
-                        value: lv_ups,
-                    }));
+                    push_level_up_rewards(player, new_lv, lv_ups, new_hp_max, new_sp_max, out);
                 }
             }
 
-            // Active-pet exp (pet cells cols 0,1,3,4 → stt = active..+3).
+            // Active-pet exp: every pet cell of our side owned by this player.
+            // Ownership (`id_char`) routes the grant to the pet's owner, so a
+            // pet is awarded exactly once even with several player rows.
             if !fled {
-                for &pc in &[0u8, 1, 3, 4] {
-                    if let Some(pet) = self.cell(2, pc).cloned() {
-                        if pet.id > 0 {
-                            let exp = per_exp * pet.exp;
-                            if exp > 0 {
-                                out.push(Out::PetExp {
-                                    owner: player,
-                                    stt: pet.id_npc_on_map,
-                                    exp,
-                                });
-                            }
-                        }
+                let pets: Vec<WarInfo> = self
+                    .keys
+                    .iter()
+                    .filter_map(|k| self.list_war.get(k))
+                    .filter(|p| p.typ == 4 && p.team == 1 && p.id > 0 && p.id_char == player)
+                    .cloned()
+                    .collect();
+                for pet in pets {
+                    let exp = per_exp * pet.exp;
+                    if exp > 0 {
+                        out.push(Out::PetExp {
+                            owner: player,
+                            stt: pet.id_npc_on_map,
+                            exp,
+                        });
                     }
                 }
             }
@@ -2888,8 +2815,8 @@ impl Battle {
                 }));
             }
             text9.push_str(&packets::hide_from_map(player as u32));
-            text9.push_str(&packets::reposition(cell.row, cell.col));
-            text9.push_str(&packets::clear_pet_cell(cell.row, cell.col));
+            text9.push_str(&packets::reset_cell(cell.row, cell.col));
+            text9.push_str(&packets::reset_cell(cell.row ^ 1, cell.col));
             out.push(Out::MapBroadcast {
                 player,
                 frame: packets::hide_from_map(player as u32),
@@ -2907,6 +2834,66 @@ impl Battle {
         out.push(Out::Broadcast(packets::battle_exit_move()));
         out.push(Out::Broadcast(packets::battle_exit_talk()));
     }
+}
+
+/// Push the level-up reward burst for one player cell (ticket 06).
+///
+/// Assumes the `Texp` write for the same cell was already emitted. Emits, in
+/// order: `08 01 23` (Lv) → `05 0A` (LevelUP event) → `08 01 CD` (MaxHP) →
+/// `08 01 19` (Hp) → `08 01 CE` (MaxSP) → `08 01 1A` (Sp) → `08 01 26` (Point)
+/// → `08 01 25` (SkillPoint).
+///
+/// `Hpmax`/`Spmax` are locked *after* `Lv` so the client stops recomputing its
+/// own (possibly mismatched) maxima from the level byte
+/// (`.scratch/client-pseudo-op-code/battle/04_battle_end_rewards.md §2.4`,
+/// M4/M6). The `05 0A` frame carries the leveled character id so the client
+/// shows the "LevelUP" label + sound (`§2.8`). Kept as a free function so the
+/// per-cell `finish()` generalization can reuse it for every player cell.
+fn push_level_up_rewards(
+    player: i64,
+    new_lv: i64,
+    lv_ups: i64,
+    new_hp_max: i64,
+    new_sp_max: i64,
+    out: &mut Vec<Out>,
+) {
+    let target = DbTarget::Player(player);
+    out.push(Out::Db(DbUpdate {
+        target,
+        stat: Stat::Lv,
+        value: new_lv,
+    }));
+    out.push(Out::Broadcast(packets::level_up(player as u32)));
+    out.push(Out::Db(DbUpdate {
+        target,
+        stat: Stat::Hpmax,
+        value: new_hp_max,
+    }));
+    out.push(Out::Db(DbUpdate {
+        target,
+        stat: Stat::Hp,
+        value: new_hp_max,
+    }));
+    out.push(Out::Db(DbUpdate {
+        target,
+        stat: Stat::Spmax,
+        value: new_sp_max,
+    }));
+    out.push(Out::Db(DbUpdate {
+        target,
+        stat: Stat::Sp,
+        value: new_sp_max,
+    }));
+    out.push(Out::Db(DbUpdate {
+        target,
+        stat: Stat::Point,
+        value: 2 * lv_ups,
+    }));
+    out.push(Out::Db(DbUpdate {
+        target,
+        stat: Stat::SkillPoint,
+        value: lv_ups,
+    }));
 }
 
 fn next_delay(data: &BattleData, cell: &WarInfo) -> i64 {

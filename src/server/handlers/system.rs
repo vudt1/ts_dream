@@ -134,13 +134,9 @@ pub async fn handle_gm_shop(ctx: &mut OpcodeCtx<'_>) {
                 return;
             }
 
-            // Emit the item-add frame `F4440E001706`+id+count+9 zero bytes
-            // *before* deducting the points.
-            let mut add_body = String::new();
-            add_body.push_str(&encoder::le16(item.id));
-            add_body.push_str(&format!("{:02X}", 1));
-            add_body.push_str(&"00".repeat(9));
-            out.send(crate::protocol::frame("1706", &add_body));
+            // Emit the shared `17 06` item-add frame *before* deducting the
+            // points.
+            out.send(crate::server::inventory::item_added_frame(&item));
 
             // Grant + deduct in memory, then persist both atomically.
             let new_points = conn.session.shop_point.saturating_sub(price);

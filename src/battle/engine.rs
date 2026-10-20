@@ -15,6 +15,17 @@ pub fn war_key(row: u8, col: u8) -> String {
     format!("{row:x}{col:x}")
 }
 
+/// Team for a grid row: the client derives the side as `grp < 2` ⇒ side 2 and
+/// `grp >= 2` ⇒ side 1 (`aLogin.exe`, `HANDOFF-client-reverse.md §0.2`), so rows
+/// 0 and 1 are the enemy side 2 while rows 2 and 3 are the player side 1.
+pub fn team_for_row(row: u8) -> i64 {
+    if row < 2 {
+        2
+    } else {
+        1
+    }
+}
+
 /// A single grid cell (Chapter 6 §6.0).
 #[derive(Debug, Clone, Default)]
 pub struct WarInfo {
@@ -68,6 +79,11 @@ impl WarInfo {
     /// The `_Packet` 23-byte snapshot (`ChangedWar`, §6.1):
     /// Type:X2 | le32(Id) | le16(IdNpcOnMap) | le32(IdChar) | row,col |
     /// le16(HpMax) | le16(SpMax) | le16(Hp) | le16(Sp) | lv, TT.
+    ///
+    /// This is byte-for-byte the 23-byte record of `0B 05` (`FUN_00644294`) and
+    /// the 24-byte record of `0B FA` (`FUN_006438ac`) with the leading `kind`
+    /// byte omitted (`01_battle_start_scene.md §2.2` and `§3.2`; verified from
+    /// the client ASM `client_pseudo_c/006438ac_FUN_006438ac.asm.txt:74-240`).
     pub fn packet_hex(&self) -> String {
         let mut s = String::with_capacity(46);
         s.push_str(&format!("{:02X}", self.typ));
@@ -96,35 +112,76 @@ fn clamp_u8(v: i64) -> u8 {
     v.clamp(0, 0xFF) as u8
 }
 
-/// Max-HP formula `(rb, job, lvl, hpx)` — resolved exactly (§6.6).
+/// Max-HP formula `(rb, job, lvl, hpx)` — byte-matched to the client
+/// `FUN_0065a554` (`test/ts_decompile/functions/0065a554_...asm.txt`).
+///
+/// The client dispatches on `reborn` (outer, arg `[EBP+0xc]`) and, for reborn
+/// 2 only, on `job` (inner, arg `[EBP+0x8]`, values 1..4). Every branch is
+/// `ROUND(pow(level, w37) * hpx * mult + level * w35) + base + hpx * add`:
+///
+/// | reborn | job | `mult` | `base` | `add` | ASM |
+/// |---:|---:|---:|---:|---:|---|
+/// | 0 | — | 2.0 | 80 | 2 | `0x65a583` |
+/// | 1 | — | 2.0 | 180 | 4 | `0x65a66d` |
+/// | 2 | 1 | 2.5 | 280 | 25 | `0x65a778` |
+/// | 2 | 2 | 3.0 | 380 | 30 | `0x65a841` |
+/// | 2 | 3 | 2.0 | 180 | 23 | `0x65a90e` |
+/// | 2 | 4 | 2.0 | 180 | 21 | `0x65a9db` |
+///
+/// `w37` (exponent), `w35` (level coefficient) and reborn-0's `base`
+/// (`base_hp`) are read from `Data/Formula.Dat` (`w37 = 0.35`, `w35 = 1.0`,
+/// `base_hp = 80`); the other multiplicands/addends are inline ASM immediates.
+/// `ROUND` is half away from zero (`@ROUND` @ `0x00402b1c`).
+///
+/// Reborn 3 (`:18`) and a reborn-2 `job` outside 1..4 (`:184`) fall through to
+/// the epilogue, where the client returns 0. The server keeps the safe job-4
+/// column (`base 180 + hpx*21`) instead of 0 so an unexpected value can never
+/// zero a live stat. See `tests/max_hp_sp_formula_test.rs` for the sample set.
 pub fn get_hp_max(rb: i64, job: i64, lvl: i64, hpx: i64) -> i64 {
     let lv = lvl as f64;
     let p = lv.powf(0.35);
-    let val = match rb {
-        0 => (p + 1.0) * (hpx as f64) * 2.0 + 80.0 + lv,
-        1 => (p + 2.0) * (hpx as f64) * 2.0 + 180.0 + lv,
-        _ => match job {
-            1 => (p * 2.0 + 25.0) * (hpx as f64) + 280.0 + lv,
-            2 => (p * 3.0 + 30.0) * (hpx as f64) + 380.0 + lv,
-            3 => (p + 11.5) * (hpx as f64) * 2.0 + 180.0 + lv,
-            _ => (p + 10.5) * (hpx as f64) * 2.0 + 180.0 + lv,
+    let (mult, base, add): (f64, i64, i64) = match rb {
+        0 => (2.0, 80, 2),
+        1 => (2.0, 180, 4),
+        2 => match job {
+            1 => (2.5, 280, 25),
+            2 => (3.0, 380, 30),
+            3 => (2.0, 180, 23),
+            _ => (2.0, 180, 21),
         },
+        _ => (2.0, 180, 21),
     };
-    val.floor() as i64
+    (p * hpx as f64 * mult + lv).round() as i64 + base + hpx * add
 }
 
-/// Max-SP formula `(rb, job, lvl, spx)` (§6.6).
+/// Max-SP formula `(rb, job, lvl, spx)` — byte-matched to the client
+/// `FUN_0065ad10` (`test/ts_decompile/functions/0065ad10_...asm.txt`), same
+/// dispatch shape as [`get_hp_max`]:
+///
+/// | reborn | job | `mult` | `base` | ASM |
+/// |---:|---:|---:|---:|---|
+/// | 0 | — | 2.0 | 60 | `0x65ad3f` |
+/// | 1 | — | 2.0 | 110 | `0x65ae06` |
+/// | 2 | 1, 2 | 2.0 | 160 | `0x65aee3` |
+/// | 2 | 3 | 3.0 | 310 | `0x65af8a` |
+/// | 2 | 4 | 3.5 | 410 | `0x65b031` |
+///
+/// Exponent `w40 = 0.25`, level coefficient `w38 = 1.0`; reborn-0's `base` is
+/// `base_sp = 60`. Both come from `Data/Formula.Dat`. Reborn 3 and an
+/// unexpected reborn-2 job fall to the epilogue (client returns 0); the server
+/// keeps the safe job-4 column (`base 410`).
 pub fn get_sp_max(rb: i64, job: i64, lvl: i64, spx: i64) -> i64 {
     let lv = lvl as f64;
     let p = lv.powf(0.25);
-    let val = match rb {
-        0 => p * (spx as f64) * 2.0 + 60.0 + lv,
-        1 => p * (spx as f64) * 2.0 + 110.0 + lv,
-        _ => match job {
-            1 | 2 => p * (spx as f64) * 2.0 + 160.0 + lv,
-            3 => p * (spx as f64) * 3.0 + 310.0 + lv,
-            _ => p * (spx as f64) * 3.5 + 410.0 + lv,
+    let (mult, base): (f64, i64) = match rb {
+        0 => (2.0, 60),
+        1 => (2.0, 110),
+        2 => match job {
+            1 | 2 => (2.0, 160),
+            3 => (3.0, 310),
+            _ => (3.5, 410),
         },
+        _ => (3.5, 410),
     };
-    val.floor() as i64
+    (p * spx as f64 * mult + lv).round() as i64 + base
 }

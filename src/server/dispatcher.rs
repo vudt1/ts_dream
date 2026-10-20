@@ -13,7 +13,7 @@ use crate::data::loader::GameData;
 use crate::error::Result;
 use crate::protocol::{
     encoder, OP_ACCOUNT, OP_ANTI_ADDICTION, OP_APPARATUS, OP_ARENA_WATERWAR, OP_AUTH, OP_BANK,
-    OP_BATTLE, OP_BATTLE_COMMAND, OP_BATTLE_PET, OP_BOAT_RACE, OP_CAFE_ID, OP_CHAT, OP_CHILD,
+    OP_BATTLE, OP_BATTLE_PET, OP_BOAT_RACE, OP_CAFE_ID, OP_CHAT, OP_CHILD,
     OP_COMPOUND, OP_CREATE_CHAR, OP_DICE_BIDAXIAO, OP_DOMINO, OP_EXP_LEVEL, OP_EXPRESS,
     OP_FRIEND_INVITE, OP_GAME_POINTS, OP_GM_ANNOUNCE, OP_GM_MANAGE, OP_GROUP, OP_HOTKEY,
     OP_ITEM, OP_ITEM_INFO, OP_ITEM_MALL, OP_JOB_CHANGE, OP_LOGIN_COMPLETE, OP_LOOK, OP_LOTTO,
@@ -351,9 +351,6 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
 
         // OP_REBORN_PET (0x2C) — Pet reborn
         OP_REBORN_PET => skills::handle_pet_reborn(ctx).await,
-
-        // OP_BATTLE_COMMAND (0x32) — Battle commands (ticket 21)
-        OP_BATTLE_COMMAND => battle::handle_battle_command(ctx),
 
         // OP_APPARATUS (0x41) — Rank system
         OP_APPARATUS => system::handle_rank(ctx),

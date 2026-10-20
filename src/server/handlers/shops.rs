@@ -269,7 +269,7 @@ pub async fn handle_npc_shop(ctx: &mut OpcodeCtx<'_>) {
                     return;
                 }
                 for item in &granted_items {
-                    out.send(equip_item_frame(item));
+                    out.send(crate::server::inventory::item_added_frame(item));
                 }
                 out.send(gold_frame(conn.session.gold, conn.session.shop_point));
                 out.send(npc_shop_buy_result(crate::protocol::NPC_SHOP_BUY_SUCCESS));
@@ -324,7 +324,7 @@ pub async fn handle_npc_shop(ctx: &mut OpcodeCtx<'_>) {
             // Wire sequence: 1A 02 -> 1A 04 -> 17 06 -> 1B 01 00
             out.send(format!("F44406001A02{}", encoder::le32(total_cost)));
             out.send(gold_frame(conn.session.gold, conn.session.shop_point));
-            out.send(equip_item_frame(&item));
+            out.send(crate::server::inventory::item_added_frame(&item));
             out.send(npc_shop_buy_result(crate::protocol::NPC_SHOP_BUY_SUCCESS));
         }
         crate::protocol::NPC_SHOP_SUB_SELL => {
@@ -722,7 +722,7 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
                     out.send(gold_frame(conn.session.gold, conn.session.shop_point));
                     // Refresh the buyer's view of the seller's catalog.
                     out.send(player_shop_catalog_frame(&seller_session));
-                    out.send(equip_item_frame(&res.item));
+                    out.send(crate::server::inventory::item_added_frame(&res.item));
                     if let Some(hub) = hub {
                         // Notify the seller of the gold received.
                         let seller_gold = gold_frame(seller_session.gold, seller_session.shop_point);
@@ -750,17 +750,3 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
     }
 }
 
-/// `1706` frame carrying a freshly purchased equipable item to the buyer
-/// (`id2 count2 0000 long giatri khang texp4`).
-fn equip_item_frame(item: &InventoryItem) -> String {
-    let body = format!(
-        "{}{:02X}0000{:02X}{:02X}{:02X}{}",
-        encoder::le16(item.id),
-        item.count,
-        item.long_val,
-        crate::server::inventory::biased_giatri_long(item.giatri_long),
-        item.khang,
-        encoder::le32(item.texp)
-    );
-    crate::protocol::frame("1706", &body)
-}

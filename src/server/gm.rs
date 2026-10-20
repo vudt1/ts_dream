@@ -9,7 +9,6 @@
 use crate::db::modern::sqlite::SqliteRepositories;
 use crate::db::persist;
 use crate::db::pool::DbPool;
-use crate::protocol::encoder;
 use crate::server::dispatcher::HandleOutcome;
 use crate::server::session::{online_sessions, Conn, InventoryItem, Session};
 use crate::server::spawn;
@@ -86,11 +85,7 @@ fn update_online(target: u32, session: Session) {
 }
 
 fn emit_item_add(out: &mut HandleOutcome, item: &InventoryItem) {
-    let mut body = String::new();
-    body.push_str(&encoder::le16(item.id));
-    body.push_str(&format!("{:02X}", item.count));
-    body.push_str(&"00".repeat(9));
-    out.send(crate::protocol::frame("1706", &body));
+    out.send(crate::server::inventory::item_added_frame(item));
 }
 
 async fn audit(

@@ -3,7 +3,7 @@
 //! Creates a new battle grid, populates cells with players/NPCs/pets, and
 //! manages the global battle-id counter.
 
-use crate::battle::engine::{war_key, WarInfo};
+use crate::battle::engine::{team_for_row, war_key, WarInfo};
 use crate::battle::packets;
 use crate::battle::rng::BattleRng;
 use crate::data::tables::Npc;
@@ -88,10 +88,10 @@ impl Battle {
     /// Add a player to the battle grid.
     ///
     /// `row` is 3 for team 1, 0 for team 2. `col` is the column (2 = leader).
-    /// `team = (row == 0) ? 2 : 1`.
+    /// `team = team_for_row(row)`.
     pub fn add_player(&mut self, session: &Session, leader_id: i64, row: u8, col: u8) {
         let key = war_key(row, col);
-        let team = if row == 0 { 2 } else { 1 };
+        let team = team_for_row(row);
 
         if let Some(cell) = self.list_war.get_mut(&key) {
             cell.typ = 2; // player type
@@ -122,7 +122,7 @@ impl Battle {
     /// `active .. active+3`. Later member pets overwrite overlapping cells
     /// (dict insertion order wins).
     pub fn load_leader_pets(&mut self, session: &Session, leader_id: i64, row: u8) {
-        let team = if row == 0 { 2 } else { 1 };
+        let team = team_for_row(row);
         let base = session.active_pet_stt as i64;
         let cols = [1u8, 3, 0, 4];
         for (i, &col) in cols.iter().enumerate() {
@@ -137,7 +137,7 @@ impl Battle {
     /// Load one battle pet for a party member at `(row^1, col)` when the member's
     /// active pet Stt is in 1..=4.
     pub fn load_member_pet(&mut self, session: &Session, leader_id: i64, row: u8, col: u8) {
-        let team = if row == 0 { 2 } else { 1 };
+        let team = team_for_row(row);
         let stt = session.active_pet_stt as i64;
         if (1..=4).contains(&stt) {
             if let Some(pet) = session.pets.iter().find(|p| i64::from(p.stt) == stt) {
@@ -417,7 +417,7 @@ impl Battle {
     ///
     /// Packet order: show leader → show other members → the `0BFA`
     /// frame → map broadcast of self → own pet entity → enemy entities.
-    /// Markers inside the frame: `05`+self, `03`+leader(+leader pet),
+    /// Markers inside the frame: `04`+self, `03`+leader(+leader pet),
     /// `64`+each other member(+their pet).
     pub fn member_battle_frame(&self, diahinh: i32, member_id: i64) -> Vec<StartPacket> {
         let mut out: Vec<StartPacket> = Vec::new();
@@ -441,7 +441,13 @@ impl Battle {
         }
 
         let mut text = String::new();
-        text.push_str("05");
+        // Self record marker `04`, not `05`: the client writes the record's
+        // `kind` byte straight into `player+0x376` (`006438ac:262`); only
+        // `0x376 == 4` unlocks the "leave battle" button (`00590ba8:159`) and
+        // the `0x376 = 0` reset inside `0B 00` (`00641fa4:69-76`). A `05` here
+        // traps the member in the battle. Non-self markers below stay
+        // `03`/`64` (entity type, never read into `+0x376`).
+        text.push_str("04");
         text.push_str(&self_packet);
 
         // Leader block: (row,2) then (row^1,2)

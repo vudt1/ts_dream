@@ -99,9 +99,9 @@ impl UseCtx<'_> {
         self.out.send(crate::protocol::frame("0802", &body));
     }
 
-    /// Add `count` of `item_id` to Homdo: emits the
-    /// `F4440E001706`+id+count+`000000000000000000` reward frame, or
-    /// `F44403001B0102` (inventory full). Returns whether the item was added.
+    /// Add `count` of `item_id` to Homdo: emits the shared `17 06` add-item
+    /// frame (see `inventory::item_added_frame`), or `F44403001B0102`
+    /// (inventory full). Returns whether the item was added.
     pub async fn add_reward(&mut self, item_id: u16, count: u8) -> bool {
         let item = crate::server::inventory::from_template(self.data, item_id, count);
         let affected = self.conn.session.add_homdo_item(item.clone());
@@ -114,11 +114,8 @@ impl UseCtx<'_> {
                 persist::upsert_item(self.pool, self.conn.session.id, "homdo", a).await;
             }
         }
-        self.out.send(format!(
-            "F4440E001706{}{:02X}000000000000000000",
-            encoder::le16(item_id),
-            count
-        ));
+        self.out
+            .send(crate::server::inventory::item_added_frame(&item));
         true
     }
 

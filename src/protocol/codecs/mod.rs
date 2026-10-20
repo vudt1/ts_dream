@@ -3,15 +3,14 @@
 //! Provides byte-exact serializers and deserializers for core TS Online entities:
 //! - `ThingData` (35 bytes item wire format)
 //! - `PlayerCard` & `FriendExtra` (Player card and social extra data)
-//! - `BattleRoleData` & `BattleRoleSerializer` (Battle entity appearances for opcodes `0x0B` / `0x32`)
+//! - `ehuman` (character entity kind constants for the `0B FA` / `0B 05` battle records)
 
-pub mod battle_role;
+pub mod ehuman;
 pub mod npc_talk;
 pub mod player_info;
 pub mod quest_sync;
 pub mod thing_data;
 
-pub use battle_role::{ehuman, BattleRoleData, BattleRoleSerializer};
 pub use npc_talk::{
     NpcTalkCodec, TalkLockMode, EVE_RESULT_SIZE, SUB_CLOSE_TALK_WINDOW, SUB_END_TALK,
     SUB_LOCK_ACTOR, SUB_SELECT_MENU, SUB_TALK_CONTINUE, SUB_TALK_STEP, TALK_STEP_BODY_SIZE,

@@ -419,6 +419,11 @@ pub fn pet_summary(s: &Session) -> Vec<String> {
 
 /// Per-pet `0F08` stat body — the fixed legacy layout shared by
 /// [`pet_summary`] and [`pet_status_single`].
+///
+/// Byte-exact per client reader `007a5010` (HANDOFF §6, G9): one record is
+/// exactly `99 + name.len()` bytes (stride `nameLen + 0x63`). `id` is `le16`
+/// (was `le32`) and `texp` is the `le32` EXP at `+0x03`; the tail is 6 bytes
+/// (`lv_skill[3] | 00 | le16(v) | 2 reserve`), not 12.
 fn pet_stat_entry(s: &Session, p: &crate::server::session::PetState) -> String {
     let stt = p.stt;
     let lv_skill = [
@@ -428,27 +433,27 @@ fn pet_stat_entry(s: &Session, p: &crate::server::session::PetState) -> String {
         p.skills.get(3).map(|x| x.1).unwrap_or(0),
     ];
     let mut stats = String::new();
-    stats.push_str(&format!("{:02X}", stt));
-    stats.push_str(&encoder::le32(u32::from(p.id)));
-    stats.push_str(&encoder::le32(p.texp));
-    stats.push_str(&format!("{:02X}", p.level));
-    stats.push_str(&encoder::le16(p.hp));
-    stats.push_str(&encoder::le16(p.sp));
-    stats.push_str(&encoder::le16(p.int1));
-    stats.push_str(&encoder::le16(p.atk));
-    stats.push_str(&encoder::le16(p.def));
-    stats.push_str(&encoder::le16(p.agi));
-    stats.push_str(&encoder::le16(p.hpx));
-    stats.push_str(&encoder::le16(p.spx));
-    stats.push_str("00"); // reserved byte
-    stats.push_str(&format!("{:02X}{:02X}", p.fai, p.quest));
-    stats.push_str(&encoder::le16(p.skill_point));
-    stats.push_str(&format!("{:02X}", p.name.len()));
-    stats.push_str(&encoder::strhex(&p.name));
+    stats.push_str(&format!("{:02X}", stt)); // +0x00 stt
+    stats.push_str(&encoder::le16(p.id)); // +0x01..0x02 id (u16)
+    stats.push_str(&encoder::le32(p.texp)); // +0x03..0x06 EXP
+    stats.push_str(&format!("{:02X}", p.level)); // +0x07 level
+    stats.push_str(&encoder::le16(p.hp)); // +0x08..0x09
+    stats.push_str(&encoder::le16(p.sp)); // +0x0A..0x0B
+    stats.push_str(&encoder::le16(p.int1)); // +0x0C..0x0D
+    stats.push_str(&encoder::le16(p.atk)); // +0x0E..0x0F
+    stats.push_str(&encoder::le16(p.def)); // +0x10..0x11
+    stats.push_str(&encoder::le16(p.agi)); // +0x12..0x13
+    stats.push_str(&encoder::le16(p.hpx)); // +0x14..0x15
+    stats.push_str(&encoder::le16(p.spx)); // +0x16..0x17
+    stats.push_str("00"); // +0x18 reserved byte
+    stats.push_str(&format!("{:02X}{:02X}", p.fai as u8, p.quest)); // +0x19 fai, +0x1A quest
+    stats.push_str(&encoder::le16(p.skill_point)); // +0x1B..0x1C
+    stats.push_str(&format!("{:02X}", p.name.len())); // +0x1D nameLen
+    stats.push_str(&encoder::strhex(&p.name)); // +0x1E.. name
     stats.push_str(&format!(
         "{:02X}{:02X}{:02X}",
         lv_skill[0], lv_skill[1], lv_skill[2]
-    ));
+    )); // 3 byte lv_skill[0..2]
     for sub in 1..=6u16 {
         let slot = (stt as u16) * 10 + sub;
         if let Some(item) = s.trangbi.iter().find(|i| u16::from(i.slot) == slot && i.id > 0) {
@@ -457,10 +462,20 @@ fn pet_stat_entry(s: &Session, p: &crate::server::session::PetState) -> String {
             stats.push_str("00000000000000000000");
         }
     }
-    stats.push_str("00000000000000"); // 7 reserved bytes
+    // Tail 6 byte: lv_skill[3] | 00 | le16(v) | 2 byte dự phòng (`pet+0x565..0x568`).
     stats.push_str(&format!("{:02X}", lv_skill[3]));
-    stats.push_str("00000000"); // 4 reserved bytes
+    stats.push_str("00");
+    stats.push_str("0000");
+    stats.push_str("0000");
     stats
+}
+
+/// Single-pet `0F 08` frame — one record only.
+///
+/// Used to push a pet stat change (e.g. the EXP earned in a battle) to its
+/// owner without resending the whole `pet_summary` sequence.
+pub fn pet_stat_frame(s: &Session, p: &crate::server::session::PetState) -> String {
+    crate::protocol::frame(OPCODE_PET_STATS, &pet_stat_entry(s, p))
 }
 
 /// Per-pet `0F14` slot entry.
