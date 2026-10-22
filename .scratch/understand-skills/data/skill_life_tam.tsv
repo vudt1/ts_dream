@@ -1,0 +1,63 @@
+id	id_hex	name	space	elem	sp_cost	sk_point	max_lvl	require_sk	skill_type	delay	server_name	server_type	server_sk_point	server_max_lvl	server_require_sk
+14001	0x36B1	Thuật trinh thám	client	5	0	0	1	0	0	20	Thuật trinh thám	5	0	1	0
+14002	0x36B2	Thuật đào tẩu	client	5	10	0	1	14001	12	5	Thuật đào tẩu	5	0	1	14001
+14003	0x36B3	Thuật mua bán	client	5	0	0	8	14001	0	20	Thuật mua bán	5	0	8	14001
+14004	0x36B4	Thuật dò xét	client	5	0	0	10	14001	0	20	Thuật dò xét	5	0	10	14001
+14005	0x36B5	Thuật luyện đơn	client	5	0	0	10	14001	0	20	Thuật luyện đơn	5	0	10	14001
+14006	0x36B6	Đại hô	client	5	20	0	10	14001	2	22	Đại hô	5	0	10	14001
+14007	0x36B7	Giải hôn	client	5	5	0	1	14002	5	20	Giải hôn	5	0	1	14002
+14008	0x36B8	Hôn mê	client	5	15	0	5	14002	3	22	Hôn mê	5	0	5	14002
+14009	0x36B9	Người làm	client	5	0	0	10	14003	0	20	Người làm	5	0	10	14003
+14010	0x36BA	Thuật đào khoáng	client	5	0	0	10	14004	0	20	Thuật đào khoáng	5	0	10	14004
+14011	0x36BB	Thuật đúc luyện	client	5	0	0	10	14005	0	20	Thuật đúc luyện 	5	0	10	14005
+14012	0x36BC	Đồng tâm	client	5	36	0	10	14006	4	20	Đồng tâm	5	0	10	14006
+14013	0x36BD	Cổ Vũ	client	5	36	0	10	14006	4	20	Cổ Vũ	5	0	10	14006
+14014	0x36BE	Giải độc	client	5	8	0	1	0	5	20	Giải độc	5	0	1	0
+14015	0x36BF	Bỏ độc	client	5	25	0	10	0	15	20	Bỏ độc	5	0	10	0
+14016	0x36C0	Thuật giao dịch	client	5	0	0	10	14009	0	20	Thuật giao dịch	5	0	10	14009
+14017	0x36C1	Tịnh toạ	client	5	0	0	10	14009	0	20	Tịnh toạ	5	0	10	14009
+14018	0x36C2	Thuật đào sâu	client	5	0	0	10	14010	0	20	Thuật đào sâu	5	0	10	14010
+14019	0x36C3	Thuật chế tạo	client	5	0	0	5	14011	0	20	Thuật chế tạo	5	0	5	14011
+14020	0x36C4	Hoạch lí phản	client	5	30	0	5	14012	15	20	Hoạch lí phản	5	0	5	14012
+14021	0x36C5	Hỗn loạn	client	5	25	0	5	0	15	20	Hỗn loạn	5	0	5	0
+14022	0x36C6	Giải hỗn loạn	client	5	10	0	1	0	5	32	Giải hỗn loạn	5	0	1	0
+14023	0x36C7	Cưỡi ngựa	client	5	0	0	1	0	0	20	Cưỡi ngựa	5	0	1	0
+14024	0x36C8	Linh quang ẩn hiện	client	5	20	0	1	0	0	12	Linh quang ẩn hiện	5	0	1	0
+14025	0x36C9	Chiếm đọat	client	5	0	0	1	0	0	12	Chiếm đọat	5	0	1	0
+14026	0x36CA	Triệu gọi	client	5	0	0	1	0	0	20	Triệu gọi	5	0	1	0
+14027	0x36CB	Đạo sư	client	5	0	0	1	0	0	12	Đạo sư	5	0	1	0
+14028	0x36CC	Đoàn kết	client	5	0	0	1	0	0	12	Đoàn kết	5	0	1	0
+14029	0x36CD	Cát Phổ Trại bắn đạn	client	5	60	0	10	0	15	30	Cát Phổ Trại bắn đạn	5	0	10	0
+14030	0x36CE	Cát Phổ Trại áp đỉnh	client	5	80	0	10	0	2	33	Cát Phổ Trại áp đỉnh	5	0	10	0
+14031	0x36CF	Tiếp chiêu	client	5	0	0	1	0	0	20	Tiếp chiêu	5	0	1	0
+14032	0x36D0	Tinh luyện	client	5	0	0	10	14019	0	20	Tinh luyện	5	0	10	14019
+14033	0x36D1	Xạ Tiễn	client	5	30	0	5	14037	2	29	Xạ Tiễn	5	0	5	14037
+14034	0x36D2	Kỵ Binh	client	5	0	0	1	0	0	20	Kỵ Binh	5	0	1	0
+14035	0x36D3	Chuyển Thể	client	5	0	0	1	0	0	0	Chuyển Thể	5	0	1	0
+14036	0x36D4	Bách Xuyên	client	5	24	0	5	0	1	29	Bách Xuyên	5	0	5	0
+14037	0x36D5	Tiễn Vũ	client	5	30	0	5	14036	2	39	Tiễn Vũ 	5	0	5	14036
+14038	0x36D6	Đại chu thiên	client	5	0	1	10	0	0	30	Đại chu thiên	5	1	10	0
+14039	0x36D7	Bá khí	client	5	0	1	10	14038	0	30	Bá khí	5	1	10	14038
+14040	0x36D8	Bá ý	client	5	46	1	5	14038	19	27	Bá ý	5	1	5	14038
+14041	0x36D9	Lực bạt sơn hề	client	5	0	1	10	14038	0	30	Lực bạt sơn hề	5	1	10	14038
+14042	0x36DA	Sóng cuồng	client	5	54	1	5	14038	1	19	Sóng cuồng	5	1	5	14038
+14043	0x36DB	Anh khí hộ thân	client	5	0	1	10	14038	0	30	Anh khí hộ thân	5	1	10	14038
+14044	0x36DC	ThiênThần thuẫn	client	5	46	1	5	14038	19	30	ThiênThần thuẫn	5	1	5	14038
+14045	0x36DD	Tâm nhãn	client	5	0	1	10	14038	0	30	Tâm nhãn	5	1	10	14038
+14046	0x36DE	NgưngKhí HộThân	client	5	46	1	5	14038	19	12	NgưngKhí HộThân	5	1	5	14038
+14047	0x36DF	Dùng kế	client	5	0	1	10	14038	0	30	Dùng kế	5	1	10	14038
+14048	0x36E0	Trí thủ	client	5	0	1	10	14038	0	30	Trí thủ	5	1	10	14038
+14049	0x36E1	Chống địch	client	5	0	1	10	14038	0	30	Chống địch	5	1	10	14038
+14050	0x36E2	Sách động	client	5	0	1	10	14038	0	30	Sách động	5	1	10	14038
+14051	0x36E3	Tiên khiếu	client	5	0	1	10	14038	0	30	Tiên khiếu	5	1	10	14038
+14052	0x36E4	HóaHuyếtHòanHồn	client	5	0	1	5	14038	0	30	HóaHuyếtHòanHồn	5	1	5	14038
+14053	0x36E5	ThánhLinh thuật	client	5	52	1	5	14038	19	30	ThánhLinh thuật	5	1	5	14038
+14054	0x36E6	CànKhônThiênLôi	client	5	84	1	5	14038	2	45	CànKhônThiênLôi	5	1	5	14038
+14055	0x36E7	Tổn huyết	client	0	0	0	0	0	0	30	Tổn huyết	5	0	0	0
+14056	0x36E8	Tiên khí hộ thân	client	0	0	0	0	0	5	0	Tiên khí hộ thân	5	0	0	0
+14057	0x36E9	Vật lý giảm nữa	client	5	0	1	10	0	0	30	Vật lý giảm nữa	5	1	10	0
+14058	0x36EA	Thiết bố sam	client	5	0	1	10	0	0	30	Thiết bố sam	5	1	10	0
+14059	0x36EB	Đằng thuật giáp	client	5	0	1	10	0	0	30	Đằng thuật giáp	5	1	10	0
+14060	0x36EC	Toàn thể Thiên Lôi	client	5	84	1	5	0	2	45	Toàn thể Thiên Lôi	5	1	5	0
+14061	0x36ED	Thiên Lôi Thần Thuẫn	client	5	0	1	10	0	0	30	Thiên Lôi Thần Thuẫn	5	1	10	0
+20006	0x4E26	Hộ chủ	client	5	0	0	1	0	17	10	Hộ chủ	5	0	1	0

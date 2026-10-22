@@ -1,0 +1,182 @@
+# VAT PHAM LIEN QUAN SU KIEN DAC BIET
+# Nguon: Data/Item.dat (giai ma san -> Data/items.json)
+# itemId	type	name	buyPrice	sellPrice	category	description
+17203	8	Hoả Dương Thiết Giáp	14	18	Thân	Áo giáp dày rèn bởi lửa cửu thiên
+18026	9	Sách Vạn Hoá Đồ	129000	21	Vũ khí	Tập ghi nhớ Quá một trận Đấu Phép
+18508	9	Thủy Chiến Thư	700	8	Vũ khí	Binh Pháp của Danh tướng Ngũ Tử Định
+18975	9	Cửu thiên pháp	0	24	Vũ khí	Tác phẩm của Cửu Thiên Huyền Nữ
+19912	10	La ngải phục	0	17	Thân	áo bào mà mỗi dịp lễ Đoan Ngọ người dân thường mặc
+20107	11	Hằng Thiên Trụ	0	12	Đầu	Được khắc lên cửu thiên sắc vân
+22040	13	Giầy Thiên Tướng	5080000	35	Giày	Chuyên dùng của Cửu Thiên Thần Tướng
+23111	14	Chúc Thất Tịch	0	10	Phụ kiện	Hoa văn chúc tình nhân được lấy nhau
+23160	11	Lđấu QuánQuânGiới	0	10	Phụ kiện	Nhẫn bạo kích loạn đấu đài, 1 tuần
+23200	14	Công cụ tháo hủy	0	0	Phụ kiện	Công cụ dùng để tháo dở khí giới công thành
+24050	15	Đoan Vũ	0	2		Lông vũ hợp với ngày Tết Đoan Ngọ
+26323	17	Đĩnh Tống	10	2		Thức ăn hợp với ngày Tết Đoan Ngọ
+26366	17	Cá đuôi Phụng	35	7		Loại cá đặc sản ở Hồ Bà Dương
+29117	20	Bản Đồ Quỷ Vương 1	0	0		1 trong các bản đồ Đi Đến Quỷ Vương Động
+29118	20	Bản Đồ Quỷ Vương 2	0	0		1 trong các bản đồ Đi Đến Quỷ Vương Động
+29119	20	Bản Đồ Quỷ Vương 3	0	0		1 trong các bản đồ Đi Đến Quỷ Vương Động
+29245	20	Cờ Quân Lệnh	0	0		Lệnh kỳ chiến thuyền chỉ huy dùng
+29305	20	ThiệnTâm của YQVương	0	0		Lòng tốt của Yêu quỷ vương dược giúp đỡ người
+29306	20	Tà tâm của YQuỷvương	0	0		Lòng tà ác của Yêu quỷ vương muốn báo thù Tà Mã Đài
+30001	21	Gạo Lương vải Cẩm	0	0		Gạo lương vải cẩm
+30002	21	Lê khô	0	0		Lê khô
+30003	21	Thư cầu cứu Kh.Dung	0	0		Thư cầu cứu của Khổng Dung
+30004	21	Thư cầu cứu ĐàoKhiêm	0	0		Thư cầu cứu của Đào khiêm
+30005	21	Thuốc Bổ cho Tr.Đăng	0	0		Thuốc bổ cho Trần Đăng
+30006	21	Thư cho Trần Cung	0	0		Thư cho Trần Cung
+30007	21	Thư cho Tr.Mạo	0	0		Thư cho Trương Mạo
+30008	21	Thư của tiều phu	0	0		Thư tiều phu viết cho người Từ Vô Sơn
+30009	21	Thư kiện thần bí	0	0		Thư kiện thần bí
+30010	21	BùaBinh của V.Thượng	0	0		Bùa binh của Viên Thượng
+30011	21	Kế hoạch đồ U.Thành	0	0		Công chiếm Uyển Thành kế họach đồ
+30012	21	Công thành đồ S.Ph	0	0		Công thành đồ sao phỏng
+30013	21	Bao dây hồng	0	0		Chiếc túi nhỏ có chứa sợi chỉ đỏ
+30014	21	Thắng lệnh 1	0	0		Khiêu chiến 1, dùng lệnh này lãnh thưởng
+30015	21	Thắng lệnh 2	0	0		Khiêu chiến 2, dùng lệnh này lãnh thưởng
+30016	21	Thắng lệnh 3	0	0		Khiêu chiến 3, dùng lệnh này lãnh thưởng
+30017	21	Thắng lệnh 4	0	0		Khiêu chiến 4, dùng lệnh này lãnh thưởng
+30018	21	Thắng lệnh 5	0	0		Khiêu chiến 5, dùng lệnh này lãnh thưởng
+30019	21	Thắng lệnh 6	0	0		Khiêu chiến 6, dùng lệnh này lãnh thưởng
+30020	21	Thắng lệnh 7	0	0		Khiêu chiến 7, dùng lệnh này lãnh thưởng
+30021	21	Thắng lệnh 8	0	0		Khiêu chiến 8, dùng lệnh này lãnh thưởng
+30022	21	Thắng lệnh 9	0	0		Khiêu chiến 9, dùng lệnh này lãnh thưởng
+30023	21	Thắng lệnh 10	0	0		Khiêu chiến 10, dùng lệnh này lãnh thưởng
+30024	21	Thắng lệnh 11	0	0		Khiêu chiến 11, dùng lệnh này lãnh thưởng
+30025	21	Thắng lệnh 12	0	0		Khiêu chiến 12, dùng lệnh này lãnh thưởng
+30026	21	Thắng lệnh 13	0	0		Khiêu chiến 13, dùng lệnh này lãnh thưởng
+30027	21	Thắng lệnh 14	0	0		Khiêu chiến 14, dùng lệnh này lãnh thưởng
+30028	21	Thắng lệnh 15	0	0		Khiêu chiến 15, dùng lệnh này lãnh thưởng
+30029	21	Thắng lệnh 16	0	0		Khiêu chiến 16, dùng lệnh này lãnh thưởng
+30030	21	Thắng lệnh 17	0	0		Khiêu chiến 17, dùng lệnh này lãnh thưởng
+30031	21	Thắng lệnh 18	0	0		Khiêu chiến 18, dùng lệnh này lãnh thưởng
+30032	21	Thắng lệnh 19	0	0		Khiêu chiến 19, dùng lệnh này lãnh thưởng
+30033	21	Thắng lệnh 20	0	0		Khiêu chiến 20, dùng lệnh này lãnh thưởng
+30034	21	Thắng lệnh 21	0	0		Khiêu chiến 21, dùng lệnh này lãnh thưởng
+30035	21	Thắng lệnh 22	0	0		Khiêu chiến 22, dùng lệnh này lãnh thưởng
+30036	21	Thắng lệnh 23	0	0		Khiêu chiến 23, dùng lệnh này lãnh thưởng
+30037	21	Thắng lệnh 24	0	0		Khiêu chiến 24, dùng lệnh này lãnh thưởng
+30038	21	Thắng lệnh 25	0	0		Khiêu chiến 25, dùng lệnh này lãnh thưởng
+30039	21	Thắng lệnh 26	0	0		Khiêu chiến 26, dùng lệnh này lãnh thưởng
+30040	21	Thắng lệnh 27	0	0		Khiêu chiến 27, dùng lệnh này lãnh thưởng
+30041	21	Thắng lệnh 28	0	0		Khiêu chiến 28, dùng lệnh này lãnh thưởng
+30042	21	Thắng lệnh 29	0	0		Khiêu chiến 29, dùng lệnh này lãnh thưởng
+30043	21	Thắng lệnh 30	0	0		Khiêu chiến 30, dùng lệnh này lãnh thưởng
+30044	21	Địa linh châu	250000	1		Tiểu linh châu thuộc địa
+30045	21	Thủy linh châu	250000	1		Tiểu linh châu thuộc thủy
+30046	21	Hoả linh châu	250000	1		Tiểu linh châu thuộc hỏa
+30047	21	Phong linh châu	250000	1		Tiểu linh châu thuộc phong
+30048	21	Huỳnh Hỉ Thước	0	1		Bộ lông màu vàng óng của chim hỉ thước
+30049	21	Xanh Hỉ Thước	0	1		Bộ lông màu xanh lam của chim hỉ thước
+30050	21	Hồng Hỉ Thước	0	1		Bộ lông màu đỏ rực của chim hỉ thước
+30051	21	Lục Hỉ Thước	0	1		Bộ lông màu xanh rờn của chim hỉ thước
+30052	21	Ngưu Lan tinh	0	0		Cây sáo Ngưu Lang thổi khi nhớ Chức Nữ
+30053	21	Trâm Chức Nữ	0	0		Tín vật cây trâm Chức Nữ tặng Ngưu Lang
+30054	21	Thắng lệnh 31	0	0		Thắng lệnh vượt qua cửa 31, sẽ lãnh phần thưởng.
+30055	21	Thắng lệnh 32	0	0		Thắng lệnh vượt qua cửa 32, sẽ lãnh phần thưởng.
+30056	21	Thắng lệnh 33	0	0		Thắng lệnh vượt qua cửa 33, sẽ lãnh phần thưởng.
+30057	21	Thắng lệnh 34	0	0		Thắng lệnh vượt qua cửa 34, sẽ lãnh phần thưởng.
+30058	21	Thắng lệnh 35	0	0		Thắng lệnh vượt qua cửa 35, sẽ lãnh phần thưởng.
+30059	21	Thắng lệnh 36	0	0		Thắng lệnh vượt qua cửa 36, sẽ lãnh phần thưởng.
+30060	21	Thắng lệnh 37	0	0		Thắng lệnh vượt qua cửa 37, sẽ lãnh phần thưởng.
+30061	21	Thắng lệnh 38	0	0		Thắng lệnh vượt qua cửa 38, sẽ lãnh phần thưởng.
+30062	21	Thắng lệnh 39	0	0		Thắng lệnh vượt qua cửa 39, sẽ lãnh phần thưởng.
+30063	21	Thắng lệnh 40	0	0		Thắng lệnh vượt qua cửa 40, sẽ lãnh phần thưởng.
+30064	21	Địa Bí Cấp	0	1		Ghi chép địa hệ có bí cấp về kỹ năng.
+30065	21	Thuỷ Bí Cấp	0	1		Ghi chép thủy hệ có bí cấp về kỹ năng.
+30066	21	Hoả Bí Cấp	0	1		Ghi chép hỏa hệ có bí cấp về kỹ năng.
+30067	21	Phong Bí Cấp	0	1		Ghi chép phong hệ có bí cấp về kỹ năng.
+30068	21	Hồng Đồ Chương	0	0		Con dấu khắc hình  hương ba đậu
+30069	21	Ai Đồ Chương	0	0		Con dấu khắc hình ái thần ba đậu.
+30070	21	Bối Đồ Chương	0	0		Con dấu khắc hình balô ba đậu.
+30071	21	Mê Đồ Chương	0	0		Con dấu khắc hình mini ba đậu.
+30072	21	Kim Đồ Chương	0	0		Con dấu khắc hình hoàng kim ba đậu.
+30073	21	Ac Đồ Chương	0	0		Con dấu khắc hình ác quỹ ba đậu.
+30074	21	Thông Bảo	0	0		Trong chốn âm giới có vật có công dụng rộng rãi.
+30075	21	Thổ hoàng nhân	0	0		Tượng đất dùng đổi tướng hệ địa
+30076	21	Ưu hắc nê nhân	0	0		Tượng đất để đổi tướng hệ địa
+30077	21	Thủy lam nhân	0	0		Tượng đất để đổi tướng hệ thủy
+30078	21	Lượng tử nhân	0	0		Tượng đất để đổi tướng hệ thủy
+30079	21	Hoả hồng nhân	0	0		Tượng đất để đổi tướng hệ hỏa
+30080	21	Chanh quang nhân	0	0		Tượng đất để đổi tướng hệ hỏa
+30081	21	Thanh lục nhân	0	0		Tượng đất để đổi tướng hệ phong
+30082	21	Khiết bạch nhân	0	0		Tượng đất để đổi tướng hệ phong
+30083	21	Thiên Châu Phiến	0	0		Nguyên tố hợp thành thiênchâulựclớn
+30084	21	Trí Tuệ Châu phiến	0	0		Nguyên tố hợp thành thiênchâutrítuệ
+30085	21	Thánh Linh Phiến	0	0		Nguyên tố hợp thành thiên châu
+30086	21	Hạt sắc nhân	0	0		Tượng đất để đổi tướng hệ địa
+30087	21	Thiên lam nhân	0	0		Tượng đất để đổi tướng hệ thủy
+30088	21	Phấn hồng nhân	0	0		Tượng đất để đổi tướng hệ hỏa
+30089	21	Huyễn lục nhân	0	0		Tượng đất để đổi tướng hệ phong
+30090	21	T.thù Quán quân lệnh	0	0		Dựa vào lệnh này để lãnh thưởng
+30091	21	T.thù Á quân lệnh	0	0		Dựa vào lệnh này để lãnh thưởng
+30092	21	T.thù Quý quân lệnh	0	0		Dựa vào lệnh này để lãnh thưởng
+30093	21	Tượng hòa hoàng	0	0		Tượng người có thể đến Thiên ngoại đảo đổi tướng tinh hệ địa
+30094	21	Tượng tinh lam	0	0		Tượng người có thể đến Thiên ngoại đảo đổi tướng tinh hệ thủy
+30095	21	Tượng viêm hồng	0	0		Tượng người có thể đến Thiên ngoại đảo đổi tướng tinh hệ hỏa
+30096	21	Tượng tảo thanh	0	0		Tượng người có thể đến Thiên ngoại đảo đổi tướng tinh hệ phong
+30097	21	Nguyệt Thạch	0	0		Tinh thạch có nguồn gốc từ Quản Hằng Cung
+31006	22	Vé đấu vật ngầm	0	0		Vật phải có khi tham gia thi đấu vật
+31121	22	Chủy thiết	0	0		Xe thiết chế tạo để tấn công thành
+31122	22	Bánh xe lớn	0	0		Bánh xe chế tạo xe để công thành
+31123	22	Dây xích thô	0	0		Dây xích sắt của xe để công thành
+31147	22	Vé vip khiêu chiến	0	0		Vé vip chuyên dùng trong lôi đài khiêu chiến
+31156	22	HC chiến thắng CựLộc	0	0		Huy hiệu thu phục Cự Lộc thành, có thể dùng đổi quan huân
+31169	22	TrangSức của NhịKiều	0	0		Trang sức tóc có ý tương kết cùng Nhị Kiều Giang Đông
+37997	29	Ngân Hà toái tiết	0	23		Truyền là kết tinh lạ ở nơi cửu thiên
+45020	36	Hùng Hoàn Tinh	0	1		Sương muối thần kỳ trong lễ Đoan Ngọ
+46058	38	Thủy tinh cầu CPS	0	1		Sau sử dụng thi đấu với Các Phổ Sái BĐY
+46073	38	Hộp kẹo phá đám	0	1		Hộp kẹo lễ HALLOWEEN có đựng quà
+46095	38	Tỵ Tà Bao	0	0		Bao thơm đựng quà tiết Đoan Ngọ
+46096	38	Nạp Cát Bao	0	0		Bao thơm lớn đựng quà tiết Đoan Ngọ
+46097	38	Đoan Hương Bao	0	0		Bao thơm cao cấpđựng quà tiết Đoan Ngọ
+46107	38	Quái Vật Tâm	0	1		Trái tim quái vật dùng để đấu với Quỷ Vương
+46110	38	Thiên Tự Bôi	0	1		Ly quà Vua tặng dũng sĩ Đại Hưng Sơn
+46111	38	Thiên Tự Bôi	0	1		Ly quà Vua tặng dũng sĩ trận Cự Lộc
+46137	38	Kim tất lễ hộp	0	1		Hộp lễ lấy được từ Lữ Bố ở Hổ Lao quan
+46140	38	L.Đấu vũ khí hộp	0	1		Hộp gỗ tặng thưởng loạn đấu
+46147	38	Tô sinh linh dược	0	1		Sẽ đượ hồi sinh 1 lần trong trận đấu
+46220	38	Túi Đoan Ngọ	0	0		Túi thơm phát ra mùi thơm, mở ra xem xem
+46317	38	Hộp bảo đại hiền	0	0		Sau khi mở có cơ hội đạt được bộ trang phục vinh quang Cự Lộc và các phương tiện đạo cụ
+46335	38	Bao lì xì năm mới	0	0		Túi bao lì xì rơi từ thân Thôn thực niên thú
+46338	38	Bao lì xì năm mới	0	0		Túi bao lì xì rơi từ thân Thôn thực niên thú
+46601	38	Lệnh bài Nhị Kiều	0	0		Lệnh bài dùng để tăng thêm lượt tham gia sự kiện Giải cứu Nhị Kiều Giang Đông trong tuần. Không giới hạn số lần sử dụng. (Chỉ nên sử dụng sau khi đã hết lượt tham gia).
+46629	38	Khiêu chiến BOSS	0	0		Su dung sau nhung thiet lap lai the gioi BOSS Chien dau so lan mot lan vat pham nay se o ắi The gioi BOSS Hoat dong ắj Ket thuc sau thu ve
+46644	38	Cửu Thiên Chiến Kỳ	0	0		Chiến Kỳ dùng để tăng thêm lượt tham gia sự kiện Chinh Phục Cửu Thiên trong tuần.  Không giới hạn số lần sử dụng. (Chỉ nên sử dụng sau khi đã hết lượt tham gia).
+46673	38	Túi đấu trường	0	0		Phần thưởng nhận được từ sự kiện Npc
+47378	37	KT Yêu Quỷ Vương	0	0		Yêu Quỷ Vương kim tỏa phiến đầy tà khí
+51276	51	TT Lữ Linh Khởi	0	0		Lữ Linh Khởi nằm mơ thấy thất tịch sao rơi đầy
+51283	51	TT Chu Phù	0	0		Chu Phù thiên tinh lạc thất tịch
+51315	51	TT Yêu Quỷ Vương	0	0		Tướng tinh của Yêu Quỷ Vương
+53021	53	Xe ném đá	0	0		Xe giết địch và công thành từ xa
+57812	57	Lôi Phong phiến	0	20	Vũ khí	Quạt văn nhân hệ phong
+61601	61	Thưởng tu mộc bản	0	0	Phụ kiện	Sửa nhanh tất cả chiến thuyền bị hao tổn bằng một tấm ván gỗ
+61602	61	Thưởng tu CM bản	0	0	Phụ kiện	Sửa nhanh chiến thuyền loại trung bị hao tổn bằng chương mộc bản
+61603	61	Thưởng tu SM bản	0	0	Phụ kiện	Sửa nhanh chiến thuyền loại lớn bị hao tổn bằng sam mộc bản
+61604	61	Thưởng tu CM bản	0	0	Phụ kiện	Sửa nhanh lâu thuyền và chiến thuyền loại lớn bị hao tổn bằng cối mộc bản
+61801	21	NguyênThần TháiVănCơ	0	0		Nguyên thần của Thái Văn Cơ - Nữ sĩ tài hoa mà bạc phận
+61802	21	NguyênThần Tiểu Kiều	0	0		Nguyên thần của Tiểu Kiều
+61803	21	Nguyên thần Ti Di Hô	0	0		Nguyên thần Ti Di Hô - Nữ Vương Tà Mã Đài
+61804	21	Nguyên thần Đại Kiều	0	0		Nguyên thần của Đại Kiều
+61805	21	Nguyên thần Chân Mật	0	0		Nguyên thần của Chân Mật - Văn Chiêu hoàng hậu
+61806	21	NgThầnHoàngNguyệtAnh	0	0		Nguyên thần của Hoàng Nguyệt Anh vợ Gia Cát Lượng
+61807	21	NgThần TrươngXuânHoa	0	0		Nguyên thần của Trương Xuân Hoa vợ Tư Mã Ý
+61808	21	NgThần Điêu Thuyền	0	0		Nguyên thần của tuyệt sắc giai nhân Điêu Thuyền
+61809	21	NgThầnTônThượngHương	0	0		Nguyên thần của Tôn Thượng Hương - Công chúa Đông Ngô
+61810	21	NgThần QuáchNữVương	0	0		Nguyên thần của Quách Nữ Vương - vợ Tào Phi
+63001	63	Tu bổ mộc đầu	100	5		Có thể dùng để sửa khí cụ công thành, hiệu quả bình thường
+63002	63	Tu bổ sam mộc	200	10		Có thể dùng để sửa khí cụ công thành, hiệu quả trung bình
+63003	63	Tu bổ cối mộc	300	15		Có thể dùng để sửa khí cụ công thành, hiệu quả tốt
+65162	65	Sách tiễnvũcửuthiên	0	0		Có thể khiến Võ tướng đời 2 lĩnh ngộ đặc kỹ xạ tiễn thuật. Tiễn vũ cửu thiên
+65179	65	Yêu dị bảo thạch	0	5		Có thể khiến Võ tướng đời 2 có ngoại hình Yêu kim quỷ vương
+65507	21	Thắng lệnh 41	0	0		Thắng lệnh vượt qua cửa 41, sẽ lãnh phần thưởng.
+65508	21	Thắng lệnh 42	0	0		Thắng lệnh vượt qua cửa 42, sẽ lãnh phần thưởng.
+65509	21	Thắng lệnh 43	0	0		Thắng lệnh vượt qua cửa 43, sẽ lãnh phần thưởng.
+65510	21	Thắng lệnh 44	0	0		Thắng lệnh vượt qua cửa 44, sẽ lãnh phần thưởng.
+65511	21	Thắng lệnh 45	0	0		Thắng lệnh vượt qua cửa 45, sẽ lãnh phần thưởng.
+65512	21	Thắng lệnh 46	0	0		Thắng lệnh vượt qua cửa 46, sẽ lãnh phần thưởng.
+65513	21	Thắng lệnh 47	0	0		Thắng lệnh vượt qua cửa 47, sẽ lãnh phần thưởng.
+65514	21	Thắng lệnh 48	0	0		Thắng lệnh vượt qua cửa 48, sẽ lãnh phần thưởng.
+65515	21	Thắng lệnh 49	0	0		Thắng lệnh vượt qua cửa 49, sẽ lãnh phần thưởng.
+65516	21	Thắng lệnh 50	0	0		Thắng lệnh vượt qua cửa 50, sẽ lãnh phần thưởng.

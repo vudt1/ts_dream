@@ -1,0 +1,256 @@
+tab	tab_label	elem	slot	skillId	skillId_hex	name	type	sp_cost	sk_point	max_lvl	require_sk	is_root	parent_hardcoded
+0	Địa (elem 1)	1	0	10001	0x2711	Thuật mưa đá	1	9	1	10	0	ROOT	
+0	Địa (elem 1)	1	1	10002	0x2712	Lôi mộc	1	13	3	10	10001		
+0	Địa (elem 1)	1	2	10003	0x2713	Cạm bẫy	1	14	3	10	10001		
+0	Địa (elem 1)	1	3	10004	0x2714	Cây tinh	1	18	6	10	10002		
+0	Địa (elem 1)	1	4	10005	0x2715	Ném đá	1	22	7	10	10003		
+0	Địa (elem 1)	1	5	10006	0x2716	Địa nha	1	28	9	10	10004		
+0	Địa (elem 1)	1	6	10007	0x2717	Đá lăn	1	34	10	10	10005		
+0	Địa (elem 1)	1	7	10008	0x2718	Phi sa tẩu thạch	1	38	10	10	10005		
+0	Địa (elem 1)	1	8	10009	0x2719	Giải kết giới	1	10	1	1	10006		
+0	Địa (elem 1)	1	9	10010	0x271A	Kết giới	1	33	12	10	10006		
+0	Địa (elem 1)	1	10	10011	0x271B	Thái Sơn áp đỉnh	1	40	14	10	10007		
+0	Địa (elem 1)	1	11	10012	0x271C	Thiên Băng Địa Liệt	1	50	18	10	10008		
+0	Địa (elem 1)	1	12	10013	0x271D	Vạn mã phi đằng	1	45	14	10	10008		
+0	Địa (elem 1)	1	13	10014	0x271E	Giải trừ kính	1	10	1	1	10010		
+0	Địa (elem 1)	1	14	10015	0x271F	Kính	1	40	18	5	10010		
+0	Địa (elem 1)	1	15	10016	0x2720	Nham quái	1	120	0	10	0		
+0	Địa (elem 1)	1	16	10017	0x2721	Gọi tiểu trung nham	1	120	0	1	0		
+0	Địa (elem 1)	1	17	10018	0x2722	Gọi trung nham	1	120	0	1	0		
+0	Địa (elem 1)	1	18	10019	0x2723	Gọi đại nham	1	120	0	1	0		
+0	Địa (elem 1)	1	19	10020	0x2724	Địa Động Quyết	1	0	1	10	0		
+0	Địa (elem 1)	1	20	10021	0x2725	ĐịaLiệt Vô Song Kiếm	1	36	8	10	10020		
+0	Địa (elem 1)	1	21	10022	0x2726	Địa Động Phá	1	44	7	10	10020		
+0	Địa (elem 1)	1	22	10023	0x2727	Khu Tượng Đột	1	54	13	10	10024		10024
+0	Địa (elem 1)	1	23	10024	0x2728	Hoành Tảo Thiên Quân	1	48	9	10	10022		
+0	Địa (elem 1)	1	24	10025	0x2729	Thổ Băng Trận	1	46	11	5	10021		
+0	Địa (elem 1)	1	25	10023	0x2727	Khu Tượng Đột	1	54	13	10	10024		10024
+0	Địa (elem 1)	1	26	10026	0x272A	Linh Kính	1	50	15	5	10025		
+0	Địa (elem 1)	1	27	10027	0x272B	Vô Gian Chấn Ba	1	56	8	10	10011		
+0	Địa (elem 1)	1	28	10028	0x272C	Cát Thiên Hồn Phủ	1	52	8	10	10021		
+0	Địa (elem 1)	1	29	10029	0x272D	Lưu Tinh Thiết Pháo	1	56	7	10	10005		
+0	Địa (elem 1)	1	30	10030	0x272E	Lang Tinh Pháo	1	44	10	10	10008		
+0	Địa (elem 1)	1	31	10031	0x272F	Kim Chung Tráo	1	56	12	10	10015		
+0	Địa (elem 1)	1	32	10032	0x2730	ChiếnTượngTrùngPhong	1	72	8	10	10013		
+0	Địa (elem 1)	1	33	10033	0x2731	Sa Bộc Cầm	1	44	8	5	10025		
+0	Địa (elem 1)	1	34	10034	0x2732	Đồ Nham Vương Sát	1	84	15	10	10024		
+0	Địa (elem 1)	1	35	10035	0x2733	Sa bạo chi loạn	1	67	0	5	0		
+0	Địa (elem 1)	1	36	10036	0x2734	Sa khau chi vũ	1	65	0	5	0		
+0	Địa (elem 1)	1	37	10037	0x2735	Kết giới 3	1	83	0	10	0		
+0	Địa (elem 1)	1	38	10038	0x2736	Kính 3	1	100	0	5	0		
+0	Địa (elem 1)	1	39	10039	0x2737	Linh Kính 3	1	125	0	5	0		
+0	Địa (elem 1)	1	40	10040	0x2738	Kim Chung Tráo 3	1	140	0	10	0		
+0	Địa (elem 1)	1	41	10041	0x2739	Sa Bộc Cầm 3	1	110	0	5	0		
+0	Địa (elem 1)	1	42	10042	0x273A	Vô Gian Chấn Ba 2	1	130	8	10	10027		
+0	Địa (elem 1)	1	43	10043	0x273B	Cát Thiên Hồn Phủ 2	1	130	8	10	10028		
+0	Địa (elem 1)	1	44	12043	0x2F0B	Bạch Hổ tàng địa phệ	1	56	5	10	0		
+0	Địa (elem 1)	1	45	12044	0x2F0C	BH tàng địa phệ A.N	1	60	5	10	0		
+0	Địa (elem 1)	1	46	20025	0x4E39	Cây tinh 3	15	36	0	10	0		
+0	Địa (elem 1)	1	47	20049	0x4E51	Siêu cấp thụ tinh	17	36	0	5	0		
+0	Địa (elem 1)	1	48	21001	0x5209	Chấn địa chùy	16	54	0	1	0		
+0	Địa (elem 1)	1	49	21005	0x520D	Mãnh ngưu kích	16	48	0	1	0		
+0	Địa (elem 1)	1	50	21009	0x5211	Vẫn tinh lạc	16	48	0	1	0		
+1	Thủy (elem 2)	2	0	11001	0x2AF9	Thuật nước ngập	2	8	1	10	0	ROOT	
+1	Thủy (elem 2)	2	1	11002	0x2AFA	Băng tường	2	11	4	5	11001		
+1	Thủy (elem 2)	2	2	11003	0x2AFB	Băng kiếm	2	12	3	10	11001		
+1	Thủy (elem 2)	2	3	11004	0x2AFC	Thanh lưu	2	22	6	10	11002		
+1	Thủy (elem 2)	2	4	11005	0x2AFD	Dũng tuyền	2	18	5	10	11003		
+1	Thủy (elem 2)	2	5	11006	0x2AFE	Thuật hồi ma	2	35	8	10	11004		
+1	Thủy (elem 2)	2	6	11007	0x2AFF	Thuật trị liệu	2	35	8	10	11004		
+1	Thủy (elem 2)	2	7	11008	0x2B00	Hồng thủy	2	26	8	10	11005		
+1	Thủy (elem 2)	2	8	11009	0x2B01	Toàn hồi ma thuật	2	40	9	10	11006		
+1	Thủy (elem 2)	2	9	11010	0x2B02	Toàn trị liệu thuật	2	42	9	10	11007		
+1	Thủy (elem 2)	2	10	11011	0x2B03	Băng đá	2	32	9	10	11008		
+1	Thủy (elem 2)	2	11	11012	0x2B04	Trạng thái giải trừ	2	15	12	1	11009		
+1	Thủy (elem 2)	2	12	11013	0x2B05	Thuật hồi sinh	2	40	12	10	11010		
+1	Thủy (elem 2)	2	13	11014	0x2B06	Băng phong	2	40	16	10	11011		
+1	Thủy (elem 2)	2	14	11015	0x2B07	Băng tan	2	10	1	1	11011		
+1	Thủy (elem 2)	2	15	11016	0x2B08	Thủy thần	2	120	0	10	0		
+1	Thủy (elem 2)	2	16	11017	0x2B09	Gọi tiểu trung thủy	2	120	0	1	0		
+1	Thủy (elem 2)	2	17	11018	0x2B0A	Gọi trung thủy	2	120	0	1	0		
+1	Thủy (elem 2)	2	18	11019	0x2B0B	Gọi đại thủy	2	120	0	1	0		
+1	Thủy (elem 2)	2	19	11020	0x2B0C	Băng Tâm Quyết	2	0	1	10	0		
+1	Thủy (elem 2)	2	20	11021	0x2B0D	Băng Tuyền Trảm	2	24	7	10	11020		
+1	Thủy (elem 2)	2	21	11022	0x2B0E	Băng Phách Chùy	2	30	9	10	11021		
+1	Thủy (elem 2)	2	22	11023	0x2B0F	Sương Hàn Đống Liệt	2	50	12	10	11022		
+1	Thủy (elem 2)	2	23	11024	0x2B10	Minh Kính Chỉ Thủy	2	45	10	5	11020		
+1	Thủy (elem 2)	2	24	11025	0x2B11	Tiến Giai Trạng Giải	2	48	15	1	11024		
+1	Thủy (elem 2)	2	25	11026	0x2B12	Diệu Thủ Hồi Xuân	2	72	15	10	11025		
+1	Thủy (elem 2)	2	26	11027	0x2B13	Thiên Hồi Băng Vũ	2	52	5	5	11014		
+1	Thủy (elem 2)	2	27	11028	0x2B14	Sương Lôi Quyền	2	52	5	5	11014		
+1	Thủy (elem 2)	2	28	11029	0x2B15	Siêu Hồi Ma Thuật	2	60	7	10	11009		
+1	Thủy (elem 2)	2	29	11030	0x2B16	Thiên Giáng Cam Lâm	2	72	7	10	11010		
+1	Thủy (elem 2)	2	30	11031	0x2B17	SiêuTrạng Giải Thuật	2	60	15	1	11025		
+1	Thủy (elem 2)	2	31	11032	0x2B18	Minh Hà Vô Tưởng	2	52	10	5	11024		
+1	Thủy (elem 2)	2	32	11033	0x2B19	Trảm Kỵ Nhất Thiểm	2	60	9	10	11022		
+1	Thủy (elem 2)	2	33	11034	0x2B1A	Lục Hồi Thiên BăngVũ	2	84	14	10	11023		
+1	Thủy (elem 2)	2	34	11035	0x2B1B	Hải đào chi loạn	2	67	0	5	0		
+1	Thủy (elem 2)	2	35	11036	0x2B1C	Thuỷ triều chi vũ	2	65	0	5	0		
+1	Thủy (elem 2)	2	36	11037	0x2B1D	Băng tường 3	2	100	0	5	11002		
+1	Thủy (elem 2)	2	37	11038	0x2B1E	Thiên Hồi Băng Vũ 3	2	130	0	5	11027		
+1	Thủy (elem 2)	2	38	11039	0x2B1F	Sương Lôi Quyền 3	2	130	0	5	11028		
+1	Thủy (elem 2)	2	39	11040	0x2B20	Minh Hà Vô Tưởng 3	2	130	0	5	11032		
+1	Thủy (elem 2)	2	40	11041	0x2B21	Trảm Kỵ Nhất Thiểm 2	2	130	9	10	11033		
+1	Thủy (elem 2)	2	41	20026	0x4E3A	Băng Phong	15	80	0	10	0		
+1	Thủy (elem 2)	2	42	20029	0x4E3D	Bạch Hổ Pháo	15	80	0	10	0		
+1	Thủy (elem 2)	2	43	20050	0x4E52	Cường hiệu giải trừ	17	60	0	5	0		
+1	Thủy (elem 2)	2	44	21002	0x520A	Hàn băng quán	16	44	0	1	0		
+1	Thủy (elem 2)	2	45	21006	0x520E	Băng nha nhẫn	16	36	0	1	0		
+1	Thủy (elem 2)	2	46	21010	0x5212	Trùng quyền	16	48	0	1	0		
+1	Thủy (elem 2)	2	47	21015	0x5217	Nhị Đoạn Thức	16	56	0	1	0		
+1	Thủy (elem 2)	2	48	21021	0x521D	Địadiệtkinhđàotrận	16	80	0	1	0		
+1	Thủy (elem 2)	2	49	21029	0x5225	Lạc Thuỷ kết tụ	16	82	0	1	0		
+1	Thủy (elem 2)	2	50										
+2	Hỏa (elem 3)	3	0	12001	0x2EE1	Thuật phóng hỏa	3	9	1	10	0	ROOT	
+2	Hỏa (elem 3)	3	1	12002	0x2EE2	Liệt hỏa	3	12	3	10	12001		
+2	Hỏa (elem 3)	3	2	12003	0x2EE3	Hỏa tiễn	3	15	4	10	12001		
+2	Hỏa (elem 3)	3	3	12004	0x2EE4	Hỏa cầu	3	22	7	10	12002		
+2	Hỏa (elem 3)	3	4	12005	0x2EE5	Hỏa luân	3	22	6	10	12002		
+2	Hỏa (elem 3)	3	5	12006	0x2EE6	Hội tâm nhất kích	3	24	7	10	12003		
+2	Hỏa (elem 3)	3	6	12007	0x2EE7	Diễm Chi Vũ	3	30	10	10	12004		
+2	Hỏa (elem 3)	3	7	12008	0x2EE8	Phong hỏa luân	3	30	10	10	12005		
+2	Hỏa (elem 3)	3	8	12009	0x2EE9	Hỏa kiếm	3	30	9	10	12006		
+2	Hỏa (elem 3)	3	9	12010	0x2EEA	Hỏa Long	3	37	12	10	12007		
+2	Hỏa (elem 3)	3	10	12011	0x2EEB	Bát diện hỏa luân	3	37	13	10	12008		
+2	Hỏa (elem 3)	3	11	12012	0x2EEC	Cuồng diêm trảm	3	46	12	10	12009		
+2	Hỏa (elem 3)	3	12	12013	0x2EED	Tam vị chân hỏa	3	50	16	10	12010		
+2	Hỏa (elem 3)	3	13	12014	0x2EEE	Phong Hỏa LiêuNguyên	3	60	16	10	12011		
+2	Hỏa (elem 3)	3	14	12015	0x2EEF	Bạch hồng quán nhật	3	50	16	10	12012		
+2	Hỏa (elem 3)	3	15	12016	0x2EF0	Phụng hoàng	3	120	0	10	0		
+2	Hỏa (elem 3)	3	16	12017	0x2EF1	Gọi tiểu trung phụng	3	120	0	1	0		
+2	Hỏa (elem 3)	3	17	12018	0x2EF2	Gọi tiểu trung phụng	3	120	0	1	0		
+2	Hỏa (elem 3)	3	18	12019	0x2EF3	Gọi đại phụng	3	120	0	1	0		
+2	Hỏa (elem 3)	3	19	12020	0x2EF4	Hỏa Dương Quyết	3	0	1	10	0		
+2	Hỏa (elem 3)	3	20	12021	0x2EF5	Cực Dương Kiếm	3	36	8	10	12020		
+2	Hỏa (elem 3)	3	21	12022	0x2EF6	Cuồng Long Phệ Nhật	3	66	18	10	12024		12024
+2	Hỏa (elem 3)	3	22	12023	0x2EF7	Sí Diễm Vô Nhị	3	48	11	10	12020		
+2	Hỏa (elem 3)	3	23	12024	0x2EF8	Đan Dương Hộ Thể	3	30	10	5	12021		
+2	Hỏa (elem 3)	3	24	12022	0x2EF6	Cuồng Long Phệ Nhật	3	66	18	10	12024		12024
+2	Hỏa (elem 3)	3	25	12026	0x2EFA	Ngũ Lôi Oanh Đỉnh	3	54	13	10	12023		
+2	Hỏa (elem 3)	3	26	12025	0x2EF9	CuồngNhiệt Chiến Hồn	3	60	15	5	12026		12026
+2	Hỏa (elem 3)	3	27	12027	0x2EFB	Hỏa Bạo Nhất Kích	3	52	7	10	12006		
+2	Hỏa (elem 3)	3	28	12028	0x2EFC	Liệt Thuật Hào Hỏa	3	56	9	10	12011		
+2	Hỏa (elem 3)	3	29	12029	0x2EFD	Xích Long Cự	3	56	5	10	12004		
+2	Hỏa (elem 3)	3	30	12030	0x2EFE	Lôi Hỏa Thiệu Lâm	3	64	9	10	12010		
+2	Hỏa (elem 3)	3	31	12031	0x2EFF	Dương Viêm	3	52	10	10	12015		
+2	Hỏa (elem 3)	3	32	12032	0x2F00	Chúc Dung Phần Dã	3	72	9	10	12014		
+2	Hỏa (elem 3)	3	33	12033	0x2F01	Long Bá Liệt Trảm	3	84	16	10	12022		
+2	Hỏa (elem 3)	3	34	12034	0x2F02	Long Vương Chấn Hề	3	84	16	10	12026		
+2	Hỏa (elem 3)	3	35	12035	0x2F03	Hoả thiệt chi loạn	3	67	0	5	0		
+2	Hỏa (elem 3)	3	36	12036	0x2F04	Liệt diễm chi vũ	3	65	0	5	0		
+2	Hỏa (elem 3)	3	37	12037	0x2F05	Chân.TLong Bá L Trảm	3	84	16	10	0		
+2	Hỏa (elem 3)	3	38	12038	0x2F06	Đại Thánh trảm yêu	3	84	16	10	0		
+2	Hỏa (elem 3)	3	39	12039	0x2F07	ĐT trảm yêu áo nghĩa	3	84	16	10	0		
+2	Hỏa (elem 3)	3	40	12040	0x2F08	Kim tinh hoả nhãn	3	15	4	10	0		
+2	Hỏa (elem 3)	3	41	12041	0x2F09	Xà mâu hồn phệ kích	3	54	1	5	0		
+2	Hỏa (elem 3)	3	42	12042	0x2F0A	XM Hồn phệ kích A.N	3	54	1	5	0		
+2	Hỏa (elem 3)	3	43	12045	0x2F0D	Đan Dương Hộ Thể 3	3	75	0	5	0		
+2	Hỏa (elem 3)	3	44	12046	0x2F0E	Liệt Thuật Hào Hỏa 2	3	130	9	10	12028		
+2	Hỏa (elem 3)	3	45	12047	0x2F0F	Dương Viêm 4	3	140	10	10	12031		
+2	Hỏa (elem 3)	3	46	12048	0x2F10	Long Bá Liệt Trảm 2	3	130	16	10	12033		
+2	Hỏa (elem 3)	3	47	20014	0x4E2E	Tứ nhân hỗn loạn	15	50	0	10	0		
+2	Hỏa (elem 3)	3	48	21003	0x520B	Hồng liên hỏa	16	54	0	1	0		
+2	Hỏa (elem 3)	3	49	21007	0x520F	Chính diệm nộ	16	48	0	1	0		
+2	Hỏa (elem 3)	3	50	21011	0x5213	Hỏa phụng thiên	16	72	0	1	0		
+3	Phong (elem 4)	4	0	13001	0x32C9	Thuật ngự phong	4	9	1	10	0	ROOT	
+3	Phong (elem 4)	4	1	13002	0x32CA	Tuyền Phong	4	15	3	5	13001		
+3	Phong (elem 4)	4	2	13003	0x32CB	Lẫn tránh	4	13	4	5	13001		
+3	Phong (elem 4)	4	3	13004	0x32CC	Cuồng phong	4	23	6	10	13002		
+3	Phong (elem 4)	4	4	13005	0x32CD	Thuật ẩn mình	4	22	7	5	13003		
+3	Phong (elem 4)	4	5	13006	0x32CE	Bão Phong	4	30	11	10	13004		
+3	Phong (elem 4)	4	6	13007	0x32CF	Huyền Kích	4	31	10	10	13004		
+3	Phong (elem 4)	4	7	13008	0x32D0	Thuật phân thân	4	38	13	1	13005		
+3	Phong (elem 4)	4	8	13009	0x32D1	Phong quyển tàn vân	4	40	16	10	13006		
+3	Phong (elem 4)	4	9	13010	0x32D2	Liên kích	4	40	13	10	13007		
+3	Phong (elem 4)	4	10	13011	0x32D3	Thuật thu nhỏ	4	33	12	5	13008		
+3	Phong (elem 4)	4	11	13012	0x32D4	Thuật phóng đại	4	33	12	5	13008		
+3	Phong (elem 4)	4	12	13013	0x32D5	Loạn kích	4	49	16	10	13010		
+3	Phong (elem 4)	4	13	13014	0x32D6	Nguyên khí	4	45	15	10	13011		
+3	Phong (elem 4)	4	14	13015	0x32D7	Thanh long	4	120	0	10	0		
+3	Phong (elem 4)	4	15	13016	0x32D8	Gọi tiểu trung long	4	120	0	1	0		
+3	Phong (elem 4)	4	16	13017	0x32D9	Gọi trung long	4	120	0	1	0		
+3	Phong (elem 4)	4	17	13018	0x32DA	Gọi đại long	4	120	0	1	0		
+3	Phong (elem 4)	4	18	13019	0x32DB	Phong Ngạo Quyết	4	0	1	10	0		
+3	Phong (elem 4)	4	19	13020	0x32DC	Phong Chi Chiến Ý	4	60	10	5	13021		13021
+3	Phong (elem 4)	4	20	13021	0x32DD	Đẩu Chuyển Tinh Di	4	48	9	5	13019		
+3	Phong (elem 4)	4	21	13020	0x32DC	Phong Chi Chiến Ý	4	60	10	5	13021		13021
+3	Phong (elem 4)	4	22	13022	0x32DE	Liệt Phong Đạn	4	36	8	10	13019		
+3	Phong (elem 4)	4	23	13023	0x32DF	Long Quyển Cụ Phong	4	54	12	10	13024		13024
+3	Phong (elem 4)	4	24	13024	0x32E0	Ảo Ảnh Liên Kích	4	44	11	10	13022		
+3	Phong (elem 4)	4	25	13023	0x32DF	Long Quyển Cụ Phong	4	54	12	10	13024		13024
+3	Phong (elem 4)	4	26	13025	0x32E1	Vô Ảnh Vô Tướng	4	52	15	5	13020		
+3	Phong (elem 4)	4	27	13026	0x32E2	Băng Lôi	4	44	11	10	13009		
+3	Phong (elem 4)	4	28	13027	0x32E3	Phong Huyễn Thần Ly	4	42	9	10	13006		
+3	Phong (elem 4)	4	29	13028	0x32E4	Trảm Kỵ Phi Kiếm	4	48	4	10	13004		
+3	Phong (elem 4)	4	30	13029	0x32E5	Sơn Lam	4	56	9	10	13024		
+3	Phong (elem 4)	4	31	13030	0x32E6	Thức Qủy Hấp Hồn	4	50	9	5	13014		
+3	Phong (elem 4)	4	32	13031	0x32E7	Phong Kình Lôi Minh	4	84	11	10	13023		
+3	Phong (elem 4)	4	33	13032	0x32E8	Ẩn Phân Thân Thuật	4	68	9	5	13005		
+3	Phong (elem 4)	4	34	13033	0x32E9	Chấn Điện	4	72	8	10	13013		
+3	Phong (elem 4)	4	35	13034	0x32EA	Cuồng phong chi loạn	4	67	0	5	0		
+3	Phong (elem 4)	4	36	13035	0x32EB	Xuy phất chi vũ	4	65	0	5	0		
+3	Phong (elem 4)	4	37	13036	0x32EC	TLong Y nguyệt trảm	4	72	8	10	0		
+3	Phong (elem 4)	4	38	13037	0x32ED	TL YN trảm áo nghĩa	4	72	8	10	0		
+3	Phong (elem 4)	4	39	13038	0x32EE	Lẫn tránh 3	4	33	0	5	0		
+3	Phong (elem 4)	4	40	13039	0x32EF	Huyền Kích 3	4	78	0	10	0		
+3	Phong (elem 4)	4	41	13040	0x32F0	Đẩu Chuyển Tinh Di 3	4	120	0	5	0		
+3	Phong (elem 4)	4	42	13041	0x32F1	Vô Ảnh Vô Tướng 3	4	130	0	5	0		
+3	Phong (elem 4)	4	43	13042	0x32F2	Sơn Lam 3	4	140	0	10	0		
+3	Phong (elem 4)	4	44	13043	0x32F3	Băng Lôi 2	4	130	11	10	13026		
+3	Phong (elem 4)	4	45	13044	0x32F4	PhongHuyễn Thần Ly 2	4	130	9	10	13027		
+3	Phong (elem 4)	4	46	20027	0x4E3B	Hoàn Phong	15	30	0	10	0		
+3	Phong (elem 4)	4	47	20028	0x4E3C	Bạo Phong	15	60	0	10	0		
+3	Phong (elem 4)	4	48	20048	0x4E50	Siêu cấp toàn phong	17	30	0	5	0		
+3	Phong (elem 4)	4	49	21004	0x520C	Phá không thiểm	16	48	0	1	0		
+3	Phong (elem 4)	4	50	21008	0x5210	Gió độc	16	30	0	1	0		
+4	Tâm (elem 5)	5	0	14001	0x36B1	Thuật trinh thám	5	0	0	1	0		
+4	Tâm (elem 5)	5	1	14002	0x36B2	Thuật đào tẩu	5	10	0	1	14001		
+4	Tâm (elem 5)	5	2	14003	0x36B3	Thuật mua bán	5	0	0	8	14001		
+4	Tâm (elem 5)	5	3	14004	0x36B4	Thuật dò xét	5	0	0	10	14001		
+4	Tâm (elem 5)	5	4	14005	0x36B5	Thuật luyện đơn	5	0	0	10	14001		
+4	Tâm (elem 5)	5	5	14006	0x36B6	Đại hô	5	20	0	10	14001		
+4	Tâm (elem 5)	5	6	14007	0x36B7	Giải hôn	5	5	0	1	14002		
+4	Tâm (elem 5)	5	7	14008	0x36B8	Hôn mê	5	15	0	5	14002		
+4	Tâm (elem 5)	5	8	14009	0x36B9	Người làm	5	0	0	10	14003		
+4	Tâm (elem 5)	5	9	14010	0x36BA	Thuật đào khoáng	5	0	0	10	14004		
+4	Tâm (elem 5)	5	10	14011	0x36BB	Thuật đúc luyện	5	0	0	10	14005		
+4	Tâm (elem 5)	5	11	14012	0x36BC	Đồng tâm	5	36	0	10	14006		
+4	Tâm (elem 5)	5	12	14013	0x36BD	Cổ Vũ	5	36	0	10	14006		
+4	Tâm (elem 5)	5	13	14014	0x36BE	Giải độc	5	8	0	1	0		
+4	Tâm (elem 5)	5	14	14015	0x36BF	Bỏ độc	5	25	0	10	0		
+4	Tâm (elem 5)	5	15	14016	0x36C0	Thuật giao dịch	5	0	0	10	14009		
+4	Tâm (elem 5)	5	16	14017	0x36C1	Tịnh toạ	5	0	0	10	14009		
+4	Tâm (elem 5)	5	17	14018	0x36C2	Thuật đào sâu	5	0	0	10	14010		
+4	Tâm (elem 5)	5	18	14019	0x36C3	Thuật chế tạo	5	0	0	5	14011		
+4	Tâm (elem 5)	5	19	14020	0x36C4	Hoạch lí phản	5	30	0	5	14012		
+4	Tâm (elem 5)	5	20	14021	0x36C5	Hỗn loạn	5	25	0	5	0		
+4	Tâm (elem 5)	5	21	14022	0x36C6	Giải hỗn loạn	5	10	0	1	0		
+4	Tâm (elem 5)	5	22	14023	0x36C7	Cưỡi ngựa	5	0	0	1	0		
+4	Tâm (elem 5)	5	23	14024	0x36C8	Linh quang ẩn hiện	5	20	0	1	0		
+4	Tâm (elem 5)	5	24	14025	0x36C9	Chiếm đọat	5	0	0	1	0		
+4	Tâm (elem 5)	5	25	14026	0x36CA	Triệu gọi	5	0	0	1	0		
+4	Tâm (elem 5)	5	26	14027	0x36CB	Đạo sư	5	0	0	1	0		
+4	Tâm (elem 5)	5	27	14028	0x36CC	Đoàn kết	5	0	0	1	0		
+4	Tâm (elem 5)	5	28	14029	0x36CD	Cát Phổ Trại bắn đạn	5	60	0	10	0		
+4	Tâm (elem 5)	5	29	14030	0x36CE	Cát Phổ Trại áp đỉnh	5	80	0	10	0		
+4	Tâm (elem 5)	5	30	14031	0x36CF	Tiếp chiêu	5	0	0	1	0		
+4	Tâm (elem 5)	5	31	14032	0x36D0	Tinh luyện	5	0	0	10	14019		
+4	Tâm (elem 5)	5	32	14033	0x36D1	Xạ Tiễn	5	30	0	5	14037		
+4	Tâm (elem 5)	5	33	14034	0x36D2	Kỵ Binh	5	0	0	1	0		
+4	Tâm (elem 5)	5	34	14035	0x36D3	Chuyển Thể	5	0	0	1	0		
+4	Tâm (elem 5)	5	35	14036	0x36D4	Bách Xuyên	5	24	0	5	0		
+4	Tâm (elem 5)	5	36	14037	0x36D5	Tiễn Vũ	5	30	0	5	14036		
+4	Tâm (elem 5)	5	37	14038	0x36D6	Đại chu thiên	5	0	1	10	0		
+4	Tâm (elem 5)	5	38	14039	0x36D7	Bá khí	5	0	1	10	14038		
+4	Tâm (elem 5)	5	39	14040	0x36D8	Bá ý	5	46	1	5	14038		
+4	Tâm (elem 5)	5	40	14041	0x36D9	Lực bạt sơn hề	5	0	1	10	14038		
+4	Tâm (elem 5)	5	41	14042	0x36DA	Sóng cuồng	5	54	1	5	14038		
+4	Tâm (elem 5)	5	42	14043	0x36DB	Anh khí hộ thân	5	0	1	10	14038		
+4	Tâm (elem 5)	5	43	14044	0x36DC	ThiênThần thuẫn	5	46	1	5	14038		
+4	Tâm (elem 5)	5	44	14045	0x36DD	Tâm nhãn	5	0	1	10	14038		
+4	Tâm (elem 5)	5	45	14046	0x36DE	NgưngKhí HộThân	5	46	1	5	14038		
+4	Tâm (elem 5)	5	46	14047	0x36DF	Dùng kế	5	0	1	10	14038		
+4	Tâm (elem 5)	5	47	14048	0x36E0	Trí thủ	5	0	1	10	14038		
+4	Tâm (elem 5)	5	48	14049	0x36E1	Chống địch	5	0	1	10	14038		
+4	Tâm (elem 5)	5	49	14050	0x36E2	Sách động	5	0	1	10	14038		
+4	Tâm (elem 5)	5	50	14051	0x36E3	Tiên khiếu	5	0	1	10	14038		

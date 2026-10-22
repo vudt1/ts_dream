@@ -1,0 +1,739 @@
+# NPC co ten lien quan den SU KIEN DAC BIET
+# npcId	name
+6	TrươngMạnThành
+34	Đại.Ph.Tướng
+35	Tiểu.Ph.Tướng
+44	Tế Quỷ Thốt
+48	Đội Chiến Rìu
+51	Binh Lao Dài
+61	Tướng Xoa Kích
+71	H.Thiên Võ Sĩ
+107	Lôi Công
+115	Tướng Kh.Vàng
+120	Thiên Thánh Sĩ
+121	Quỷ Vệ Binh
+122	Hổ Bình Dương
+123	Quỷ Sư
+139	Quân Mãnh Hổ
+142	Binh Sĩ Dã Hổ
+143	Dã Hổ Quân
+146	Thủy Sư Quân
+147	Phù Thủy Lửa
+154	Võ Vệ Tướng
+155	Thiên Công Vệ
+156	Thiên.Ph.Tướng
+157	Thiên.T.Tướng
+160	Tiểu.Ch.Tướng
+166	Đại.Ph.Tướng
+167	Đ.Cương Tướng
+168	Đại Võ Tướng
+169	Đ.Thành Tướng
+170	Đ.Châu Tướng
+172	Khổ Nhu 
+197	Hổ Sĩ.Kh.Vàng
+201	H.Sơn Chiến Sĩ
+204	HắtSơnQuỷLính
+239	T.ThủyTặc
+250	Thủy Đạo Ma
+253	Phi Mâu Tướng
+255	Câu Đao Tướng
+273	Khổng Dung
+378	Khổng Tú
+455	Khổng Tín
+462	Thành Công Anh
+476	ThànhHà phẫnnộ
+477	VuCấm C.Thuyền
+478	BàngĐứcCThuyền
+518	Lôi Đồng
+544	Thanh Lôi
+554	Đỗ Phổ
+565	Hách Phổ
+574	Lôi Tự
+708	Trình Phổ
+778	Thủy Linh
+779	Thổi Tuyết
+781	Thành Đương 
+876	Cửu Chính
+905	Khổng Hữu
+919	Lôi Bạo
+949	Tào Cửu
+980	Thâm Thủy Tặc
+1040	Tướng TrụThiên
+1050	Điêu Thuyền
+1056	TrùmTướngCướp
+1067	Cửu Khâm
+1089	Bành Hổ
+1147	Lôi Tự
+1163	Thành Liêm
+1164	Hầu Thành
+1216	Nghiêm Bạch Hổ
+1222	Vương Thành
+1245	Lưu Hổ
+1249	Trương Hổ
+1259	Yêu Quỷ Vương
+1264	H.Quỷ Chảo
+1265	Lam Quỷ Chảo
+1266	Hồng Quỷ Chảo
+1267	Lục Quỷ Chảo
+1287	Quỷ Bí Vàng
+1296	Quỷ Chảo
+1309	Trương Thành
+1314	Thẩm Thành
+1336	Phổ Phú Lư
+1338	Phổ Tịnh
+1367	Mai Thành
+1376	Thiên Vạn
+1380	Thành Nghị
+1445	Thành Luật
+1469	KhổngTướcnữthị
+1582	Tướng Cá
+1583	Quy Thừa Tướng
+1592	Cửu Vĩ Hồ
+1594	Quỷ Diện Ác Ma
+1597	Ngô Phổ
+1612	Tiểu Cửu Tử
+1618	A Hổ
+1643	Bắc Tinh Quân
+1688	Hổ Cang Đường
+1706	Chủ LôiĐàiNgầm
+1738	Thuyền Hòa
+1756	LôiĐàiTruyềnSư
+1757	Chủ Lôi Đài
+1815	Thổ Khố Lý
+1820	Chủ LoạnĐấuĐài
+1823	Chủ Võ Đài
+1824	Tiểu Hổ
+1833	Thiên Hạc
+1838	Chủđài Kchiến
+1877	Chủ Lôi Đài
+1885	Chủ LĐài Stồn
+1921	Bào Thành
+1925	Thiên Thần Cô 
+1947	Phổ Lâm
+1999	Quỷ bốc
+2000	Quỷ dược
+2008	Lam hổ nhi
+2022	Cônhichiếnhoả
+2023	Cônhichiếnhoả
+2027	Thạch Thành
+2035	Tiểu quỷ vương
+2057	Chủ lôi đài
+2095	CChiếnViên
+2102	TChiếnViên
+2104	Quỷ Đại Phu
+2114	Thủychiến binh
+2116	Ngườilàmthuyền
+2117	Ngườibánthuyền
+2118	Thủy chiến đốc
+2131	Thợ thuyền nhỏ
+2132	Thợ thuyền vừa
+2133	Thợ thuyền to
+2135	Q.cấp thủybinh
+2149	Quản Lý LôiĐài
+2165	Thủ Thành Binh
+2171	Hổ Náo Quân
+2183	Thạch Hổ binh
+2191	Hổ Vệ Binh
+2192	Hổ Quân Vệ
+2193	Hổ Quân Trưởng
+2194	Hổ Võ Sĩ
+2195	Hổ Dũng Sĩ
+2199	Tướng Bộ Khúc 
+2229	QuânLầuThuyền
+2240	Phong Thủy Sư
+2255	Thiên Võ Binh
+2267	Chiến.Th.Binh
+2271	Thiên Võ Quân
+2273	Độc Tướng
+2276	Thiên.H.Sư
+2284	Bút Đao Tướng
+2286	Binh Lao Sắt
+2311	Khư Hổ Binh
+2335	Như Đài Binh
+2340	UyểnThànhBinh
+2357	Tướng Hải Tặc
+2367	Đại Thổ Phỉ
+2374	Phiến Tướng
+2375	Phiến Tướng
+2376	Phiến Tướng
+2380	Nha Môn Tướng
+2389	Lục Hổ Chảo
+2396	Bà Triệu Quỷ
+2418	Phiến Tướng
+2419	Tì Tướng
+2428	Huân Quỷ Mao
+2462	Tướng Sói Xám
+2470	Tướng Mã Hàn
+2504	Thủy Sư Trưởng
+2508	Hổ Bàn Binh
+2512	Hổ Tiêu Võ Sĩ
+2514	Mãnh Trảo Sĩ
+2517	Phi Tướng
+2543	LínhTr.Thành
+2544	Tr.Thành Vệ
+2551	ThủySưKinhSở
+2567	Sở Hổ Sĩ
+2572	TiểuThuyềnBinh
+2583	Thủy Binh
+2596	Mong Hổ quân
+2608	Nhung Tướng
+2623	Binh Hổ Thân
+2631	QuỷKhươngTướng
+2633	PhiKhươngTướng
+2643	Thành Đô Vĩ
+2649	TâyThục ThủySư
+2653	Mãn Tướng
+2665	Lạc Thành Quân
+2673	Phó Tướng
+2677	TrậnLiệt Tướng
+2686	Thành Vũ Sĩ
+2688	Cử Thành Trại
+2689	Thượng Tướng
+2695	TướngSơnKhương
+2697	SKhương Tướng
+2703	TiểuthànhBinh 
+2704	Gấu Hổ Sĩ
+2715	Nông Chiến Sĩ
+2717	Nhô Tướng
+2721	Thuyền QLương 
+2754	Nam Hải Tướng
+2763	Bì Giáp Tướng
+2772	Mãnh tướng
+2778	Th.nguyêntướng
+2800	Thích hổ sĩ
+2805	Lính quỷ ngục
+2811	Binhchèothuyền
+2812	Tây thành binh
+2813	Tâythành vệ sĩ
+2820	Viên Lô tướng
+2825	Sa thành vệ
+2848	Đê mãnh tướng
+2849	Đê phi tướng
+2851	Tuyệtvực tướng
+2853	Hồnggiáp tướng
+2855	Thiên lí kỵ
+2864	Ng.khanhbốcquỷ
+2865	Ngânkhanhvuquỷ
+2868	ThủbinhV.Xương
+2885	CThuyền NamMan
+2893	Hungtàchiếnmã
+2920	TThiên kỳ chủ
+2921	TThiên kỳ binh
+2922	TThiên sa binh
+2923	TThiên pháp sư
+2961	Hổ
+2962	Mãnh hổ
+2967	ChiếnmãnướcOa
+2995	Thiên Khải TK
+2999	Mãnh hổ
+3027	Quan Đốc Chiến
+3029	QuanTuầnThành
+3075	Thủy Tinh Quái
+3100	Thổi Tuyết
+3104	CácPhổSáiYêu
+3122	Cửu Vĩ Hồ
+3146	Đài Trác
+3151	Thủy Tinh Đỏ
+3152	Thủy Tinh Tím
+3159	Thủy Tinh Đỏ
+3160	Thủy Tinh Tím
+3167	Thủy Tinh Đỏ
+3168	Thủy Tinh Tím
+3175	Thủy Tinh Đỏ
+3176	Thủy Tinh Tím
+3183	Thủy Tinh Đỏ
+3184	Thủy Tinh Tím
+3191	Thủy Tinh Đỏ
+3192	Thủy Tinh Tím
+3199	Thủy Tinh Đỏ
+3200	Thủy Tinh Tím
+3207	Thủy Tinh Đỏ
+3208	Thủy Tinh Tím
+3227	Thủy Tinh Đỏ
+3228	Thủy Tinh Tím
+3236	Thủy Tinh Đỏ
+3237	Thủy Tinh Tím
+3245	Thủy Tinh Đỏ
+3246	Thủy Tinh Tím
+3254	Thủy Tinh Đỏ
+3255	Thủy Tinh Tím
+3263	Thủy Tinh Đỏ
+3264	Thủy Tinh Tím
+3272	Thủy Tinh Đỏ
+3273	Thủy Tinh tím
+3281	Thủy Tinh Đỏ
+3282	Thủy Tinh Tím
+3290	Thủy Tinh Đỏ
+3291	Thủy Tinh Tím
+3299	Thủy Tinh Đỏ
+3300	Thủy Tinh Tím
+3308	Thủy Tinh Đỏ
+3309	Thủy Tinh Tím
+3317	Đỏ Thủy Tinh 
+3326	Đỏ Thủy Tinh 
+3344	Thủy tinh hồng
+3345	Thủy tinh tím
+3353	Thủy tinh hồng
+3354	Thủy tinh tím
+3401	Tàu Chiến
+3402	ThuyềnLiênHoàn
+3403	TàoNhân thuyền
+3404	CamNinh thuyền
+3405	T.Trung thuyền
+3406	Đ Nghi thuyền
+3407	Lưu Bàn thuyền
+3408	TháiMạo thuyền
+3409	Thuyền T.Đương
+3410	ThuyềnHànĐương
+3411	Thuyền ChuThái
+3412	Thuyền LýThông
+3413	Lữ Kiền thuyền
+3414	Thuyền ChuLinh
+3415	VănSính thuyền
+3416	Vu Cấm thuyền
+3417	Thuyền LạcTiến
+3419	Thchiến VThiệu
+3420	ThchiếnTrầnLan
+3421	Thchiến TrHuân
+3423	Thchiến ĐPhiền
+3424	ThchiếnCh.Hoàn
+3427	TrìnhPhổđấuhạm
+3428	Thuyền Chu Du
+3429	Thchiến TrDuẫn
+3430	ThchiếnVănSính
+3431	Thchiến LCương
+3432	ThchiếnLưuHuân
+3433	Thuyền vậnbinh
+3434	Thuyền cấp đạn
+3435	Thuyềnquângiới
+3436	Thuyền Tô Phi
+3437	Thuyền Tạ Kỳ
+3438	TàoPhi LThuyền
+3442	Ng Bạch Hổ CT
+3451	HaoThiênKhuyển
+3459	Địa ThiênTướng
+3460	Thủy.Th.Tướng
+3461	Hỏa ThiênTướng
+3462	Phong.Th.Tướng
+3463	Địa Thiên Binh
+3464	Thủy ThiênBinh
+3465	Hỏa Thiên Binh
+3471	Tam nhãn tướng
+3473	Quỷ Quan
+3474	Quỷ Soa
+3475	Nhân Hổ Tiên
+3478	Cửu Âm Mị Cơ
+3483	Lợi Trảo  Nhân
+3496	Mạc quỷ
+3497	U Quỷ
+3519	Huyết Nha Quỷ 
+3521	Thanh Trảo Hầu
+3530	Bạo Phá Tà Quỷ
+3544	Trủng giác Quỷ
+3545	Thiết diện Quỷ
+3546	Cửu Vĩ Hồ
+3548	Phiêu hỏa Quỷ
+3550	Quỷ luyện ngục
+3551	TuLa yêu tướng
+3552	TuLa yêu tướng
+3565	Quỷ tâm Ma
+3567	ThDươngthtướng
+3568	CựcÂmthầntướng
+3569	CựcDươngttướng
+3570	ThiếuÂmthtướng
+3574	Thủy Quỷ
+3575	Đông thiênbinh
+3576	Nam thiên binh
+3577	Tây thiên binh
+3578	Bắc thiên binh
+3589	ThiênGiai vệsĩ
+3593	Quỷ Diện Tả Từ
+3596	Quỷ Li Tang
+3597	Quỷ Mê Tử
+3612	Quỷ hắc hổ
+3614	Lôi Công
+3615	Lôi Mẫu
+3623	Trì Quốc Thiên
+3624	Đa Văn Thiên
+3625	QuảngMụcThiên
+3626	Tăng Tr Thiên
+3647	Mãnh Hổ
+3652	Mèo Vân Hổ
+3656	Rắn Hổ Mang
+3673	Rắn Hổ Đất
+3692	Đại thủy Lộc
+3697	Hổ 
+3699	Khổng Tước
+3706	Dã phiêu hổ 
+3707	Phiêu hổ vương
+3717	Mãnh hổ
+3718	Mãnh hổ vương
+3719	Tiểu Lão hổ
+3720	Tường Thành
+3744	Chiến Tượng
+3745	Chiến Tượng
+3746	Chiến Tượng
+3747	Chiến Tượng
+3748	Chiến Tượng
+3749	Chiến Tượng
+3752	Quỷ biến thân
+3778	Chảo Quỷ binh
+3779	Chiểu Quỷ binh
+3780	Cự Quỷ binh
+3781	Mộ Quỷ binh
+3789	Hổ Cự Hán
+3794	Nữ Thủy Thần
+3801	Phong Quỷ Binh
+3803	Hữu Long Trảo 
+3804	Tả Long Trảo
+3806	Hữu Bí Hí Trảo
+3807	Tả Bí Hí Trảo
+3809	Họa thủy yêu
+3810	Phần thiên yêu
+3812	AnhHồn ChiếnSĩ
+3817	Cấp Đống Hổ
+3827	Bạch hổ
+3828	Móng hổ phải
+3829	Móng hổ trái
+3851	Cửa Thành
+3853	Cửa Thành
+3854	Tường Thành
+3855	Tường Thành
+3874	Thú Thiên Niên
+3875	Quỷ Bí Vàng
+3878	Tiểu Quỷ Binh
+3879	Hỏa Quỷ Binh
+3881	Nhân Quỷ Vương
+3882	Địa Quỷ Vương
+3883	ThiênQuỷVương
+3890	Hỏa Am Quỷ 
+3891	Quỷ Hổ Tướng
+3944	Mật sứ V.Thành
+3952	TiểuquỷH.Loan
+3959	Tiểu quỷ
+3961	Lôi phthủtướng
+3962	Lôi ph thủbinh
+3988	VongcốtướngTần
+3998	Thiên Niên Thú
+4005	Tả Tước Trảo
+4006	Hữu Tước Trảo
+4007	NiênTháiĐạiTrù
+4010	Thử thiên kim
+4018	Thiên lý nhãn
+4022	Phi thiên ngũ
+4026	Đại đỗ cửu
+4033	Thành ĐạiHuyện
+4034	Thành Lâm Lưu
+4035	Thành ChânĐịnh
+4036	Thành Lang Gia
+4037	Thành Đại Mạc
+4049	Khổng Tước
+4068	Thiênkìtinhbồn
+4079	Thủy vân ảo cơ
+4083	HàmOánTầnTướng
+4085	Quỷ Thừa Tướng
+4086	Quỷ Thừa Tướng
+4090	Thủy sư G.Đông
+4091	ThủybinhG.Đông
+4092	ChuDuthiếuniên
+4098	Quỷvươngyêukim
+4099	Tiểuquỷyêukim
+4100	Bọn quỷ vương 
+4107	ThủbinhP.H.Đài
+4108	TinhbinhP.HĐài
+4111	TướngL mộ giáp
+4112	Tiểuquỷdạxoa
+4113	Tiểuquỷdạxoa
+4129	Đằnggiáptướng
+4136	ThôngT quỷbinh
+4165	Quỷ Tần vương
+4177	Quỷ Tần vương
+4178	Quỷ Tần vương
+4179	VongcốtướngTần
+4188	Hầu Thành
+4203	Hầu Thành
+4224	Nghiêm Bạch Hổ
+4232	Trình Phổ
+4244	Khổng Tú
+4245	Tường Thành
+4249	Hổ Vệ Binh
+4267	Diệu Võ Tướng
+4268	Kiến Võ Tướng
+4269	Chấn Võ Tướng
+4270	Huyền Võ Tướng
+4354	Trình Phổ
+4364	Điêu Thuyền
+4379	TrươngMạnThành
+4389	Nghiêm Bạch Hổ
+4465	Phổ Tịnh
+4504	Hách Phổ
+4590	Thành Công Anh
+4604	Lôi Đồng
+4662	Khổng Dung
+4668	Yêu Quỷ Vương
+4691	Thiên vạn
+4747	Quỷ Tốt
+4764	Chiến Sĩ
+4765	Chiến Sĩ
+4766	Chiến Sĩ
+4767	Chiến Sĩ
+4772	Phương Tướng 
+4773	Phương Tướng 
+4774	Phương Tướng 
+4775	Phương Tướng 
+4781	Quỷ Đao Binh
+4782	Quỷ Binh
+4783	Quỷ Hoả Binh
+4784	Quỷ Câu Binh
+4790	Lôi Công
+4808	TrươngMạnThành
+4837	Khổ Tù
+4849	O Hoàn Tướng
+4850	O Hoàn Tướng
+4853	Liêu Đông Hổ
+4855	Phổ Phú Hỗ
+4896	TỵThuỷQThủBinh
+4900	Thành Liêm
+4903	Hầu Thành
+4906	HổLao QThủBinh
+4920	LDươngTThủBinh
+4936	Điêu Thuyền
+4942	Mạch Thành TB
+4944	Hoàn Thành TB
+4945	Thủ binh N.T
+4954	ÂmHồn ChiếnSĩ
+4955	Tiểuquỷyêukim
+4962	Thiên Niên Thú
+4975	Bạch Hổ
+4976	Tả Hổ Trảo
+4977	Hữu Hổ Trảo
+4978	Quỷ Bạch Hổ
+4981	Quỷ hắc hổ
+4983	Dạ Hổ Vương
+4984	Niên Tống Sư
+4985	Bách Niên Xà
+5019	P.H ThiênTướng
+5029	Bđoàn Thành Đô
+5035	BđoànThuyềntốc
+5036	Bđoàn Thuyềnto
+5052	Tướngsĩgiaochi
+5060	Hoa Cửu Công
+5071	BDY Quỷ Diện
+5076	Giang Quỷ Điện
+5078	La Sát Tấn Lôi
+5079	Quỷ La Sát
+5085	ThiênTrưởngLão
+5087	Tiểu Quỷ
+5093	TâyQuyềnThành
+5094	Khổ Thiền
+5098	Lôi Sát Quỷ
+5110	ThchiếnTônSách
+5116	Nghiêm Bạch Hổ
+5149	TrươngMạnThành
+5235	Trình Phổ
+5258	Điêu Thuyền
+5433	Yêu Quỷ Vương
+5442	Bảng phủ tướng
+5455	Tấn Quỷ doanh
+5460	Phươngđaotướng
+5479	Trườngthủybinh
+5484	Việtdũng tướng
+5495	Phùthuyền binh
+5501	Hổ lâm quân
+5504	Xuyênsơn tướng
+5506	Truân sở tướng
+5508	Yết mãnh tướng
+5510	Vọnglâuthtướng
+5520	Thànhphòngbinh
+5522	Hổ kỵ binh
+5529	Hùng hổ quân
+5533	Thủy quân hiệu
+5539	ThiênđànTiênHổ
+5548	Lục Ác Quỷ
+5551	Sa Tặc Tư Hổ
+5553	Hỏa Nhân Hổ
+5556	ChiếnTượng N.M
+5557	Hổ Man nhân
+5558	Mãnh hổ NamMan
+5559	ChiếnTượng NK
+5562	ManTướngĐ.Giáp
+5563	Địa nhẫn tướng
+5564	Thuỷnhẫntướng
+5565	Hỏa nhẫn tướng
+5566	Phongnhẫntướng
+5571	Búa quỷ
+5575	Nam thiên binh
+5576	Bắc thiên binh
+5581	Tây thiên binh
+5582	Đông thiênbinh
+5619	Hổ Dữ
+5620	Giác Hổ Cốt
+5643	VạnniênQuytiên
+5644	Địa thiêntướng
+5646	Cửu Âm Mị Cơ
+5649	HaothiênKhuyển
+5654	Thủythiêntướng
+5655	Tam nhãn tướng
+5657	ThiêncơthầnQuy
+5660	Hỏa thiêntướng
+5661	Nhân Hổ Tiên
+5666	Th.NiênLinhQuy
+5667	Phong th.tướng
+5670	Bắc Tinh Quân
+5672	Lôi Công
+5673	Lôi Mẫu
+5678	Trì Quốc Thiên
+5679	Đa Văn Thiên
+5680	QuảngMụcThiên
+5681	Tăng Tr Thiên
+5689	QuảngLạcTTướng
+5692	GiaQuanTTướng
+5699	Tam Nhãn Tướng
+5700	ThDươngthtướng
+5703	QuảngMụcThiên
+5704	Tăng Tr Thiên
+5705	Đa Văn Thiên
+5706	Trì Quốc Thiên
+5711	ThiếuÂmTtướng
+5712	CựcÂmthầntướng
+5713	CựcDươngTTướng
+5714	ĐôngThiênTướng
+5715	TâyThiênTướng
+5716	NamThiênTướng
+5717	BắcThiênTướng
+5723	VạnniênQuytiên
+5724	Nhân Hổ Tiên
+5727	Thiên Lý Nhãn
+5734	Kim Thiên Thị
+5739	Hậu Thổ
+5754	Lôi Chấn Tử
+5760	Thổ Hành Tôn
+5763	Thủy Đức Quân
+5777	Cửu Thiên H.Nữ
+5784	Lôi Tổ
+5800	Hình Thiên
+5804	Thiên Lung
+5820	ThiênQuanĐạiĐế
+5821	ThủyQuan ĐạiĐế
+5822	Mã Tướng Quân
+5832	HoàngThiênCẩu
+5833	Lam Thiên Xà
+5834	Hỗn Thiên Lang
+5835	Húc Thiên Hầu
+5836	Lực Thiên Hợi
+5840	Tiểu Quỷ
+5843	Quỷ Môn Thần
+5846	Tiểu Quỷ
+5852	Tiểu Quỷ
+5861	Chiến Tử
+5866	Luyện Ngục Quỷ
+5870	Lam Thẩm Quỷ
+5874	Hữu Bí Hí Trảo
+5876	TuLa yêu tướng
+5877	TuLa yêu tướng
+5878	Quỷ luyện ngục
+5881	Quỷ tâm Ma
+5917	Điêu Thuyền
+5929	Trình Phổ
+5984	Quỷ Mẫu
+5987	Quỷ Diện Tả Từ
+5988	Quỷ Mê Tử
+5992	Quỷ Li Tang
+5993	Lôi phthủtướng
+5994	Lôi ph thủbinh
+5995	Lôi Phủ Quan
+5996	Tả Bí Hí Trảo
+6026	TrươngMạnThành
+6044	Lâm Quỷ Chảo
+6045	Lam Quỷ Chảo
+6046	Hồng Quỷ Chảo
+6047	Lục Quỷ Chảo
+6053	Lục Th.Quỷ
+6054	Lâm Th.Quỷ
+6055	Lam Th.Quỷ
+6056	Hồng Th.Quỷ
+6078	Hổ Vương Tinh
+6079	Hổ Tinh
+6080	Hổ Tinh
+6081	Hổ Tinh
+6082	Hổ Tinh
+6123	CôNhiChiếnHoả
+6124	CôNhiChiếnHoả
+6125	CôNhiChiếnHoả
+6126	CôNhiChiếnHoả
+6127	CôNhiChiếnHoả
+6128	CôNhiChiếnHoả
+6129	CôNhiChiếnHoả
+6130	CôNhiChiếnHoả
+6131	CôNhiChiếnHoả
+6132	CôNhiChiếnHoả
+6133	CôNhiChiếnHoả
+6134	CôNhiChiếnHoả
+6135	CôNhiChiếnHoả
+6136	CôNhiChiếnHoả
+6137	CôNhiChiếnHoả
+6138	CôNhiChiếnHoả
+6139	CôNhiChiếnHoả
+6140	CôNhiChiếnHoả
+6141	CôNhiChiếnHoả
+6142	CôNhiChiếnHoả
+6143	CôNhiChiếnHoả
+6144	CôNhiChiếnHoả
+6145	CôNhiChiếnHoả
+6146	CôNhiChiếnHoả
+6147	CôNhiChiếnHoả
+6148	CôNhiChiếnHoả
+6149	CôNhiChiếnHoả
+6150	CôNhiChiếnHoả
+6151	CôNhiChiếnHoả
+6152	CôNhiChiếnHoả
+6153	CôNhiChiếnHoả
+6154	CôNhiChiếnHoả
+6155	CôNhiChiếnHoả
+6156	CôNhiChiếnHoả
+6157	CôNhiChiếnHoả
+6158	CôNhiChiếnHoả
+6159	CôNhiChiếnHoả
+6160	CôNhiChiếnHoả
+6161	CôNhiChiếnHoả
+6162	CôNhiChiếnHoả
+6231	Điêu Thuyền
+6293	Nghiêm Bạch Hổ
+6308	Trình Phổ
+6342	Khổng Minh
+6349	Cửu Vĩ Hồ
+6373	Lâu thuyền
+6374	Thuyền chiến
+6375	N.Cchiếnthuyền
+6376	N.Cchiếnthuyền
+6377	N.Cchiếnthuyền
+6378	ĐuathuyềnĐ.Ngọ
+6379	ĐuathuyềnĐ.Ngọ
+6380	ĐuathuyềnĐ.Ngọ
+6381	ĐuathuyềnĐ.Ngọ
+6383	Tẩukhả thủytặc
+6384	Duđĩnh thủytặc
+6386	Hảicốt thủytặc
+6397	LâuthuyềnNg.Dư
+6398	LâuthuyềnN.BHổ
+6400	Thchiến kẻđịch
+6401	Thchiến kẻđịch
+6402	Thchiến kẻđịch
+6416	Điêu Thuyền
+6426	QuảngĐứcTTướng
+6537	BiệnThànhVương
+6540	DiêmLaThiênTử
+6554	Yêu Quỷ Vương
+6556	Quỷ Diện Ác Ma
+6563	BáchNiênĐậuYêu
+6568	Thổ Thần
+6569	Thổ Công
+6570	Thổ Địa
+6571	Đại Thổ Công
+6572	Thổ Gia Công
+6588	MãnhHổ DịGiới
+6589	HổVương DịGiới
+6597	Cửu Vĩ Hồ
+6611	ThủyĐứcT.Quân
+6612	Thiên Môn Thần
+6631	Phục Hổ La Hán

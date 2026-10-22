@@ -1,0 +1,1476 @@
+va	section	region	text	hex
+0x00577435	CODE	TSe_NPCSkillTreeForm / form region	j2j2ỰỶ	6a326a32b914
+0x0057743E	CODE	TSe_NPCSkillTreeForm / form region	Ứ(vW	ba287657
+0x0057749E	CODE	TSe_NPCSkillTreeForm / form region	jFjỸỰP	6a466a19b950
+0x005774A7	CODE	TSe_NPCSkillTreeForm / form region	Ứ8vW	ba387657
+0x0057758C	CODE	TSe_NPCSkillTreeForm / form region	Sử dụng hợp đồng	53d82064f86e672068fe7020f0b06e67
+0x005775EC	CODE	TSe_NPCSkillTreeForm / form region	ỮỮỮỮẪ	ffffffff06
+0x00577628	CODE	TSe_NPCSkillTreeForm / form region	panel10	70616e656c3130
+0x0057766F	CODE	TSe_NPCSkillTreeForm / form region	dỮ0dẸ ỮẴỂỗỢ	64ff30648920ff058cb294
+0x00577920	CODE	TSe_NPCSkillTreeForm / form region	ỮỮỮỮ(yW	ffffffff287957
+0x00577934	CODE	TSe_NPCSkillTreeForm / form region	ỮỮỮỮẤyW	ffffffff847957
+0x00577D07	CODE	TSe_NPCSkillTreeForm / form region	jFhlẲ	6a46686c02
+0x00577D40	CODE	TSe_NPCSkillTreeForm / form region	Ứ0ỔW	ba309157
+0x00577D4A	CODE	TSe_NPCSkillTreeForm / form region	ỀUủẸẰụ	8b55fc8982f8
+0x00577D5A	CODE	TSe_NPCSkillTreeForm / form region	ỨHỔW	ba489157
+0x00577D64	CODE	TSe_NPCSkillTreeForm / form region	ỀUủẸẰxẲ	8b55fc89827802
+0x00577D8E	CODE	TSe_NPCSkillTreeForm / form region	ỨxỔW	ba789157
+0x00577D98	CODE	TSe_NPCSkillTreeForm / form region	ỀUủẸẰẠẲ	8b55fc89828002
+0x00577DB6	CODE	TSe_NPCSkillTreeForm / form region	ẸỒlẲ	89906c02
+0x00577DC7	CODE	TSe_NPCSkillTreeForm / form region	ẵẠtẲ	c7807402
+0x00577E79	CODE	TSe_NPCSkillTreeForm / form region	jFjỸỰỷ	6a466a19b9d6
+0x00577E82	CODE	TSe_NPCSkillTreeForm / form region	ỨấỔW	baa49157
+0x00577EB8	CODE	TSe_NPCSkillTreeForm / form region	ỀUủẸẰđ	8b55fc8982f0
+0x00577EC1	CODE	TSe_NPCSkillTreeForm / form region	ỀEủỀẠđ	8b45fc8b80f0
+0x00577EE5	CODE	TSe_NPCSkillTreeForm / form region	ỨƠỔW	bab49157
+0x00577F0C	CODE	TSe_NPCSkillTreeForm / form region	ỀEảẳẠĐ	8b45e4c680d0
+0x005780A4	CODE	TSe_NPCSkillTreeForm / form region	ỀUủỀỖLẲ	8b55fc8b924c02
+0x005780D4	CODE	TSe_NPCSkillTreeForm / form region	ỀUủỀỖLẲ	8b55fc8b924c02
+0x00578104	CODE	TSe_NPCSkillTreeForm / form region	ỀUủỀỖLẲ	8b55fc8b924c02
+0x00578134	CODE	TSe_NPCSkillTreeForm / form region	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057817F	CODE	TSe_NPCSkillTreeForm / form region	jdhÕ	6a6468a0
+0x00578186	CODE	TSe_NPCSkillTreeForm / form region	jẲỰẲ	6a02b902
+0x005781BF	CODE	TSe_NPCSkillTreeForm / form region	jdhđ	6a6468f0
+0x005781E9	CODE	TSe_NPCSkillTreeForm / form region	jẴỰẴ	6a05b905
+0x0057820C	CODE	TSe_NPCSkillTreeForm / form region	jẪỰẪ	6a06b906
+0x005783F0	CODE	TSe_NPCSkillTreeForm / form region	jỶỰỶ	6a14b914
+0x0057849C	CODE	TSe_NPCSkillTreeForm / form region	jỸỰỸ	6a19b919
+0x00578583	CODE	TSe_NPCSkillTreeForm / form region	ỄUẽị('	8d55a8b82827
+0x005785B8	CODE	TSe_NPCSkillTreeForm / form region	ỄUÕị''	8d55a0b82727
+0x005785ED	CODE	TSe_NPCSkillTreeForm / form region	ỄUỊị%'	8d5598b82527
+0x00578622	CODE	TSe_NPCSkillTreeForm / form region	ỄUỒị)'	8d5590b82927
+0x0057898C	CODE	TSe_NPCSkillTreeForm / form region	ỄỚ ỮỮỮịụ.	8d9520ffffffb8f82e
+0x005789C4	CODE	TSe_NPCSkillTreeForm / form region	ỀUủẸẰ	8b55fc8982
+0x00578AD1	CODE	TSe_NPCSkillTreeForm / form region	ỄỚụợỮỮịư2	8d95f8feffffb8df32
+0x00578B09	CODE	TSe_NPCSkillTreeForm / form region	ỀUủẸẰỶẲ	8b55fc89821402
+0x00578B12	CODE	TSe_NPCSkillTreeForm / form region	ỄỚđợỮỮịÝ2	8d95f0feffffb8dd32
+0x00578BCC	CODE	TSe_NPCSkillTreeForm / form region	ỀUủẸẰ Ẳ	8b55fc89822002
+0x00578C3A	CODE	TSe_NPCSkillTreeForm / form region	ỀEủỀẠLẲ	8b45fc8b804c02
+0x00578D64	CODE	TSe_NPCSkillTreeForm / form region	ỨủỔW	bafc9157
+0x00578DAF	CODE	TSe_NPCSkillTreeForm / form region	ỨủỔW	bafc9157
+0x00578DFA	CODE	TSe_NPCSkillTreeForm / form region	ỨủỔW	bafc9157
+0x00578E45	CODE	TSe_NPCSkillTreeForm / form region	ỨủỔW	bafc9157
+0x00578E8D	CODE	TSe_NPCSkillTreeForm / form region	ỨủỔW	bafc9157
+0x00579061	CODE	TSe_NPCSkillTreeForm / form region	jFjỸỰẲẲ	6a466a19b90202
+0x005790C2	CODE	TSe_NPCSkillTreeForm / form region	ỀUủẸẰỢẲ	8b55fc89829402
+0x0057919C	CODE	TSe_NPCSkillTreeForm / form region	ỮỮỮỮẪ	ffffffff06
+0x00579224	CODE	TSe_NPCSkillTreeForm / form region	Ball	42616c6c
+0x005792E1	CODE	TSe_NPCSkillTreeForm / form region	ỨỬỊW	babc9857
+0x00579325	CODE	TSe_NPCSkillTreeForm / form region	ỨLỎW	ba4c9957
+0x00579347	CODE	TSe_NPCSkillTreeForm / form region	ỨỢỎW	ba949957
+0x0057937F	CODE	TSe_NPCSkillTreeForm / form region	ỨỵỎW	badc9957
+0x00579418	CODE	TSe_NPCSkillTreeForm / form region	ẠẠẠỶ	80808014
+0x00579503	CODE	TSe_NPCSkillTreeForm / form region	ỀUủẸBLỀEủỀẠLẲ	8b55fc89424c8b45fc8b804c02
+0x00579860	CODE	TSe_NPCSkillTreeForm / form region	Ứ ỌW	ba209a57
+0x005798FC	CODE	TSe_NPCSkillTreeForm / form region	ỮỮỮỮ?	ffffffff3f
+0x0057998C	CODE	TSe_NPCSkillTreeForm / form region	ỮỮỮỮ?	ffffffff3f
+0x005799D4	CODE	TSe_NPCSkillTreeForm / form region	ỮỮỮỮ!	ffffffff21
+0x005799DC	CODE	TSe_NPCSkillTreeForm / form region	Đẳng cấp vẫn chưa học chuyển sinh	d0c66e672063a4702076e76e206368df612068f7632063687579ac6e2073696e68
+0x00579A20	CODE	TSe_NPCSkillTreeForm / form region	TurnTwoBall	5475726e54776f42616c6c
+0x00579A5D	CODE	TSe_NPCSkillTreeForm / form region	dỮ0dẸ ỀEụỰd	64ff306489208b45f8b964
+0x00579A86	CODE	TSe_NPCSkillTreeForm / form region	ỨđŨW	baf09d57
+0x00579C77	CODE	TSe_NPCSkillTreeForm / form region	h8ỤW	68389e57
+0x00579C7C	CODE	TSe_NPCSkillTreeForm / form region	hDỤW	68449e57
+0x00579E28	CODE	TSe_NPCSkillTreeForm / form region	Điểm	d069ac6d
+0x00579E60	CODE	TSe_NPCSkillTreeForm / form region	Cần học trước	43a56e2068f763207472dfbe63
+0x00579E78	CODE	TSe_NPCSkillTreeForm / form region	Hoặc	486fa363
+0x0057C001	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057C02E	CODE	payload builder / TSe_SkillTreeForm	ỀMủỀẸLẲ	8b4dfc8b894c02
+0x0057C05E	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057C08B	CODE	payload builder / TSe_SkillTreeForm	ỀMủỀẸLẲ	8b4dfc8b894c02
+0x0057C0BE	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057C0EB	CODE	payload builder / TSe_SkillTreeForm	ỀMủỀẸLẲ	8b4dfc8b894c02
+0x0057C11E	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057C14B	CODE	payload builder / TSe_SkillTreeForm	ỀMủỀẸLẲ	8b4dfc8b894c02
+0x0057C17E	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057C1AB	CODE	payload builder / TSe_SkillTreeForm	ỀMủỀẸLẲ	8b4dfc8b894c02
+0x0057C1DE	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057C20B	CODE	payload builder / TSe_SkillTreeForm	ỀMủỀẸLẲ	8b4dfc8b894c02
+0x0057C23E	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057C26B	CODE	payload builder / TSe_SkillTreeForm	ỀMủỀẸLẲ	8b4dfc8b894c02
+0x0057C29E	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057C2C8	CODE	payload builder / TSe_SkillTreeForm	ỀMủỀẸLẲ	8b4dfc8b894c02
+0x0057C2FB	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057C328	CODE	payload builder / TSe_SkillTreeForm	ỀMủỀẸLẲ	8b4dfc8b894c02
+0x0057C35B	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057C388	CODE	payload builder / TSe_SkillTreeForm	ỀMủỀẸLẲ	8b4dfc8b894c02
+0x0057C3BB	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057C3E8	CODE	payload builder / TSe_SkillTreeForm	ỀMủỀẸLẲ	8b4dfc8b894c02
+0x0057C41B	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057C448	CODE	payload builder / TSe_SkillTreeForm	ỀMủỀẸLẲ	8b4dfc8b894c02
+0x0057C47B	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057C4A8	CODE	payload builder / TSe_SkillTreeForm	ỀMủỀẸLẲ	8b4dfc8b894c02
+0x0057C4DB	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057C508	CODE	payload builder / TSe_SkillTreeForm	ỀMủỀẸLẲ	8b4dfc8b894c02
+0x0057C53B	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057C565	CODE	payload builder / TSe_SkillTreeForm	ỀMủỀẸLẲ	8b4dfc8b894c02
+0x0057C598	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057C5C5	CODE	payload builder / TSe_SkillTreeForm	ỀMủỀẸLẲ	8b4dfc8b894c02
+0x0057C5F8	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057C625	CODE	payload builder / TSe_SkillTreeForm	ỀMủỀẸLẲ	8b4dfc8b894c02
+0x0057C658	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057C685	CODE	payload builder / TSe_SkillTreeForm	ỀMủỀẸLẲ	8b4dfc8b894c02
+0x0057C6B8	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057C6E5	CODE	payload builder / TSe_SkillTreeForm	ỀMủỀẸLẲ	8b4dfc8b894c02
+0x0057C718	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057C745	CODE	payload builder / TSe_SkillTreeForm	ỀMủỀẸLẲ	8b4dfc8b894c02
+0x0057C778	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057C7A5	CODE	payload builder / TSe_SkillTreeForm	ỀMủỀẸLẲ	8b4dfc8b894c02
+0x0057C7E9	CODE	payload builder / TSe_SkillTreeForm	ẵEụẪ	c745f806
+0x0057C85C	CODE	payload builder / TSe_SkillTreeForm	dỮ0dẸ ỀEủẴỂẲ	64ff306489208b45fc058c02
+0x0057C894	CODE	payload builder / TSe_SkillTreeForm	fẮị:Ẫ	6681b83a06
+0x0057C8C1	CODE	payload builder / TSe_SkillTreeForm	ỀEủỀẠLẲ	8b45fc8b804c02
+0x0057C8EC	CODE	payload builder / TSe_SkillTreeForm	ỀEụỀUủỀỖLẲ	8b45f88b55fc8b924c02
+0x0057C927	CODE	payload builder / TSe_SkillTreeForm	ỀEụỀUủỀỖLẲ	8b45f88b55fc8b924c02
+0x0057C96A	CODE	payload builder / TSe_SkillTreeForm	ỀEụỀUủỀỖLẲ	8b45f88b55fc8b924c02
+0x0057C9EB	CODE	payload builder / TSe_SkillTreeForm	ỀMụỀ]ủỀỈLẲ	8b4df88b5dfc8b9b4c02
+0x0057CCB7	CODE	payload builder / TSe_SkillTreeForm	u.ỀEủẶịẼẲ	752e8b45fc83b88802
+0x0057CCD5	CODE	payload builder / TSe_SkillTreeForm	Ứ ĨW	ba20ce57
+0x0057CCE7	CODE	payload builder / TSe_SkillTreeForm	ỀEủẶịẼẲ	8b45fc83b88802
+0x0057CCF1	CODE	payload builder / TSe_SkillTreeForm	t8ỀEủỀẠỂẲ	74388b45fc8b808c02
+0x0057CD0A	CODE	payload builder / TSe_SkillTreeForm	ỀEủỀỒẼẲ	8b45fc8b908802
+0x0057CD5D	CODE	payload builder / TSe_SkillTreeForm	ẻ8ỀEủỀẠỂẲ	eb388b45fc8b808c02
+0x0057CD76	CODE	payload builder / TSe_SkillTreeForm	ỀEủỀỒẼẲ	8b45fc8b908802
+0x0057CDD8	CODE	payload builder / TSe_SkillTreeForm	ỮỮỮỮ5	ffffffff35
+0x0057CE18	CODE	payload builder / TSe_SkillTreeForm	ỮỮỮỮ0	ffffffff30
+0x0057CFB1	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057CFEC	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057D053	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057D08A	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057D11B	CODE	payload builder / TSe_SkillTreeForm	dỮ0dẸ ỀEụỰd	64ff306489208b45f8b964
+0x0057D239	CODE	payload builder / TSe_SkillTreeForm	ỨHỵW	ba48dc57
+0x0057D3C0	CODE	payload builder / TSe_SkillTreeForm	ỨHỵW	ba48dc57
+0x0057D537	CODE	payload builder / TSe_SkillTreeForm	ỨhỵW	ba68dc57
+0x0057D602	CODE	payload builder / TSe_SkillTreeForm	hỂỵW	688cdc57
+0x0057D737	CODE	payload builder / TSe_SkillTreeForm	ỨĐỵW	bad0dc57
+0x0057D910	CODE	payload builder / TSe_SkillTreeForm	hỂỵW	688cdc57
+0x0057DA65	CODE	payload builder / TSe_SkillTreeForm	ỨĐỵW	bad0dc57
+0x0057DC08	CODE	payload builder / TSe_SkillTreeForm	ỄẦƠợỮỮỨẴ	8d85b4feffffba05
+0x0057DCC8	CODE	payload builder / TSe_SkillTreeForm	ỮỮỮỮ/	ffffffff2f
+0x0057DCD0	CODE	payload builder / TSe_SkillTreeForm	Điểm số kỹ năng của bạn chưa đủ cho sự tăng cấp	d069ac6d2073af206bdb206ee56e672063fc612062d56e206368df6120f0fc2063686f2073f12074e56e672063a470
+0x0057DD1E	CODE	payload builder / TSe_SkillTreeForm	ỀEủẠịXẲ	8b45fc80b85802
+0x0057DD62	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖxẲ	8b55fc8b927802
+0x0057DDB2	CODE	payload builder / TSe_SkillTreeForm	ỀEủẶịTẲ	8b45fc83b85402
+0x0057DDC2	CODE	payload builder / TSe_SkillTreeForm	ỀEủÝẠhẲ	8b45fcdd806802
+0x0057DDCB	CODE	payload builder / TSe_SkillTreeForm	ỀEủỵẠpẲ	8b45fcdc807002
+0x0057DE88	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖụ	8b55fc8b92f8
+0x0057DEF2	CODE	payload builder / TSe_SkillTreeForm	ỀEủẠịXẲ	8b45fc80b85802
+0x0057DF31	CODE	payload builder / TSe_SkillTreeForm	ỀẠĐẲ	8b80d002
+0x0057DF37	CODE	payload builder / TSe_SkillTreeForm	ỀẠpẲ	8b807002
+0x0057DFA7	CODE	payload builder / TSe_SkillTreeForm	ỀẠĐẲ	8b80d002
+0x0057DFAD	CODE	payload builder / TSe_SkillTreeForm	ỀẠpẲ	8b807002
+0x0057E00E	CODE	payload builder / TSe_SkillTreeForm	ỀEủẠịXẲ	8b45fc80b85802
+0x0057E36E	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖỢẲ	8b55fc8b929402
+0x0057E512	CODE	payload builder / TSe_SkillTreeForm	ỀUủẸẰTẲ	8b55fc89825402
+0x0057E9E4	CODE	payload builder / TSe_SkillTreeForm	ỀUỵẸBLỀEỵẳẠ	8b55dc89424c8b45dcc680
+0x0057E9F4	CODE	payload builder / TSe_SkillTreeForm	ỀEỵẳẠẹ	8b45dcc680a9
+0x0057EAA7	CODE	payload builder / TSe_SkillTreeForm	ỀUỵẸẰủ	8b55dc8982fc
+0x0057EB36	CODE	payload builder / TSe_SkillTreeForm	ỀUỵẸBLỀEỵẳẠ	8b55dc89424c8b45dcc680
+0x0057EB46	CODE	payload builder / TSe_SkillTreeForm	ỀEỵẳẠẹ	8b45dcc680a9
+0x0057EBF9	CODE	payload builder / TSe_SkillTreeForm	ỀUỵẸẰủ	8b55dc8982fc
+0x0057EC40	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057ECF2	CODE	payload builder / TSe_SkillTreeForm	ỀUửẸBLỀEửẳẠ	8b55d889424c8b45d8c680
+0x0057ED02	CODE	payload builder / TSe_SkillTreeForm	ỀEửẳẠẹ	8b45d8c680a9
+0x0057EDC1	CODE	payload builder / TSe_SkillTreeForm	ỀUửẸẰủ	8b55d88982fc
+0x0057EE42	CODE	payload builder / TSe_SkillTreeForm	ỀEủẠxỶ	8b45fc807814
+0x0057EF50	CODE	payload builder / TSe_SkillTreeForm	dỮ0dẸ ỀEủỀẠLẲ	64ff306489208b45fc8b804c02
+0x0057EF81	CODE	payload builder / TSe_SkillTreeForm	ỀEụỀUủỀỖLẲ	8b45f88b55fc8b924c02
+0x0057EFBC	CODE	payload builder / TSe_SkillTreeForm	ỀEụỀUủỀỖLẲ	8b45f88b55fc8b924c02
+0x0057F24B	CODE	payload builder / TSe_SkillTreeForm	ẵEụẪ	c745f806
+0x0057F46B	CODE	payload builder / TSe_SkillTreeForm	ẠẠẠỶ	80808014
+0x0057FB82	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057FBBC	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057FBF6	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057FC30	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057FC8C	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057FCC6	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057FD00	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057FD5C	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057FD96	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0057FDD0	CODE	payload builder / TSe_SkillTreeForm	ỀUủỀỖLẲ	8b55fc8b924c02
+0x0059C3B9	CODE	skill tree ctor + captions	ỀẠĐẲ	8b80d002
+0x0059C3BF	CODE	skill tree ctor + captions	ỀẠpẲ	8b807002
+0x0059C457	CODE	skill tree ctor + captions	ỀẠĐẲ	8b80d002
+0x0059C45D	CODE	skill tree ctor + captions	ỀẠpẲ	8b807002
+0x0059C4A6	CODE	skill tree ctor + captions	Ẳupj	0275706a
+0x0059C4DE	CODE	skill tree ctor + captions	ỀẠĐẲ	8b80d002
+0x0059C4E4	CODE	skill tree ctor + captions	ỀẠpẲ	8b807002
+0x0059C555	CODE	skill tree ctor + captions	ỀẠĐẲ	8b80d002
+0x0059C55B	CODE	skill tree ctor + captions	ỀẠpẲ	8b807002
+0x0059C5C6	CODE	skill tree ctor + captions	ỀẠĐẲ	8b80d002
+0x0059C5CC	CODE	skill tree ctor + captions	ỀẠpẲ	8b807002
+0x0059C6FA	CODE	skill tree ctor + captions	ỄEỊỨẲ	8d4598ba02
+0x0059C75C	CODE	skill tree ctor + captions	ỀEủẠxỶ	8b45fc807814
+0x0059C819	CODE	skill tree ctor + captions	Ữuđh(ẺY	ff75f06828cb59
+0x0059C853	CODE	skill tree ctor + captions	Ữuđh(ẺY	ff75f06828cb59
+0x0059D31C	CODE	skill tree ctor + captions	ỮuỵhtừY	ff75dc6874d759
+0x0059D774	CODE	skill tree ctor + captions	Đẳng cấp	d0c66e672063a470
+0x0059E1E1	CODE	skill tree ctor + captions	ẠịfẴ	80b86605
+0x0059ED35	CODE	skill tree ctor + captions	ẠịfẴ	80b86605
+0x0059F008	CODE	skill tree ctor + captions	Đẳng cấp	d0c66e672063a470
+0x0059F01C	CODE	skill tree ctor + captions	Phải đạt số điểm để học được	5068e46920f0d5742073af20f069ac6d20f0ac2068f76320f0dffe63
+0x0059F044	CODE	skill tree ctor + captions	Điểm học được	d069ac6d2068f76320f0dffe63
+0x0059F080	CODE	skill tree ctor + captions	Điểm thăng cấp	d069ac6d207468e56e672063a470
+0x0059FD41	CODE	skill tree ctor + captions	ỮộểợỮỮh	ffb5acfeffff68
+0x005A0300	CODE	skill tree ctor + captions	Đẳng cấp	d0c66e672063a470
+0x005A0314	CODE	skill tree ctor + captions	Phải đạt số điểm để học được	5068e46920f0d5742073af20f069ac6d20f0ac2068f76320f0dffe63
+0x005A033C	CODE	skill tree ctor + captions	Điểm học được	d069ac6d2068f76320f0dffe63
+0x005A0378	CODE	skill tree ctor + captions	Điểm thăng cấp	d069ac6d207468e56e672063a470
+0x005A04D8	CODE	skill tree ctor + captions	ịpởỢ	b870b794
+0x005A06CA	CODE	skill tree ctor + captions	ỀEụfẶịhẴ	8b45f86683b86805
+0x005A06D5	CODE	skill tree ctor + captions	t8ỄỄ4ỮỮỮỀEụfỀỒhẴ	74388d8d34ffffff8b45f8668b906805
+0x005A0988	CODE	skill tree ctor + captions	ỀUủẸẰẤẲ	8b55fc89828402
+0x005A099E	CODE	skill tree ctor + captions	ỀEủẳẠẽ	8b45fcc680a8
+0x005A0A24	CODE	skill tree ctor + captions	ỀEđẳẠĐ	8b45f0c680d0
+0x005A0B40	CODE	skill tree ctor + captions	j2jỶỰJ	6a326a14b94a
+0x005A0BD8	CODE	skill tree ctor + captions	ỀUủẸẰ	8b55fc8982
+0x005A0BE1	CODE	skill tree ctor + captions	ỀEủỀẠ	8b45fc8b80
+0x005A0DEE	CODE	skill tree ctor + captions	j,jỸỰỶ	6a2c6a19b914
+0x005A0E7C	CODE	skill tree ctor + captions	ỮỮỮỮỀEủẵẠÕẲ	ffffffff8b45fcc780a002
+0x005A700E	CODE	skill upgrade / level group	Ữ0h(qZ	ff306828715a
+0x005A713C	CODE	skill upgrade / level group	.dat	2e646174
+0x005A714C	CODE	skill upgrade / level group	User	55736572
+0x005A715C	CODE	skill upgrade / level group	skin	736b696e
+0x005A71D5	CODE	skill upgrade / level group	dỮ0dẸ ịẲ	64ff30648920b802
+0x005A7248	CODE	skill upgrade / level group	ỰẠrZ	b980725a
+0x005A7278	CODE	skill upgrade / level group	ỮỮỮỮ3	ffffffff33
+0x005A72E9	CODE	skill upgrade / level group	Ữ0h(uZ	ff306828755a
+0x005A732F	CODE	skill upgrade / level group	Ữ0h(uZ	ff306828755a
+0x005A74A0	CODE	skill upgrade / level group	Ữ0h(uZ	ff306828755a
+0x005A753C	CODE	skill upgrade / level group	.dat	2e646174
+0x005A754C	CODE	skill upgrade / level group	User	55736572
+0x005A755C	CODE	skill upgrade / level group	skin	736b696e
+0x005A7564	CODE	skill upgrade / level group	ỮỮỮỮẴ	ffffffff05
+0x005A7574	CODE	skill upgrade / level group	ỮỮỮỮẴ	ffffffff05
+0x005A75BE	CODE	skill upgrade / level group	ỨụuZ	baf8755a
+0x005A766B	CODE	skill upgrade / level group	ỀEủẠxỶ	8b45fc807814
+0x005A771C	CODE	skill upgrade / level group	jẲhỮỮ	6a0268ffff
+0x005A775D	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005A7763	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005A7822	CODE	skill upgrade / level group	ỀEủẳẠẽ	8b45fcc680a8
+0x005A782C	CODE	skill upgrade / level group	ỨỒxZ	ba90785a
+0x005A784E	CODE	skill upgrade / level group	ỀEủẳẠẽ	8b45fcc680a8
+0x005A7880	CODE	skill upgrade / level group	panel4	70616e656c34
+0x005A7890	CODE	skill upgrade / level group	Tin tức vật phẩm	54696e2074d1632076a774207068a66d
+0x005A79B2	CODE	skill upgrade / level group	ỀEụẶịả	8b45f883b8e4
+0x005A79D7	CODE	skill upgrade / level group	ỀEụỀỒả	8b45f88b90e4
+0x005A7B4D	CODE	skill upgrade / level group	ỄEảỨĐẾZ	8d45e4bad08a5a
+0x005A7B71	CODE	skill upgrade / level group	ỄEảỨđẾZ	8d45e4baf08a5a
+0x005A7D40	CODE	skill upgrade / level group	hảỀZ	68e48b5a
+0x005A7D5D	CODE	skill upgrade / level group	Ữ4ẰhủỀZ	ff348268fc8b5a
+0x005A7E42	CODE	skill upgrade / level group	Ữ4ẰhủỀZ	ff348268fc8b5a
+0x005A7F19	CODE	skill upgrade / level group	veh ỂZ	766568208c5a
+0x005A7FD6	CODE	skill upgrade / level group	v]h ỂZ	765d68208c5a
+0x005A8087	CODE	skill upgrade / level group	ỨHỂZ	ba488c5a
+0x005A80CE	CODE	skill upgrade / level group	ỨHỂZ	ba488c5a
+0x005A824F	CODE	skill upgrade / level group	ỀEụỀỒả	8b45f88b90e4
+0x005A8AF0	CODE	skill upgrade / level group	HP nhiều nhất: 	4850206e6869ab75206e68a4743a20
+0x005A8B08	CODE	skill upgrade / level group	SP nhiều nhất: 	5350206e6869ab75206e68a4743a20
+0x005A8B64	CODE	skill upgrade / level group	Độ nhanh nhẹn: 	d0b5206e68616e68206e68a96e3a20
+0x005A8B7C	CODE	skill upgrade / level group	Tốc độ thuyền:	54af6320f0b52074687579ab6e3a
+0x005A8B94	CODE	skill upgrade / level group	Thể chất:	5468ac206368a4743a
+0x005A8BA8	CODE	skill upgrade / level group	Năng lượng:	4ee56e67206cdffe6e673a
+0x005A8C20	CODE	skill upgrade / level group	Đẳng cấp hạn chế 	d0c66e672063a4702068d56e206368aa20
+0x005A8CFC	CODE	skill upgrade / level group	ỮỮỮỮỸ	ffffffff19
+0x005A8D84	CODE	skill upgrade / level group	Tỷ lệ bội nhanh nhẹn: %d%%	54d6206cae2062b569206e68616e68206e68a96e3a2025642525
+0x005A8DA0	CODE	skill upgrade / level group	ỮỮỮỮỸ	ffffffff19
+0x005A8DCC	CODE	skill upgrade / level group	[%s] bộ(%d/%d)	5b25735d2062b52825642f256429
+0x005A8E8C	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005A8E92	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005A8F45	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005A8F4B	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005A9007	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005A900D	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005A905B	CODE	skill upgrade / level group	jẲhuẴ	6a02687505
+0x005A908F	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005A9095	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005A91CD	CODE	skill upgrade / level group	ịdỘZ	b864935a
+0x005A922B	CODE	skill upgrade / level group	ịỢỘZ	b894935a
+0x005A925A	CODE	skill upgrade / level group	ịịỘZ	b8b8935a
+0x005A9289	CODE	skill upgrade / level group	ịỵỘZ	b8dc935a
+0x005A92B8	CODE	skill upgrade / level group	ịủỘZ	b8fc935a
+0x005A938C	CODE	skill upgrade / level group	ỮỮỮỮỸ	ffffffff19
+0x005A93D4	CODE	skill upgrade / level group	ỮỮỮỮỶ	ffffffff14
+0x005A9494	CODE	skill upgrade / level group	ỀEủẳẠẽ	8b45fcc680a8
+0x005A94D4	CODE	skill upgrade / level group	fẮị:Ẫ	6681b83a06
+0x005A94EF	CODE	skill upgrade / level group	ỨỬỊZ	babc985a
+0x005A9534	CODE	skill upgrade / level group	ỀEủẠxỶ	8b45fc807814
+0x005A9561	CODE	skill upgrade / level group	ỄỄẠợỮỮỀEủỀỒả	8d8d80feffff8b45fc8b90e4
+0x005A95A7	CODE	skill upgrade / level group	ỨủỊZ	bafc985a
+0x005A95B9	CODE	skill upgrade / level group	ỀEủẮịả	8b45fc81b8e4
+0x005A9651	CODE	skill upgrade / level group	ỀUủỀỖả	8b55fc8b92e4
+0x005A96BC	CODE	skill upgrade / level group	tyỄỄ(ợỮỮỀEủỀỒả	74798d8d28feffff8b45fc8b90e4
+0x005A96FF	CODE	skill upgrade / level group	Ứ4ỎZ	ba34995a
+0x005A9718	CODE	skill upgrade / level group	ỀUủỀỖả	8b55fc8b92e4
+0x005A974B	CODE	skill upgrade / level group	ỀEủỀỒả	8b45fc8b90e4
+0x005A97B2	CODE	skill upgrade / level group	ỨlỎZ	ba6c995a
+0x005A980D	CODE	skill upgrade / level group	ỨấỎZ	baa4995a
+0x005A9857	CODE	skill upgrade / level group	ỨịỎZ	bab8995a
+0x005A98B4	CODE	skill upgrade / level group	ỮỮỮỮ5	ffffffff35
+0x005A98F4	CODE	skill upgrade / level group	ỮỮỮỮ-	ffffffff2d
+0x005A992C	CODE	skill upgrade / level group	ỮỮỮỮ/	ffffffff2f
+0x005A9964	CODE	skill upgrade / level group	ỮỮỮỮ.	ffffffff2e
+0x005A99B0	CODE	skill upgrade / level group	ỮỮỮỮ9	ffffffff39
+0x005A9A5F	CODE	skill upgrade / level group	ỀEủỀẠị	8b45fc8b80b8
+0x005A9A9A	CODE	skill upgrade / level group	ỨủỈZ	bafc9b5a
+0x005A9AF9	CODE	skill upgrade / level group	tEỀEủẮịả	74458b45fc81b8e4
+0x005A9B1F	CODE	skill upgrade / level group	ỀUủỀỖả	8b55fc8b92e4
+0x005A9B8C	CODE	skill upgrade / level group	ỀUủỀỖả	8b55fc8b92e4
+0x005A9FBA	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005A9FC0	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005AA0BA	CODE	skill upgrade / level group	fẮị:Ẫ	6681b83a06
+0x005AA0D5	CODE	skill upgrade / level group	ỨụấZ	baf8a45a
+0x005AA33C	CODE	skill upgrade / level group	Ứ8ầZ	ba38a55a
+0x005AA406	CODE	skill upgrade / level group	Ứ8ầZ	ba38a55a
+0x005AA46D	CODE	skill upgrade / level group	ỨpầZ	ba70a55a
+0x005AA4F0	CODE	skill upgrade / level group	ỮỮỮỮ5	ffffffff35
+0x005AA530	CODE	skill upgrade / level group	ỮỮỮỮ.	ffffffff2e
+0x005AA59A	CODE	skill upgrade / level group	fẮị:Ẫ	6681b83a06
+0x005AA5B5	CODE	skill upgrade / level group	ỨỶẹZ	ba14a95a
+0x005AA6DD	CODE	skill upgrade / level group	ỨTẹZ	ba54a95a
+0x005AA73B	CODE	skill upgrade / level group	ỨpẹZ	ba70a95a
+0x005AA76E	CODE	skill upgrade / level group	ỨỦẹZ	ba9ca95a
+0x005AA7A1	CODE	skill upgrade / level group	ỨĐẹZ	bad0a95a
+0x005AA7C0	CODE	skill upgrade / level group	,Ẳu"j	2c0275226a
+0x005AA90C	CODE	skill upgrade / level group	ỮỮỮỮ5	ffffffff35
+0x005AA968	CODE	skill upgrade / level group	ỮỮỮỮ"	ffffffff22
+0x005AA970	CODE	skill upgrade / level group	Thời gian cần để chuẩn bị đạn dược	5468b669206769616e2063a56e20f0ac20636875a66e2062b820f0d56e2064dffe63
+0x005AA994	CODE	skill upgrade / level group	ỮỮỮỮ(	ffffffff28
+0x005AA9C8	CODE	skill upgrade / level group	ỮỮỮỮ)	ffffffff29
+0x005AA9FC	CODE	skill upgrade / level group	ỮỮỮỮ2	ffffffff32
+0x005AAA54	CODE	skill upgrade / level group	ỮỮỮỮ:	ffffffff3a
+0x005AAAAC	CODE	skill upgrade / level group	fẮị:Ẫ	6681b83a06
+0x005AAAC7	CODE	skill upgrade / level group	ỨẢềZ	bac4ab5a
+0x005AAC10	CODE	skill upgrade / level group	fẮị:Ẫ	6681b83a06
+0x005AAD10	CODE	skill upgrade / level group	ỨỶệZ	ba14ae5a
+0x005AADCC	CODE	skill upgrade / level group	ỮỮỮỮ5	ffffffff35
+0x005AAE0C	CODE	skill upgrade / level group	ỮỮỮỮ"	ffffffff22
+0x005AAE91	CODE	skill upgrade / level group	ỀEụỀẠđ	8b45f88b80f0
+0x005AAE9F	CODE	skill upgrade / level group	ỀEụỀỒể	8b45f88b90ac
+0x005AAEB9	CODE	skill upgrade / level group	ỀUụỀỖđ	8b55f88b92f0
+0x005AAEDA	CODE	skill upgrade / level group	ỀEụỀẠđ	8b45f88b80f0
+0x005AAEF5	CODE	skill upgrade / level group	ỀUụỀỖđ	8b55f88b92f0
+0x005AAF10	CODE	skill upgrade / level group	ỀEụỀẠđ	8b45f88b80f0
+0x005AAFAB	CODE	skill upgrade / level group	ỀEụỀẠđ	8b45f88b80f0
+0x005AAFCB	CODE	skill upgrade / level group	ỀEụỀẠđ	8b45f88b80f0
+0x005AAFDC	CODE	skill upgrade / level group	ỀEụỀẠđ	8b45f88b80f0
+0x005AAFEC	CODE	skill upgrade / level group	ỀEụỀẠđ	8b45f88b80f0
+0x005AB05D	CODE	skill upgrade / level group	ẸBLỀEụỀỒể	89424c8b45f88b90ac
+0x005AB069	CODE	skill upgrade / level group	ỀEụỀẠđ	8b45f88b80f0
+0x005AB080	CODE	skill upgrade / level group	ỀUụỀỖđ	8b55f88b92f0
+0x005AB280	CODE	skill upgrade / level group	ỨỵỠZ	badcb35a
+0x005AB98F	CODE	skill upgrade / level group	hịỬZ	68b8bc5a
+0x005ABA93	CODE	skill upgrade / level group	ắảỠỢ	a1e4b394
+0x005ABAEE	CODE	skill upgrade / level group	hịỬZ	68b8bc5a
+0x005ABC31	CODE	skill upgrade / level group	ắảỠỢ	a1e4b394
+0x005ABCD8	CODE	skill upgrade / level group	ỮỮỮỮẴ	ffffffff05
+0x005ABCE0	CODE	skill upgrade / level group	Arms:	41726d733a
+0x005AC108	CODE	skill upgrade / level group	ắảỠỢ	a1e4b394
+0x005AC1AC	CODE	skill upgrade / level group	ỮỮỮỮẲ	ffffffff02
+0x005AC1B8	CODE	skill upgrade / level group	ỮỮỮỮẲ	ffffffff02
+0x005AC1CC	CODE	skill upgrade / level group	HP nhiều nhất	4850206e6869ab75206e68a474
+0x005AC1E4	CODE	skill upgrade / level group	SP nhiều nhất	5350206e6869ab75206e68a474
+0x005AC204	CODE	skill upgrade / level group	ỮỮỮỮẴ	ffffffff05
+0x005AC3B9	CODE	skill upgrade / level group	ỮtlỀEủẮịả	ff746c8b45fc81b8e4
+0x005AC5E4	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005AC5EA	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005AC99E	CODE	skill upgrade / level group	ỄEảỨẲ	8d45e4ba02
+0x005AC9F4	CODE	skill upgrade / level group	Kỹ năng	4bdb206ee56e67
+0x005AC9FC	CODE	skill upgrade / level group	ỮỮỮỮẪ	ffffffff06
+0x005ACAB0	CODE	skill upgrade / level group	ỀEủẠxỶ	8b45fc807814
+0x005ACE2C	CODE	skill upgrade / level group	ỀEụỰẴ	8b45f8b905
+0x005ACE63	CODE	skill upgrade / level group	ỀEụỰẴ	8b45f8b905
+0x005AD4FC	CODE	skill upgrade / level group	fẮị:Ẫ	6681b83a06
+0x005AD517	CODE	skill upgrade / level group	Ứ,ỷZ	ba2cd65a
+0x005AD624	CODE	skill upgrade / level group	ỮỮỮỮ5	ffffffff35
+0x005AD673	CODE	skill upgrade / level group	ắủỠỢ	a1fcb394
+0x005AD70D	CODE	skill upgrade / level group	hỂửZ	688cd85a
+0x005AD790	CODE	skill upgrade / level group	ỮuảhẽửZ	ff75e468a8d85a
+0x005AD7F9	CODE	skill upgrade / level group	fỀEÕỀUủỀỖụ	668b45a08b55fc8b92f8
+0x005AD910	CODE	skill upgrade / level group	jỴjTj	6a1e6a546a
+0x005ADC64	CODE	skill upgrade / level group	ỀEụfẶịhẴ	8b45f86683b86805
+0x005ADC6F	CODE	skill upgrade / level group	tỴỀEụfỀỒhẴ	741e8b45f8668b906805
+0x005ADDB9	CODE	skill upgrade / level group	hLưZ	684cdf5a
+0x005ADEE5	CODE	skill upgrade / level group	fỀEỒỀUủỀỖụ	668b45908b55fc8b92f8
+0x005ADF2A	CODE	skill upgrade / level group	ỄEĐỨẴ	8d45d0ba05
+0x005AE079	CODE	skill upgrade / level group	ỀUủẸẰđ	8b55fc8982f0
+0x005AE082	CODE	skill upgrade / level group	ỀEủỀẠđ	8b45fc8b80f0
+0x005AE0D6	CODE	skill upgrade / level group	ỀEđẳẠĐ	8b45f0c680d0
+0x005AE113	CODE	skill upgrade / level group	jFjỸỰỔ	6a466a19b991
+0x005AE221	CODE	skill upgrade / level group	ỀEảẳẠ	8b45e4c680
+0x005AE2F0	CODE	skill upgrade / level group	ỮỮỮỮẪ	ffffffff06
+0x005AE36A	CODE	skill upgrade / level group	ỀEủỀẠẢ	8b45fc8b80c4
+0x005AE3D4	CODE	skill upgrade / level group	ỀEủỀẠẢ	8b45fc8b80c4
+0x005AE45A	CODE	skill upgrade / level group	ỨTẫZ	ba54e75a
+0x005AE4B7	CODE	skill upgrade / level group	ỨẼẫZ	ba88e75a
+0x005AE4D6	CODE	skill upgrade / level group	ỨấẫZ	baa4e75a
+0x005AE643	CODE	skill upgrade / level group	ỀUủỀỖụ	8b55fc8b92f8
+0x005AE691	CODE	skill upgrade / level group	ỀEủỀẠủ	8b45fc8b80fc
+0x005AE6A0	CODE	skill upgrade / level group	ỀUủỀỖ	8b55fc8b92
+0x005AE6DA	CODE	skill upgrade / level group	ỀUủỀỖủ	8b55fc8b92fc
+0x005AE79C	CODE	skill upgrade / level group	ỮỮỮỮỴ	ffffffff1e
+0x005AE7C4	CODE	skill upgrade / level group	ỮỮỮỮỶ	ffffffff14
+0x005AE7E4	CODE	skill upgrade / level group	ỮỮỮỮ"	ffffffff22
+0x005AE810	CODE	skill upgrade / level group	ỮỮỮỮỸ	ffffffff19
+0x005AE834	CODE	skill upgrade / level group	ỮỮỮỮ+	ffffffff2b
+0x005AE9D1	CODE	skill upgrade / level group	ỀUủẸẰđ	8b55fc8982f0
+0x005AE9DA	CODE	skill upgrade / level group	ỀEủỀẠđ	8b45fc8b80f0
+0x005AEA2E	CODE	skill upgrade / level group	ỀEđẳẠĐ	8b45f0c680d0
+0x005AEA6B	CODE	skill upgrade / level group	jFjỸỰỔ	6a466a19b991
+0x005AEB79	CODE	skill upgrade / level group	ỀEảẳẠ	8b45e4c680
+0x005AEC4C	CODE	skill upgrade / level group	ỮỮỮỮẪ	ffffffff06
+0x005AECC6	CODE	skill upgrade / level group	ỀEủỀẠẢ	8b45fc8b80c4
+0x005AED30	CODE	skill upgrade / level group	ỀEủỀẠẢ	8b45fc8b80c4
+0x005AEDAC	CODE	skill upgrade / level group	ỀEủỀẠụ	8b45fc8b80f8
+0x005AEDE2	CODE	skill upgrade / level group	ỀUủỀỖụ	8b55fc8b92f8
+0x005AEDF6	CODE	skill upgrade / level group	ỀEủỀẠủ	8b45fc8b80fc
+0x005AEE2C	CODE	skill upgrade / level group	ỀUủỀỖủ	8b55fc8b92fc
+0x005AEE40	CODE	skill upgrade / level group	ỀEủỀẠụ	8b45fc8b80f8
+0x005AEE4F	CODE	skill upgrade / level group	ỀUủỀỖủ	8b55fc8b92fc
+0x005AEE89	CODE	skill upgrade / level group	ỀUủỀỖụ	8b55fc8b92f8
+0x005AEE9D	CODE	skill upgrade / level group	ỀEủỀẠụ	8b45fc8b80f8
+0x005AEEB3	CODE	skill upgrade / level group	ỀEủỀẠụ	8b45fc8b80f8
+0x005AEEF4	CODE	skill upgrade / level group	ỀUủỀỖụ	8b55fc8b92f8
+0x005AEF08	CODE	skill upgrade / level group	ỀEủỀẠụ	8b45fc8b80f8
+0x005AEF18	CODE	skill upgrade / level group	toỀEủỀẠủ	746f8b45fc8b80fc
+0x005AEF2A	CODE	skill upgrade / level group	t]ỀEủỀẠụ	745d8b45fc8b80f8
+0x005AEF3B	CODE	skill upgrade / level group	ỀUủỀỖủ	8b55fc8b92fc
+0x005AEF89	CODE	skill upgrade / level group	ỀEủỀẠ	8b45fc8b80
+0x005AF0A6	CODE	skill upgrade / level group	ỀEủỀẠ	8b45fc8b80
+0x005AF168	CODE	skill upgrade / level group	ỀUủỀỖ	8b55fc8b92
+0x005AF210	CODE	skill upgrade / level group	t;ỀEủỀẠ	743b8b45fc8b80
+0x005AF25D	CODE	skill upgrade / level group	u9ỀEủỀẠ	75398b45fc8b80
+0x005AF2A0	CODE	skill upgrade / level group	ỮỮỮỮỸ	ffffffff19
+0x005AF2C4	CODE	skill upgrade / level group	ỮỮỮỮỴ	ffffffff1e
+0x005AF30C	CODE	skill upgrade / level group	ỮỮỮỮỶ	ffffffff14
+0x005AF378	CODE	skill upgrade / level group	ỮỮỮỮ"	ffffffff22
+0x005AF464	CODE	skill upgrade / level group	ỮỮỮỮỸ	ffffffff19
+0x005AF4F2	CODE	skill upgrade / level group	dỮ0dẸ ẳEọ	64ff30648920c645f7
+0x005AF515	CODE	skill upgrade / level group	dỮ0dẸ ỄEđPỰẲ	64ff306489208d45f050b902
+0x005AF5D0	CODE	skill upgrade / level group	ỮỮỮỮẲ	ffffffff02
+0x005AF5DC	CODE	skill upgrade / level group	ỮỮỮỮẲ	ffffffff02
+0x005AF629	CODE	skill upgrade / level group	ỨđụZ	baf0f85a
+0x005AF647	CODE	skill upgrade / level group	ỀUủẸẰ	8b55fc8982
+0x005AF6C1	CODE	skill upgrade / level group	jFjỸỰỔ	6a466a19b991
+0x005AF759	CODE	skill upgrade / level group	ỀUủẸẰđ	8b55fc8982f0
+0x005AF762	CODE	skill upgrade / level group	ỀEủỀẠđ	8b45fc8b80f0
+0x005AF847	CODE	skill upgrade / level group	ỀEảẳẠẽ	8b45e4c680a8
+0x005AF950	CODE	skill upgrade / level group	ỮỮỮỮẪ	ffffffff06
+0x005AFA19	CODE	skill upgrade / level group	ỀEủỀẠụ	8b45fc8b80f8
+0x005AFA82	CODE	skill upgrade / level group	ỀEủỀẠẢ	8b45fc8b80c4
+0x005AFAAD	CODE	skill upgrade / level group	5ăỮỀEủẠịủ	35e5ff8b45fc80b8fc
+0x005AFAC4	CODE	skill upgrade / level group	ỀEủẳẠủ	8b45fcc680fc
+0x005AFAEC	CODE	skill upgrade / level group	ỀEủỀẠẢ	8b45fc8b80c4
+0x005AFB9C	CODE	skill upgrade / level group	uJỀEủỀẠụ	754a8b45fc8b80f8
+0x005AFBE8	CODE	skill upgrade / level group	ỀEủỀẠụ	8b45fc8b80f8
+0x005AFC30	CODE	skill upgrade / level group	ỀUủỀỖụ	8b55fc8b92f8
+0x005AFCD4	CODE	skill upgrade / level group	t"ỀEủỀẠụ	74228b45fc8b80f8
+0x005AFD06	CODE	skill upgrade / level group	ỀEủỀẠụ	8b45fc8b80f8
+0x005AFD30	CODE	skill upgrade / level group	ỮỮỮỮ%	ffffffff25
+0x005AFDF5	CODE	skill upgrade / level group	ỀEủỀẠụ	8b45fc8b80f8
+0x005B0070	CODE	skill upgrade / level group	ẲtWỀEủẠị	0274578b45fc80b8
+0x005B0088	CODE	skill upgrade / level group	Ẳẻ?ỀEủẳẠử	02eb3f8b45fcc680d8
+0x005B017A	CODE	skill upgrade / level group	ẸEđj	8945f06a
+0x005B01F8	CODE	skill upgrade / level group	Kỹ năng tăng cấp	4bdb206ee56e672074e56e672063a470
+0x005B025E	CODE	skill upgrade / level group	ỀUủỀỖị	8b55fc8b92b8
+0x005B05C9	CODE	skill upgrade / level group	fẶịhẴ	6683b86805
+0x005B05DF	CODE	skill upgrade / level group	fỀỒhẴ	668b906805
+0x005B081B	CODE	skill upgrade / level group	j2jỶỰ2	6a326a14b932
+0x005B08B6	CODE	skill upgrade / level group	jFjỸỰ(	6a466a19b928
+0x005B0918	CODE	skill upgrade / level group	jFjỸỰỂ	6a466a19b98c
+0x005B0988	CODE	skill upgrade / level group	editorBG	656469746f724247
+0x005B0994	CODE	skill upgrade / level group	ỮỮỮỮẪ	ffffffff06
+0x005B0A5A	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005B0A60	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005B0ACB	CODE	skill upgrade / level group	ỀEủỀẠẢ	8b45fc8b80c4
+0x005B0C85	CODE	skill upgrade / level group	ỀEủẳẠẽ	8b45fcc680a8
+0x005B0FE7	CODE	skill upgrade / level group	jFjỸỰ-	6a466a19b92d
+0x005B102E	CODE	skill upgrade / level group	ẸEỵhƠ	8945dc68b4
+0x005B1040	CODE	skill upgrade / level group	jFjỸỰẬ	6a466a19b987
+0x005B1066	CODE	skill upgrade / level group	ỀEỵẳẠĐ	8b45dcc680d0
+0x005B10DC	CODE	skill upgrade / level group	ỀEửẳẠĐ	8b45d8c680d0
+0x005B133C	CODE	skill upgrade / level group	ỮỮỮỮẪ	ffffffff06
+0x005B1463	CODE	skill upgrade / level group	ẻaắ(ƠỢ	eb61a128b494
+0x005B149D	CODE	skill upgrade / level group	ắ(ƠỢ	a128b494
+0x005B14A9	CODE	skill upgrade / level group	ắ(ƠỢ	a128b494
+0x005B14CC	CODE	skill upgrade / level group	ỮỮỮỮ'	ffffffff27
+0x005B1575	CODE	skill upgrade / level group	ắ(ƠỢ	a128b494
+0x005B164C	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005B1652	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005B16CA	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005B16D0	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005B171C	CODE	skill upgrade / level group	ắ(ƠỢ	a128b494
+0x005B1837	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005B183D	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005B1893	CODE	skill upgrade / level group	ắ(ƠỢ	a128b494
+0x005B18B8	CODE	skill upgrade / level group	ắ(ƠỢ	a128b494
+0x005B190C	CODE	skill upgrade / level group	Ngọc	4e67f763
+0x005B1A78	CODE	skill upgrade / level group	ỮỮỮỮẲ	ffffffff02
+0x005B1BE2	CODE	skill upgrade / level group	ỨỶỴ[	ba141e5b
+0x005B1C30	CODE	skill upgrade / level group	ỨDỴ[	ba441e5b
+0x005B1C4A	CODE	skill upgrade / level group	ỨTỴ[	ba541e5b
+0x005B1C64	CODE	skill upgrade / level group	ỨhỴ[	ba681e5b
+0x005B1C98	CODE	skill upgrade / level group	ẸEđhẰ	8945f06882
+0x005B1CAA	CODE	skill upgrade / level group	jFjỸỰF	6a466a19b946
+0x005B1CB3	CODE	skill upgrade / level group	ỨxỴ[	ba781e5b
+0x005B1CDB	CODE	skill upgrade / level group	ỀEđẳẠĐ	8b45f0c680d0
+0x005B1CF4	CODE	skill upgrade / level group	ỀUủẸẰđ	8b55fc8982f0
+0x005B1CFD	CODE	skill upgrade / level group	ỀEủỀẠđ	8b45fc8b80f0
+0x005B1D1E	CODE	skill upgrade / level group	ỨỂỴ[	ba8c1e5b
+0x005B1D9F	CODE	skill upgrade / level group	ỄEảỨẲ	8d45e4ba02
+0x005B1E0C	CODE	skill upgrade / level group	ỮỮỮỮẪ	ffffffff06
+0x005B1E14	CODE	skill upgrade / level group	online	6f6e6c696e65
+0x005B1E24	CODE	skill upgrade / level group	offline	6f66666c696e65
+0x005B1E2C	CODE	skill upgrade / level group	ỮỮỮỮẪ	ffffffff06
+0x005B1E34	CODE	skill upgrade / level group	OnBusy	4f6e42757379
+0x005B1E44	CODE	skill upgrade / level group	Away	41776179
+0x005B1E68	CODE	skill upgrade / level group	partner	706172746e6572
+0x005B23E0	CODE	skill upgrade / level group	jẴhỮ	6a0568ff
+0x005B2591	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005B2597	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005B2760	CODE	skill upgrade / level group	Ặị8Ỷ	83b83814
+0x005B28BD	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005B28C3	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005B2A96	CODE	skill upgrade / level group	Ặị8Ỷ	83b83814
+0x005B2ABB	CODE	skill upgrade / level group	ắ(ƠỢ	a128b494
+0x005B2B63	CODE	skill upgrade / level group	ẸEđhẰ	8945f06882
+0x005B2B75	CODE	skill upgrade / level group	jFjỸỰỸ	6a466a19b919
+0x005B2BDA	CODE	skill upgrade / level group	jFjỸỰi	6a466a19b969
+0x005B2D40	CODE	skill upgrade / level group	ỮỮỮỮẪ	ffffffff06
+0x005B2E30	CODE	skill upgrade / level group	ắ(ƠỢ	a128b494
+0x005B2E40	CODE	skill upgrade / level group	ắ(ƠỢ	a128b494
+0x005B2E5A	CODE	skill upgrade / level group	ắ(ƠỢ	a128b494
+0x005B2EB2	CODE	skill upgrade / level group	ắ(ƠỢ	a128b494
+0x005B2F2A	CODE	skill upgrade / level group	ắ(ƠỢ	a128b494
+0x005B2F36	CODE	skill upgrade / level group	ắ(ƠỢ	a128b494
+0x005B2FDD	CODE	skill upgrade / level group	jỶhđ1[	6a1468f0315b
+0x005B2FEB	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005B2FF1	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005B304E	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005B3054	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005B30B1	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005B30B7	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005B31F0	CODE	skill upgrade / level group	Phương Thức	5068dfbd6e67205468d163
+0x005B3218	CODE	skill upgrade / level group	Điểm số	d069ac6d2073af
+0x005B32A4	CODE	skill upgrade / level group	ẾẠoẴ	8a806f05
+0x005B374F	CODE	skill upgrade / level group	ỀEủPhồ7[	8b45fc5068b0375b
+0x005B3846	CODE	skill upgrade / level group	ỀUủẸẰđ	8b55fc8982f0
+0x005B384F	CODE	skill upgrade / level group	ỀEủỀẠđ	8b45fc8b80f0
+0x005B38A2	CODE	skill upgrade / level group	ỀEđẳẠĐ	8b45f0c680d0
+0x005B3B36	CODE	skill upgrade / level group	ẳẠỜÕ	c68096a0
+0x005B3CB8	CODE	skill upgrade / level group	ỮỮỮỮẲ	ffffffff02
+0x005B3CCC	CODE	skill upgrade / level group	Thăng cấp	5468e56e672063a470
+0x005B3EF1	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005B3EF7	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005B42AA	CODE	skill upgrade / level group	ỮuảhHD[	ff75e46848445b
+0x005B4448	CODE	skill upgrade / level group	Đẳng cấp	d0c66e672063a470
+0x005B448C	CODE	skill upgrade / level group	hấE[	68a4455b
+0x005B450E	CODE	skill upgrade / level group	ỨủE[	bafc455b
+0x005B4535	CODE	skill upgrade / level group	hHF[	6848465b
+0x005B455D	CODE	skill upgrade / level group	htF[	6874465b
+0x005B45F4	CODE	skill upgrade / level group	ỮỮỮỮỸ	ffffffff19
+0x005B4660	CODE	skill upgrade / level group	Số đạn dược	53af20f0d56e2064dffe63
+0x005B46EB	CODE	skill upgrade / level group	ỀEụẶịả	8b45f883b8e4
+0x005B4710	CODE	skill upgrade / level group	ỀEụỀỒả	8b45f88b90e4
+0x005B4A65	CODE	skill upgrade / level group	ẾẠjẴ	8a806a05
+0x005B4A97	CODE	skill upgrade / level group	ẾẠjẴ	8a806a05
+0x005B4C72	CODE	skill upgrade / level group	ỨDN[	ba444e5b
+0x005B4CA6	CODE	skill upgrade / level group	ỨXN[	ba584e5b
+0x005B4D46	CODE	skill upgrade / level group	ỨẠN[	ba804e5b
+0x005B4D60	CODE	skill upgrade / level group	ỨỢN[	ba944e5b
+0x005B4DF8	CODE	skill upgrade / level group	ỀEđẳẠĐ	8b45f0c680d0
+0x005B4E0F	CODE	skill upgrade / level group	ỀEđẳẠĐ	8b45f0c680d0
+0x005B4EB4	CODE	skill upgrade / level group	ỮỮỮỮẴ	ffffffff05
+0x005B4EBC	CODE	skill upgrade / level group	[ESC]	5b4553435d
+0x005B4FCC	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005B4FD2	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005B502F	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005B5035	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005B5084	CODE	skill upgrade / level group	jỶhhX[	6a146868585b
+0x005B5092	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005B5098	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005B5195	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005B519B	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005B555B	CODE	skill upgrade / level group	jỶhẤX[	6a146884585b
+0x005B5569	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005B556F	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005B565B	CODE	skill upgrade / level group	ỄEụỨấX[	8d45f8baa4585b
+0x005B5777	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005B577D	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005B5818	CODE	skill upgrade / level group	quan chức trước mắt của bạn:	7175616e206368d163207472dfbe63206da1742063fc612062d56e3a
+0x005B5868	CODE	skill upgrade / level group	hiệu quả quan chức:	6869ae75207175e4207175616e206368d1633a
+0x005B587C	CODE	skill upgrade / level group	ỮỮỮỮẲ	ffffffff02
+0x005B58DC	CODE	skill upgrade / level group	Độ nhanh nhẹn: 	d0b5206e68616e68206e68a96e3a20
+0x005B5911	CODE	skill upgrade / level group	ỀEủẠxỶ	8b45fc807814
+0x005B5B46	CODE	skill upgrade / level group	ỀEđẳẠĐ	8b45f0c680d0
+0x005B5D9A	CODE	skill upgrade / level group	ỀUủẸỒỢ	8b55fc899094
+0x005B5E37	CODE	skill upgrade / level group	ỄEảỨẲ	8d45e4ba02
+0x005B5EA8	CODE	skill upgrade / level group	ỮỮỮỮẴ	ffffffff05
+0x005B5EB0	CODE	skill upgrade / level group	[ESC]	5b4553435d
+0x005B5EB8	CODE	skill upgrade / level group	ỮỮỮỮẪ	ffffffff06
+0x005B5FDB	CODE	skill upgrade / level group	ỨHb[	ba48625b
+0x005B609F	CODE	skill upgrade / level group	ỨẼb[	ba88625b
+0x005B617F	CODE	skill upgrade / level group	ỨPc[	ba50635b
+0x005B61DB	CODE	skill upgrade / level group	ỨẠc[	ba80635b
+0x005B6240	CODE	skill upgrade / level group	ỮỮỮỮ5	ffffffff35
+0x005B6280	CODE	skill upgrade / level group	ỮỮỮỮB	ffffffff42
+0x005B62CC	CODE	skill upgrade / level group	ỮỮỮỮ/	ffffffff2f
+0x005B6304	CODE	skill upgrade / level group	ỮỮỮỮ/	ffffffff2f
+0x005B6348	CODE	skill upgrade / level group	ỮỮỮỮ%	ffffffff25
+0x005B64F1	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005B64F7	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005B664F	CODE	skill upgrade / level group	ẸEƠẳEị	8945b4c645b8
+0x005B6673	CODE	skill upgrade / level group	ịTj[	b8546a5b
+0x005B6694	CODE	skill upgrade / level group	ẸEƠẳEị	8945b4c645b8
+0x005B66B8	CODE	skill upgrade / level group	ịTj[	b8546a5b
+0x005B66D9	CODE	skill upgrade / level group	ẸEƠẳEị	8945b4c645b8
+0x005B66FD	CODE	skill upgrade / level group	ịTj[	b8546a5b
+0x005B671E	CODE	skill upgrade / level group	ẸEƠẳEị	8945b4c645b8
+0x005B6742	CODE	skill upgrade / level group	ịTj[	b8546a5b
+0x005B6763	CODE	skill upgrade / level group	ẸEƠẳEị	8945b4c645b8
+0x005B6787	CODE	skill upgrade / level group	ịTj[	b8546a5b
+0x005B67A5	CODE	skill upgrade / level group	ẸEƠẳEị	8945b4c645b8
+0x005B67C9	CODE	skill upgrade / level group	ịTj[	b8546a5b
+0x005B67F7	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005B67FD	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005B6A79	CODE	skill upgrade / level group	dỮ0dẸ ỀEủẠxỶ	64ff306489208b45fc807814
+0x005B6B76	CODE	skill upgrade / level group	hỮỮỮ	68ffffff
+0x005B6D24	CODE	skill upgrade / level group	ỀEụẴế	8b45f805aa
+0x005B785C	CODE	skill upgrade / level group	Ứảx[	bae4785b
+0x005B787B	CODE	skill upgrade / level group	ỀEủỀUđẸBtẵBpđx[	8b45fc8b55f0894274c74270f0785b
+0x005B7BD7	CODE	skill upgrade / level group	dỮ0dẸ ỮẴủởỢ	64ff30648920ff05fcb794
+0x005B83AA	CODE	skill upgrade / level group	ỨDỖ[	ba44925b
+0x005B8486	CODE	skill upgrade / level group	ỨDỖ[	ba44925b
+0x005B8562	CODE	skill upgrade / level group	ỨdỖ[	ba64925b
+0x005B863E	CODE	skill upgrade / level group	ỨdỖ[	ba64925b
+0x005B86F1	CODE	skill upgrade / level group	ẸEđj	8945f06a
+0x005B8732	CODE	skill upgrade / level group	ỨỢỖ[	ba94925b
+0x005B8840	CODE	skill upgrade / level group	ỨỢỖ[	ba94925b
+0x005B8900	CODE	skill upgrade / level group	j,jỸỰỔ	6a2c6a19b991
+0x005B8909	CODE	skill upgrade / level group	ỨĐỖ[	bad0925b
+0x005B896C	CODE	skill upgrade / level group	j,jỸỰỔ	6a2c6a19b991
+0x005B8975	CODE	skill upgrade / level group	ỨỶỘ[	ba14935b
+0x005B89EF	CODE	skill upgrade / level group	j,jỸỰỔ	6a2c6a19b991
+0x005B89F8	CODE	skill upgrade / level group	ỨỶỘ[	ba14935b
+0x005B8AE3	CODE	skill upgrade / level group	ỨPỘ[	ba50935b
+0x005B8B89	CODE	skill upgrade / level group	ỨỂỘ[	ba8c935b
+0x005B8BCE	CODE	skill upgrade / level group	ỨÕỘ[	baa0935b
+0x005B8CB9	CODE	skill upgrade / level group	ỨủỘ[	bafc935b
+0x005B8EBD	CODE	skill upgrade / level group	ỀEỵẳẠĐ	8b45dcc680d0
+0x005B8FE9	CODE	skill upgrade / level group	ỨểỢ[	baac945b
+0x005B9035	CODE	skill upgrade / level group	jIjDj	6a496a446a
+0x005B92E0	CODE	skill upgrade / level group	ỮỮỮỮ 	ffffffff20
+0x005B92E8	CODE	skill upgrade / level group	Vai trong cảnh tự động di chuyển	5661692074726f6e672063e46e682074f120f0b56e672064692063687579ac6e
+0x005B9348	CODE	skill upgrade / level group	ỮỮỮỮ2	ffffffff32
+0x005B93F4	CODE	skill upgrade / level group	ỮỮỮỮ/	ffffffff2f
+0x005B94A4	CODE	skill upgrade / level group	ỮỮỮỮA	ffffffff41
+0x005B9AE0	CODE	skill upgrade / level group	ỨỢỈ[	ba949b5b
+0x005B9B0F	CODE	skill upgrade / level group	ỨẽỈ[	baa89b5b
+0x005B9B60	CODE	skill upgrade / level group	ỨỬỈ[	babc9b5b
+0x005B9C1C	CODE	skill upgrade / level group	ỨĐỦ[	bad09c5b
+0x005B9C4B	CODE	skill upgrade / level group	ỨảỦ[	bae49c5b
+0x005B9C9C	CODE	skill upgrade / level group	ỨụỦ[	baf89c5b
+0x005B9DF0	CODE	skill upgrade / level group	ỨấỤ[	baa49e5b
+0x005B9E1F	CODE	skill upgrade / level group	ỨịỤ[	bab89e5b
+0x005B9F7C	CODE	skill upgrade / level group	ỨẼÕ[	ba88a05b
+0x005BA054	CODE	skill upgrade / level group	ỮỮỮỮ!	ffffffff21
+0x005BA2F9	CODE	skill upgrade / level group	ỨỢấ[	ba94a45b
+0x005BA326	CODE	skill upgrade / level group	Ứẽấ[	baa8a45b
+0x005BA353	CODE	skill upgrade / level group	ỨỬấ[	babca45b
+0x005BA5AD	CODE	skill upgrade / level group	ỀEủẠịĩ	8b45fc80b8ee
+0x005BA712	CODE	skill upgrade / level group	t!hỮ	742168ff
+0x005BA891	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005BA897	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005BA938	CODE	skill upgrade / level group	 hh:nn:ss	2068683a6e6e3a7373
+0x005BA9EC	CODE	skill upgrade / level group	ỄEđỨẲ	8d45f0ba02
+0x005BAAC4	CODE	skill upgrade / level group	ỄEđỨẲ	8d45f0ba02
+0x005BAD08	CODE	skill upgrade / level group	ẸB(ắ	894228a1
+0x005BAD26	CODE	skill upgrade / level group	ẸB,ắ	89422ca1
+0x005BAD44	CODE	skill upgrade / level group	ẸB(ắ	894228a1
+0x005BB14A	CODE	skill upgrade / level group	ỄEĐỨẪ	8d45d0ba06
+0x005BBA37	CODE	skill upgrade / level group	ỨpỨ[	ba70ba5b
+0x005BBA56	CODE	skill upgrade / level group	ỨẢỨ[	bac4ba5b
+0x005BBABC	CODE	skill upgrade / level group	ỮỮỮỮ?	ffffffff3f
+0x005BBB1F	CODE	skill upgrade / level group	ỀEủẠịĩ	8b45fc80b8ee
+0x005BBB32	CODE	skill upgrade / level group	ỨtỪ[	ba74bb5b
+0x005BBB52	CODE	skill upgrade / level group	ỨẼỪ[	ba88bb5b
+0x005BBC36	CODE	skill upgrade / level group	ỨỂỬ[	ba8cbc5b
+0x005BBC84	CODE	skill upgrade / level group	ỮỮỮỮ?	ffffffff3f
+0x005BC011	CODE	skill upgrade / level group	ỀUủỀỖử	8b55fc8b92d8
+0x005BC028	CODE	skill upgrade / level group	PỄEửPỀEủkẠ	508d45d8508b45fc6b80
+0x005BC195	CODE	skill upgrade / level group	ỀUủỀỖử	8b55fc8b92d8
+0x005BC2D2	CODE	skill upgrade / level group	ỀUủỀỖử	8b55fc8b92d8
+0x005BC3B7	CODE	skill upgrade / level group	ỀUủỀỖử	8b55fc8b92d8
+0x005BC56D	CODE	skill upgrade / level group	ỀEủẾẠử	8b45fc8a80d8
+0x005BC5B7	CODE	skill upgrade / level group	ỀEủẳẠử	8b45fcc680d8
+0x005BC603	CODE	skill upgrade / level group	ỀEủẳẠử	8b45fcc680d8
+0x005BC660	CODE	skill upgrade / level group	Ỉẻ4ỀEủẳẠử	9beb348b45fcc680d8
+0x005BC67B	CODE	skill upgrade / level group	ỈẻỸỀEủẳẠử	9beb198b45fcc680d8
+0x005BCBF3	CODE	skill upgrade / level group	ẻDỀEủẠx]	eb448b45fc80785d
+0x005BCE96	CODE	skill upgrade / level group	ỀEđẳẠĐ	8b45f0c680d0
+0x005BCFE3	CODE	skill upgrade / level group	ẾẤẲỉ	8a8402ef
+0x005BD019	CODE	skill upgrade / level group	ẠỬẲỉ	80bc02ef
+0x005BD02A	CODE	skill upgrade / level group	ỨỂĐ[	ba8cd05b
+0x005BD059	CODE	skill upgrade / level group	ỨÕĐ[	baa0d05b
+0x005BD107	CODE	skill upgrade / level group	ỨDứ[	ba44d15b
+0x005BD47B	CODE	skill upgrade / level group	ỄEảỨẲ	8d45e4ba02
+0x005BD4EC	CODE	skill upgrade / level group	ỮỮỮỮẴ	ffffffff05
+0x005BD4F4	CODE	skill upgrade / level group	[ESC]	5b4553435d
+0x005BD686	CODE	skill upgrade / level group	ỄEụỨ,ử[	8d45f8ba2cd85b
+0x005BD6BF	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005BD6C5	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005BD70C	CODE	skill upgrade / level group	ỄEụỨTử[	8d45f8ba54d85b
+0x005BD77C	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005BD782	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005BD854	CODE	skill upgrade / level group	Số lượng:dư:	53af206cdffe6e673a64df3a
+0x005BD8C1	CODE	skill upgrade / level group	ỨXỹ[	ba58db5b
+0x005BD9BE	CODE	skill upgrade / level group	ỨẠỹ[	ba80db5b
+0x005BDB1B	CODE	skill upgrade / level group	ỄEảỨẲ	8d45e4ba02
+0x005BDB8C	CODE	skill upgrade / level group	ỮỮỮỮẴ	ffffffff05
+0x005BDB94	CODE	skill upgrade / level group	[ESC]	5b4553435d
+0x005BDD05	CODE	skill upgrade / level group	ỀỒđẴ	8b90f005
+0x005BDD6B	CODE	skill upgrade / level group	Ứxỡ[	ba78de5b
+0x005BDDEC	CODE	skill upgrade / level group	ỮỮỮỮA	ffffffff41
+0x005BDE38	CODE	skill upgrade / level group	ỮỮỮỮ,	ffffffff2c
+0x005BDE70	CODE	skill upgrade / level group	ỮỮỮỮE	ffffffff45
+0x005BDEC0	CODE	skill upgrade / level group	ỮỮỮỮ.	ffffffff2e
+0x005BDF34	CODE	skill upgrade / level group	ỀẠĐẲ	8b80d002
+0x005BDF3A	CODE	skill upgrade / level group	ỀẠpẲ	8b807002
+0x005BDF88	CODE	skill upgrade / level group	ỮỮỮỮb	ffffffff62
+0x005BE25D	CODE	skill upgrade / level group	dỮ0dẸ ịẲ	64ff30648920b802
+0x005BE314	CODE	skill upgrade / level group	Server trừ điểm thất bại	536572766572207472d720f069ac6d207468a4742062d569
+0x005BE3AF	CODE	skill upgrade / level group	dỮ0dẸ ỮẴỶịỢ	64ff30648920ff0514b894
+0x005BE9FD	CODE	skill upgrade / level group	fẮị:Ẫ	6681b83a06
+0x005BEA18	CODE	skill upgrade / level group	Ứỵẻ[	badceb5b
+0x005BEBD4	CODE	skill upgrade / level group	ỮỮỮỮ5	ffffffff35
+0x005BEF28	CODE	skill upgrade / level group	ỮỮỮỮẴ	ffffffff05
+0x005BF14B	CODE	skill upgrade / level group	PỀEủPỀ	508b45fc508b
+0x005BF237	CODE	skill upgrade / level group	PỀEủPỀ	508b45fc508b
+0x005BF2C4	CODE	skill upgrade / level group	ỮỮỮỮ,	ffffffff2c
+0x005BF3D4	CODE	skill upgrade / level group	ỮỮỮỮ,	ffffffff2c
+0x005BF47B	CODE	skill upgrade / level group	jFjỸỰỶ	6a466a19b914
+0x005BF518	CODE	skill upgrade / level group	ỮỮỮỮẴ	ffffffff05
+0x005BF520	CODE	skill upgrade / level group	[ESC]	5b4553435d
+0x005BF5FB	CODE	skill upgrade / level group	ỨTỏ[	ba54f65b
+0x005BF615	CODE	skill upgrade / level group	ỨTỏ[	ba54f65b
+0x005BF64C	CODE	skill upgrade / level group	ỮỮỮỮ,	ffffffff2c
+0x005BF68F	CODE	skill upgrade / level group	dỮ0dẸ ỮẴ ỨỢ	64ff30648920ff0520ba94
+0x005BF90D	CODE	skill upgrade / level group	ỄẦỦợỮỮỨẲ	8d859cfeffffba02
+0x005C9013	CODE	skill list captions	jFjỸỰẰ	6a466a19b982
+0x005C9089	CODE	skill list captions	ẸEỬhẬ	8945bc6887
+0x005C9111	CODE	skill list captions	ẸEịhẬ	8945b86887
+0x005C9123	CODE	skill list captions	jFjỸỰ(	6a466a19b928
+0x005C9199	CODE	skill list captions	ẸEƠhẬ	8945b46887
+0x005C91AB	CODE	skill list captions	jFjỸỰF	6a466a19b946
+0x005C92C8	CODE	skill list captions	ỮỮỮỮẲ	ffffffff02
+0x005C92D4	CODE	skill list captions	ỮỮỮỮẲ	ffffffff02
+0x005C92E0	CODE	skill list captions	ỮỮỮỮẲ	ffffffff02
+0x005C92EC	CODE	skill list captions	ỮỮỮỮẲ	ffffffff02
+0x005C9324	CODE	skill list captions	editorBG	656469746f724247
+0x005C9330	CODE	skill list captions	ỮỮỮỮẲ	ffffffff02
+0x005C933C	CODE	skill list captions	ỮỮỮỮẲ	ffffffff02
+0x005C9348	CODE	skill list captions	ỮỮỮỮẲ	ffffffff02
+0x005C9354	CODE	skill list captions	ỮỮỮỮẲ	ffffffff02
+0x005C9360	CODE	skill list captions	ỮỮỮỮẲ	ffffffff02
+0x005C936C	CODE	skill list captions	ỮỮỮỮẲ	ffffffff02
+0x005C9378	CODE	skill list captions	ỮỮỮỮẲ	ffffffff02
+0x005C93DF	CODE	skill list captions	ẳẠẾẴ	c6808a05
+0x005C9413	CODE	skill list captions	ẳẠẾẴ	c6808a05
+0x005C952B	CODE	skill list captions	ẳẠẾẴ	c6808a05
+0x005C95EC	CODE	skill list captions	ổổẽĩFightHum:	b1b1a8ee466967687448756d3a
+0x005C9623	CODE	skill list captions	ẳẠẾẴ	c6808a05
+0x005C96C0	CODE	skill list captions	ổổẽĩFightHum:	b1b1a8ee466967687448756d3a
+0x005C9760	CODE	skill list captions	ổổẽĩFightHum:	b1b1a8ee466967687448756d3a
+0x005C9800	CODE	skill list captions	ổổẽĩFightHum:	b1b1a8ee466967687448756d3a
+0x00638AEE	CODE	battle/skill messages	ỘỒẵẴ	9390c705
+0x00638B28	CODE	battle/skill messages	ỐỒẵẴỶẢỊ	8f90c70514c498
+0x00638B45	CODE	battle/skill messages	ỐỒẵẴỴẢỊ	8f90c7051ec498
+0x00638B51	CODE	battle/skill messages	ẵẴ"ẢỊ	c70522c498
+0x00638B62	CODE	battle/skill messages	ỐỒẵẴ(ẢỊ	8f90c70528c498
+0x00638B6E	CODE	battle/skill messages	ẵẴ,ẢỊ	c7052cc498
+0x00638B78	CODE	battle/skill messages	fẵẴ0ẢỊ	66c70530c498
+0x00638B7F	CODE	battle/skill messages	ỐỒẵẴ2ẢỊ	8f90c70532c498
+0x00638B8B	CODE	battle/skill messages	ẵẴ6ẢỊ	c70536c498
+0x00638B95	CODE	battle/skill messages	fẵẴ:ẢỊ	66c7053ac498
+0x00638BB2	CODE	battle/skill messages	fẵẴDẢỊ	66c70544c498
+0x00638BB9	CODE	battle/skill messages	ỐỒẵẴFẢỊ	8f90c70546c498
+0x00638BC5	CODE	battle/skill messages	ẵẴJẢỊ	c7054ac498
+0x00638BCF	CODE	battle/skill messages	fẵẴNẢỊ	66c7054ec498
+0x00638BD6	CODE	battle/skill messages	ẸỒẵẴPẢỊ	8990c70550c498
+0x00638BE2	CODE	battle/skill messages	ẵẴTẢỊ	c70554c498
+0x00638BEC	CODE	battle/skill messages	fẵẴXẢỊ	66c70558c498
+0x00638BF3	CODE	battle/skill messages	ẸỒẵẴZẢỊ	8990c7055ac498
+0x00638C09	CODE	battle/skill messages	fẵẴbẢỊ	66c70562c498
+0x00638C10	CODE	battle/skill messages	ẸỒẵẴdẢỊ	8990c70564c498
+0x00638C1C	CODE	battle/skill messages	ẵẴhẢỊ	c70568c498
+0x00638C26	CODE	battle/skill messages	fẵẴlẢỊ	66c7056cc498
+0x00638C2D	CODE	battle/skill messages	ẸỒẵẴnẢỊ	8990c7056ec498
+0x00638C39	CODE	battle/skill messages	ẵẴrẢỊ	c70572c498
+0x00638C43	CODE	battle/skill messages	fẵẴvẢỊ	66c70576c498
+0x00638C4A	CODE	battle/skill messages	ẾỒẵẴxẢỊ	8a90c70578c498
+0x00638C60	CODE	battle/skill messages	fẵẴẠẢỊ	66c70580c498
+0x00638C67	CODE	battle/skill messages	ẾỒẵẴẰẢỊ	8a90c70582c498
+0x00638C73	CODE	battle/skill messages	ẵẴẨẢỊ	c70586c498
+0x00638C7D	CODE	battle/skill messages	fẵẴẾẢỊ	66c7058ac498
+0x00638C84	CODE	battle/skill messages	ẾỒẵẴỂẢỊ	8a90c7058cc498
+0x00638C90	CODE	battle/skill messages	ẵẴỒẢỊ	c70590c498
+0x00638C9A	CODE	battle/skill messages	fẵẴỢẢỊ	66c70594c498
+0x00638CA1	CODE	battle/skill messages	ỂỒẵẴỜẢỊ	8c90c70596c498
+0x00638CAD	CODE	battle/skill messages	ẵẴỌẢỊ	c7059ac498
+0x00638CB7	CODE	battle/skill messages	fẵẴỤẢỊ	66c7059ec498
+0x00638CBE	CODE	battle/skill messages	ỄỒẵẴÕẢỊ	8d90c705a0c498
+0x00638CCA	CODE	battle/skill messages	ẵẴấẢỊ	c705a4c498
+0x00638CD4	CODE	battle/skill messages	ịỗẢỊ	b8b2c498
+0x00638CEA	CODE	battle/skill messages	8JfẵẴỨẢỊ	384a66c705bac498
+0x00638CF3	CODE	battle/skill messages	WJfẵẴỬẢỊ	574a66c705bcc498
+0x00638CFC	CODE	battle/skill messages	[JfẵẴớẢỊ	5b4a66c705bec498
+0x00638D17	CODE	battle/skill messages	gKfẵẴDĂỊ	674b66c70544c598
+0x00638D32	CODE	battle/skill messages	fKfẵẴJĂỊ	664b66c7054ac598
+0x00638D7A	CODE	battle/skill messages	XJfẵẴĨẢỊ	584a66c705cec498
+0x00638D83	CODE	battle/skill messages	YJfẵẴĐẢỊ	594a66c705d0c498
+0x00638DD0	CODE	battle/skill messages	ẵẴỏẢỊ	c705f6c498
+0x00638DE4	CODE	battle/skill messages	ẵẴợẢỊ	c705fec498
+0x00638DEE	CODE	battle/skill messages	ẵẴẲĂỊ	c70502c598
+0x00638DF8	CODE	battle/skill messages	ẵẴẪĂỊ	c70506c598
+0x00638E2E	CODE	battle/skill messages	ẵẴỴĂỊ	c7051ec598
+0x00638E38	CODE	battle/skill messages	ẵẴ"ĂỊ	c70522c598
+0x00638E56	CODE	battle/skill messages	ẵẴ.ĂỊ	c7052ec598
+0x00638E60	CODE	battle/skill messages	ẵẴ2ĂỊ	c70532c598
+0x00638E6A	CODE	battle/skill messages	ẵẴ6ĂỊ	c70536c598
+0x00638E74	CODE	battle/skill messages	ẵẴ:ĂỊ	c7053ac598
+0x00638E88	CODE	battle/skill messages	fẵẴNĂỊ	66c7054ec598
+0x00638E8F	CODE	battle/skill messages	[JfẵẴPĂỊ	5b4a66c70550c598
+0x00638E9A	CODE	battle/skill messages	fẵẴRĂỊ	66c70552c598
+0x00638EA1	CODE	battle/skill messages	ỬẲfẵẴTĂỊ	bc0266c70554c598
+0x00638EAA	CODE	battle/skill messages	ỘỒẵẴVĂỊ	9390c70556c598
+0x00638EB6	CODE	battle/skill messages	ẵẴZĂỊ	c7055ac598
+0x00638ED3	CODE	battle/skill messages	ẵẴdĂỊ	c70564c598
+0x00638EDD	CODE	battle/skill messages	fẵẴhĂỊ	66c70568c598
+0x00638EE4	CODE	battle/skill messages	ỐỒẵẴjĂỊ	8f90c7056ac598
+0x00638EF0	CODE	battle/skill messages	ẵẴnĂỊ	c7056ec598
+0x00638EFA	CODE	battle/skill messages	fẵẴrĂỊ	66c70572c598
+0x00638F01	CODE	battle/skill messages	ỐỒẵẴtĂỊ	8f90c70574c598
+0x00638F0D	CODE	battle/skill messages	ẵẴxĂỊ	c70578c598
+0x00638F2A	CODE	battle/skill messages	ẵẴẰĂỊ	c70582c598
+0x00638F34	CODE	battle/skill messages	fẵẴẨĂỊ	66c70586c598
+0x00638F3B	CODE	battle/skill messages	ẸỒẵẴẼĂỊ	8990c70588c598
+0x00638F47	CODE	battle/skill messages	ẵẴỂĂỊ	c7058cc598
+0x00638F51	CODE	battle/skill messages	fẵẴỒĂỊ	66c70590c598
+0x00638F58	CODE	battle/skill messages	ẸỒẵẴỖĂỊ	8990c70592c598
+0x00638F64	CODE	battle/skill messages	ẵẴỜĂỊ	c70596c598
+0x00638F6E	CODE	battle/skill messages	fẵẴỌĂỊ	66c7059ac598
+0x00638F75	CODE	battle/skill messages	ẸỒẵẴỦĂỊ	8990c7059cc598
+0x00638F81	CODE	battle/skill messages	ẵẴÕĂỊ	c705a0c598
+0x00638F8B	CODE	battle/skill messages	fẵẴấĂỊ	66c705a4c598
+0x00638F92	CODE	battle/skill messages	ẸỒẵẴẩĂỊ	8990c705a6c598
+0x00638F9E	CODE	battle/skill messages	ẵẴếĂỊ	c705aac598
+0x00638FA8	CODE	battle/skill messages	fẵẴệĂỊ	66c705aec598
+0x00638FAF	CODE	battle/skill messages	ẸỒẵẴồĂỊ	8990c705b0c598
+0x00638FBB	CODE	battle/skill messages	ẵẴƠĂỊ	c705b4c598
+0x00638FC5	CODE	battle/skill messages	fẵẴịĂỊ	66c705b8c598
+0x00638FCC	CODE	battle/skill messages	ẸỒẵẴỨĂỊ	8990c705bac598
+0x00638FD8	CODE	battle/skill messages	ẵẴớĂỊ	c705bec598
+0x00638FE9	CODE	battle/skill messages	ẸỒẵẴẢĂỊ	8990c705c4c598
+0x00639006	CODE	battle/skill messages	ẸỒẵẴĨĂỊ	8990c705cec598
+0x0063901C	CODE	battle/skill messages	fẵẴỷĂỊ	66c705d6c598
+0x00639023	CODE	battle/skill messages	ẸỒẵẴửĂỊ	8990c705d8c598
+0x0063902F	CODE	battle/skill messages	ẵẴỵĂỊ	c705dcc598
+0x0063904C	CODE	battle/skill messages	ẵẴữĂỊ	c705e6c598
+0x00639069	CODE	battle/skill messages	ẵẴđĂỊ	c705f0c598
+0x0063907A	CODE	battle/skill messages	ỂỒẵẴỏĂỊ	8c90c705f6c598
+0x00639090	CODE	battle/skill messages	fẵẴợĂỊ	66c705fec598
+0x00639097	CODE	battle/skill messages	ỄỒẵẴ	8d90c705
+0x006390CC	CODE	battle/skill messages	ĐẠI HUYỆN 	d08049204855598e4e20
+0x00639104	CODE	battle/skill messages	LANG GIA 	4c414e472047494120
+0x00639118	CODE	battle/skill messages	ĐẠI MẠC lỔc	d08049204d8043206c9163
+0x00639A91	CODE	battle/skill messages	ỨảŨc	bae49d63
+0x00639AEC	CODE	battle/skill messages	ỨụŨc	baf89d63
+0x00639B71	CODE	battle/skill messages	ỨụŨc	baf89d63
+0x00639BF7	CODE	battle/skill messages	jFjỸỰA	6a466a19b941
+0x00639C00	CODE	battle/skill messages	ỨụŨc	baf89d63
+0x00639C86	CODE	battle/skill messages	jFjỸỰA	6a466a19b941
+0x00639C8F	CODE	battle/skill messages	ỨụŨc	baf89d63
+0x00639D15	CODE	battle/skill messages	jFjỸỰx	6a466a19b978
+0x00639D1E	CODE	battle/skill messages	ỨụŨc	baf89d63
+0x00639DE4	CODE	battle/skill messages	editorBG	656469746f724247
+0x00639E0C	CODE	battle/skill messages	ầ[ấJ	a55ba44a
+0x00639E44	CODE	battle/skill messages	ỮỮỮỮẲ	ffffffff02
+0x00639F94	CODE	battle/skill messages	Ứ0ắc	ba30a163
+0x00639FF3	CODE	battle/skill messages	ỨDắc	ba44a163
+0x0063A015	CODE	battle/skill messages	ỨXắc	ba58a163
+0x0063A043	CODE	battle/skill messages	ẸEđj-hÕ	8945f06a2d68a0
+0x0063A05E	CODE	battle/skill messages	ỨDắc	ba44a163
+0x0063A0B0	CODE	battle/skill messages	jFjỸỰỴ	6a466a19b91e
+0x0063A0B9	CODE	battle/skill messages	ỨẤắc	ba84a163
+0x0063A144	CODE	battle/skill messages	editorBG	656469746f724247
+0x0063A150	CODE	battle/skill messages	ỮỮỮỮ 	ffffffff20
+0x0063A190	CODE	battle/skill messages	ỮỮỮỮẲ	ffffffff02
+0x0063A2A9	CODE	battle/skill messages	Ứ ấc	ba20a463
+0x0063A2CB	CODE	battle/skill messages	Ứ4ấc	ba34a463
+0x0063A311	CODE	battle/skill messages	ỨTấc	ba54a463
+0x0063A34D	CODE	battle/skill messages	ỀEủỀUđẸBTẵBPẠấc	8b45fc8b55f0894254c7425080a463
+0x0063A38D	CODE	battle/skill messages	jFjỸỰK	6a466a19b94b
+0x0063A396	CODE	battle/skill messages	ỨTấc	ba54a463
+0x0063A420	CODE	battle/skill messages	editorBG	656469746f724247
+0x0063A5E5	CODE	battle/skill messages	ỀEủỀUđẸBTẵBPHậc	8b45fc8b55f0894254c7425048a763
+0x0063A625	CODE	battle/skill messages	jFjỸỰK	6a466a19b94b
+0x0063A6F4	CODE	battle/skill messages	editorBG	656469746f724247
+0x0063A809	CODE	battle/skill messages	ỨẠẹc	ba80a963
+0x0063A82B	CODE	battle/skill messages	ỨỢẹc	ba94a963
+0x0063A871	CODE	battle/skill messages	ỨƠẹc	bab4a963
+0x0063A8ED	CODE	battle/skill messages	jFjỸỰK	6a466a19b94b
+0x0063A8F6	CODE	battle/skill messages	ỨƠẹc	bab4a963
+0x0063A980	CODE	battle/skill messages	editorBG	656469746f724247
+0x0063A9C8	CODE	battle/skill messages	ẩểớn	a6acbe6e
+0x0063AA4D	CODE	battle/skill messages	ỨẤếc	ba84aa63
+0x0063AA84	CODE	battle/skill messages	panel4	70616e656c34
+0x0063AAC6	CODE	battle/skill messages	ẠịxẴ	80b87805
+0x0063ABAC	CODE	battle/skill messages	ỀEủPhịếc	8b45fc5068b8aa63
+0x0063ABB5	CODE	battle/skill messages	ỀEủPhỂếc	8b45fc50688caa63
+0x0063ACC6	CODE	battle/skill messages	rHỀEủẠxỶ	72488b45fc807814
+0x0063ACE9	CODE	battle/skill messages	Ứ ễc	ba20ad63
+0x0063AD18	CODE	battle/skill messages	ỮỮỮỮ5	ffffffff35
+0x0063AD9C	CODE	battle/skill messages	Ứủệc	bafcae63
+0x0063ADE8	CODE	battle/skill messages	jdỰỸ	6a64b919
+0x0063AE3F	CODE	battle/skill messages	ẸEđhẰ	8945f06882
+0x0063AE96	CODE	battle/skill messages	ỀEủỀUđẸBTỀ	8b45fc8b55f08942548b
+0x0063B13E	CODE	battle/skill messages	ẠịxẴ	80b87805
+0x0063B205	CODE	battle/skill messages	ỀEủPh0ổc	8b45fc506830b163
+0x0063B24C	CODE	battle/skill messages	ỮỮỮỮJ	ffffffff4a
+0x0063B2D2	CODE	battle/skill messages	rHỀEủẠxỶ	72488b45fc807814
+0x0063B2F5	CODE	battle/skill messages	Ứ,Ỡc	ba2cb363
+0x0063B324	CODE	battle/skill messages	ỮỮỮỮ5	ffffffff35
+0x0063B36F	CODE	battle/skill messages	dỮ0dẸ ỮẴ,ẳỊ	64ff30648920ff052cc698
+0x0063B4A3	CODE	battle/skill messages	ỀEủỀẠẢ	8b45fc8b80c4
+0x0063B4BB	CODE	battle/skill messages	ỀEủỀẠẢ	8b45fc8b80c4
+0x0063BBA7	CODE	battle/skill messages	Ứđớc	baf0be63
+0x0063BC2E	CODE	battle/skill messages	jFjỸỰỎ	6a466a19b999
+0x0063BC7F	CODE	battle/skill messages	ẸEđh	8945f068
+0x0063BC91	CODE	battle/skill messages	jFjỸỰă	6a466a19b9e5
+0x0063BCC1	CODE	battle/skill messages	ỀEđẳẠĐ	8b45f0c680d0
+0x0063BD9F	CODE	battle/skill messages	Ứ8Ưc	ba38bf63
+0x0063BE4F	CODE	battle/skill messages	ẸEảj	8945e46a
+0x0063BEF0	CODE	battle/skill messages	panel13	70616e656c3133
+0x0063BEF8	CODE	battle/skill messages	ỮỮỮỮẪ	ffffffff06
+0x0063BF30	CODE	battle/skill messages	ỮỮỮỮẪ	ffffffff06
+0x0063BF38	CODE	battle/skill messages	panel4	70616e656c34
+0x0063BF40	CODE	battle/skill messages	ỮỮỮỮẪ	ffffffff06
+0x0063C35A	CODE	battle/skill messages	ẸXXhỮ	89585868ff
+0x0063C3D7	CODE	battle/skill messages	ỀẠĐẲ	8b80d002
+0x0063C3DD	CODE	battle/skill messages	ỀẠpẲ	8b807002
+0x0063CBDB	CODE	battle/skill messages	dỮ0dẸ ỮẴ8ẳỊ	64ff30648920ff0538c698
+0x0063CDD3	CODE	battle/skill messages	ỀEủẳẠIẴ	8b45fcc6804905
+0x0063CE51	CODE	battle/skill messages	ỀEủfẵẠẽẴ	8b45fc66c780a805
+0x0063CE87	CODE	battle/skill messages	ỀEủẳẠHẴ	8b45fcc6804805
+0x0063CEDA	CODE	battle/skill messages	ỀEủỀẠỒẴ	8b45fc8b809005
+0x0063CEFB	CODE	battle/skill messages	ỀEủỀẠồẴ	8b45fc8b80b005
+0x0063CF1C	CODE	battle/skill messages	ỀEủỀẠịẴ	8b45fc8b80b805
+0x0063CFC7	CODE	battle/skill messages	fẶịẽẴ	6683b8a805
+0x0063CFF4	CODE	battle/skill messages	fẶịếẴ	6683b8aa05
+0x0063D045	CODE	battle/skill messages	ẠịiẴ	80b86905
+0x0063D093	CODE	battle/skill messages	fẶịẽẴ	6683b8a805
+0x0063D103	CODE	battle/skill messages	fỀỒẽẴ	668b90a805
+0x0063D16C	CODE	battle/skill messages	fẮịẽẴ	6681b8a805
+0x0063D19E	CODE	battle/skill messages	ẶịtẴ	83b87405
+0x0063D22F	CODE	battle/skill messages	fỀỒẽẴ	668b90a805
+0x0063D2AE	CODE	battle/skill messages	fẮịẽẴ	6681b8a805
+0x0063D2B5	CODE	battle/skill messages	ữ6u"j	e63675226a
+0x0063D2FE	CODE	battle/skill messages	fỀẠẽẴ	668b80a805
+0x0063D348	CODE	battle/skill messages	ẾẠnẴ	8a806e05
+0x0063D34E	CODE	battle/skill messages	ỀUủ:ẰnẴ	8b55fc3a826e05
+0x0063D37C	CODE	battle/skill messages	ẾẠoẴ	8a806f05
+0x0063D382	CODE	battle/skill messages	ỀUủ:ẰoẴ	8b55fc3a826f05
+0x0063D40C	CODE	battle/skill messages	ẾẠỂẴ	8a808c05
+0x0063D412	CODE	battle/skill messages	ỀUủ:ẰỂẴ	8b55fc3a828c05
+0x0063D440	CODE	battle/skill messages	fỀỒẽẴ	668b90a805
+0x0063D4A5	CODE	battle/skill messages	ẾẠỂẴ	8a808c05
+0x0063D4AB	CODE	battle/skill messages	ỀUủ:ẰỂẴ	8b55fc3a828c05
+0x0063D4D9	CODE	battle/skill messages	fỀỒẽẴ	668b90a805
+0x0063D546	CODE	battle/skill messages	fỀỒẽẴ	668b90a805
+0x0063D5A7	CODE	battle/skill messages	ẳẠjẴ	c6806a05
+0x0063D5E6	CODE	battle/skill messages	fẶịếẴ	6683b8aa05
+0x0063D617	CODE	battle/skill messages	fỀẠếẴ	668b80aa05
+0x0063D68D	CODE	battle/skill messages	fỀỒếẴ	668b90aa05
+0x0063D6FA	CODE	battle/skill messages	ỨPảc	ba50e463
+0x0063D798	CODE	battle/skill messages	fẵẠếẴ	66c780aa05
+0x0063D864	CODE	battle/skill messages	fẵẠếẴ	66c780aa05
+0x0063D90B	CODE	battle/skill messages	fỀẠ:Ẫ	668b803a06
+0x0063D981	CODE	battle/skill messages	ẠịXỶ	80b85814
+0x0063D987	CODE	battle/skill messages	Ẳu"j	0275226a
+0x0063D9B3	CODE	battle/skill messages	fỀỒ:Ẫ	668b903a06
+0x0063DA43	CODE	battle/skill messages	ỨPảc	ba50e463
+0x0063DA7A	CODE	battle/skill messages	ỨÕảc	baa0e463
+0x0063DAAF	CODE	battle/skill messages	ẾẠỂẴ	8a808c05
+0x0063DAB5	CODE	battle/skill messages	ỀUủ:ẰỂẴ	8b55fc3a828c05
+0x0063DAC4	CODE	battle/skill messages	ỨÕảc	baa0e463
+0x0063DB1B	CODE	battle/skill messages	ỨÕảc	baa0e463
+0x0063DB91	CODE	battle/skill messages	ỨPảc	ba50e463
+0x0063DBCB	CODE	battle/skill messages	ỨPảc	ba50e463
+0x0063DBF0	CODE	battle/skill messages	ẠịXỶ	80b85814
+0x0063DBF6	CODE	battle/skill messages	Ẳu"j	0275226a
+0x0063DBFD	CODE	battle/skill messages	ỨPảc	ba50e463
+0x0063DC3E	CODE	battle/skill messages	fỀẠếẴ	668b80aa05
+0x0063DC7D	CODE	battle/skill messages	ẠxyẲt"j	8078790274226a
+0x0063DCC8	CODE	battle/skill messages	ẾẠnẴ	8a806e05
+0x0063DCCE	CODE	battle/skill messages	ỀUủ:ẰnẴ	8b55fc3a826e05
+0x0063DCFC	CODE	battle/skill messages	ẾẠoẴ	8a806f05
+0x0063DD02	CODE	battle/skill messages	ỀUủ:ẰoẴ	8b55fc3a826f05
+0x0063DD56	CODE	battle/skill messages	ẠxyẲt"j	8078790274226a
+0x0063DDF0	CODE	battle/skill messages	Ứđảc	baf0e463
+0x0063DF0E	CODE	battle/skill messages	Ứhăc	ba68e563
+0x0063DF53	CODE	battle/skill messages	ỨẤăc	ba84e563
+0x0063DF85	CODE	battle/skill messages	ỨÕăc	baa0e563
+0x0063DFDF	CODE	battle/skill messages	ỨỬăc	babce563
+0x0063E012	CODE	battle/skill messages	Ứđảc	baf0e463
+0x0063E030	CODE	battle/skill messages	ỀEủẠịỵ	8b45fc80b8dc
+0x0063E039	CODE	battle/skill messages	ku"j	6b75226a
+0x0063E081	CODE	battle/skill messages	ẾẠỂẴ	8a808c05
+0x0063E087	CODE	battle/skill messages	ỀUủ:ẰỂẴ	8b55fc3a828c05
+0x0063E0DC	CODE	battle/skill messages	Ứủăc	bafce563
+0x0063E111	CODE	battle/skill messages	ẾẠỂẴ	8a808c05
+0x0063E117	CODE	battle/skill messages	ỀUủ:ẰỂẴ	8b55fc3a828c05
+0x0063E15E	CODE	battle/skill messages	Ứ ữc	ba20e663
+0x0063E1ED	CODE	battle/skill messages	ẳẠjẴ	c6806a05
+0x0063E257	CODE	battle/skill messages	fẵẠẽẴ	66c780a805
+0x0063E283	CODE	battle/skill messages	fẵẠếẴ	66c780aa05
+0x0063E308	CODE	battle/skill messages	ỮỮỮỮ)	ffffffff29
+0x0063E33C	CODE	battle/skill messages	ỮỮỮỮ!	ffffffff21
+0x0063E384	CODE	battle/skill messages	ỮỮỮỮ+	ffffffff2b
+0x0063E3B8	CODE	battle/skill messages	ỮỮỮỮ"	ffffffff22
+0x0063E3E4	CODE	battle/skill messages	ỮỮỮỮ.	ffffffff2e
+0x0063E448	CODE	battle/skill messages	ỮỮỮỮ!	ffffffff21
+0x0063E474	CODE	battle/skill messages	ỮỮỮỮỸ	ffffffff19
+0x0063E498	CODE	battle/skill messages	ỮỮỮỮỴ	ffffffff1e
+0x0063E4C0	CODE	battle/skill messages	ỮỮỮỮỴ	ffffffff1e
+0x0063E5B4	CODE	battle/skill messages	ỮỮỮỮ4	ffffffff34
+0x0063E752	CODE	battle/skill messages	ỀUủẸBPỀEủẳẠă	8b55fc8942508b45fcc680e5
+0x0063EB08	CODE	battle/skill messages	Ạị7Ỷ	80b83714
+0x0063EB58	CODE	battle/skill messages	ẻỴỀEủẳẠỈ	eb1e8b45fcc6809b
+0x0063ED3E	CODE	battle/skill messages	ỀEủỀẠLẴ	8b45fc8b804c05
+0x0063ED47	CODE	battle/skill messages	PỀEủẾẼIẴ	508b45fc8a884905
+0x0063EDF1	CODE	battle/skill messages	ỀEủẮhTẹ	8b45fc816854a9
+0x0063F0D2	CODE	battle/skill messages	ỀẤẰTẲ	8b84825402
+0x0063F0F6	CODE	battle/skill messages	ỀẤẰTẲ	8b84825402
+0x0063F11A	CODE	battle/skill messages	ỀẤẰTẲ	8b84825402
+0x0063F13E	CODE	battle/skill messages	ỀẤẰẽẲ	8b8482a802
+0x0063F162	CODE	battle/skill messages	ỀẤẰẽẲ	8b8482a802
+0x0063F186	CODE	battle/skill messages	ỀẤẰẽẲ	8b8482a802
+0x0063F1AA	CODE	battle/skill messages	ỀẤẰủẲ	8b8482fc02
+0x0063F1CE	CODE	battle/skill messages	ỀẤẰủẲ	8b8482fc02
+0x0063F1F2	CODE	battle/skill messages	ỀẤẰủẲ	8b8482fc02
+0x0063F2BB	CODE	battle/skill messages	ỀEủẠxx	8b45fc807878
+0x0063F44D	CODE	battle/skill messages	ỀEủẾẠnẴ	8b45fc8a806e05
+0x0063F486	CODE	battle/skill messages	ỀẠĐẲ	8b80d002
+0x0063F48C	CODE	battle/skill messages	ỀẠpẲ	8b807002
+0x0063F50B	CODE	battle/skill messages	ỀẠĐẲ	8b80d002
+0x0063F511	CODE	battle/skill messages	ỀẠpẲ	8b807002
+0x0063F5AF	CODE	battle/skill messages	ỀẠĐẲ	8b80d002
+0x0063F5B5	CODE	battle/skill messages	ỀẠpẲ	8b807002
+0x0063F617	CODE	battle/skill messages	ỀEủẾẠoẴ	8b45fc8a806f05
+0x0063F652	CODE	battle/skill messages	ỀẠĐẲ	8b80d002
+0x0063F658	CODE	battle/skill messages	ỀẠpẲ	8b807002
+0x0063F6D7	CODE	battle/skill messages	ỀẠĐẲ	8b80d002
+0x0063F6DD	CODE	battle/skill messages	ỀẠpẲ	8b807002
+0x0063F77B	CODE	battle/skill messages	ỀẠĐẲ	8b80d002
+0x0063F781	CODE	battle/skill messages	ỀẠpẲ	8b807002
+0x0063F80B	CODE	battle/skill messages	ỀẠĐẲ	8b80d002
+0x0063F811	CODE	battle/skill messages	ỀẠpẲ	8b807002
+0x0063F8AB	CODE	battle/skill messages	ỀẠĐẲ	8b80d002
+0x0063F8B1	CODE	battle/skill messages	ỀẠpẲ	8b807002
+0x0063F96A	CODE	battle/skill messages	ỀẠĐẲ	8b80d002
+0x0063F970	CODE	battle/skill messages	ỀẠpẲ	8b807002
+0x0063FA18	CODE	battle/skill messages	ỮỮỮỮẴ	ffffffff05
+0x0063FA3C	CODE	battle/skill messages	Thủy	5468fc79
+0x0063FA50	CODE	battle/skill messages	ỮỮỮỮẴ	ffffffff05
+0x0063FA58	CODE	battle/skill messages	Phong	50686f6e67
+0x0063FAA8	CODE	battle/skill messages	Hiền si	4869ab6e207369
+0x0063FC48	CODE	battle/skill messages	fẮị:Ẫ	6681b83a06
+0x0063FC5A	CODE	battle/skill messages	fỀỒ:Ẫ	668b903a06
+0x0063FC78	CODE	battle/skill messages	fẮị:Ẫ	6681b83a06
+0x0063FDB8	CODE	battle/skill messages	fẮị:Ẫ	6681b83a06
+0x0063FDCA	CODE	battle/skill messages	fỀỒ:Ẫ	668b903a06
+0x0063FE9D	CODE	battle/skill messages	ỀEủẠx,	8b45fc80782c
+0x00653004	CODE	skill gate + messages	ẴbạnBị	0562d56e42b8
+0x0065310A	CODE	skill gate + messages	PẾEũPỀEủỀẠấẴ	508a45fb508b45fc8b80a405
+0x00653455	CODE	skill gate + messages	Ý]ĐỈỹ-P8e	dd5dd09bdb2d503865
+0x006538D9	CODE	skill gate + messages	ẾẠXỶ	8a805814
+0x006538DF	CODE	skill gate + messages	,Ẳu"j	2c0275226a
+0x00653AD9	CODE	skill gate + messages	fẸẰẽẴ	668982a805
+0x00653AFE	CODE	skill gate + messages	fẵẠếẴ	66c780aa05
+0x00653B2E	CODE	skill gate + messages	fỀẠẽẴ	668b80a805
+0x00653C4F	CODE	skill gate + messages	fẵẠẽẴ	66c780a805
+0x00653D31	CODE	skill gate + messages	fẵẠẽẴ	66c780a805
+0x00653DEE	CODE	skill gate + messages	fẵẠẽẴ	66c780a805
+0x00653E28	CODE	skill gate + messages	Chiến dịch lại đến	436869aa6e2064b86368206cd56920f0aa6e
+0x00653E44	CODE	skill gate + messages	kỹ năng được sử dụng trong chiến đấu	6bdb206ee56e6720f0dffe632073d82064f86e672074726f6e6720636869aa6e20f0a475
+0x00653E6C	CODE	skill gate + messages	ỮỮỮỮ4	ffffffff34
+0x00728069	CODE	player info / job names	hỂẮr	688c8172
+0x007280CA	CODE	player info / job names	htẮr	68748172
+0x007280E2	CODE	player info / job names	hấẮr	68a48172
+0x00728136	CODE	player info / job names	ỄEỬỨẴ	8d45bcba05
+0x00728178	CODE	player info / job names	ỮỮỮỮẲ	ffffffff02
+0x0072832D	CODE	player info / job names	dỮ0dẸ ịẲ	64ff30648920b802
+0x00728362	CODE	player info / job names	ỰĐẶr	b9d08372
+0x00728397	CODE	player info / job names	Ứ0Ấr	ba308472
+0x007283C8	CODE	player info / job names	ỮỮỮỮ(	ffffffff28
+0x007283FC	CODE	player info / job names	ỮỮỮỮ"	ffffffff22
+0x007286C5	CODE	player info / job names	ỄEĐỨẲ	8d45d0ba02
+0x00728710	CODE	player info / job names	ỮỮỮỮẲ	ffffffff02
+0x0072886F	CODE	player info / job names	h,Ẹr	682c8972
+0x007288B3	CODE	player info / job names	h,Ẹr	682c8972
+0x00728938	CODE	player info / job names	ỮỮỮỮẴ	ffffffff05
+0x0072896C	CODE	player info / job names	ỮỮỮỮB	ffffffff42
+0x00728A11	CODE	player info / job names	t7ịẪ	7437b806
+0x00728A41	CODE	player info / job names	ỀỶỔẼẰỂ	8b149188828c
+0x00728C10	CODE	player info / job names	jẴhỮ	6a0568ff
+0x00728D0B	CODE	player info / job names	jẴhỮ	6a0568ff
+0x00728DC5	CODE	player info / job names	dỮ0dẸ ịẲ	64ff30648920b802
+0x00728E6A	CODE	player info / job names	hủỔr	68fc9172
+0x00728E6F	CODE	player info / job names	ỄEảỨẴ	8d45e4ba05
+0x00728EA6	CODE	player info / job names	hủỔr	68fc9172
+0x00728EDD	CODE	player info / job names	h,Ỗr	682c9272
+0x00728EE2	CODE	player info / job names	hủỔr	68fc9172
+0x00728EE7	CODE	player info / job names	ỄEỵỨẴ	8d45dcba05
+0x00728F1E	CODE	player info / job names	hủỔr	68fc9172
+0x00728F23	CODE	player info / job names	ỄEửỨẴ	8d45d8ba05
+0x00728F99	CODE	player info / job names	hPỖr	68509272
+0x00728FCF	CODE	player info / job names	hỊỖr	68989272
+0x00728FD4	CODE	player info / job names	hấỖr	68a49272
+0x00728FD9	CODE	player info / job names	hịỖr	68b89272
+0x00728FF8	CODE	player info / job names	hỊỖr	68989272
+0x00728FFD	CODE	player info / job names	hỵỖr	68dc9272
+0x00729002	CODE	player info / job names	hịỖr	68b89272
+0x00729021	CODE	player info / job names	hỊỖr	68989272
+0x00729026	CODE	player info / job names	hđỖr	68f09272
+0x0072902B	CODE	player info / job names	hịỖr	68b89272
+0x007290F6	CODE	player info / job names	hỊỖr	68989272
+0x007290FB	CODE	player info / job names	hHỘr	68489372
+0x00729100	CODE	player info / job names	hịỖr	68b89272
+0x0072911F	CODE	player info / job names	hỊỖr	68989272
+0x00729124	CODE	player info / job names	hdỘr	68649372
+0x00729129	CODE	player info / job names	hịỖr	68b89272
+0x00729148	CODE	player info / job names	hỊỖr	68989272
+0x0072914D	CODE	player info / job names	hỵỖr	68dc9272
+0x00729152	CODE	player info / job names	hịỖr	68b89272
+0x007291D4	CODE	player info / job names	Nhận được	4e68a76e20f0dffe63
+0x0072922C	CODE	player info / job names	Hiền sĩ	4869ab6e2073ee
+0x00729248	CODE	player info / job names	ỮỮỮỮ/	ffffffff2f
+0x00729288	CODE	player info / job names	Điểm	d069ac6d
+0x007292A4	CODE	player info / job names	Đẳng Cấp	d0c66e672043a470
+0x007292B8	CODE	player info / job names	Bồi thường	42b069207468dfb66e67
+0x007292DC	CODE	player info / job names	Nhiệm vụ	4e6869ae6d2076f8
+0x007292E8	CODE	player info / job names	ỮỮỮỮỶ	ffffffff14
+0x00729308	CODE	player info / job names	ỮỮỮỮ,	ffffffff2c
+0x00729348	CODE	player info / job names	Chưa chuyển sinh	4368df612063687579ac6e2073696e68
+0x00729364	CODE	player info / job names	Chuyển sinh	43687579ac6e2073696e68
+0x0072949A	CODE	player info / job names	ỰỒỚr	b9909572
+0x00729502	CODE	player info / job names	Ự4Ởr	b9349772
+0x00729519	CODE	player info / job names	ỰẼỞr	b9889772
+0x00729530	CODE	player info / job names	ỰửỞr	b9d89772
+0x00729547	CODE	player info / job names	Ự,Ịr	b92c9872
+0x0072955E	CODE	player info / job names	ỰẠỊr	b9809872
+0x00729575	CODE	player info / job names	ỰỶỎr	b9149972
+0x00729588	CODE	player info / job names	ỮỮỮỮ[	ffffffff5b
+0x007295EC	CODE	player info / job names	ỮỮỮỮb	ffffffff62
+0x00729658	CODE	player info / job names	ỮỮỮỮv	ffffffff76
+0x007296D8	CODE	player info / job names	ỮỮỮỮI	ffffffff49
+0x0072972C	CODE	player info / job names	ỮỮỮỮJ	ffffffff4a
+0x00729780	CODE	player info / job names	ỮỮỮỮF	ffffffff46
+0x007297D0	CODE	player info / job names	ỮỮỮỮH	ffffffff48
+0x00729824	CODE	player info / job names	ỮỮỮỮJ	ffffffff4a
+0x00729878	CODE	player info / job names	ỮỮỮỮẼ	ffffffff88
+0x0072990C	CODE	player info / job names	ỮỮỮỮO	ffffffff4f
+0x007299B0	CODE	player info / job names	ẸEđịẪ	8945f0b806
+0x00729ADB	CODE	player info / job names	ẸEđỄEảPỰẲ	8945f08d45e450b902
+0x00729D70	CODE	player info / job names	ẸEđịẪ	8945f0b806
+0x00729E97	CODE	player info / job names	ẸEđỄEảPỰẲ	8945f08d45e450b902
+0x00729F66	CODE	player info / job names	ỄEảỨẲ	8d45e4ba02
+0x0079015E	CODE	login + misc	ỄẦỂủỮỮPỰẲ	8d858cfcffff50b902
+0x00790228	CODE	login + misc	ỄẦẠủỮỮPỰẲ	8d8580fcffff50b902
+0x00790973	CODE	login + misc	ỄẦtủỮỮỨẲ	8d8574fcffffba02
+0x00790B8C	CODE	login + misc	ẳẠSỶ	c6805314
+0x00790E03	CODE	login + misc	ỄẦpủỮỮPỄẦXủỮỮPỰẲ	8d8570fcffff508d8558fcffff50b902
+0x00790E67	CODE	login + misc	ẳẦlủỮỮ	c6856cfcffff
+0x00790F28	CODE	login + misc	ỄẦTủỮỮPỰẲ	8d8554fcffff50b902
+0x007910F5	CODE	login + misc	ỄẦ8ủỮỮPỰẲ	8d8538fcffff50b902
+0x007914FF	CODE	login + misc	ủỮỮh,Ạy	fcffff682c8079
+0x007917FB	CODE	login + misc	h8Ạy	68388079
+0x0079197F	CODE	login + misc	hỢẠy	68948079
+0x007919BF	CODE	login + misc	ỨƠẠy	bab48079
+0x007919CC	CODE	login + misc	ỨƠẠy	bab48079
+0x00791AD3	CODE	login + misc	h8Ạy	68388079
+0x00791BD3	CODE	login + misc	h8Ạy	68388079
+0x00791C93	CODE	login + misc	ỄẦịũỮỮPỰẲ	8d85b8fbffff50b902
+0x007920D7	CODE	login + misc	hụẰy	68f88279
+0x00792117	CODE	login + misc	ỨỶẶy	ba148379
+0x00792124	CODE	login + misc	ỨỶẶy	ba148379
+0x007923B5	CODE	login + misc	ỨpẶy	ba708379
+0x007923DD	CODE	login + misc	ỨÕẶy	baa08379
+0x007923EE	CODE	login + misc	ẳẠỜÕ	c68096a0
+0x007924AB	CODE	login + misc	fẮị:Ẫ	6681b83a06
+0x007924CC	CODE	login + misc	fẮị:Ẫ	6681b83a06
+0x007924ED	CODE	login + misc	fỀỒ:Ẫ	668b903a06
+0x0079251A	CODE	login + misc	ẠịXỶ	80b85814
+0x00792572	CODE	login + misc	ỨÕẶy	baa08379
+0x00792754	CODE	login + misc	ẶịỊẲ	83b89802
+0x00792780	CODE	login + misc	ỀẠỒẲ	8b809002
+0x00792834	CODE	login + misc	ỨảẶy	bae48379
+0x00792991	CODE	login + misc	ỨHẤy	ba488479
+0x007929B3	CODE	login + misc	ỨxẤy	ba788479
+0x007929F7	CODE	login + misc	ỨđẤy	baf08479
+0x00792A19	CODE	login + misc	Ứ0Ầy	ba308579
+0x00792A3B	CODE	login + misc	ỨpẦy	ba708579
+0x00792A5D	CODE	login + misc	ỨỢẦy	ba948579
+0x00792AFF	CODE	login + misc	ỄẦẤũỮỮPỰẲ	8d8584fbffff50b902
+0x00792C5D	CODE	login + misc	ỨđẦy	baf08579
+0x00792C93	CODE	login + misc	ỄịHẪ	8db84806
+0x00792C99	CODE	login + misc	ớ Ẩy	be208679
+0x00792CB7	CODE	login + misc	Ứ0Ẩy	ba308679
+0x00792CD9	CODE	login + misc	ỨLẨy	ba4c8679
+0x00792CFB	CODE	login + misc	ỨlẨy	ba6c8679
+0x00792D1D	CODE	login + misc	ỨẤẨy	ba848679
+0x00792D70	CODE	login + misc	ỨẢẨy	bac48679
+0x00792DEE	CODE	login + misc	ỨHẬy	ba488779
+0x00792E5D	CODE	login + misc	ỨlẬy	ba6c8779
+0x00792E7F	CODE	login + misc	ỨẼẬy	ba888779
+0x00792EA1	CODE	login + misc	ỨấẬy	baa48779
+0x00792EC3	CODE	login + misc	ỨẢẬy	bac48779
+0x00792EE5	CODE	login + misc	ỨỵẬy	badc8779
+0x00792F07	CODE	login + misc	ỨụẬy	baf88779
+0x00792F4B	CODE	login + misc	ỨdẼy	ba648879
+0x00793010	CODE	login + misc	hẢẼy	68c48879
+0x007930F7	CODE	login + misc	ẸỊlỶ	89986c14
+0x007931EF	CODE	login + misc	ỀỄTũỮỮỄẦXũỮỮỨxẸy	8b8d54fbffff8d8558fbffffba788979
+0x0079325E	CODE	login + misc	hẢẸy	68c48979
+0x00793307	CODE	login + misc	hẢẸy	68c48979
+0x0079337D	CODE	login + misc	hẢẼy	68c48879
+0x007933BB	CODE	login + misc	Ữộ(ũỮỮỄẦ8ũỮỮỨẴ	ffb528fbffff8d8538fbffffba05
+0x007935FD	CODE	login + misc	ỨPẾy	ba508a79
+0x00793A8A	CODE	login + misc	hlẾy	686c8a79
+0x00793BBB	CODE	login + misc	ũỮỮỰỬoy	fbffffb9bc6f79
+0x00793C7B	CODE	login + misc	ẠịnẲ	80b86e02
+0x00793F17	CODE	login + misc	hlẾy	686c8a79
+0x00793FD3	CODE	login + misc	ỨPỀy	ba508b79
+0x0079413D	CODE	login + misc	ỨtỀy	ba748b79
+0x0079415F	CODE	login + misc	ỨẢỀy	bac48b79
+0x00794181	CODE	login + misc	ỨỶỂy	ba148c79
+0x007941A3	CODE	login + misc	ỨdỂy	ba648c79
+0x007941C5	CODE	login + misc	ỨịỂy	bab88c79
+0x00794209	CODE	login + misc	ỨPỄy	ba508d79
+0x0079422B	CODE	login + misc	ỨồỄy	bab08d79
+0x00794421	CODE	login + misc	ẾẠ.Dy	8a802e4479
+0x00794646	CODE	login + misc	ẳẠ6Ỷ	c6803614
+0x007948BA	CODE	login + misc	ỨƠỆy	bab48e79
+0x007948DC	CODE	login + misc	ỨỶỐy	ba148f79
+0x00794ABF	CODE	login + misc	ỨửỐy	bad88f79
+0x00794B47	CODE	login + misc	ỨXỒy	ba589079
+0x00794B69	CODE	login + misc	ỨpỒy	ba709079
+0x00794B8B	CODE	login + misc	ỨÕỒy	baa09079
+0x00794C0C	CODE	login + misc	ẸỒDỶ	89904414
+0x00794C19	CODE	login + misc	ẳẠHỶ	c6804814
+0x00794C30	CODE	login + misc	ỨồỒy	bab09079
+0x00794C68	CODE	login + misc	ỨÕỒy	baa09079
+0x00794DD2	CODE	login + misc	Ứ0Ổy	ba309179
+0x00794DF4	CODE	login + misc	ỨPỔy	ba509179
+0x00794E0A	CODE	login + misc	ỨÕỒy	baa09079
+0x00794E6C	CODE	login + misc	ỨẠỔy	ba809179
+0x00794EC6	CODE	login + misc	hẽỔy	68a89179
+0x00795515	CODE	login + misc	ỨửỔy	bad89179
+0x007958EC	CODE	login + misc	ỨTỖy	ba549279
+0x0079590E	CODE	login + misc	ỨĐỖy	bad09279
+0x00795952	CODE	login + misc	Ứ,Ộy	ba2c9379
+0x00795974	CODE	login + misc	ỨPỘy	ba509379
+0x00795996	CODE	login + misc	ỨẤỘy	ba849379
+0x007959B8	CODE	login + misc	ỨĐỘy	bad09379
+0x007959FC	CODE	login + misc	ỨPỢy	ba509479
+0x00795DDE	CODE	login + misc	ẾẠẻ]y	8a80eb5d79
+0x00796236	CODE	login + misc	ỨẼỢy	ba889479
+0x00796410	CODE	login + misc	ỮỮỮỮ 	ffffffff20
+0x00796444	CODE	login + misc	Trả lời sai 3 lần sẽ bị mất kết nối	5472e4206cb669207361692033206ca56e2073a82062b8206da474206baa74206eaf69
+0x00796470	CODE	login + misc	Đăng nhập sai 3 lần	d0e56e67206e68a770207361692033206ca56e
+0x007964A8	CODE	login + misc	ỮỮỮỮ,	ffffffff2c
+0x007964E0	CODE	login + misc	ỮỮỮỮ,	ffffffff2c
+0x007965A4	CODE	login + misc	ỮỮỮỮ"	ffffffff22
+0x007965AC	CODE	login + misc	Kết nối gặp trục trặc, mất kết nối	4baa74206eaf692067a370207472f863207472a3632c206da474206baa74206eaf69
+0x007965D0	CODE	login + misc	ỮỮỮỮ!	ffffffff21
+0x00796604	CODE	login + misc	Mất kết nối	4da474206baa74206eaf69
+0x00796610	CODE	login + misc	ỮỮỮỮ-	ffffffff2d
+0x00796648	CODE	login + misc	ỮỮỮỮ)	ffffffff29
+0x0079667C	CODE	login + misc	ỮỮỮỮ(	ffffffff28
+0x007966B0	CODE	login + misc	ỮỮỮỮ/	ffffffff2f
+0x007966F0	CODE	login + misc	Dữ liệu thay đổi,mất kết nối	44e6206c69ae75207468617920f0b1692c6da474206baa74206eaf69
+0x0079673C	CODE	login + misc	ỮỮỮỮ!	ffffffff21
+0x00796744	CODE	login + misc	Hệ thống gặp trục trặc bất thường	48ae207468af6e672067a370207472f863207472a3632062a474207468dfb66e67
+0x00796768	CODE	login + misc	ỮỮỮỮ+	ffffffff2b
+0x00796770	CODE	login + misc	Gặp trục trặc với việc lưu trữ, mất kết nối	47a370207472f863207472a3632076be69207669ae63206cdf75207472e62c206da474206baa74206eaf69
+0x0079679C	CODE	login + misc	ỮỮỮỮ)	ffffffff29
+0x007967D0	CODE	login + misc	ỮỮỮỮỶ	ffffffff14
+0x007967F0	CODE	login + misc	ỮỮỮỮỴ	ffffffff1e
+0x0079683C	CODE	login + misc	ỮỮỮỮỴ	ffffffff1e
+0x00796844	CODE	login + misc	Sự kiện phạm luật, mất kết nối	53f1206b69ae6e207068d56d206c75a7742c206da474206baa74206eaf69
+0x0079686C	CODE	login + misc	Mất kết nối do đăng nhập sai	4da474206baa74206eaf6920646f20f0e56e67206e68a77020736169
+0x0079688C	CODE	login + misc	ỮỮỮỮỶ	ffffffff14
+0x00796918	CODE	login + misc	Cảnh chiến đấu bị lỗi	43e46e6820636869aa6e20f0a4752062b8206cb269
+0x00796930	CODE	login + misc	ỮỮỮỮ0	ffffffff30
+0x00796974	CODE	login + misc	Đăng nhập lại qua Server	d0e56e67206e68a770206cd5692071756120536572766572
+0x00796998	CODE	login + misc	Hiệp định đăng nhập	4869ae7020f0b86e6820f0e56e67206e68a770
+0x007969D0	CODE	login + misc	ỮỮỮỮ!	ffffffff21
+0x007969FC	CODE	login + misc	ỮỮỮỮ.	ffffffff2e
+0x00796A34	CODE	login + misc	ỮỮỮỮ"	ffffffff22
+0x00796A3C	CODE	login + misc	Sửa đổi files Tạo Vật bị  rớt mạng	53d86120f0b1692066696c65732054d56f2056a7742062b8202072be74206dd56e67
+0x00796A60	CODE	login + misc	ỮỮỮỮỸ	ffffffff19
+0x00796A68	CODE	login + misc	Lưu lại sau khi đăng nhập	4cdf75206cd56920736175206b686920f0e56e67206e68a770
+0x00796A84	CODE	login + misc	ỮỮỮỮỸ	ffffffff19
+0x00796A8C	CODE	login + misc	Sửa đổi tư liệu chiến đấu	53d86120f0b1692074df206c69ae7520636869aa6e20f0a475
+0x00796AA8	CODE	login + misc	ỮỮỮỮ.	ffffffff2e
+0x00796B14	CODE	login + misc	ỮỮỮỮ5	ffffffff35
+0x00796B54	CODE	login + misc	ỮỮỮỮ'	ffffffff27
+0x00796B84	CODE	login + misc	ỮỮỮỮ.	ffffffff2e
+0x00796BBC	CODE	login + misc	ỮỮỮỮ 	ffffffff20
+0x00796BE8	CODE	login + misc	ỮỮỮỮ'	ffffffff27
+0x00796BF0	CODE	login + misc	Cấm vận gia nhập đối với bạn chưa đủ 18	43a46d2076a76e20676961206e68a77020f0af692076be692062d56e206368df6120f0fc203138
+0x00796C18	CODE	login + misc	ỮỮỮỮ%	ffffffff25
+0x00796C48	CODE	login + misc	ỮỮỮỮ/	ffffffff2f
+0x00796C80	CODE	login + misc	ỮỮỮỮỸ	ffffffff19
+0x00796CD0	CODE	login + misc	ỮỮỮỮ,	ffffffff2c
+0x00796D38	CODE	login + misc	Mất kết nối với Server 	4da474206baa74206eaf692076be692053657276657220
+0x00796DA8	CODE	login + misc	Rời mạng	52b669206dd56e67
+0x00796E20	CODE	login + misc	ỮỮỮỮG	ffffffff47
+0x00796EB8	CODE	login + misc	ỮỮỮỮ%	ffffffff25
+0x00796EE8	CODE	login + misc	ỮỮỮỮ"	ffffffff22
+0x00796F1C	CODE	login + misc	Sử dụng tự động bổ huyết đan	53d82064f86e672074f120f0b56e672062b120687579aa7420f0616e
+0x00796F50	CODE	login + misc	Đối phương đang bận rộn	d0af69207068dfbd6e6720f0616e672062a76e2072b56e
+0x00796FD4	CODE	login + misc	Bạn chơi	42d56e206368bd69
+0x00796FE0	CODE	login + misc	ỮỮỮỮỸ	ffffffff19
+0x00796FE8	CODE	login + misc	Tiếp nhận lời mời bạn hữu	5469aa70206e68a76e206cb669206db6692062d56e2068e675
+0x00797004	CODE	login + misc	ỮỮỮỮỸ	ffffffff19
+0x0079700C	CODE	login + misc	Cự tuyệt gia nhễp bạn hũu	43f120747579ae7420676961206e68ad702062d56e2068fb75
+0x00797064	CODE	login + misc	ỮỮỮỮ1	ffffffff31
+0x007970A8	CODE	login + misc	Ồ...bạn trả lời sai rồi!	902e2e2e62d56e207472e4206cb669207361692072b06921
+0x007970C4	CODE	login + misc	ỮỮỮỮ"	ffffffff22
+0x00797118	CODE	login + misc	ỮỮỮỮ!	ffffffff21
+0x0079716C	CODE	login + misc	ỮỮỮỮO	ffffffff4f
+0x007971E0	CODE	login + misc	ỮỮỮỮẲ	ffffffff02
+0x00797208	CODE	login + misc	ỮỮỮỮc	ffffffff63
+0x00797274	CODE	login + misc	ỮỮỮỮS	ffffffff53
+0x007972D0	CODE	login + misc	ỮỮỮỮ9	ffffffff39
+0x00797314	CODE	login + misc	ỮỮỮỮA	ffffffff41
+0x00797360	CODE	login + misc	ỮỮỮỮI	ffffffff49
+0x007973BC	CODE	login + misc	Nhận được điểm số năng lực	4e68a76e20f0dffe6320f069ac6d2073af206ee56e67206cf163
+0x007973E0	CODE	login + misc	Điểm	d069ac6d
+0x007973E8	CODE	login + misc	ỮỮỮỮỸ	ffffffff19
+0x007973F0	CODE	login + misc	Nhận được điểm số kỹ năng	4e68a76e20f0dffe6320f069ac6d2073af206bdb206ee56e67
+0x00797430	CODE	login + misc	ỮỮỮỮM	ffffffff4d
+0x00797488	CODE	login + misc	ỮỮỮỮ,	ffffffff2c
+0x007974EC	CODE	login + misc	ỮỮỮỮ/	ffffffff2f
+0x00797524	CODE	login + misc	ỮỮỮỮ9	ffffffff39
+0x00797568	CODE	login + misc	ỮỮỮỮ8	ffffffff38
+0x007975AC	CODE	login + misc	ỮỮỮỮ;	ffffffff3b
+0x007975F0	CODE	login + misc	ỮỮỮỮ"	ffffffff22
+0x0079764C	CODE	login + misc	ỮỮỮỮ.	ffffffff2e
+0x0079778C	CODE	login + misc	ỮỮỮỮr	ffffffff72
+0x00797808	CODE	login + misc	ỮỮỮỮ"	ffffffff22
+0x00797834	CODE	login + misc	ỮỮỮỮỗ	ffffffffb2
+0x007978F0	CODE	login + misc	ỮỮỮỮỦ	ffffffff9c
+0x007979B4	CODE	login + misc	ỮỮỮỮỸ	ffffffff19
+0x007979BC	CODE	login + misc	Thi đấu vẫn chưa bắt đầu!	54686920f0a4752076e76e206368df612062a17420f0a57521
+0x00797A28	CODE	login + misc	ỮỮỮỮ!	ffffffff21
+0x00797A54	CODE	login + misc	ỮỮỮỮỌ	ffffffff9a
+0x00797AF8	CODE	login + misc	ỮỮỮỮX	ffffffff58
+0x00797B5C	CODE	login + misc	ỮỮỮỮH	ffffffff48
+0x00797BDC	CODE	login + misc	ỮỮỮỮ6	ffffffff36
+0x00797C1C	CODE	login + misc	ỮỮỮỮ.	ffffffff2e
+0x00797C54	CODE	login + misc	ỮỮỮỮ0	ffffffff30
+0x00797C90	CODE	login + misc	ỮỮỮỮẤ	ffffffff84
+0x00797D68	CODE	login + misc	ỮỮỮỮ%	ffffffff25
+0x00797D98	CODE	login + misc	ỮỮỮỮ'	ffffffff27
+0x00797DC8	CODE	login + misc	ỮỮỮỮH	ffffffff48
+0x00797E1C	CODE	login + misc	ỮỮỮỮ%	ffffffff25
+0x00797E4C	CODE	login + misc	ỮỮỮỮ6	ffffffff36
+0x00797E8C	CODE	login + misc	ỮỮỮỮK	ffffffff4b
+0x00797EE0	CODE	login + misc	ỮỮỮỮ(	ffffffff28
+0x00797F1C	CODE	login + misc	Hủy bỏ giao dịch	48fc792062f6206769616f2064b86368
+0x00797F30	CODE	login + misc	ỮỮỮỮ 	ffffffff20
+0x00797F80	CODE	login + misc	ỬĐồO	bcd0b04f
+0x00797FA0	CODE	login + misc	ỮỮỮỮẪ	ffffffff06
+0x00797FB8	CODE	login + misc	ỬWầ[ầằổứ	bc57a55ba5a2b1d1
+0x00797FCC	CODE	login + misc	Ơĩấỷầằổứ	b4eea4d6a5a2b1d1
+0x00798018	CODE	login + misc	ậRồặầằổứ	a752b0a3a5a2b1d1
+0x00798024	CODE	login + misc	ỮỮỮỮẲ	ffffffff02
+0x00798038	CODE	login + misc	Nhận được 	4e68a76e20f0dffe6320
+0x0079804C	CODE	login + misc	Tiền	5469ab6e
+0x0079805C	CODE	login + misc	Thất bại  đoạt được	5468a4742062d5692020f06fd57420f0dffe63
+0x00798084	CODE	login + misc	Giảm	4769e46d
+0x00798094	CODE	login + misc	Thất bại   giảm thiểu	5468a4742062d5692020206769e46d20746869ac75
+0x007980DC	CODE	login + misc	Thủy binh	5468fc792062696e68
+0x00798100	CODE	login + misc	Điểm đạn dược	d069ac6d20f0d56e2064dffe63
+0x00798110	CODE	login + misc	ỮỮỮỮỶ	ffffffff14
+0x007981C4	CODE	login + misc	Xin lỗi, giao dịch thất bại	58696e206cb2692c206769616f2064b86368207468a4742062d569
+0x00798230	CODE	login + misc	ỮỮỮỮ5	ffffffff35
+0x00798270	CODE	login + misc	ỮỮỮỮ5	ffffffff35
+0x007982B8	CODE	login + misc	Lưu trữ	4cdf75207472e6
+0x007982C8	CODE	login + misc	Thất bại lưu trữ	5468a4742062d569206cdf75207472e6
+0x0079830C	CODE	login + misc	ỮỮỮỮỴ	ffffffff1e
+0x00798334	CODE	login + misc	ỮỮỮỮ(	ffffffff28
+0x00798398	CODE	login + misc	ỮỮỮỮ9	ffffffff39
+0x007983DC	CODE	login + misc	ỮỮỮỮ)	ffffffff29
+0x00798410	CODE	login + misc	ỮỮỮỮ%	ffffffff25
+0x00798418	CODE	login + misc	Đối phương chưa mở chức năng PK / PvP	d0af69207068dfbd6e67206368df61206db7206368d163206ee56e6720504b202f20507650
+0x00798440	CODE	login + misc	ỮỮỮỮ'	ffffffff27
+0x00798448	CODE	login + misc	Đối phương chưa mở chức năng Tham Chiến	d0af69207068dfbd6e67206368df61206db7206368d163206ee56e67205468616d20436869aa6e
+0x007984E8	CODE	login + misc	ỮỮỮỮ5	ffffffff35
+0x00798528	CODE	login + misc	ỮỮỮỮ5	ffffffff35
+0x00798570	CODE	login + misc	Bạn chơi ấy hiện đang ở trọ	42d56e206368bd6920a479206869ae6e20f0616e6720b7207472f7
+0x0079858C	CODE	login + misc	ỮỮỮỮ"	ffffffff22
+0x007985F0	CODE	login + misc	Sửa đổi thất bại	53d86120f0b169207468a4742062d569
+0x0079867C	CODE	login + misc	ỮỮỮỮ6	ffffffff36
+0x007986E4	CODE	login + misc	ỮỮỮỮ!	ffffffff21
+0x00798710	CODE	login + misc	ỮỮỮỮ%	ffffffff25
+0x00798788	CODE	login + misc	Lưu trữ thất bại	4cdf75207472e6207468a4742062d569
+0x007987F0	CODE	login + misc	ỮỮỮỮ 	ffffffff20
+0x0079881C	CODE	login + misc	ỮỮỮỮ4	ffffffff34
+0x0079885C	CODE	login + misc	ỮỮỮỮ,	ffffffff2c
+0x007988F8	CODE	login + misc	ỮỮỮỮm	ffffffff6d
+0x007989C4	CODE	login + misc	Điểm số được giới thiệu đạt đến	d069ac6d2073af20f0dffe63206769be6920746869ae7520f0d57420f0aa6e
+0x007989E4	CODE	login + misc	ỮỮỮỮY	ffffffff59
+0x00798A50	CODE	login + misc	Bị cấm gửi lời nhắn	42b82063a46d2067d869206cb669206e68a16e
+0x00798A64	CODE	login + misc	ỮỮỮỮO	ffffffff4f
+0x00798AC4	CODE	login + misc	yyyy/m/d	797979792f6d2f64
+0x00798AE4	CODE	login + misc	ỮỮỮỮY	ffffffff59
+0x00798B48	CODE	login + misc	ỮỮỮỮỸ	ffffffff19
+0x00798B6C	CODE	login + misc	ỮỮỮỮG	ffffffff47
+0x00798BBC	CODE	login + misc	ỮỮỮỮE	ffffffff45
+0x00798C0C	CODE	login + misc	ỮỮỮỮG	ffffffff47
+0x00798C5C	CODE	login + misc	ỮỮỮỮH	ffffffff48
+0x00798CB0	CODE	login + misc	ỮỮỮỮC	ffffffff43
+0x00798CFC	CODE	login + misc	ỮỮỮỮB	ffffffff42
+0x00798D48	CODE	login + misc	ỮỮỮỮV	ffffffff56
+0x00798DA8	CODE	login + misc	ỮỮỮỮM	ffffffff4d
+0x00798E00	CODE	login + misc	ỮỮỮỮO	ffffffff4f
+0x00798E58	CODE	login + misc	ỮỮỮỮ9	ffffffff39
+0x00798EAC	CODE	login + misc	ỮỮỮỮW	ffffffff57
+0x00798F74	CODE	login + misc	ỮỮỮỮQ	ffffffff51
+0x007990A0	CODE	login + misc	Sai lầm	536169206ca56d
+0x00799148	CODE	login + misc	ỮỮỮỮ'	ffffffff27
+0x007991A8	CODE	login + misc	Số tiền thu người đến	53af207469ab6e20746875206e67dfb66920f0aa6e
+0x007991C0	CODE	login + misc	ỮỮỮỮẪ	ffffffff06
+0x007991C8	CODE	login + misc	Lễ kim	4cad206b696d
+0x007991EC	CODE	login + misc	Thất bại	5468a4742062d569
+0x0079924C	CODE	login + misc	ỮỮỮỮp	ffffffff70
+0x007992C8	CODE	login + misc	ỮỮỮỮ%	ffffffff25
+0x00799348	CODE	login + misc	ỮỮỮỮ+	ffffffff2b
+0x007993C8	CODE	login + misc	ỮỮỮỮ6	ffffffff36
+0x00799408	CODE	login + misc	ỮỮỮỮ6	ffffffff36
+0x00799448	CODE	login + misc	ỮỮỮỮ/	ffffffff2f
+0x007994F0	CODE	login + misc	fỀỒ:Ẫ	668b903a06
+0x0079962A	CODE	login + misc	fẮịệÕ	6681b8aea0
+0x0079963C	CODE	login + misc	ỄịỰÕ	8db8b9a0
+0x00799642	CODE	login + misc	ớ0Ỏy	be309979
+0x00799662	CODE	login + misc	ẳẠỞÕ	c68097a0
+0x007997A5	CODE	login + misc	fỀẠ:Ẫ	668b803a06
+0x007997D2	CODE	login + misc	ẳẠ5Ỷ	c6803514
+0x0079987C	CODE	login + misc	fỀỒ:Ẫ	668b903a06
+0x007998A4	CODE	login + misc	fỀỒ:Ẫ	668b903a06
+0x00799EA0	CODE	login + misc	fẵEủ	66c745fc
+0x00799EA5	CODE	login + misc	ẠẻvfẵEủ	80eb7666c745fc
+0x00799EAD	CODE	login + misc	ụẻnfẵEủ	f8eb6e66c745fc

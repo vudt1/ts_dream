@@ -1,0 +1,46 @@
+id	id_hex	name	type	group	elem	sp_cost	sk_point	max_lvl	require_sk	skill_type	des
+22001	0x55F1	Quang mâu thuật	18	QUANG (Light)	0	15	4	10	0	Active	ầHầúấậầÙờẺệ`3ẩìỬẢấH
+22002	0x55F2	Phật quang chưởng	18	QUANG (Light)	0	52	5	5	0	Active	ẩòầúỪEờồẹóƠxấấ, ậ@ầXổjốPậđÀỪ
+22003	0x55F3	Huyễn quang	18	QUANG (Light)	0	72	8	10	0	Active	ộoầXẽẻỗƠốtầú, ậđÀỪấTẩìỬẢấH
+22004	0x55F4	Liệt diệm chi quang	18	QUANG (Light)	0	30	0	5	0	Buff	ẽẻỬỏếỨấõầúậđÀỪỬẢấHẽÃỠÂởôầLễÌ
+22005	0x55F5	Quang du thuật	18	QUANG (Light)	0	15	12	1	0	5	ịứồặấTẩìờấấÍẩUỨửồIệzếểỨA
+22006	0x55F6	Quang chi kính	18	QUANG (Light)	0	46	1	5	0	19	ểIẹựầúấậÃèắAểồ3ẩìờấấÍẹèớừờẺệ`
+22007	0x55F7	Quang tuyền quán chú	18	QUANG (Light)	0	72	15	10	0	14	ầúểuấậấOẢéế`ẽễĂé, ẩPệÉềìƠ_ẽễấư
+22008	0x55F8	Hồi quang phản chiếu	18	QUANG (Light)	0	40	1	1	0	Passive	ẽủễPẩỨấ@ÀỪềá, ẩỹồÊƠ_ểắấ@ẩị
+22009	0x55F9	Quang tốc đầu trịch	18	QUANG (Light)	0	104	7	5	0	Buff	ầHầúỠtậẻÂYÀợờắểIệiậđÀỪ
+22010	0x55FA	Kim tê công kích	18	QUANG (Light)	0	24	7	10	0	Active	ậẻÂYếọỰôậđÀỪỰỉấè
+22011	0x55FB	Bạch Hổ	18	QUANG (Light)	0	120	0	10	0	Buff	ầlỠêầạếêậđÀỪ
+22012	0x55FC	Gọi tiểu Bạch Hổ	18	QUANG (Light)	0	120	0	1	0	Buff	N/A
+22013	0x55FD	Gọi trung Bạch Hổ	18	QUANG (Light)	0	120	0	1	0	Buff	N/A
+22014	0x55FE	Gọi đại Bạch Hổ	18	QUANG (Light)	0	120	0	1	0	Buff	N/A
+22015	0x55FF	Tập thức quang đạn	18	QUANG (Light)	0	84	14	10	0	Buff	ộoệgờồậôầúỬuậđÀỪỬẢấè
+22016	0x5600	Đồng quang chi ban	18	QUANG (Light)	0	52	5	5	0	Active	ểIẹựẢặầửấậầúờẺệ`ẩPệÉệỰịjỬẢấè
+22017	0x5601	C.Đ quang chi ban	18	QUANG (Light)	0	52	5	5	0	Active	ểIẹựẢặầửấậầúờẺệ`ẩPệÉệỰịjỬẢấè
+22018	0x5602	C.L diệm chi quang	18	QUANG (Light)	0	30	0	5	0	Buff	ẽẻỬỏếỨấõầúậđÀỪỬẢấHẽÃỠÂởôầLễÌ
+22019	0x5603	Chân huyễn quang	18	QUANG (Light)	0	72	8	10	0	Active	ộoầXẽẻỗƠốtầú, ậđÀỪấTẩìỬẢấH
+22020	0x5604	C.Phật quang chưởng	18	QUANG (Light)	0	52	5	5	0	Active	ẩòầúỪEờồẹóƠxấấ, ậ@ầXổjốPậđÀỪ
+22021	0x5605	Siêu quang ba	18	QUANG (Light)	0	52	10	10	0	Active	ếựờZÂọẽỳầXờWổjầúếi
+22022	0x5606	Quyền khuynh vạn lý	18	QUANG (Light)	0	30	0	5	0	Buff	ẽỳễpĂýỬẢồÊỬuấặổo
+23001	0x59D9	Ám độc tiễn	19	ÁM (Dark)	0	15	4	10	0	Active	ếợởtốàẹóấ}ơbấậấWậđÀỪầửỬĐ
+23002	0x59DA	Ám đao trảm	19	ÁM (Dark)	0	66	18	10	0	Active	ỰỉỬẢấèấ@ấHẽỳầXĩĩờÂấOờqếỨổÙÀỪ
+23003	0x59DB	Hắc toàn trảm	19	ÁM (Dark)	0	72	16	10	0	Active	ẽỳầXờÂổỹổÙậđÀỪấTẩìỬẢấH
+23004	0x59DC	Vu độc	19	ÁM (Dark)	0	30	0	5	0	Buff	ẹựầXậĂểrĩĩỠNờẺệ`ỬẢấHẽÃởlốÓSP
+23005	0x59DD	Tụ ẩn kiếm	19	ÁM (Dark)	0	30	0	1	0	Buff	ểớởâếỨỠSịÌỬCÀuầýầXấâờẺệ`ỬẢấH
+23006	0x59DE	Khô lâu đầu trịch	19	ÁM (Dark)	0	52	7	5	0	Buff	ậẻÂYớuĂ\, ậđÀỪầ|ẩìỬẢấH
+23007	0x59DF	Vu độc oa oa	19	ÁM (Dark)	0	50	0	1	0	15	ầĨậĂểrềơềơổổẽĩỬẢấèấ@ấHấểểỹƠÝổợ
+23008	0x59E0	Yêu thuật kích hoả	19	ÁM (Dark)	0	69	1	5	0	19	ậốỠNƯEấẳờấấÍ, ầXấâẹỹẹỹễPẹR
+23009	0x59E1	Mê hoặc độc trâm	19	ÁM (Dark)	0	30	0	5	0	Buff	ầHồgƠbểrồwậđÀỪỬẢấHẽÃỗVờÃầLễÌ
+23010	0x59E2	Độc phi luân	19	ÁM (Dark)	0	56	9	10	0	Active	ổNờĩấWỬ@ểrếỨễịơủÂYẩVỰỉấè
+23011	0x59E3	Huyền Vũ	19	ÁM (Dark)	0	120	0	10	0	15	ầlỠêầÈếZậđÀỪ
+23012	0x59E4	Gọi tiểu Huyền Vũ	19	ÁM (Dark)	0	120	0	1	0	Buff	N/A
+23013	0x59E5	Gọi trung Huyền Vũ	19	ÁM (Dark)	0	120	0	1	0	Buff	N/A
+23014	0x59E6	Gọi đại Huyền Vũ	19	ÁM (Dark)	0	120	0	1	0	Buff	N/A
+23015	0x59E7	Vựng trảm	19	ÁM (Dark)	0	56	9	10	0	Active	ểớờBếỨậđÀỪếổệaếợổaớọỗvầƠởw
+23016	0x59E8	Hắc ám liên trảm	19	ÁM (Dark)	0	84	16	10	0	Active	ẩVỬẢấHẽỳầXÀợờắĩĩờÂỠsổÙ
+23017	0x59E9	C.Ám độc tiễn	19	ÁM (Dark)	0	15	4	10	0	Active	ếợởtốàẹóấ}ơbấậấWậđÀỪầửỬĐ
+23018	0x59EA	Chân Vu độc	19	ÁM (Dark)	0	30	0	5	0	Buff	ẹựầXậĂểrĩĩỠNờẺệ`ỬẢấHẽÃởlốÓSP
+23019	0x59EB	Vạn độc xuyên tâm	19	ÁM (Dark)	0	72	9	10	0	Buff	ểIẹựịUƠcấậểrắAẽỳỬẢấHểrệđậđấư
+23020	0x59EC	C.Độc phi luân	19	ÁM (Dark)	0	56	9	10	0	Active	ổNờĩấWỬ@ểrếỨễịơủÂYẩVỰỉấè
+23021	0x59ED	C.Ám nhẫn trẩm	19	ÁM (Dark)	0	66	18	10	0	Active	ỰỉỬẢấèấ@ấHẽỳầXĩĩờÂấOờqếỨổÙÀỪ
+23022	0x59EE	C.Mê hoặc độc trâm	19	ÁM (Dark)	0	30	0	5	0	Buff	ầHồgƠbểrồwậđÀỪỬẢấHẽÃỗVờÃầLễÌ
+23023	0x59EF	Phiêu diêu lưu phong	19	ÁM (Dark)	0	82	0	5	0	Buff	ểầốềốBồÊẢẳẹƯẩủễởậjịẽỠởấậậỡ!

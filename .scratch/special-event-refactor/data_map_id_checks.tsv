@@ -1,0 +1,45 @@
+# HANH VI DAC BIET CUA CLIENT THEO MAP ID HIEN TAI
+# Nguon: moi so sanh *(short*)(LocalPlayer + 0x63A) trong corpus Ghidra (86 ham, 39 map id).
+# LocalPlayer = *gvar_007DA7BC ; +0x63A = map id hien tai (int16).
+# "coEve" = map id nay co scene trong eve.emg (script su kien).
+# "ten_map" = ten map giai ma tu Scene.Dat (xem SCENE_DAT_FORMAT.md).
+# mapId	dec	cmp	subOp	coEve	ten_map	hamSo
+0x0000	0	!=,==				005e8534_FUN_005e8534;005ef398_FUN_005ef398;006355c8_FUN_006355c8;00643470_FUN_00643470;0064efa0_FUN_0064efa0;00716a94_FUN_00716a94;0073bed0_FUN_0073bed0;0078a89c_FUN_0078a89c;007a3b5c_FUN_007a3b5c
+0x0003	3	==				00735ef8_FUN_00735ef8
+0x0008	8	==				00642c2c_FUN_00642c2c;00735134_FUN_00735134
+0x000A	10	==				00733b94_FUN_00733b94
+0x003B	59	==				0076d578_FUN_0076d578
+0x29CD	10701	==		Y		00532904_FUN_00532904;0055ee9c_FUN_0055ee9c;0058b5a4_FUN_0058b5a4;005aa09c_FUN_005aa09c;005aa57c_FUN_005aa57c;005aabfc_FUN_005aabfc;005be9ec_FUN_005be9ec;005c182c_FUN_005c182c;007b3474_FUN_007b3474
+0x2AEF	10991	!=,==			QuảngTrườngTrácQuận | Mê cung sinh tồn	0060ecdc_FUN_0060ecdc;0063cf58_FUN_0063cf58;0063fadc_TFightField.Create;00642720_FUN_00642720;00642c2c_FUN_00642c2c;00643470_FUN_00643470;0064f580_FUN_0064f580;00652454_FUN_00652454;0070d43c_FUN_0070d43c;0070f7b4_FUN_0070f7b4;0075ad70_FUN_0075ad70;0075b66c_FUN_0075b66c;0076d578_FUN_0076d578;0078a89c_FUN_0078a89c;007922e6_FUN_007922e6;case_027_007922E6_FUN_007922e6;jumptable_0x78A9B6_cases
+0x2AF1	10993	!=			U Châu	0050f4ac_TForm1.Transition
+0x2AF2	10994	==		Y	QuảngTrườngTrácQuận	00642720_FUN_00642720;00642c2c_FUN_00642c2c
+0x2EE0	12000	!=,==			Thôn Lâu Tang | Cửa thành Trác Quận | CửaThành NghiệpThành | Trại Lê Dương | Giới Kiều | Bia Chi Lâm | Thanh Châu | Thôn Thường Sơn | Cửa thành Cự Lộc | Cửathành Bình Nguyên | Kiệt Thạch Sơn | Lô Long Khẩu | Hồ Quan | Rừng cây vô tận | Rừng Trung Sơn | Bờ biển Hoàng Hà | Động Đại Hưng Sơn | Đường Từ Vô Sơn | Nội Hoàng thụ lâm | Rừng Tây Sơn | Rừng Hà Nội | Rừng Triều Ca | Rừng Mục Dã | Rừng Dịch Huyện | Bờ biển Ký Châu | Duyện Châu | Ký Châu | Tàn tích Bột Hải | Quân trướng | Thôn Ẩn Thế | Ghi danh Đoan Ngọ | QuảngTrường ĐoànViên	0051b070_FUN_0051b070;0051b2b8_FUN_0051b2b8;005e8534_FUN_005e8534
+0x2EE1	12001	!=		Y	U Châu | Rừng ngoại ô | Nhà Trương Phi | Vườn Đào | Lò rèn | Bần hộ | Khách sạn Duyệt Lai | Phủ Quách Dịch | Cầu Thất Tịch | Nhà thuốc | Tiền trang | Đường lớn Trác Quận | Phú hộ | NguyênTiêu nhạc viên | Chiếntrường dũng giả | Nguyên Tiêu ký vực | Tháp Lôi Phong | Rừng đào Thất Tịch	005d6f7c_FUN_005d6f7c
+0x2EE2	12002	==			Tiệm trà | Cửa thành Trác Quận | Quan phủ | Bần hộ | QuảngTrườngTrácQuận	00743814_FUN_00743814
+0x2EE3	12003	!=		Y	Đường lớn Trác Quận | Rừng Trác Quận | Bần hộ | Khách sạn Duyệt Lai | Sòng bạc | Lôi đài thôn thực | Lôi đài 5 vs 5 | LôiĐàiHỏiĐápNămMới | Tầng 1 Tâm Ma tháp | Nhà tranh	005eee60_FUN_005eee60
+0x2EE5	12005	!=		Y	Cửa thành Trác Quận | Hội thi nướng thịt | Thôn tuyết Bắc Quốc	005e8534_FUN_005e8534
+0x2F1D	12061	!=		Y	Ký Châu | ĐườngLớn NghiệpThành | Khách sạn Thiên Vạn | Bần hộ | Lò rèn | Lôi đài tỉ võ | Khách sạn | Đồng Tước đài | Tháp thí luyện	005d6f7c_FUN_005d6f7c
+0x2F94	12180	==		Y	QuảngTrườngTrácQuận | Chợ P-TS Online	00642720_FUN_00642720;00642c2c_FUN_00642c2c
+0x3073	12403	!=		Y	Đường mòn Từ Vô Sơn | Phòng nhỏ Từ Vô Sơn | Ký Châu	005e8534_FUN_005e8534
+0x3075	12405	!=		Y	Đỉnh Từ Vô Sơn | TừVôSơn TrắcPhong	005e8534_FUN_005e8534
+0x3076	12406	==		Y	Đường Từ Vô Sơn | TừVôSơn TrắcPhong | Hương Dữu cự tháp	0074e638_FUN_0074e638
+0x3077	12407	==		Y	TừVôSơn TrắcPhong	0074e82c_FUN_0074e82c
+0x3082	12418	==		Y	Đường Từ Vô Sơn | TừVôSơn TrắcPhong | Hương Dữu cự tháp	0074e638_FUN_0074e638
+0x3083	12419	==		Y	TừVôSơn TrắcPhong	0074e82c_FUN_0074e82c
+0x3085	12421	!=		Y	U Châu | Đất tuyết Lô Long | Bộ lạc Giáng Sinh | Thôn Giáng Sinh	005e8534_FUN_005e8534
+0x31A7	12711	==		Y	Cửa thành Trác Quận | Tiền tiêu Cự Lộc | Tiền tiêu ĐạiHưngSơn | Tiền tiêu Hổ Lao | Tiền tiêu Hồ BàDương	005eb530_FUN_005eb530
+0x3204	12804	==			Bia Chi Lâm	0070d86c_FUN_0070d86c
+0x3216	12822	==			Rừng Trung Sơn	0070d86c_FUN_0070d86c
+0x3219	12825	==		Y	Thôn Lâu Tang | Rừng Lâu Tang	0073d558_FUN_0073d558
+0x326F	12911	==		Y	Q Trường NghiệpThành	00642720_FUN_00642720;00642c2c_FUN_00642c2c
+0x348C	13452	==			Chân núi Ngoạ Ngưu | Sườn núi Ngoạ Ngưu	0070d86c_FUN_0070d86c
+0x3612	13842	==			Rừng Nhương Sơn | Động Nhương Sơn	0070d86c_FUN_0070d86c
+0x3613	13843	==			Động Nhương Sơn	0070d86c_FUN_0070d86c
+0x3DE1	15841	==			Rừng Lư Giang | Từ Châu	0070d86c_FUN_0070d86c
+0x3DE2	15842	==		Y		0070d86c_FUN_0070d86c
+0x5174	20852	==			Rừng Tấn Dương	0070d86c_FUN_0070d86c
+0xBF7B	49019	!=			Trấn Nhu Tu | Xưởng đóng tàu | U tàu Nhu Tu | QuảngTrườngTrácQuận	005ef398_FUN_005ef398
+0xBF9B	49051	!=		Y	Trấn Ngưu Chữ | Ao Ngưu Chữ | Cửa vào Ngưu Chữ | Quân trướng | Binh trướng	007a6590_FUN_007a6590
+0xE678	59000	!=		Y	Thông đạo Dao Trì | Tế đàn Tiên Giới | Khu vực Thuần Tinh | Thông đạo Thiên Đình | Khu vực Thái Bạch | Thôn Tiên Giới | Nam Thiên Môn | Khu vực Mê Hoặc | Thông đạo Bàn Đào | Khu vực Tuế Tinh | Núi Linh Hư | Đảo Thiên Ngoại | Địa Thiên Nghi | Chân núi Tiên Ẩn | Long Tuyền | Phật Giới	007a6590_FUN_007a6590
+0xEBFB	60411	!=,==		Y	Thôn U Linh | Bình Nguyên Tử Linh	005ef1c0_FUN_005ef1c0;007a6590_FUN_007a6590
+0xFFFF	65535	!=				0051c2ec_FUN_0051c2ec

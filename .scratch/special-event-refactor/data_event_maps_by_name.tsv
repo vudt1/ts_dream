@@ -1,0 +1,275 @@
+# Cac ban ghi Scene.Dat co TEN lien quan den SU KIEN DAC BIET
+# (loc theo ten; danh sach day DU nam o data_mapid_to_name.tsv / data_event_maps.tsv)
+# idx	map_id	kind	name
+34	10986	2	Mê cung Vạn Thắng
+35	10987	1	Mê cung Vạn Thắng
+36	10988	1	Mê cung Quỷ Vương
+37	10988	2	Mê cung Quỷ Vương
+38	10989	1	Mê cung Quỷ Vương
+41	10991	2	Mê cung sinh tồn
+42	10991	3	Mê cung sinh tồn
+43	10991	4	Mê cung sinh tồn
+44	10991	5	Mê cung sinh tồn
+45	10991	6	Mê cung sinh tồn
+46	10991	7	Mê cung sinh tồn
+47	10991	8	Mê cung sinh tồn
+48	10991	9	Mê cung sinh tồn
+49	10991	10	Mê cung sinh tồn
+50	10991	11	Mê cung sinh tồn
+51	10991	12	Mê cung sinh tồn
+52	10991	13	Mê cung sinh tồn
+53	10991	14	Mê cung sinh tồn
+54	10991	15	Mê cung sinh tồn
+55	10991	16	Mê cung sinh tồn
+56	10991	17	Mê cung sinh tồn
+63	10995	3	Rừng đào Thất Tịch
+117	11031	5	Vương thành bí đạo
+118	11041	5	Vương thành bí đạo
+280	12000	5	Giới Kiều
+287	12000	13	Giới Kiều
+311	12000	43	Ghi danh Đoan Ngọ
+322	12001	10	Cầu Thất Tịch
+324	12001	12	Cầu Thất Tịch
+331	12001	19	Nguyên Tiêu ký vực
+332	12001	20	Tháp Lôi Phong
+333	12001	21	Rừng đào Thất Tịch
+346	12003	8	Lôi đài thôn thực
+347	12003	9	Lôi đài 5 vs 5
+348	12003	10	LôiĐàiHỏiĐápNămMới
+349	12003	11	LôiĐàiHỏiĐápNămMới
+350	12003	12	LôiĐàiHỏiĐápNămMới
+356	12005	3	Hội thi nướng thịt
+357	12005	4	Hội thi nướng thịt
+358	12005	5	Hội thi nướng thịt
+369	12011	8	Lôi đài tỉ võ
+392	12022	7	Điểm binh đài
+413	12061	8	Lôi đài tỉ võ
+435	12071	5	Vương thành bí đạo
+436	12081	5	Vương thành bí đạo
+480	12180	2	Chợ P-TS Online
+726	12711	2	Tiền tiêu Cự Lộc
+727	12711	3	Tiền tiêu ĐạiHưngSơn
+728	12711	4	Tiền tiêu Hổ Lao
+729	12711	5	Tiền tiêu Hồ BàDương
+730	12711	6	Tiền tiêu Hồ BàDương
+731	12711	7	Tiền tiêu Hồ BàDương
+732	12711	8	Tiền tiêu Hồ BàDương
+733	12711	9	Tiền tiêu Hồ BàDương
+839	12941	1	Tháp Lôi Phong
+924	13004	2	Lôi đài Lạc Dương
+930	13005	1	Lôi đài Lạc Dương
+941	13012	9	Điểm binh đài
+1125	13423	1	Hổ Lao Quan
+1138	13431	2	ThôngĐạo Hổ Lao Quan
+1139	13432	1	ĐườngLớn Hổ Lao Quan
+1140	13432	2	Hổ Lao Quan
+1141	13433	1	Hổ Lao Quan
+1143	13433	3	Rừng Hổ Lao
+1145	13434	1	ĐườngLớn Hổ Lao Quan
+1148	13435	2	ĐườngLớn Hổ Lao Quan
+1149	13436	1	Động Hổ Lao Sơn
+1150	13436	2	ĐườngLớn Hổ Lao Quan
+1151	13437	1	ĐườngLớn Hổ Lao Quan
+1152	13437	2	ThôngĐạo Hổ Lao Quan
+1153	13438	1	Hổ Lao Quan
+1226	13501	1	Mê cung Hứa Xương
+1227	13502	1	Mê cung Hứa Xương
+1228	13502	2	Mê cung Hứa Xương
+1229	13503	1	Mê cung Hứa Xương
+1230	13503	2	Mê cung Hứa Xương
+1231	13504	1	Mê cung Hứa Xương
+1233	13505	1	Mê cung Hứa Xương
+1234	13505	2	Mê cung Hứa Xương
+1235	13506	1	Mê cung Hứa Xương
+1236	13506	2	Mê cung Hứa Xương
+1237	13507	1	Mê cung Hứa Xương
+1238	13507	2	Mê cung Hứa Xương
+1288	13571	3	Rừng Hổ Lao
+1289	13572	1	Động Hổ Lao Sơn
+1290	13572	2	Động Hổ Lao Sơn
+1291	13573	1	Động Hổ Lao Sơn
+1292	13573	2	Động Hổ Lao Sơn
+1293	13574	1	Động Hổ Lao Sơn
+1294	13574	2	Động Hổ Lao Sơn
+1295	13574	3	Động Hổ Lao Sơn
+1296	13574	4	Động Hổ Lao Sơn
+1297	13574	5	Động Hổ Lao Sơn
+1298	13575	1	Động Hổ Lao Sơn
+1299	13576	1	Động Hổ Lao Sơn
+1300	13577	1	Động Hổ Lao Sơn
+1301	13578	1	Động Hổ Lao Sơn
+1302	13578	2	Động Hổ Lao Sơn
+1303	13578	3	Động Hổ Lao Sơn
+1304	13578	4	Động Hổ Lao Sơn
+1305	13579	1	Động Hổ Lao Sơn
+1306	13580	1	Động Hổ Lao Sơn
+1307	13581	1	Động Hổ Lao Sơn
+1308	13581	2	Động Hổ Lao Sơn
+1309	13582	1	Động Hổ Lao Sơn
+1310	13582	2	Động Hổ Lao Sơn
+1311	13583	1	Động Hổ Lao Sơn
+1312	13583	2	Động Hổ Lao Sơn
+1313	13583	3	Động Hổ Lao Sơn
+1314	13584	1	Động Hổ Lao Sơn
+1315	13585	1	Động Hổ Lao Sơn
+1316	13585	2	Động Hổ Lao Sơn
+1317	13585	3	Động Hổ Lao Sơn
+1318	13585	4	Động Hổ Lao Sơn
+1319	13586	1	Động Hổ Lao Sơn
+1320	13587	1	Động Hổ Lao Sơn
+1321	13588	1	Động Hổ Lao Sơn
+1970	15000	31	Rừng Ngưu Chữ
+1974	15000	35	Cửa vào Ngưu Chữ
+2336	15893	3	Thuyền rồng Tào Phi
+2454	18000	15	Rừng Ngưu Chữ
+2455	18000	16	Rừng Ngưu Chữ
+2479	18001	1	Lôi đài Kiến Nghiệp
+2495	18003	1	Lôi đài Kiến Nghiệp
+2757	18703	3	Thuyền rồng Tào Phi
+2763	18801	1	Bến đò  Ngưu Chữ
+2764	18801	2	Rừng Ngưu Chữ
+2766	18801	4	Rừng Ngưu Chữ
+2767	18802	1	Rừng Ngưu Chữ
+2768	18803	1	Rừng Ngưu Chữ
+2770	18804	1	Rừng Ngưu Chữ
+2890	19031	5	Vương thành bí đạo
+3250	21012	9	Điểm binh đài
+3441	21706	1	Điểm binh đài
+4297	25013	8	Điểm binh đài
+6276	33033	2	Cửu Thiên
+6309	33911	1	Tầng 1 Cửu Thiên
+6310	33912	1	Tầng 2 Cửu Thiên
+6311	33912	2	Tầng 1 Cửu Thiên
+6312	33913	1	Tầng 1 Cửu Thiên
+6313	33913	2	Tầng 3 Cửu Thiên
+6314	33914	1	Tầng 2 Cửu Thiên
+6315	33914	2	Tầng 4 Cửu Thiên
+6316	33915	1	Tầng 3 Cửu Thiên
+6317	33915	2	Tầng 5 Cửu Thiên
+6318	33916	1	Tầng 4 Cửu Thiên
+6319	33916	2	Tầng 6 Cửu Thiên
+6320	33917	1	Tầng 5 Cửu Thiên
+6321	33917	2	Tầng 7 Cửu Thiên
+6322	33918	1	Tầng 6 Cửu Thiên
+6323	33918	2	Tầng 8 Cửu Thiên
+6324	33919	1	Tầng 7 Cửu Thiên
+6325	39919	2	Tầng 9 Cửu Thiên
+6326	33920	1	Tầng 8 Cửu Thiên
+6583	49051	1	Trấn Ngưu Chữ
+6584	49051	2	Trấn Ngưu Chữ
+6585	49051	3	Ao Ngưu Chữ
+6586	49051	4	Cửa vào Ngưu Chữ
+6590	49052	1	Trấn Ngưu Chữ
+6591	49053	1	Trấn Ngưu Chữ
+6592	49054	1	Ao Ngưu Chữ
+6593	49054	2	Thuỷ động Ngưu Chữ
+6594	49054	3	Rừng Ngưu Chữ
+6595	49055	1	Ao Ngưu Chữ
+6597	49059	2	Trấn Ngưu Chữ
+6599	49059	4	U tàu Ngưu Chữ
+6607	49136	1	Trấn Ngưu Chữ
+6622	49185	1	Trấn Ngưu Chữ
+6623	49186	1	Trấn Ngưu Chữ
+6629	49216	2	Cửa vào Ngưu Chữ
+6635	49226	1	Cửa vào Ngưu Chữ
+6696	49960	1	Tầng 1 Cửu Thiên
+6697	49961	1	Tầng 2 Cửu Thiên
+6698	49962	1	Tầng 1 Cửu Thiên
+6699	49962	2	Tầng 3 Cửu Thiên
+6700	49963	1	Tầng 2 Cửu Thiên
+6701	49963	2	Tầng 4 Cửu Thiên
+6702	49964	1	Tầng 3 Cửu Thiên
+6703	49964	2	Tầng 5 Cửu Thiên
+6704	49965	1	Tầng 4 Cửu Thiên
+6705	49965	2	Tầng 6 Cửu Thiên
+6706	49966	1	Tầng 5 Cửu Thiên
+6707	49966	2	Tầng 7 Cửu Thiên
+6708	49967	1	Tầng 6 Cửu Thiên
+6709	49967	2	Tầng 8 Cửu Thiên
+6710	49968	1	Tầng 7 Cửu Thiên
+6711	49968	2	Tầng 9 Cửu Thiên
+6712	49969	1	Tầng 8 Cửu Thiên
+6718	54821	2	Thất Tịch đào lâm 2
+6719	54821	3	Thất Tịch đào lâm 3
+6720	54821	4	Thất Tịch Kiều
+6722	54822	1	Thất Tịch đào lâm
+6723	54823	1	Thất Tịch đào lâm
+6725	54825	1	Thất Tịch đào lâm
+6736	54901	1	Khu chuẩn bị lôi đài
+6737	54902	1	Khu chuẩn bị lôi đài
+6738	54903	1	Khu chuẩn bị lôi đài
+6739	54904	1	Khu chuẩn bị lôi đài
+6918	57518	3	Động Quỷ Vương
+6935	57531	2	Động Quỷ Vương
+6936	57532	1	Động Quỷ Vương
+6937	57532	2	Động Quỷ Vương
+6938	57533	1	Động Quỷ Vương
+6939	57533	2	Động Quỷ Vương
+6940	57534	1	Động Quỷ Vương
+6941	57534	2	Động Quỷ Vương
+6942	57535	1	Động Quỷ Vương
+6943	57535	2	Động Quỷ Vương
+6944	57536	1	Động Quỷ Vương
+6945	57536	2	Thôn Quỷ Vương
+6961	59000	2	Tế đàn Tiên Giới
+6965	59000	6	Thôn Tiên Giới
+6975	59000	16	Phật Giới
+6978	59001	3	Tiên Giới
+6980	59011	2	Tiên Giới
+6981	59101	1	Thôn Tiên Giới
+6983	59131	1	Thôn Tiên Giới
+6985	59401	1	Tiên Giới
+6987	59411	1	Tiên Giới
+6989	59421	2	Tiên Giới
+6993	59431	3	Tiên Giới
+6999	59441	2	Tiên Giới
+7000	59451	1	Tiên Giới
+7007	59461	1	Tiên Giới
+7009	59471	2	Tiên Giới
+7014	59801	2	Tiên Giới
+7017	59811	2	Tiên Giới
+7020	59821	2	Tiên Giới
+7023	59831	2	Tiên Giới
+7026	59842	1	Tiên Giới
+7303	61051	1	Nhà cỏ Quỷ Vương
+7325	61178	1	Mê cung Quỷ Vương
+7326	61178	2	Thôn Quỷ Vương
+7400	61551	1	Nhà cỏ Quỷ Vương
+7401	61551	1	Nhà cỏ Quỷ Vương
+7402	61551	3	Mê cung Quỷ Vương
+7403	61551	4	Mê cung Quỷ Vương
+7404	61552	1	Mê cung Quỷ Vương
+7405	61553	1	Mê cung Quỷ Vương
+7406	61553	2	Mê cung Quỷ Vương
+7407	61553	3	Mê cung Quỷ Vương
+7408	61553	4	Mê cung Quỷ Vương
+7409	61554	1	Mê cung Quỷ Vương
+7410	61555	1	Mê cung Quỷ Vương
+7411	61556	1	Mê cung Quỷ Vương
+7412	61556	2	Mê cung Quỷ Vương
+7413	61556	3	Mê cung Quỷ Vương
+7414	61556	4	Mê cung Quỷ Vương
+7415	61557	1	Mê cung Quỷ Vương
+7416	61558	1	Mê cung Quỷ Vương
+7417	61559	1	Mê cung Quỷ Vương
+7418	61559	2	Mê cung Quỷ Vương
+7419	61559	3	Mê cung Quỷ Vương
+7420	61559	4	Mê cung Quỷ Vương
+7421	61559	5	Mê cung Quỷ Vương
+7422	61560	1	Mê cung Quỷ Vương
+7423	61561	1	Mê cung Quỷ Vương
+7424	61561	2	Mê cung Quỷ Vương
+7425	61561	3	Mê cung Quỷ Vương
+7426	61562	1	Mê cung Quỷ Vương
+7427	61563	1	Mê cung Quỷ Vương
+7428	61563	2	Mê cung Quỷ Vương
+7429	61563	3	Mê cung Quỷ Vương
+7430	61563	4	Mê cung Quỷ Vương
+7431	61563	5	Mê cung Quỷ Vương
+7432	61563	6	Mê cung Quỷ Vương
+7433	61564	1	Mê cung Quỷ Vương
+7434	61565	1	Mê cung Quỷ Vương
+7435	61565	2	Động Quỷ Vương
+7436	61566	1	Mê cung Quỷ Vương
+7437	61567	1	Mê cung Quỷ Vương
+7480	62000	1	Tiên Giới

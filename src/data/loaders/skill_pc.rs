@@ -138,19 +138,23 @@ impl SkillDatLoaderPc {
 
 // ── Decoders (mirror the C# `DecodeItem8/16/32` helpers) ──────────────
 
+// ⚠ Thứ tự phép tính quan trọng: XOR và SUB **không** giao hoán.
+// `SkillData.cs` (Bear server, nguồn gốc) dùng `(val ^ K) - N` — KHÔNG phải
+// `(val - N) ^ K`. Bản cũ ở đây dùng sai thứ tự ⇒ mọi field giải mã ra sai
+// (id/loại/level/điểm…), khiến `binary_skill_defs` là dữ liệu rác.
 #[inline]
 fn decode_item8(val: u8) -> u8 {
-    val.wrapping_sub(4) ^ 0xFD
+    (val ^ 0xFD).wrapping_sub(4)
 }
 
 #[inline]
 fn decode_item16(val: u16) -> u16 {
-    val.wrapping_sub(4) ^ 0x6E90
+    (val ^ 0x6E90).wrapping_sub(4)
 }
 
 #[inline]
 fn decode_item32(val: u32) -> u32 {
-    val.wrapping_sub(2) ^ 0x0BAEB716
+    (val ^ 0x0BAEB716).wrapping_sub(2)
 }
 
 // ── Reverse-in-place helpers (mirror the C# name/des byte-swap loops) ──

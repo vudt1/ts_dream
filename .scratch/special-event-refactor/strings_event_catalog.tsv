@@ -1,0 +1,349 @@
+# BANG CHUOI SU KIEN DAC BIET — aLogin.exe (VISCII 1.1 decode)
+# Nguon: trich xuat truc tiep tu client_delphi/aLogin.exe (PE, image base 0x400000)
+# Cot 1 = Virtual Address trong image; Cot 2 = chuoi da decode VISCII
+
+## LOI_DAI  (34 chuoi)
+0x0053BD40	[Lôi đài tranh đấu 1]
+0x0053BD60	[Lôi đài tranh đấu 2]
+0x0053BD80	[Lôi đài tranh đấu 3]
+0x0053BDA0	[Lôi đài tranh đấu 4]
+0x0053D158	hiện giờ không có họat động xếp hạng thi đấu
+0x0063E47C	Đoàn P cấm sử dụng phù én
+0x007106F0	thi đấu lôi đài thiêu chiến 
+0x00710734	thi đấu lôi đàiThứ
+0x0072541C	Thứ hai hằng tuần từ 7:00 đến 9:00 tiến hành cuộc thi lôi đài tiên đấu đấy!
+0x0072690C	Quảng trường Quận Trác, lôi đài tỷ võ Nghiệp thành, quảng trường Tương thành, phía trước lôi đài tỷ võ Kiến nghiệp xuất hiện Niên thú Thôn Thực. Người chơi nào hứng thú cùng nhau tới đámh bom Niên thú.
+0x00729590	Các bạn chơi thân mến, đấu võ lôi đài đã bắt đầu, các bạn hãy dũng cẩm bước ra lôi đài nhé!
+0x007295F4	Các bạn chơi thân mến, trận đấu lôi đài hôm nay kết thúc tại đây, hãy quyết đấu trong lần sau nhé!
+0x00729660	Bạn chơi thân mến, thời gian lôi đài đấu võ hôm nay kết thúc tại đây, đừng quên gặp cô đổi quà để đổi phần thưởng nhé!
+0x007296E0	Trận đấu lôi đài hôm nay đã kết thúc, hoanh ghênh bạn lần sau tham chiến.
+0x00729734	Hoạt động lôi đài hôm nay đã bắt đầu, mọi người gia nhập từ Trác Quận nhé!
+0x00729788	Trận đấu lôi đài đoàn P bắt đầu, các bạn hãy cùng nhau tham chiến nhé!
+0x007297D8	Trận đấu lôi đài loạn đấu bắt đầu, các bạn hãy cùng nhau tham chiến nhé!
+0x00729914	Các bạn thân mến, lôi đài tiên đấu đã bắt đầu, mời các bạn hãy đến lôi đài nhé!
+0x0075C438	tạm thời không thể vào Lôi Đài Sinh Tồn
+0x0075C468	số lượng tửu vong của bạn đã đạt đến thượng hạn, hoan nghênh lầ sau đến tiêu chiến
+0x0076CDB0	Do thời hạn đã được 1 tuần, hệ thống thu hồi nhẫn loạn đấu mà bạn có
+0x0076CE00	Vì thời hạn duy trì đã đến 1 tuần, hệ thống sẽ thu hồi chiếc nhẫn đoàn P mà bạn đang có
+0x00796C20	Đăng nhập thi đấu chuyên thuộc Server
+0x00796C50	Không thể đăng nhập thi đấu chuyên thuộc Server
+0x00796CAC	Hoạt động lôi đài đấu trận kết thúc
+0x00797210	Mỗi tối chủ nhật, thứ 4, thứ 6 7:00 đến 9:00với chiều thứ 7 từ 2:00 đến 4:00 tổ chức tỉ thí lôi đài
+0x0079727C	Vào mỗi tối chủ nhật từ 7:00 ? 9:00 tiến hành trận đấu Lôi Đài Đoàn P được tổ chức!
+0x007972D8	Mỗi tuần thứ 4 từ 7:00 đến 9:0 tiến hành lọan đấu lôi đài
+0x0079731C	Mỗi tuần tối thứ 6 từ 7:00 đến 9:00, tiến hành tiêu chiến lôi đài
+0x00797368	tuần thứ 6 sau kết thúctỉ thí  lôi đài , mới có thể đổi thành giải thưởng
+0x007979BC	Thi đấu vẫn chưa bắt đầu!
+0x007979E0	Trận đấu lôi đài đã bắt đầu!
+0x00797A08	Trận đấu lôi đài đã kết thúc!
+0x00797E94	Thứ hai hằng tuần từ 7:00 đến 9:00 tiến hành cuộc thi lôi đài tiên đấu đấy!
+
+## THUY_CHIEN  (35 chuoi)
+0x0051B370	Cuộc tranh tài đua thuyền bên cạnh Cầu biên giới đã bắt đầu, các vị anh hùng hào kiệt của Thiên địa Thôn Thực mau đến xem có chuyện gì.
+0x0051B890	Cuộc thi đua thuyền rồng kỳ 2, ở bên cạnh Cầu biên giới thật náo nhiệt, mau qua đó thử sức nào.
+0x0051B8F8	Hôm nay Cuộc thi đua thuyền rồng Thôn Thực đã kết thúc, kế đó sẽ phát thưởng, mời người chơi hãy nghỉ ngơi tý xíu.2h trưa ngày mai hãy đến sân tranh tài đua thuyền bên cạnh Cầu biên giới nhé.
+0x0051B9C0	Cuộc thi đua thuyền rồng kỳ 2 đã chính thức kết thúc, kế đó sẽ phát phần thưởng, cám ơn người chơi nhiệt tình tham gia, chúc mọi người Tết Đoan Ngọ vui vẻ.
+0x0051BA64	Hoạt động tranh tài đua thuyền rồng Đoan Ngọ năm nay đã kết thúc, phần thưởng của hoạt động lần này sẽ phát sau đây, cám ơn mọi người nhiệt tình tham gia.Chúc mọi người Tết Đoan Ngọ vui vẻ.
+0x0051C05C	Hôm nay số trận thu của bạn đã là 5 rồi! Nếu muốn tiếp tục thi, trong cột vật phẩm nếu có Quyển tham gia cuộc đua thuyền thì mới có thể tiếp tục tham gia.Quyển tham gia cuộc thi đua thuyền mua ở khu bán Hư bảo, sau khi có quyển này, thì không cần phải lo lắng sau khi thua 5 trận thì không được tham gia thi.
+0x0051C19C	Khi kết thúc cuộc thi của mỗi ngày, những người chơi có tên trong bảng xếp hạng người thắng cuộc thi, thì được phần thưởng phong phú của cuộc thi, nếu muốn có được tên người thắng cuộc vàlấy phần thưởng, thì tuyệt đối không thể sơ xuất trong Quyển tham gia cuộc thi đua thuyền này.Bạn còn đợi gì nữa? Mau đi mua ở Khu bán Hư bảo đi
+0x0051D340	Bảng xếp hạng người thắng giải đua thuyền rồng
+0x005310A8	Thuyền này đã xuất chiến
+0x005310CC	Thuyền này trong trạng thái sửa, không thể xuất chiến
+0x0053110C	Một khi thay đổi thuyền chiến, thì thuyền chiến trước đây sẽ vào trạng thái sửa không thể lại xuất chiến, hơn nữa điểm kho báu đạt được trước đây sẽ quay về 0, xin hỏi bạn muốn như vậy không?
+0x00531394	Chỉ có thể giải trừ trang bị đối với thuyền xuất chiến
+0x005315F4	Chỉ có thể trang bị thuyền xuất chiến
+0x00531624	Trang bị này không thể trang bị trên thuyền này
+0x00532BA4	Đạo cụ phi thủy chiến không thể hợp thành
+0x00532BD8	Ô thuyền chiến của bạn không đủ
+0x0054A910	Hoạt động thủy chiến sắp bắt đầu, các gamer hãy nhanh chóng gia nhập chiến trường 
+0x0054A96C	Hoạt động thủy chiến bắt đầu rồi, các gamer hãy nhanh chóng vào chiến trường chuẩn bị
+0x0054A9CC	Thủy chiến đã kết thúc
+0x0054AF84	Vẫn chưa thiết định thuyền chiến xuất chiến
+0x0054D360	Cuộc chiến Đại Hưng Sơn
+0x0054D380	Cuộc chiến Cự Lộc
+0x0054D39C	Cuộc chiến thảo phạt Đổng Trác
+0x00592AF0	Chức năng này không thể sử dụng lúc thủy chiến
+0x005A8B7C	Tốc độ thuyền:
+0x005AAA5C	Thủy binh đang sửa thuyền, không rảnh phát động công kích 
+0x005AAE14	Kỹ năng chiến thuyền không thể hủy
+0x005B45FC	Có thể công kích 1 thuyền
+0x005B4620	Có thể công kích nhiều thuyền
+0x005C0DE8	Chức năng này không thể sử dụng lúc thủy chiến
+0x0062A6B4	Chức năng này không thể sử dụng lúc thủy chiến
+0x0062C510	Trang bị thủy chiến chỉ có thể trang bị trên thuyền
+0x00725350	Ô thuyền chiến của bạn không đủ
+0x007253B0	Thuyền chiến của bạn bị đánh hủy rồi
+0x0077B715	Đạt được thuyền chiến
+
+## CONG_THANH  (27 chuoi)
+0x005387F0	Trong kỳ hạn thành chiến, Võ tướng trấn võng không thể ở nhà trọ
+0x0053A260	Trong kỳ hạn thành chiến, Võ tướng trấn võng không thể ở nhà trọ
+0x0053A834	Thời gian thành chiến, võ tướng vong trận không thể hồi sinh trong nhà trọ
+0x00590958	Rời khỏi nơi tham quan thành chiến
+0x005A1448	Trong thời kỳ Thành Chiến, võ tướng trận vong không thể phóng tộc
+0x005A18A4	Trong thời kỳ Thành Chiến, võ tướng trận vong không thể xuất chiến
+0x005BDDF4	Đạo cụ này giới hạn trường cảnh thành chiến của thành này sử dụng
+0x005BDEC8	Đạo cụ này giới hạn kỳ hạn thành chiến sử dụng
+0x005DEDA0	Trong kỳ hạn thành chiến, Võ tướng trấn võng không thể ở nhà trọ
+0x005DF31C	Trong thời kỳ Thành Chiến, võ tướng trận vong không thể chuyển về nhà trọ
+0x0060B610	Trong thời kỳ Thành Chiến, võ tướng trận vong không thể giao dịch
+0x00635AFC	Chiếm lĩnh: Quân đoàn 
+0x006363F0	Thời gian thành chiến, tạm không thể sử dụng
+0x00636750	Thành môn cấp báo: quân địch đang đánh phá thành môn, mọi người cẩn thận ứng chiến.
+0x00636B30	Các vị bạn chơi thân mến, cuộc chiến công thành sẽ chính thức bắt đầu vào 8 giờ tối, các vị hãy nhanh chống chuẩn bị tốt nhé!
+0x00636BB8	Các vị bạn chơi thân mến, thời gian công thành đã bắt đầu, mời mọi người hãy nhanh chống ra chiến trường tham chiến!
+0x00636C98	Quân đoàn thành công bả thủ
+0x00636CBC	Các vị bạn chơi thân mến, thời gian công thành hôm nay đã kết thúc, mọi người tiếp tục cố gắng nhé!
+0x00636D28	Các bạn chơi thân mến, trận chiến công thành Đại Mạc đã bắt đầu, các bạn dũng cảm tiến đến Đại Mạc thành tham chiến nhé!
+0x00636DAC	Các bạn chơi thân mến, trận chiến công thành Đại Mạc kết thúc tại đây, các bạn cố gắng trong lần sau nhé!
+0x006378B8	không người chiếm lĩnh
+0x0063E51C	Trong kỳ hạn thành chiến, Võ tướng trấn võng không thể ở nhà trọ
+0x00725954	Quân đoàn chiếm lĩnh của thành này mới có thể có thể đề lãnh đạo cụ đặc thù
+0x007259FC	Trong khi tiến hành thành chiến mới có thể đề lãnh đạo cụ đặc thù
+0x00725AF4	Đạo cụ này giới hạn kỳ hạn thành chiến sử dụng
+0x007984F0	Thành Môn Chiến, không liên minh không thể tham chiến
+0x00798530	Thành Môn Chiến, không cùng đoàn không thể tham chiến
+
+## DUA_THUYEN  (8 chuoi)
+0x0051B370	Cuộc tranh tài đua thuyền bên cạnh Cầu biên giới đã bắt đầu, các vị anh hùng hào kiệt của Thiên địa Thôn Thực mau đến xem có chuyện gì.
+0x0051B890	Cuộc thi đua thuyền rồng kỳ 2, ở bên cạnh Cầu biên giới thật náo nhiệt, mau qua đó thử sức nào.
+0x0051B8F8	Hôm nay Cuộc thi đua thuyền rồng Thôn Thực đã kết thúc, kế đó sẽ phát thưởng, mời người chơi hãy nghỉ ngơi tý xíu.2h trưa ngày mai hãy đến sân tranh tài đua thuyền bên cạnh Cầu biên giới nhé.
+0x0051B9C0	Cuộc thi đua thuyền rồng kỳ 2 đã chính thức kết thúc, kế đó sẽ phát phần thưởng, cám ơn người chơi nhiệt tình tham gia, chúc mọi người Tết Đoan Ngọ vui vẻ.
+0x0051BA64	Hoạt động tranh tài đua thuyền rồng Đoan Ngọ năm nay đã kết thúc, phần thưởng của hoạt động lần này sẽ phát sau đây, cám ơn mọi người nhiệt tình tham gia.Chúc mọi người Tết Đoan Ngọ vui vẻ.
+0x0051C05C	Hôm nay số trận thu của bạn đã là 5 rồi! Nếu muốn tiếp tục thi, trong cột vật phẩm nếu có Quyển tham gia cuộc đua thuyền thì mới có thể tiếp tục tham gia.Quyển tham gia cuộc thi đua thuyền mua ở khu bán Hư bảo, sau khi có quyển này, thì không cần phải lo lắng sau khi thua 5 trận thì không được tham gia thi.
+0x0051C19C	Khi kết thúc cuộc thi của mỗi ngày, những người chơi có tên trong bảng xếp hạng người thắng cuộc thi, thì được phần thưởng phong phú của cuộc thi, nếu muốn có được tên người thắng cuộc vàlấy phần thưởng, thì tuyệt đối không thể sơ xuất trong Quyển tham gia cuộc thi đua thuyền này.Bạn còn đợi gì nữa? Mau đi mua ở Khu bán Hư bảo đi
+0x0051D340	Bảng xếp hạng người thắng giải đua thuyền rồng
+
+## LE_HOI  (66 chuoi)
+0x005082A4	Hoạt động thêm số tặng Vòng quay BĐY Tết Âm lịch đã kết thúc, cám ơn mÍi người nhiệt tình tham gia, chúc mọi người kiếm được nhiều tiền.
+0x0051B9C0	Cuộc thi đua thuyền rồng kỳ 2 đã chính thức kết thúc, kế đó sẽ phát phần thưởng, cám ơn người chơi nhiệt tình tham gia, chúc mọi người Tết Đoan Ngọ vui vẻ.
+0x0051BA64	Hoạt động tranh tài đua thuyền rồng Đoan Ngọ năm nay đã kết thúc, phần thưởng của hoạt động lần này sẽ phát sau đây, cám ơn mọi người nhiệt tình tham gia.Chúc mọi người Tết Đoan Ngọ vui vẻ.
+0x00635B98	CƯỜNG ĐỘ THÀNH MÔN
+0x00635BD0	Chủ thành môn: HP
+0x00636750	Thành môn cấp báo: quân địch đang đánh phá thành môn, mọi người cẩn thận ứng chiến.
+0x00707860	Đừng xem thường Bà Bà, đoán câu đố cần phải xem bản lĩnh, nhưng vì Tết Nguyên Tiêu 1 năm có 1 lần, nên cho bạn 1 món quà nhỏ, Tết Nguyên Tiêu ngoan ngoãn nhé. 
+0x007079A0	Tới đây, đây là phần thưởng của bạn, Tết Nguyên Tiêu vui vẻ.
+0x00724424	Các bạn chơi thân mến, mừng Tết Đoan Ngọ ăn bánh Chưng, hoạt động tập hợp linh châu đã bắt đầu rồi đấy!
+0x00724494	Các bạn chơi thân mến, mừng Tết Đoan Ngọ ăn bánh Chưng, hoạt động tập hợp linh châu đã kết thúc rồi
+0x00724500	Ngày 31 tháng 10,Vua Quỷ thu thập sức mạnh tà khí để thoát khỏi địa ngục.Hỡi các anh hùng mang thiên mệnh hãy đi tìm và tiêu diệt Quỷ Vương để làm suy giảm sức mạnh tà khí của hắn.
+0x007245C0	Sự kiện ngày lễ Halloween đã kết thúc.Chúc các bạn ngon giấc.
+0x00724D60	Hội nướng thịt của tết Trung Thu năm nay đã kết thúc rồi, cám ơn sự nhiệt tình tham gia của bạn!
+0x00724EBC	Hội nướng thịt Tết Trung thu đã bắt đầu rồi, đường vào ở vườn Đào của Quận Trác, hội trường ngoài việc có thịt nướng của các nước cho ngồời chơi dùng, còn có chuẩn bị đạo cụ pháo hoa và quả cầu nước chờ người chơi tới lấy.
+0x007251D8	Hoạt động Lễ Noel đã bắt đầu rồi, trong bộ lạc Noel có các nhiệm vụ nhỏ đang chờ người chơi, nhanh chóng đến đó xem nào.
+0x00725298	Tết Nguyên Tiêu đã đến rồi! Mọi người nhanh đến gần cửa thành Trác quận tìm nữ ngọc đế đi.
+0x007252FC	Thời gian hoạt động tết Nguyên Tiêu đã kết thúc! Cám ơn các bạn tham gia
+0x00725470	Thời gian tết Đoan Ngọ đã kết thúc rồi! Cảm ơn sự tham gia của các bạn!
+0x007254C0	Các bạn thân mến!Các bạn hãy nhanh chân tiến vào Tháp Lôi Phong để được sống lại trong thế giới huyền thoại của Thanh Xà Bạch Xà cực kì hấp dẫn.
+0x0072555C	Các bạn thân mến!Sự kiện Tháp Lôi Phong đã kết thúc tại đây.Cám ơn sự tham gia của các bạn,Chúc các bạn những giây phút thật vui với thế giới TS.
+0x007257AC	Lễ Thất Tịch mỗi năm một lần lại đến rồi! Trong thời gian hoạt động sẽ có cơ hội đạt được chim hỷ tước tượng trưng cho Thất Tịch hỷ khí! Ngưu lang si tình ở quận trục, còn có Chức nữ đang ngày đêm đau khổ mong ngóng, các bạn hãy mau chóng giúp họ đi!
+0x007258B0	Hoạt động lễ tình nhân thất tịch đã kết thúc rồi, các ơn sự tham gia nhiệt tình của các bạn
+0x00725BF8	Lại là Trung thu lại đoàn viên, Trung thu mỗi năm đêm thấy trăng, hoạt động Trung thu dạ không thưởng nguyệt đã bắt đầu, người chơi mau đi bên ngoài ngôi nhà Từ Vô Sơn, nghiên cứu xem.
+0x00725CBC	Mặt trăng sáng tròn trong Trung thu, tôi đem tâm tư gửi đi xa! Hoạt động Trung thu dạ không thưởng nguyệt đã kết thúc, chúc mọi người Tết Trung thu vui vẻ.
+0x00725E04	Hoạt động Trung thu kết thúc rồi, Cám ơn sự tham gia nhiệt tình của bạn.
+0x00725E58	Tiên tử Hằng Nga nấu ăn siêu quần, và tiểu Ngọc Thố bánh đạt nhân, xin hãy nhanh ăn thịt nướng! Văn hương thưởng bánh trung thu! Mọi ngồời phải nhanh chân tay.
+0x00725F00	Noel sắp tới rồi, thiên địa Thôn Thực sẽ chuẩn bị nhiều loại hoạt động cho người chơi, bây giờ chính thức bắt đầu, chúc mọi người chơi thật vui vẻ.
+0x00725F9C	Hoạt động Noel năm nay đến hồi kết thúc, chúc mọi người hạnh phúc. 
+0x00725FE8	Ông già Noel phát quà, mời người chơi nhanh chóng đến trường cảnh hoạt đông lấy quà.
+0x00726048	Đem đôi tất Noel màu đỏ đưa cho bạn của tôi, thì sáng 6h sẽ lấy được quà.
+0x0072609C	Chào người chơi, hoạt động tết Nguyên Tiêu đã bắt đầu rồi! Nha dịch đại ca của quan phủ Quận Trác hình như có gì cần người chơi giúp đỡ, những người mau qua đó xem sao.
+0x00726150	Người chơi đang thu thập Cự long nguyên thần, mau tận dụng thời gian cuối cùng hoàn thành nhiệm vụ, nếu qua Tết Nguyên Tiêu thì nhiệm vụ sẽ thất bại. 
+0x007261F0	Hoạt động Tết Nguyên Tiêu đã kết thúc, cám ơn sự nhiệt tình của người chơi, chúc người chơi có 1 kỳ nghỉ tốt đẹp.
+0x007262DC	Hoạt động lồng đèn tề tụ trong Tết Nguyên Tiêu đã kết thúc, nếu trên người bạn còn lồng đèn mà chưa đổi vật phẩm thì đến Quận Trác gặp tôi để đổi.
+0x00726378	Hoạt động lồng đèn tề tụ trong Tết Nguyên Tiêu đã bắt đầu, xin mọi người hãy đến thành môn Quận Trác tìm Nữ Ngọc đế, Người ấy có việc quan trọng cần nhờ người chơi giúp đỡ.
+0x00726430	Hoạt động lồng đèn tề tụ trong Tết Nguyên Tiêu đã kết thúc, nếu trên người người chơi vẫn còn lồng đèn, có thể tới thành môn Quận Trác tìm Nữ ngọc đế đổi phần thưởng, qua 2 ngày nữa có thể người phải quay về tiên đình rồi.
+0x00726634	Những người chơi đang thu thập Hùng Hoàng, Thạch Đầu Ngư, mau tận dụng thời gian cuối cùng để hoàn thành nhiệm vụ, nếu qua Tết Đoan NgÍ thì nhiệm vụ thất bại.
+0x007266DC	Tết Đoan Ngọ đã qua rồi, cám ơn người chơi nhiệt tình tham gia, chúc mọi người có kỳ nghỉ tốt đẹp
+0x00726748	Thôn Noel xuất hiện cơn mưa lễ vật! Người chơi nào có hứng thú mau đến giành lễ vật nào
+0x007267A8	Cơn mưa lễ vật trong thôn Noel dừng rồi, cám ơn sự nhiệt tình của người chơi, Thiên địa Thôn Thực chúc mọi người Noel vui vẻ.
+0x00726830	Lô Long Khẩu xuất hiện thông đạo thần bí thông tới thôn Noel, Người chơi nào có hứng thú mau tới dò thám xem nào.
+0x007268AC	Hoạt động Lễ Noel đã kết thúc hoàn toàn, cám ơn sự tham gia nhiệt tình của người chơi
+0x0072690C	Quảng trường Quận Trác, lôi đài tỷ võ Nghiệp thành, quảng trường Tương thành, phía trước lôi đài tỷ võ Kiến nghiệp xuất hiện Niên thú Thôn Thực. Người chơi nào hứng thú cùng nhau tới đámh bom Niên thú.
+0x007269E0	Cám ơn mọi người nhiệt tình tham gia hoạt động đánh bom Niên thú, thiên địa Thôn Thực thêm lần nữa xin chúc tất cả người chơi Thôn Thực có 1 năm mới vui vẻ.
+0x00726A88	Người nào thu thập đủ Thiệp năm mới cát tường có thể đến Tà lão đầu ở thành môn Quận Trác đổi 1 phần quà năm mới. Người chơi nào có hứng thú nhanh chân đi tìm xung quanh xem.
+0x00726BCC	Tết âm lịch mỗi năm 1 lần lại đến nữa rồi, ngoài thành Quận Trác đang rất náo nhiệt, có rất nhiều món ăn thơm ngon, hoan nghênh mọi người cùng đến vui.
+0x00726C6C	Năm mới thu hoạch nhiều. Thiên địa Thôn Thực lần nữa chúc tất cả người chơi có 1 cái Tết âm lịch vui vẻ.
+0x00726D3C	Tết âm lịch đến rồi, Tà lão đầu lại muốn bắt đầu nhờ thu thập đồ! Người chơi nào có hứng thú hãy tới thành môn Quận Trác giúp ông ấy đi.
+0x00726DD0	Trao đổi huy xuân đã kết thúc rồi, cám ơn mọi người nhiệt tình tham gia hoạt động mừng Tết âm lịch, Thiên địa Thôn Thực chúc người chơi năm mới vui vẻ. 
+0x00726F94	Thiên địa Thôn Thực cùng với mỗi người chơi trải qua Tết Nguyên Tiêu, chỉ cần trang bị cái lồng đèn nhỏ, đánh quái gấp đôi điểm kinh nghiệm! Cuộc chơi vui thế đừng để sai sót nhé!
+0x00727050	Hoạt động gấp đôi điểm kinh nghiệm Tết Nguyên Tiêu đã kết thúc rồi, cám ơn mọi người nhiệt tình tham gia
+0x007270C4	Bạn có biết hôm nay là ngày gì không?  Mau đến thành môn Quận Trác tìm Tiết Khánh Ba Đậu Yêu tìm hiểu 1 tý, Ba Đậu Yêu cũng chuẩn bị quà tặng cho người chơi.
+0x007486B0	Họat động tết Đoan Ngọ đã kết thúc rồi
+0x007487B4	Hoạt động giải câu đố Tết Nguyên Tiêu đã kết thúc hoàn toàn, thiên địa Thôn Thực chúc người chơi Tết Nguyên Tiêu vừa ăn ngon vừa chơi vui
+0x007489C4	Hoạt động tiêu diệt Tứ Hại dành cho các gamer mới luyện tập đã kết thúc, đa tạ mọi người đã nhiệt tình tham dự
+0x00748AE4	Hoạt động tiêu diệt Tứ Hại dành cho các gamer mới luyện tập đã bát đầu rồi !Các gamer hãy mau đến đường Trác Quận tìm Tiểu ca sai nha , anh ấy sẽ nói cho gămer biết cách chơi 
+0x0076D44C	khí giới ấy quá gần thành môn, không thể bài thiết
+0x0079768C	hôm nay không phải là ngày nguyên tiêu đâu
+0x007976C0	Tiệc nguyên tiêu năm nay đã bửu lạc họat động! Sẽ tổ chức vào ngày 23 tháng 2 vào lúc 23 giờ! Tại Thành môn Hòan Quận,tìm Nguyên Tiêu Trường chủ thì có thể tiến và, người chơi hãy nhanh lên thủ tài nào.
+0x00797794	23 tháng 2 là ngày nguyên tiêu họat động đả bửu lạc đã kết thúc rồi! Chúc bạn năm dậu may mắn! Mọi việc điều như ý
+0x00797BB8	Hôm nay không phải là thất tịch đâu
+0x00797BE4	Tết Trung thu bắt Ngọc Thố vào ngày 18 tháng 9 vào lúc
+0x00797C5C	Hôm nay không phải là họat động tết Trung Thu ư?
+0x00798478	Trong khi trả lời câu hỏi Bắc Tinh Quân không thể quan chiến
+0x007984F0	Thành Môn Chiến, không liên minh không thể tham chiến
+0x00798530	Thành Môn Chiến, không cùng đoàn không thể tham chiến
+
+## QUAN_CHIEN  (42 chuoi)
+0x004CB310	Sau khi tắt sẽ không thể tiếp nhận PK và cũng không thể PK các bạn chơi khác
+0x0056B53D	3ÒèPK$
+0x0058B4D4	PK / PvP
+0x0058B4FC	Quan chiến
+0x0058B848	Đội viên không thể quan chiến
+0x0058B980	Khu vực tu hành cấm PK
+0x0058B9A0	Đội viên không thể PK, chỉ có đội trưởng có thể PK
+0x00595CA8	Rời khỏi quan chiến [Alt+R]
+0x005FC9D4	Đội viên không thể quan chiến
+0x005FCB04	Đội viên không thể PK, chỉ có đội trưởng có thể PK
+0x005FEB3C	Đội viên không thể quan chiến
+0x005FEC44	Đội viên không thể PK, chỉ có đội trưởng có thể PK
+0x006429F0	Nơi này cấm PK võ tướng
+0x00642A10	Khu vực tu hành cấm PK
+0x00642A30	Cấm PK
+0x006431D4	Nơi này cấm PK người chơi
+0x00643210	Đối phương đang quan chiến, không thể PK
+0x00643244	Không thể PK Thiên Thần
+0x00643264	Công tắc tắt mở đã đóng, không thể PK người chơi
+0x006432A0	Không thể sử dụng PK với người rao bán
+0x006432D0	Khu vực tu hành cấm PK
+0x006432F0	Không thể PK đội viên của mình
+0x00643440	Trạm tiền tiêu trụ thủ, không thể quan chiến
+0x00644CF0	Số người quan chiến đã đầy
+0x0064ECA0	Đối phương đang quan chiến, không thể PK
+0x0064ECD4	Không thể PK Thiên Thần
+0x0064ECF4	Không thể PK đội viên của mình
+0x0064EF70	Trạm tiền tiêu trụ thủ, không thể quan chiến
+0x0064F42C	Đối phương đang quan chiến, không thể PK
+0x0064F460	Không thể PK Thiên Thần
+0x0064F480	Không thể PK đội viên của mình
+0x0064F4C0	Không thể PK bạn chơi đang ở khu vực chuẩn bị
+0x0064F4F8	Trong khu chuẩn bị, không thể PK
+0x0064F6B4	Trạm tiền tiêu trụ thủ, không thể quan chiến
+0x0064F9B0	Không thể PK Thiên Thần
+0x0064F9D0	Không thể PK đội viên của mình
+0x0075AEE8	Đối phương đang quan chiến, không thể giao dịch
+0x0075B7E4	Đối phương đang quan chiến, không thể giao dịch
+0x00798418	Đối phương chưa mở chức năng PK / PvP
+0x00798478	Trong khi trả lời câu hỏi Bắc Tinh Quân không thể quan chiến
+0x007A3154	Đối phương đang quan chiến, không thể gia nhập
+0x007A3558	Đối phương đang quan chiến, không thể gia nhập
+
+## DIEU_KIEN  (120 chuoi)
+0x00504B40	đăng ký và save lại server, thủ tiêu động tác trước khi vượt qua server.
+0x005082A4	Hoạt động thêm số tặng Vòng quay BĐY Tết Âm lịch đã kết thúc, cám ơn mÍi người nhiệt tình tham gia, chúc mọi người kiếm được nhiều tiền.
+0x0051B9C0	Cuộc thi đua thuyền rồng kỳ 2 đã chính thức kết thúc, kế đó sẽ phát phần thưởng, cám ơn người chơi nhiệt tình tham gia, chúc mọi người Tết Đoan Ngọ vui vẻ.
+0x0051BA64	Hoạt động tranh tài đua thuyền rồng Đoan Ngọ năm nay đã kết thúc, phần thưởng của hoạt động lần này sẽ phát sau đây, cám ơn mọi người nhiệt tình tham gia.Chúc mọi người Tết Đoan Ngọ vui vẻ.
+0x0051BB2C	Hoạt động lần này chia ra 3 ngày 7-8-9/tháng 6, thời gian thi là mỗi ngày vào lúc 2h trưa bắt đầu đến 4h chiều kết thúcXin mọi người nắm bắt thời gian mà tham gia
+0x0051BBD8	Bởi vì bạn giữa đường mất quyền lợi, nên bạn phải đợi sau 5 phút, rồi tham gia cuộc thi
+0x0051C05C	Hôm nay số trận thu của bạn đã là 5 rồi! Nếu muốn tiếp tục thi, trong cột vật phẩm nếu có Quyển tham gia cuộc đua thuyền thì mới có thể tiếp tục tham gia.Quyển tham gia cuộc thi đua thuyền mua ở khu bán Hư bảo, sau khi có quyển này, thì không cần phải lo lắng sau khi thua 5 trận thì không được tham gia thi.
+0x0051C19C	Khi kết thúc cuộc thi của mỗi ngày, những người chơi có tên trong bảng xếp hạng người thắng cuộc thi, thì được phần thưởng phong phú của cuộc thi, nếu muốn có được tên người thắng cuộc vàlấy phần thưởng, thì tuyệt đối không thể sơ xuất trong Quyển tham gia cuộc thi đua thuyền này.Bạn còn đợi gì nữa? Mau đi mua ở Khu bán Hư bảo đi
+0x00521A2C	Điểm số không đủ
+0x00521A5C	Không gian trên người không đủ
+0x00522E54	]Thất bại! nguyên nhân: số điểm có được không đủ
+0x00525310	]Thất bại! nguyên nhân: số điểm có được không đủ
+0x0052FB7C	điểm số không đủ
+0x00532BD8	Ô thuyền chiến của bạn không đủ
+0x0053FB4C	đăng ký thành công
+0x0053FBAC	đăng ký thất bại
+0x0053FBC8	Tiền mặt không đủ, ít nhất là 30 lần vàng
+0x0053FCE0	Đội ngũ trong trò chơiTiền mặt không đủ, ít nhất là 30 lần vàng
+0x0053FD5C	tổ này không được đăng ký
+0x005479E4	Tiền mặt không đủ !
+0x0054AE0C	Nghỉ ngơi không đủ 3 phút; không thể rời khu chuẩn bị
+0x0054AE4C	Bạn không có tham gia chiến dịch này
+0x0054AE9C	Nghỉ ngơi không đủ 3 phút; không thể tạo đội nhóm
+0x0054AF04	Chưa tham gia chiến dịch, không thể tạo đội nhóm
+0x0054AF40	Đối phương chưa tham gia chiến dịch, không thể tạo đội nhóm
+0x0054CD9C	Bạn không có tham gia chiến dịch này
+0x0054CDCC	Nghỉ ngơi không đủ 3 phút; không thể rời khu chuẩn bị
+0x0054CE0C	Số người tham gia chiến dịch đã đầy
+0x0054CE38	Nghỉ ngơi không đủ 3 phút; không thể tạo đội nhóm
+0x0054CEA0	Chưa tham gia chiến dịch, không thể tạo đội nhóm
+0x0054CEDC	Đối phương chưa tham gia chiến dịch, không thể tạo đội nhóm
+0x0054CF20	Bạn đã tham gia chiến dịch ở trận khác
+0x0054DB68	Tiền Bạn mang theo không đủ!
+0x00551594	Tiền Bạn mang theo không đủ!
+0x005515BC	Tiền đặt cược không đủ! Tiểu điểm nhỏ hơn!
+0x00551C84	Tiền Bạn mang theo không đủ!
+0x00556A8C	Tích lũy điểm số chiến dịch không đủ
+0x00559074	Số người tham gia :
+0x0055B308	Tài nguyên không đủ, không thể xây dựng
+0x00598EF4	SP không đủ
+0x005A99A4	SP không đủ
+0x005AA570	SP không đủ
+0x005AA954	Đạn dược không đủ
+0x005BA088	Đẳng cấp không đủ, không thể sử dụng
+0x005C0AF4	Điểm số không đủ, mời bạn bổ sung điểm số
+0x005C1988	Tham gia hội Giáng Sinh.
+0x005C2010	Tiền bạc trên thân bạn không đủ
+0x005E79D8	tiền trên người không đủ
+0x005F1A74	đăng kýThành công
+0x005F1A90	Trong đội ngũ có người đăng ký tên lại đại tì thí, đăng ký tên thất bại
+0x005F1AE0	Số người không đủ, sau khi 1 đội 5 người mới làm thủ tục
+0x005F1B24	đăng kýThất bại
+0x005F1B90	trong đội ngũ có người không đăng ký tỉ thí Hinet, thủ tiêu đăng ký thất bại
+0x005F1BE8	Với những thành viên đăng ký tên trước đây không giống nhau, không thể thủ tiêu
+0x006091F8	Tiền bạc trên thân bạn không đủ
+0x0060B710	Tiền bạc trên thân bạn không đủ
+0x0060D894	Thuật Mua Bán đẳng cấp không đủ, không thể rao bán quá nhiều vật phẩm
+0x0060DE0C	Tham gia hội Giáng Sinh.
+0x0061014C	Tiền bạc không đủ
+0x00611484	Tiền bạc không đủ
+0x0062C56C	Đẳng cấp không đủ, không thể sử dụng
+0x0062E2B8	Số lượng không đủ, hủy bỏ chuyển giao nhanh
+0x0062E32C	Không gian vật phẩm đối phương không đủ, hủy bỏ chuyển giao nhanh
+0x0063E2FC	SP không đủ
+0x0063E4F0	Đẳng cấp người chơi không đủ để bắt
+0x00654BC0	$Đẳng cấp không đủ, không thể sử dụng
+0x00716E50	Tham gia hội Giáng Sinh.
+0x00724638	Hoạt động Năm mới Lì xì từ trên trời rơi xuống triển khai náo nhiệt ở quảng trường Quận Trác, người chơi nào có hứng thú tham gia mau nhanh chóng đến đó.
+0x0072481C	Hoạt động Năm mới Lì xì từ trên trời rơi xuống đã kết thúc rồi, cám ơn sự tham gia nhiệt tình của người chơi, Thiên địa Thôn Thực chúc tất cả người chơi đều được như ý muốn trong năm mới này!
+0x0072494C	Các bạn, hoạt động giáng sinh bắt đầu rồi, mau đến Thánh đản tuyết địa gần Lư Long Khẩu tham gia lể hội
+0x00724D60	Hội nướng thịt của tết Trung Thu năm nay đã kết thúc rồi, cám ơn sự nhiệt tình tham gia của bạn!
+0x00724DCC	Đẳng cấp của bạn không đủ, không thể tham gia sự kiện
+0x0072525C	Giáng sinh đã kết thúc.Cám ơn các bạn đã tham gia.
+0x007252FC	Thời gian hoạt động tết Nguyên Tiêu đã kết thúc! Cám ơn các bạn tham gia
+0x00725350	Ô thuyền chiến của bạn không đủ
+0x00725470	Thời gian tết Đoan Ngọ đã kết thúc rồi! Cảm ơn sự tham gia của các bạn!
+0x0072555C	Các bạn thân mến!Sự kiện Tháp Lôi Phong đã kết thúc tại đây.Cám ơn sự tham gia của các bạn,Chúc các bạn những giây phút thật vui với thế giới TS.
+0x007255F8	Các bạn thân mến!Vườn Địa Đàng đã chính thức mở ra để chào đón các đôi tình nhân của thế giới TS.Mới các bạn tham gia để được chứng kiến các thiên tình sử lâm li nhất.
+0x00725708	Các bạn thân mến!Vườn Địa Đàng đã chính thức khép lại,Cám ơn sự tham gia của các bạn.Chúc các bạn sẽ tìm được vườn địa đàng hạnh phúc thật sự của mình.
+0x007258B0	Hoạt động lễ tình nhân thất tịch đã kết thúc rồi, các ơn sự tham gia nhiệt tình của các bạn
+0x00725B5C	Tài nguyên không đủ, không thể đề lĩnh
+0x00725D84	Đẳng cấp của bạn chưa đến 15, không thể tham gia hoạt động này.
+0x00725E04	Hoạt động Trung thu kết thúc rồi, Cám ơn sự tham gia nhiệt tình của bạn.
+0x007266DC	Tết Đoan Ngọ đã qua rồi, cám ơn người chơi nhiệt tình tham gia, chúc mọi người có kỳ nghỉ tốt đẹp
+0x007268AC	Hoạt động Lễ Noel đã kết thúc hoàn toàn, cám ơn sự tham gia nhiệt tình của người chơi
+0x007269E0	Cám ơn mọi người nhiệt tình tham gia hoạt động đánh bom Niên thú, thiên địa Thôn Thực thêm lần nữa xin chúc tất cả người chơi Thôn Thực có 1 năm mới vui vẻ.
+0x00726CE0	Nguyên liệu trên người bạn không đủ.
+0x00726DD0	Trao đổi huy xuân đã kết thúc rồi, cám ơn mọi người nhiệt tình tham gia hoạt động mừng Tết âm lịch, Thiên địa Thôn Thực chúc người chơi năm mới vui vẻ. 
+0x00726E74	Thập huynh đệ dũng mãnh xông vào phong ma trận đã bắt đầu, hoan nghênh người chơi háo hức tham gia.
+0x00726EE0	Hoạt động Thập huynh đệ dũng mãnh xông vào phong ma trận đã kết thúc hoàn toàn, cám ơn mọi người nhiệt tình tham gia, Thiên địa Thôn Thực chúc người chơi năm mới may mắn.
+0x00727050	Hoạt động gấp đôi điểm kinh nghiệm Tết Nguyên Tiêu đã kết thúc rồi, cám ơn mọi người nhiệt tình tham gia
+0x00728430	Không đủ tiền
+0x007486E0	hoạt động đối đáp đã bắt đầu, đi tham gia mau thôi
+0x0074871C	Khiêu gia quan đến quản trường Quận Trác chiệu mộ những người chơi thông minh giải câu đố, người nào có hứng thú mau đến ghi danh tham gia nào.
+0x0074C2B8	Ô vật phẩm trên người bạn không đủ
+0x00753DC4	Quyền hạn không đủ
+0x00755810	Tiếng tăm của bạn chơi này không đủ, không thể nhượng chỗ
+0x0075594C	Tiền bạc không đủ, quyên tặng thất bại
+0x0075597C	Số lượng không đủ, dâng hiến thất bại
+0x00755A50	Đẳng cấp không đủ, không thể sinh sản
+0x00755BA8	độ cống hiến không đủ
+0x00755BE0	Quyền hạn không đủ, không thể chế tạo
+0x00755C10	Vật liệu không đủ, đình chỉ chế tạo
+0x0075B318	Đối phương nào đó không đủ tiền bạc, hủy bỏ giao dịch
+0x0075BCE8	Đối phương nào đó không đủ tiền bạc, hủy bỏ giao dịch
+0x0075C3C0	Các bạn thân mến, thời gian hoạt động của ác đảo đã kết thúc rồi, cảm ơn sự tham gia nhiệt tình của các bạn.
+0x0075C4EC	Thời gian báo danh Thục Ác Đảo đã chấm dứt
+0x0076C6C8	Số điểm tối thiểu phải có 50 điểm mới được tham gia chức năng này
+0x0076F17C	Đẳng cấp không đủ, không thể sử dụng
+0x0076F2E8	Tham gia hội Giáng Sinh.
+0x0077E220	Đẳng cấp không đủ, không thể trang bị
+0x00797654	Xin lỗi, trước mắt tạm thời không nhận đăng ký
+0x00797D70	Hôm nay bạn đã tham gia họat động rồi
+0x00797DD0	Người không có võ tướng có nhiều kĩ năng hợac võ tướng đẳng cấp không đủ
+0x007980B4	Dung lượng tiền bạc không đủ
+0x00798138	Xin lỗi, vàng của bạn không đủ!
+0x00798314	Dung lượng tiền trang không đủ
+0x00798370	Số tiền trên người bạn không đủ nhé!
+0x00799018	Có người không đủ đẳng cấp
+0x007A1624	Điểm số không đủ để chuyển đổi thành thể chế tháng chế

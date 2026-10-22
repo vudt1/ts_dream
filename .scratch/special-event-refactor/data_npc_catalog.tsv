@@ -1,0 +1,6661 @@
+# Npc.dat - catalog ten NPC (client doc tai Data/Npc.dat, record 92 byte)
+# npcId	name
+1	Trương Giác
+2	Trương Bảo
+3	Trương Lương
+4	Trình Viễn Chí
+5	Đặng Mậu
+6	TrươngMạnThành
+7	Mã Ng Nghĩa
+8	Quách Đại
+9	Cao Thăng
+10	Bùi Ng Thiệu
+11	Bo Tài
+12	Tôn Trọng
+13	Trương Hỷ
+14	Hà Nghi
+15	Triệu Hoằng
+16	Hàn Trung
+17	Quản Hợi
+18	Triệu V.Khương
+19	Hà Hỷ
+20	Lưu Tích
+21	Từ Hòa
+22	Tư Mã Đều
+23	Trần Bại
+24	Vạn Tỉnh
+25	Mã Tương
+26	Triệu Chỉ
+27	Hoàng Thiệu
+28	Hà Mạn
+29	Đỗ Viễn
+30	Cung Đô
+31	Bành Thoát
+32	Ngô Bá
+33	Bù Kỷ
+34	Đại.Ph.Tướng
+35	Tiểu.Ph.Tướng
+36	Lính Khăn Vàng
+37	Binh Đạo Ma
+38	Binh Khăn Vàng
+39	NamHoa LãoTiên
+40	Tiêu Võ Sĩ
+41	Lính Phục Kích
+42	Vệ Binh K.Vàng
+43	Du Hồn Thốt
+44	Tế Quỷ Thốt
+45	Binh Du Kích
+46	Binh Dao Lẻ
+47	Dân Binh
+48	Đội Chiến Rìu
+49	Binh Dao Ngắn
+50	Trường.Th.Binh
+51	Binh Lao Dài
+52	Binh Dao Lớn
+53	Thánh Binh
+54	Binh Trưởng
+55	Binh Tinh Giáp
+56	Binh Dao Mi
+57	Binh Kiếm Sắt
+58	Trảm.Ph.Quang
+59	Binh Giáp Nặng
+60	Binh Giáp Nhẹ
+61	Tướng Xoa Kích
+62	Binh Phi Kích
+63	Tặc.Tr.Kích
+64	BinhThươngSắt
+65	Võ Sĩ Ma
+66	Biêu Võ Sĩ
+67	Giải Võ Sĩ
+68	Chính Võ Sĩ
+69	Võ Vệ Sĩ
+70	Tà Võ Sĩ
+71	H.Thiên Võ Sĩ
+72	Th.Bình Võ Sĩ
+73	Th.Công Võ Sĩ
+74	Tr.Võ Sĩ Ma
+75	Diêm Chính
+76	Tô Mã
+77	Quách Thạch
+78	Châu Triều 
+79	Khư Tinh
+80	Vương Độ
+81	Lính Cô Hồn
+82	Lính Ma Dữ
+83	Phần Nữ Tặc
+84	Thanh Diện Tặc
+85	Trưởng Lính Ma
+86	Tế Rượu Tào
+87	Tế Rượu Hầu 
+88	Tế Rượu Thi
+89	Tế Rượu Vệ
+90	Tế Rượu Sư
+91	Sư Bói
+92	Yêu Thuật Sĩ
+93	Yêu Thuật Sư
+94	Hầu Bói
+95	Đại Yêu Sư
+96	Phong Thế
+97	Từ Phụng
+98	Vu Độc
+99	Bạch Nhiễu
+100	Giai Cố
+101	Đường Chu
+102	Tàn Binh
+103	Lý Đại Mục
+104	Tả Tượng Bát
+105	Lưu Thạch
+106	La Thị
+107	Lôi Công
+108	Ngũ Lộc
+109	Đại Hồng
+110	Khăn Vàng
+111	Binh Kh.Vàng
+112	Vệ Sĩ Kh.Vàng
+113	ThuậtSĩ.KhVàng
+114	Huỳnh Đại Sĩ
+115	Tướng Kh.Vàng
+116	Ch.Sĩ Kh.Vàng
+117	Hãn Đấu Binh
+118	KiênBinh KVàng
+119	Huỳnh Đại Binh
+120	Thiên Thánh Sĩ
+121	Quỷ Vệ Binh
+122	Hổ Bình Dương
+123	Quỷ Sư
+124	Linh Ma Tím
+125	Binh Lang
+126	Lính Lang
+127	Binh Lang Nha
+128	Lang Sư
+129	Quân Lang Nha
+130	Tử Sĩ
+131	Sĩ Cẩm Tử
+132	Sĩ Bóng Tử
+133	Linh Sĩ
+134	Binh Linh Nha
+135	Binh Nộ Giáp
+136	Binh Bạo Giáp
+137	LangThốtTrưởng
+138	Sư Nộ Giáp
+139	Quân Mãnh Hổ
+140	Ma Võ Sĩ
+141	Dã Võ Quân
+142	Binh Sĩ Dã Hổ
+143	Dã Hổ Quân
+144	Dã Võ Thi
+145	Địa Sư Quân
+146	Thủy Sư Quân
+147	Phù Thủy Lửa
+148	Phong Sư Quân
+149	Quân Rượu Tế
+150	Võ Dũng Sĩ
+151	Man Nữ Võ Lăng
+152	Man.B.Võ Lăng
+153	Võ Vệ Sư
+154	Võ Vệ Tướng
+155	Thiên Công Vệ
+156	Thiên.Ph.Tướng
+157	Thiên.T.Tướng
+158	Lục Pháp Sư
+159	Hắc Pháp Sư
+160	Tiểu.Ch.Tướng
+161	Ngưu Giác
+162	Bạch Chim
+163	Tôn Khanh
+164	Vương Đang
+165	Quân Thái Bình
+166	Đại.Ph.Tướng
+167	Đ.Cương Tướng
+168	Đại Võ Tướng
+169	Đ.Thành Tướng
+170	Đ.Châu Tướng
+171	Triệu Từ
+172	Khổ Nhu 
+173	Thanh Châu Sĩ
+174	Quân ThanhChâu
+175	Binh ThanhChâu
+176	Trưởng.Th.Châu
+177	Lính Ma Dao
+178	Lính Ma Thương
+179	Lính Ma Kiếm
+180	Giang Tặc
+181	Lính Kích Ngắn
+182	Lính Dao Lớn
+183	Họ Trúc
+184	Khiết.Th.Quân
+185	Tử Thân Quân
+186	Hồng Thân Quân
+187	Lục Thân Quân
+188	Dân Đói
+189	Binh Hắt Sơn 
+190	B.ThươngHắtSơn
+191	Tr.Binh HắtSơn
+192	Ma Sư Hắt Sơn
+193	Đỗ Trưởng
+194	Đào Thăng
+195	Võ Sĩ.Kh.Vàng
+196	Đao Sĩ.Kh.Vàng
+197	Hổ Sĩ.Kh.Vàng
+198	Quý Khăn Vàng
+199	Lính Hắt Sơn
+200	Quân Hắt Sơn
+201	H.Sơn Chiến Sĩ
+202	Hắt Sơn Võ Sĩ
+203	HắtSơnGiápBinh
+204	HắtSơnQuỷLính
+205	Binh Kh.Vàng
+206	GiápBinh KVàng
+207	SơnBinh KhVàng
+208	Dũng Sĩ KhVàng
+209	Quân Sư KhVàng
+210	Đấu Sĩ Kh.Vàng
+211	Quân Sĩ KhVàng
+212	BinhSói KhVàng
+213	Lãnhđạo KhVàng
+214	Người Đào Mộ
+215	Đai Phong
+216	Lương.Tr.Ninh
+217	Hoành Thương
+218	Trương Bác
+219	Lục Lương
+220	Lai Đạt
+221	Trương Tu
+222	Quan Hạo
+223	Trương Hiểu
+224	Binh Khăn Vàng
+225	Binh Khăn Vàng
+226	Binh Khăn Vàng
+227	LínhTrườngKích
+228	TLỗChưa RaTrận
+229	Phong Đao Binh
+230	Trung chế tửu
+231	Đao Sư Quân
+232	Trương Lỗ
+233	Dương Nhâm
+234	Dương Ngang
+235	Diêm Phố
+236	Dương Tùng
+237	Dương Bá
+238	Chu Phụng
+239	T.ThủyTặc
+240	Đại Đao Tặc
+241	Loan đao tặc
+242	Quan Bình
+243	Quan Vũ
+244	Lĩnh Man binh
+245	Sơn Man binh
+246	Nghiêm Nhan
+247	Lê Tinh Binh
+248	Cự Sa Dũng Phu
+249	Cự Sa Binh
+250	Thủy Đạo Ma
+251	Hải Tặc Vu
+252	Hồi Đao Tốt
+253	Phi Mâu Tướng
+254	Kiêu Dũng Binh
+255	Câu Đao Tướng
+256	Hải Ba Tài
+257	Nghê Hải Tặc 
+258	Sa Hải Tặc 
+259	Ngạc Hải Tặc
+260	Giao Hải Tặc 
+261	Kích Đao
+262	Hàn Phi
+263	LangBinh T Ti
+264	Tử sĩ Tiên Ti
+265	Bành Tài
+266	Lý Ngọc
+267	Vương Hải
+268	Tay sai hảitặc
+269	Tr.Bảo bị hại
+270	Tr.Lương bị
+271	Đại võ quan
+272	Vu Cấm
+273	Khổng Dung
+274	Văn Sính
+275	Mao Giới
+276	Ngưu Kim
+277	Lưu Diệp
+278	Vương Song
+279	Tô Tắc
+280	Tư Mã Sư
+281	Tư Mã Ý
+282	Thân Thẩm
+283	Thân Nghi
+284	Chu Linh
+285	Lữ Kiền
+286	Lữ Tường
+287	Lý Điển
+288	Tân Tì
+289	Điển Vi
+290	Lưu Yên
+291	Hạ Hầu Đôn
+292	Hạ Hầu Uyên
+293	Chu Quang
+294	Dương Phụ
+295	Từ Hoảng
+296	Từ Thứ
+297	Tuân Úc
+298	Hách Chiêu
+299	Hạ Hầu Thượng
+300	Cao Lãm
+301	Lữ Khoáng
+302	Trương Hợp
+303	Trương Vệ
+304	Hạ Hầu Ân
+305	Trương Liêu
+306	Trương Tú
+307	Tào Nhân
+308	Tào Phi
+309	Tào Hưu
+310	Tào Ngạn
+311	Tào Hồng
+312	Tào Chân
+313	Tào Thuần
+314	Tào Báo
+315	Tào Thực
+316	Tào Chương
+317	Tào Hùng
+318	Tào Tháo
+319	Hứa Du
+320	Tào Xung
+321	Hứa Chử
+322	Tảo Chỉ
+323	Quách Hoài
+324	Quách Gia
+325	Trần Giai
+326	Trần Lâm
+327	Trần Đăng
+328	Trần Quần
+329	Trần Kiểu
+330	Phó Cán
+331	Trình Dục
+332	Hạ Hầu Bác
+333	Lý Tiến
+334	Dương Tu
+335	Giả Quỳ
+336	Giả Hủ
+337	Tuân Du
+338	Mãn Sủng
+339	Thái Dương
+340	Lưu Đại
+341	Tần Kỳ
+342	Nhạc Tiến
+343	Tang Bá
+344	Tưởng Cán
+345	Chân Mật
+346	Chung Tiến
+347	Chung Diêu
+348	Bàng Đức
+349	A Mạn
+350	Quan Ngụy
+351	Tư Mã Lãng
+352	Tuấn Diễn
+353	Hứa Định
+354	Lý Thông
+355	Tiết Đệ
+356	Hàn Hạo
+357	Tào An Dân
+358	Sử Hoán
+359	Lộ Chiêu
+360	Xa Trụ
+361	Vương Trung
+362	Đổng Chiêu
+363	Trương Phấn
+364	Hí Chí Tài
+365	Tào Thiệu
+366	Lý Cang
+367	Lý Chỉnh
+368	Cận Doãn
+369	Nhâm Tuấn
+370	Phùng Giai
+371	Giả Tín
+372	Điền Dự
+373	Tiên Vu Phụ
+374	Lương Tập
+375	Diêm Nhu
+376	Thôi Diễm
+377	Vương Diêm 
+378	Khổng Tú
+379	Hàn Phúc
+380	Mãnh Thản
+381	Vương Trực
+382	Hạ Hầu Lan
+383	Phùng Lễ 
+384	Mã Diên
+385	Trương Dĩ
+386	Lý Phu
+387	Khiên Chiêu
+388	Tr.Tử Khiêm
+389	Cao Nhu
+390	Vương Sán
+391	TrươngXuân Hoa
+392	Lưu Phóng
+393	Vương Tùng
+394	Quách Nữ Vương
+395	Chuân Du đạo
+396	Yến Minh
+397	Chung Tấn
+398	Chung Thân
+399	Hà Hầu Kiệt
+400	Lưu Phục
+401	Khang kỳ
+402	Tạ Kỳ
+403	Tống  Hào
+404	Tôn Tử Tài
+405	Lý Tụ
+406	Lý Cơ
+407	Trương Hỷ
+408	Lâu Khuê
+409	Đỗ Kỳ
+410	Triệu Nghiễm
+411	Đặng Triển
+412	Lý Lập
+413	Trương Kí
+414	Hỗ Chất
+415	Tưởng Tế
+416	Vệ Kí
+417	Đổng Kỷ
+418	Ti Trạm
+419	Đinh Phỉ
+420	An Thự
+421	Tào Vinh
+422	Lưu Nhược
+423	Lưu Triển
+424	Trịnh Hồn
+425	TTháo pthương
+426	Điển Mãn
+427	Vi Khang
+428	Diêm Ôn
+429	Đổng Hành
+430	Đổng Siêu
+431	Từ Cán
+432	Ưng Dương
+433	Văn Tắc
+434	Võ Châu
+435	Triệu Ngung
+436	Đỗ Kích
+437	Triệu Ngang
+438	Quản Lộ
+439	Cao Tộ
+440	Giải Phiếu
+441	Vương Đồ
+442	Khương Súc
+443	Viên Mẫn
+444	Hạ Hầu Đức
+445	Giải Yên
+446	Công Tôn Tập
+447	Tuân Uẩn
+448	TTháo trúngtên
+449	Lữ Thường
+450	Hạ Hầu Tồn
+451	Lương Khoan
+452	Triệu Hoắc
+453	Doãn Phụng
+454	Thiệu Kình
+455	Khổng Tín
+456	Dương Nhạc
+457	Dương Mô
+458	Ngô Chất
+459	Tông Thế Lâm
+460	Nguyễn Vũ
+461	Lưu Trinh
+462	Thành Công Anh
+463	Diêm Hành
+464	Đinh Dị
+465	Đinh Uy
+466	Vô Khâu Hưng
+467	Phạm Lăng
+468	Tân Hiến Anh
+469	Si Lo
+470	Vương Tất
+471	Mộ dung liệt
+472	Tiêu Bính
+473	TừHoảng phẫnnộ
+474	Trạch Nguyên
+475	BàngĐức phẫnnộ
+476	ThànhHà phẫnnộ
+477	VuCấm C.Thuyền
+478	BàngĐứcCThuyền
+479	Từ Thương
+480	Lữ Kiến
+481	Tư Mã Phu
+482	Biện Vương Hậu
+483	Lý Phục
+484	Hứa Chi
+485	Hình Trinh
+486	Thường Điêu
+487	Gia Cát Kiền
+488	Hạ Hầu Nho
+489	Phí Diệu
+490	Đặng Ngải
+491	Chung Hội
+492	Mã Tuân
+493	Gia Cát Lượng
+494	Vương Bình
+495	Vương Phủ
+496	Y Tịch
+497	Hướng Sủng
+498	Ngô Ban
+499	Ngô Lan
+500	Ngô Ý
+501	Lý Nghiêm
+502	Sa Ma Kha
+503	Chu Thương
+504	Pháp Chính
+505	Trần Thức
+506	Tôn Càn
+507	Mã Lương
+508	Liêu Hóa
+509	Mã Siêu
+510	Mã Tắc
+511	Trương Bào
+512	Trương Phi
+513	Phí Vĩ
+514	Hoàng Trung
+515	Bào Tam Nương
+516	Dương Nghi
+517	Đổng Uẩn
+518	Lôi Đồng
+519	Triệu Vân
+520	Mã Đại
+521	Lưu Ba
+522	Hồ Ban
+523	Lưu Phong
+524	Triệu Luy
+525	Lưu Bị
+526	Lưu Thiền
+527	Đặng Chi
+528	Củng Chí
+529	Mi Trúc
+530	Mi Phương
+531	Giản Ung
+532	Ngụy Diên
+533	Bàng Thống
+534	Quan Bình
+535	Quan Vũ
+536	Quan Tác
+537	Quan Hưng
+538	Nghiêm Nhan
+539	Mẹ Lưu Bị
+540	Cam Cô Nương
+541	Cam phu nhân
+542	Mẹ Triệu Vân
+543	Tiểu Gia Cát
+544	Thanh Lôi
+545	Ma Phu Nhân
+546	Tư Mã Huy
+547	Hoắc Tuấn 
+548	Trần Đáo
+549	Trần Chấn
+550	Gia Cát Quân
+551	HoàngNguyệtAnh
+552	Hướng Lãng
+553	Tô Phi
+554	Đỗ Phổ
+555	Lương Đại
+556	HoàngThừaNgạn
+557	Hướng Thông
+558	Quan Ngân Bình
+559	Hạ Hầu Lâm
+560	Từ Lão Ph.Nhân
+561	Liêu Lập
+562	Bác Học Nhân
+563	Phùng Tập
+564	Trương Nam
+565	Hách Phổ
+566	Phan Đốc
+567	Vương Sĩ
+568	Đặng Phương
+569	Ân Quan
+570	Phụ Khuông
+571	Lưu Ung
+572	Tưởng Uyển
+573	Hoàng Tự
+574	Lôi Tự
+575	Tinh Phu
+576	Ảnh Đồ  
+577	Đơn Phúc
+578	Gia Cát Vân
+579	Bàng Đức Công
+580	Lưu Diễm
+581	Phụng Nhi
+582	Điệp Nhi
+583	Tông Dự
+584	Trương Tùng
+585	Hoàng Quyền
+586	Mạnh Đạt
+587	Trác Ưng
+588	Phí Thư
+589	Phí Quan
+590	Lý Khôi
+591	Triệu Tạc
+592	Cung Kham
+593	Tần Mật
+594	Trương Dực
+595	Trương Nghi
+596	Mã Tế
+597	Mã Huân
+598	Tiếu Chu
+599	Vương Liên
+600	Lữ Nghĩa
+601	Bành Dạng
+602	Đổng Hòa
+603	Trương Kiều
+604	Ngô Nãng
+605	Viên Long
+606	Hứa Tĩnh
+607	Dương Hồng
+608	A Quý
+609	Phó Đồng
+610	Cư Phù
+611	Trương Chú
+612	Kích Lộc
+613	Mễ Uy
+614	Lại Cung
+615	Tập Trinh
+616	A Đẩu
+617	Xạ Viên
+618	Lý Triều
+619	Thiệu Vệ
+620	Bàng Thống
+621	BThốngtrúngtên
+622	Lý Thiệu
+623	Lưu Cán
+624	Đỗ Kỳ
+625	Nhiệm Dưỡng
+626	MSiêu bịthương
+627	Mã Trung
+628	Châu Quần
+629	Bàng Nhu
+630	Xa Tuấn
+631	Dương Phong
+632	Dương Phát
+633	Dương Vũ
+634	Dương Diêm
+635	Dương Kình
+636	Dương Lực
+637	Phiền Kiến
+638	Huân Quyết
+639	Trương Thiệu
+640	Lưu Thiền
+641	QuanVũ phẫn nộ
+642	Qu.Bìnhanhdũng
+643	Thượng Cử
+644	Lưu Báo
+645	Triệu Tộ
+646	Đổ Quỳnh
+647	Trương Sảng
+648	Lại Trung
+649	Hà Tằng
+650	Doãng Mặc
+651	Vương Mưu
+652	Hứa Từ
+653	Mạnh Quang
+654	Lưu Vĩnh
+655	Lưu Lý
+656	Trình Kỳ
+657	Quan Vũ
+658	Trương Phi
+659	Oan hồn Tr.Phi
+660	Đổ Lộ
+661	Lưu Ninh
+662	LưuBị bịthương
+663	T.Bảo anhdũng 
+664	QuanHưngphẫnnộ
+665	N.Bantiênphong
+666	Khương Duy
+667	Mẹ Khương Duy
+668	HTrungtrúngtên
+669	Hồn ma
+670	NguỵDiênphẫnnộ
+671	Gia Cát Quả
+672	Tư Mã Chiêu
+673	Lưu Bang
+674	Hàn Tín
+675	Phàn Khoái
+676	Tiêu Hà
+677	Tào Tham
+678	Lữ Trĩ
+679	Ung Xỉ
+680	Hạ Hầu Anh
+681	Trương Lương
+682	Thích Cơ
+683	Chu Bột
+684	Bạch Cơ
+685	Đinh Phụng
+686	Thái Sử Từ
+687	Cam Ninh
+688	Chu Trị
+689	Lữ Mông
+690	Lữ Phạm
+691	Bộ Chất
+692	Chu Thái
+693	Chu Du
+694	Lăng Thống
+695	Thái Sử Hưởng
+696	Tôn Kiên
+697	Tôn Dực
+698	Tôn Sách
+699	Tôn Du
+700	Tôn Quyền
+701	Từ Thịnh
+702	Trương Chiêu
+703	Trương Hoành
+704	Trần Võ
+705	Lục Tốn
+706	Lục Tích
+707	Trình Bỉnh
+708	Trình Phổ
+709	Hoàng Cái
+710	Ngu Phiên
+711	Phan Chương
+712	Tưởng Khâm
+713	Gia Cát Cẩn
+714	Lỗ Túc
+715	Tiết Chung
+716	Hàn Đương
+717	Nghiêm Tuấn
+718	Hám Trạch
+719	Cố Ung
+720	Đại Kiều
+721	Tiểu Kiều
+722	TônThượngHương
+723	Tổ Mậu
+724	Phản Hồng Lan
+725	Tương Binh
+726	Đà Thủ
+727	Tr.Phàm Binh
+728	Gi.Đông Binh
+729	Trường.T.Binh
+730	Linh Tháo
+731	Đổng Tập
+732	Hạ Tề
+733	Tôn Phấn
+734	Tôn Phụ
+735	Ngô Cảnh
+736	Từ Bi
+737	Tôn Tịnh
+738	Hàn An
+739	Châu Chương
+740	Tôn Hà
+741	Lý Thuật
+742	Tần Tùng
+743	Trần Đoan
+744	Toàn Nhu
+745	Ngô Quốc Thái
+746	Chu Nhiên
+747	Chu Hoàn
+748	Trần Bửu
+749	Nai Lương
+750	Ngô Phấn
+751	Đinh Phan
+752	Trương Dị
+753	Trần Cần
+754	Trình Tư
+755	Phùng Tắc
+756	Trương Ôn
+757	Lạc Thống
+758	Ngô Sán
+759	Từ Kiều
+760	Từ Tộ
+761	Lưu Cơ
+762	Nghị Lãm
+763	Đới Viên 
+764	Biên Hùng
+765	Tô Cao
+766	Phù Ưng
+767	Từ Thị
+768	Kiều Quốc Lão
+769	Lữ Đại
+770	Tống Khiêm
+771	Giả Hòa  
+772	Trương Thừa
+773	Chu Tuấn
+774	Châu Tài 
+775	Châu Kỷ 
+776	Ngô Phạm
+777	Tôn Thiều
+778	Thủy Linh
+779	Thổi Tuyết
+780	Tôn Kiểu
+781	Thành Đương 
+782	Tống Định
+783	Từ Cố
+784	Duẫn Dị
+785	Công Tôn Dương
+786	Hoàng Bỉnh
+787	Qua định
+788	Trương Phấn
+789	Tiên Vu Đơn
+790	Từ Trung
+791	Tôn Quy
+792	Tôn Mậu
+793	Nhiêu Trợ
+794	Nhan Liền
+795	Chu Thiện
+796	Cốc Lợi
+797	Cố Thiệu
+798	Đặng Đang
+799	Tôn Thiệu
+800	Toàn Tông
+801	Tôn Hoán
+802	Tôn Lãng
+803	Hạ Cảnh
+804	Trương Huyền
+805	Trương Hưu
+806	Từ Tường
+807	Hồ Tống
+808	Thị Uy
+809	Lưu Thước
+810	Lưu Thượng
+811	Lữ Mông PhNộ
+812	Cam Ninh PhNộ
+813	Tôn Quyền Bth
+814	Lục Thương
+815	Lữ Bá
+816	Tôn Hoàn
+817	Lý Dị
+818	Tạ Tinh
+819	Đàm Hùng
+820	Thôi Vũ
+821	Thuần Vu Đơn
+822	Hạ Tuân
+823	Sử Tích
+824	Chu Bình
+825	Bộ Hoàng
+826	Triệu Tư
+827	T.Hoànbịthương
+828	C.Ninhbịthương
+829	Từ Thịnh
+830	Đinh Phụng
+831	Lăng Thống
+832	Hàn Đương
+833	Chu Thái
+834	Chu Nhiên
+835	Tôn Hoàn
+836	Trần Thời
+837	Đới Lương
+838	Đại Võ Quan
+839	Hạng Vũ
+840	Hạng Can
+841	Anh Bố
+842	Trần Bình
+843	Phạm Tăng
+844	Hạng Bá
+845	Bành Việt
+846	Chung Ly Muội
+847	Hạng Lương
+848	Long Thả
+849	Ngưu Cơ
+850	Sở Hoài Vương
+851	Công Tôn Toản
+852	Văn Xú
+853	Điền Phong
+854	Phùng Phương
+855	Hạ Mậu
+856	Chu Tiến
+857	Đổng Việt
+858	Phương Duyệt
+859	Lữ Bố
+860	Ngưu Phụ
+861	Hồ Phong
+862	Tống Hiến
+863	Phan Phụng
+864	Lý Túc
+865	Lý Giác
+866	Lý Biệt
+867	Lý Nho
+868	Lý Xiêm
+869	Ngũ Tập
+870	Trương Long
+871	Thư Thụ
+872	Lý Ân
+873	Lưu Lữ
+874	Kỷ Linh
+875	Hồ Trân
+876	Cửu Chính
+877	Cao Thạc
+878	Từ Vinh
+879	Dương Định
+880	Viên Thiệu
+881	Viên Thuật
+882	Viên Hi
+883	Viên Đàm
+884	Đoạn Uy
+885	Hạ Dục
+886	Ngô Khang
+887	Điền Cảnh
+888	Trương Chương
+889	Lý Hắt
+890	Hồ Xích Nhi
+891	Tần Nghi
+892	Trần Vệ
+893	Trương Bao
+894	Cung Cảnh
+895	Trương Tế
+896	Lưu Tường
+897	Du Thiệp
+898	Tống Quả
+899	Diền Giai
+900	Vương Khang
+901	Quách Tỷ
+902	Quách Đồ
+903	Trần Kỷ
+904	Trần Cung
+905	Khổng Hữu
+906	Trần Lan
+907	Đào Khiêm
+908	Tả Linh
+909	Lưu Ngải
+910	Vương Xương
+911	Hoa Hùng
+912	Hoàng Tổ
+913	Dương Phụng
+914	Đổng Hoàng
+915	Lý Mông
+916	Đổng Trác
+917	Đổng Mân
+918	Vương Phương
+919	Lôi Bạo
+920	Khoái Việt
+921	Lưu Biểu
+922	Lưu Yên
+923	Võ An Quốc
+924	Triệu Sầm
+925	Thôi Dũng
+926	Hàn Phúc
+927	Kiều Mao
+928	Trường Nô
+929	Thẩm Phối
+930	Phàn Trù
+931	Trương Dương
+932	Mộc Thuận
+933	Thái Ung
+934	Thái Mạo
+935	Hạ Chiêu
+936	Bào Tín
+937	Bào Trung
+938	Hoàng Bửu Lệ
+939	HoàngBửu.K.Thọ
+940	Hàn Xiêm
+941	Nhan Lương
+942	Ngụy Tục
+943	Tô Song
+944	Quách Huân
+945	Lưu Vệ
+946	Tuân Thái
+947	TrươngThếBình
+948	Trâu Tĩnh
+949	Tào Cửu
+950	Vệ Chi
+951	Thái Văn Cơ
+952	Chu Cống
+953	Triệu Khiêm
+954	Hứa Thiệu
+955	Tống Nhân
+956	Tống Dũng
+957	Tần Cát
+958	Từ Miêu
+959	Quách Dịch
+960	Gia Đinh Ác
+961	Tưởng Nghĩa Cừ
+962	Đốc Du Ác
+963	Vương Doãn
+964	Mã Phu
+965	Hà Mậu
+966	Vương Ma
+967	Từ Tha
+968	Công Tôn Việt
+969	Thuần Vu Quỳnh
+970	Trương Cử
+971	Trương Thuần
+972	Trương Huân
+973	Lưu.Ng.Khởi
+974	Kiều Phụ
+975	Hoàng Phủ Tung
+976	Gi.Dang ĐạiĐạo
+977	Độc Hành Đạo
+978	Dâm Tặc
+979	Hưởng Mã
+980	Thâm Thủy Tặc
+981	Sơn Tặc
+982	Phi Tặc
+983	Cường Đạo
+984	Tên Ăn Trộm
+985	Hoàng Hà Đạo
+986	Ph.Lai Hải Tặc
+987	Tiểu Hải Tặc
+988	Hải Tặc Nhị Ca
+989	Hải Tặc Đại Ca
+990	Hải Tặc
+991	Trùm Hải Tặc
+992	Trưởng Hải Tặc
+993	Đại Hải Tặc
+994	Tuy.Ng.Tiến
+995	Hải Tặc Vương
+996	Hải Tặc Võ Sĩ
+997	Lữ Uy Hoàng
+998	Tiên Từ Vô Sơn
+999	Hàn Cự Tử
+1000	Lý Vĩnh
+1001	Lư Thực
+1002	Thôi Nghị
+1003	Tiểu Thắng
+1004	Địch đại bác
+1005	Hồ Ngọc
+1006	Chúc Tý
+1007	Đinh Nguyên
+1008	Đại Sơn Tặc
+1009	Sơn Đại Vương
+1010	Vương Môn
+1011	Man Tộc
+1012	Người Mọi
+1013	Hà Ngẩu
+1014	Tống Dịch
+1015	Vương Hoành
+1016	Vương Thương
+1017	Hồ Mẫu Ban
+1018	Trình Cầu
+1019	Triệu Nga
+1020	Mạnh Công Uy
+1021	Trịnh Huyền
+1022	Kiều Huyền
+1023	Âm Tuần
+1024	Ngô Tu
+1025	Triệu Dung
+1026	Công Tôn Độ
+1027	Công Tôn Khang
+1028	Công Tôn Tục
+1029	Trương Nam
+1030	Tân Bình
+1031	Tiêu Xúc
+1032	Nghiêm Cương
+1033	Cao Thuận
+1034	Viên Thượng
+1035	Cao Cán
+1036	Mạch Nghĩa
+1037	Phùng Kỷ
+1038	Đặng Thăng
+1039	Công Tôn Phạm
+1040	Tướng TrụThiên
+1041	Dư Thị Cân
+1042	Hoàng Long
+1043	Dương Phụng
+1044	Uông Siêu
+1045	Vương Quốc
+1046	Trương Yến
+1047	Địch Bỉ
+1048	Ân Cử
+1049	Đạo Mã Tặc
+1050	Điêu Thuyền
+1051	Lưu Trưởng Quý
+1052	Trịnh Đại bác
+1053	Quản Thống
+1054	Vương Thông
+1055	Sầm Bích
+1056	TrùmTướngCướp
+1057	Bàng An
+1058	Lưu Tuấn
+1059	Man Di
+1060	Man Sĩ
+1061	Quái Ẩn Sĩ
+1062	Mã Tặc Vương
+1063	Hồ Phỉ
+1064	Nữ Sơn Tặc
+1065	Hiệp Sĩ Trẻ
+1066	Vương Hoành
+1067	Cửu Khâm
+1068	Hà Tiến
+1069	Hà Miêu
+1070	Trương Mạo
+1071	Trương Siêu
+1072	Dương Chung
+1073	Châu Thận
+1074	Bào Hồng
+1075	Tả Từ
+1076	Vương Chính
+1077	Tông Bảo
+1078	TặcHoàngHàA
+1079	TặcHoàngHàB
+1080	Cao Phan
+1081	Du Côn Đầu Hẻm
+1082	Du Côn
+1083	Quách Tổ
+1084	Công Tôn Độc
+1085	Tiểu Đạo
+1086	Lang Trung
+1087	Tô Do
+1088	Chu Hán
+1089	Bành Hổ
+1090	Quản Thừa
+1091	Lý Điều
+1092	Tùng Tiền
+1093	Vương Doanh
+1094	Quận Đô Úy
+1095	Doãn Giai
+1096	Giang Tặc Thủ
+1097	Tự Hộc
+1098	Binh Kim Giáp
+1099	Khâu Lực Cư
+1100	Dân Mộc Tộc
+1101	Mộc Tộc Trưởng
+1102	Từ Phúc
+1103	Âm Khuê
+1104	Bá NgọcBắcCung
+1105	Lý Văn Hầu
+1106	Mã Đằng
+1107	Hàn Toại
+1108	Biên Chương
+1109	Đại Phu
+1110	Đại Phu
+1111	Đại Phu
+1112	Đại Phu
+1113	Gia Cát Huyền
+1114	Chu Hạo
+1115	Chu Hạo
+1116	Quản Ninh
+1117	Đơn Kinh
+1118	Phạm Phương
+1119	Thôi Cự Nghiệp
+1120	Ch.Nam ẩn sĩ
+1121	Tự Tông
+1122	Mạnh Đại
+1123	Tưởng Kỳ
+1124	Hàn Mãnh
+1125	Lữ Công
+1126	Bàng Lương
+1127	Lưu Dư
+1128	Ngũ Phú
+1129	Dương Bưu
+1130	Hồ Tài
+1131	Lý Lạc
+1132	Đổng Thừa
+1133	Lữ Bố
+1134	Lữ Bố
+1135	Lữ Bố
+1136	Điền Âu Nghị
+1137	Lục Khang
+1138	Lục Tuấn
+1139	Lưu Sủng
+1140	Lạc Tuấn
+1141	Lưu Chính
+1142	Biên Nhượng
+1143	Lữ Do
+1144	Hứa Đảm
+1145	Ưng Thiệu
+1146	Hồ Xa Nhi
+1147	Lôi Tự
+1148	Trương Tiên
+1149	Lưu Dực
+1150	Chiêm Chi
+1151	Mao Huy
+1152	Từ Hấp
+1153	Hứa Kỷ
+1154	Vương giai
+1155	Viên Hoán
+1156	Quách Cung
+1157	Kỷ Nghi
+1158	Tiết Lan
+1159	Lý Phong
+1160	Ngô Tư
+1161	Cao Nhã
+1162	Hầu Giai
+1163	Thành Liêm
+1164	Hầu Thành
+1165	Từ Tuyên
+1166	Đai Cang
+1167	Lưu Hà
+1168	Triệu Cam
+1169	Lý Châu
+1170	Hách Manh
+1171	Tào Tính
+1172	Tần Nghi Lộc
+1173	Tôn Khang
+1174	Tôn Quan
+1175	Ngô Đôn
+1176	Y Lễ
+1177	Xương Hy
+1178	Hàn Nhân
+1179	Viên Trị
+1180	Trịnh Thái
+1181	Lý Nghiệp
+1182	Hà Quỳ
+1183	Tư Trọng Ứng
+1184	Dương Hoằng
+1185	Diêm Tượng
+1186	Lý Phong
+1187	Lương Cang
+1188	Lạc Tựu
+1189	Tần Dực
+1190	Thích Ký
+1191	Trịnh Bửu
+1192	Hứa Cang
+1193	Trương Đa
+1194	Huệ Cừ
+1195	Tôn Hương
+1196	Lưu Giai
+1197	Lưu Uy
+1198	Kiều Nhuỵ
+1199	Lưu Huân
+1200	Kim Thượng
+1201	Viên Nhân
+1202	Viên Diệu
+1203	Hoàng Kỳ
+1204	Tổ Lang
+1205	Trần Tín
+1206	Trần Mục
+1207	Vạn Diễn
+1208	Tiêu Kỷ
+1209	Lưu Diều
+1210	Tiết Lễ
+1211	Cha Dung
+1212	Trương Anh
+1213	Trần Hoành
+1214	Như Ma
+1215	Phan Năng
+1216	Nghiêm Bạch Hổ
+1217	Nghiêm Dư
+1218	Hoàng Long La
+1219	Châu Bộc
+1220	Châu Đà
+1221	Tiền Đồng
+1222	Vương Thành
+1223	Vương Lang
+1224	Châu Triết
+1225	Châu Ngạn
+1226	Châu Ngẩu
+1227	Lữ Hiệp
+1228	Tần Sói
+1229	Thương Thăng
+1230	Trương Nhã
+1231	Chiêm Cường
+1232	Hà Hùng
+1233	Điền Thọ
+1234	Công Tôn Cung
+1235	Lương Mậu
+1236	Liễu Nghị
+1237	Dương Nghi
+1238	Dương Xẩu
+1239	Tiết Hồng
+1240	Miêu Thượng
+1241	Vương Tử Phục
+1242	Ngô Thạc
+1243	Đạp Đốn
+1244	Hoàng Xạ
+1245	Lưu Hổ
+1246	Hàn Hy
+1247	Lưu Bàn
+1248	Trần Sanh
+1249	Trương Hổ
+1250	Đặng Tế
+1251	Trương Thạc
+1252	Hoa Âm
+1253	Đổng Chi
+1254	Hứa Cung
+1255	Hoàng Uyển
+1256	Dư Phu La
+1257	Lầu Ban
+1258	Ô Nhiên
+1259	Yêu Quỷ Vương
+1260	Ninja Động Địa
+1261	Ninja.Ph.Băng
+1262	Ninja Lướt Hỏa
+1263	Ninja.T.Phong
+1264	H.Quỷ Chảo
+1265	Lam Quỷ Chảo
+1266	Hồng Quỷ Chảo
+1267	Lục Quỷ Chảo
+1268	Bỉnh Nguyên
+1269	Công Tôn Mô
+1270	Trương Tản
+1271	Khách Hứa Cung
+1272	Khách Hứa Cung
+1273	Khách Hứa Cung
+1274	Hồng Minh
+1275	Hồng Tiến
+1276	Uyển Du
+1277	Ngô Miễn
+1278	Ngô Ngũ
+1279	Hoa Đang
+1280	Châu Lâm
+1281	Chu Thượng
+1282	Ngô Tử Lan
+1283	Trồng Tấp
+1284	Vương Uy
+1285	Đa Mô
+1286	Di Di
+1287	Quỷ Bí Vàng
+1288	Ti Nô Mẫu Li
+1289	Nhĩ Chi
+1290	Tiết Mô Hồ
+1291	Bỉnh Cư Hồ
+1292	Bác Cố
+1293	Bạch Kỳ
+1294	Y Di Mô
+1295	Vương Liệt
+1296	Quỷ Chảo
+1297	Thẩm Vinh
+1298	Hàn Hoành
+1299	Quách Viện
+1300	Nghiêm Kính
+1301	Hàn Phạm
+1302	Lương Kỳ
+1303	Xuân Khanh
+1304	Triệu Độc
+1305	Hoắc Nô
+1306	Chúc Áo
+1307	Vệ Cố
+1308	Phạm Tiên
+1309	Trương Thành
+1310	Trương Diêm
+1311	Cù Cung 
+1312	Giang Cung
+1313	Trương Xích
+1314	Thẩm Thành
+1315	Lưu Kỳ
+1316	Lưu Tông
+1317	Hàn Cao
+1318	Trương Duẫn
+1319	Thái Trung
+1320	Thái Hòa
+1321	Thái Huân
+1322	Thái phu nhân
+1323	Tô Phi
+1324	Trần Tựu
+1325	Đặng Long
+1326	Phó Tốn
+1327	Tống Trung
+1328	Đặng Nghĩa
+1329	Lưu Tiên
+1330	Trần Bộc
+1331	Kim Kỳ
+1332	Mao Cam
+1333	Tổ Sơn
+1334	Nan Lâu
+1335	Tô Bộc Diên
+1336	Phổ Phú Lư
+1337	Tả Hiền Vương
+1338	Phổ Tịnh
+1339	Thôi Châu Bình
+1340	Thạch Q Nguyên
+1341	Trần Tôn
+1342	Trương Võ
+1343	Phan Lâm
+1344	Phí Sạn
+1345	Vưu Đột
+1346	Bùi Tiềm
+1347	Doãn Giai
+1348	Trương Hùng
+1349	Trương Tiễn
+1350	Trương Thi
+1351	Tô Đại
+1352	Bối Vũ
+1353	Cát Bình 
+1354	Hô Trù Tuyền
+1355	Khứ Ti
+1356	Triệu Thương
+1357	Lưu Phu Nhân
+1358	Lưu Độ
+1359	Lưu Hiền
+1360	Hình Đạo Vinh
+1361	Triệu Phạm
+1362	Trần Ứng
+1363	Bào Long
+1364	Kim Tuyền
+1365	Hàn Huyền
+1366	Dương Linh
+1367	Mai Thành
+1368	Cảnh Mậu
+1369	Tô Việt
+1370	Tiểu Kim
+1371	ĐPNhân Áp Trại
+1372	TPNhân Áp Trại
+1373	Tử Hư Nhân
+1374	Tống Kiến
+1375	Đậu Mậu
+1376	Thiên Vạn
+1377	Mã Hưu
+1378	Mã Thiết
+1379	Lương Hưng
+1380	Thành Nghị
+1381	Lý Kham
+1382	Dương Thu
+1383	Trình Ngân
+1384	Hầu Tuyển
+1385	Trường Hoàng
+1386	Mã Ngọan
+1387	Lưu Chương
+1388	Trương Nhậm
+1389	Lưu Quý
+1390	Linh Bao
+1391	Đặng Hiền
+1392	Lưu Tuần
+1393	Triệu Vĩ
+1394	Vương Di
+1395	Trương Tiêu
+1396	Bàng Hi
+1397	Lý Dị
+1398	Bàng Lạc
+1399	Dương Hoài
+1400	Cao Phối
+1401	Trịnh Độ
+1402	Am Bạc
+1403	Tập Thiêu
+1404	Phù Cấm
+1405	Hướng Tồn
+1406	Trương Mẫn
+1407	Bàng Dục
+1408	Từ Ấp
+1409	Dương Phong
+1410	Lý Ý
+1411	Sĩ Tiếp
+1412	Sĩ Nhất
+1413	Sĩ Hữu
+1414	Sĩ Võ
+1415	Trương Mân
+1416	Khu Cảnh
+1417	Ngô Cự 
+1418	Hoàng Khôi
+1419	Miêu Trạch
+1420	Xuân Hương 
+1421	Trâu Tịnh
+1422	Hắc Khách
+1423	Tử Khách
+1424	Hồng Khách
+1425	Lục Khách
+1426	Sơn Đại Vương
+1427	Lư Thực
+1428	Đổng Trác
+1429	Tô Bá
+1430	Điền Ngân 
+1431	Thương Diệu
+1432	Lữ Tịnh
+1433	Bào Xuất
+1434	Lang Trĩ 
+1435	Mộng Mai cư sĩ
+1436	Lưu Hùng
+1437	Cận Phú
+1438	Thần Bốc
+1439	Kha Tỉ Năng
+1440	Bộ Độ Căn
+1441	Phù La Hàn
+1442	Tiết Quy Nê
+1443	Dục Diên
+1444	Tố Lợi
+1445	Thành Luật
+1446	Tu Võ Lô
+1447	NhạnĐiêuTuyết
+1448	Khu Liên
+1449	Phạm Hùng
+1450	Phạm Sư Mạn
+1451	Phạm Tầm
+1452	Tây Na Bà Địa
+1453	Tát Ba Địa Qua
+1454	Luân Đa Tính
+1455	Qua Luân Tri
+1456	Ất Địa Gia Lan
+1457	Phất La
+1458	A Luân
+1459	Bà La Môn
+1460	Tư La Hầu
+1461	Nhĩ Gia
+1462	Ngịch Cơ
+1463	Khôn Đàn Huống
+1464	Tăng Già Bà La
+1465	Mạn Đà La
+1466	Chu Phù
+1467	Sử Huỳnh
+1468	Lan Mộc La Na
+1469	KhổngTướcnữthị
+1470	Triệu ThụTruân
+1471	Chiêu Động Hải
+1472	Ma Cổ Lạp
+1473	Khôngtướcvương
+1474	Từ Đăng
+1475	Khúc Diễn
+1476	Tưởng Thạch
+1477	Lưu Tuấn
+1478	Mã Hán
+1479	Nhậm Kì
+1480	Tào Hóa
+1481	Trương Trụ
+1482	Yểm La
+1483	Thản Già
+1484	Long Dã
+1485	Trán
+1486	Bùi Yêu
+1487	Y Lị
+1488	An Quốc
+1489	Định Hưng
+1490	Cam Ngạn
+1491	Bạch Chí
+1492	Toa Nguyệt
+1493	Xương Kỳ
+1494	Mạnh Hoạch
+1495	Chúc Dung
+1496	Mạnh Ưu
+1497	Ẩn giả Vạn An
+1498	Ung Khải
+1499	Ngạc Hoán
+1500	Cao Định
+1501	Chu Bao
+1502	Lữ Khải
+1503	Kimhoàntamkêt
+1504	Đổng Trà Na
+1505	A Khoái Nôm
+1506	MangNhaTrưởng
+1507	ĐoáTưĐạiVương
+1508	Đớilaiđộngchủ
+1509	Ngột Đột Cốt
+1510	ĐạiQuânMộcLộc
+1511	Mạnh lân
+1512	Chúc Bưu
+1513	Mạnh đại bá
+1514	Chúc Tuyền
+1515	Chúc Anh
+1516	Khaisơnđộngchủ
+1517	AnKhê tùtrưởng
+1518	Vương Kháng
+1519	Sĩ An
+1520	Hề Nê
+1521	Hoàng Phủ Tung
+1522	Lư Thực
+1523	Chu Tuấn
+1524	Cáp cách đinh
+1525	Thiết Mộc Gia
+1526	Thạch Thí
+1527	Vũ Văn Chí
+1528	Lưu Tử Bân
+1529	Thiết Mộc Lăng
+1530	Thiết Mộc Yến
+1531	Thạch Hạo
+1532	Vũ Văn Hoằng
+1533	Vệ Hạo
+1534	ĐôngThiệnkỳchủ
+1535	TâyThiệnkỳchủ
+1536	ThácNguyênHán
+1537	Phạm Cương
+1538	Trương Đạt
+1539	UngKhải phẫnnộ
+1540	ChuBao phẫn nộ
+1541	Thiết Mộc Lăng
+1542	Thiết Mộc Lăng
+1543	Thiết Mộc Lăng
+1544	Thiết Mộc Lăng
+1545	Thiết Mộc Lăng
+1546	Thiết Mộc Lăng
+1547	Thiết Mộc Lăng
+1548	MạnhƯu sayrượu
+1549	Mạnh Tiết
+1550	ChDung phẫn nộ
+1551	Mạnh Hộ phẫnnộ
+1552	Mạnh Ưu phẫnnộ
+1553	MạnhVânđộngchủ
+1554	ChúcNinhNguyệt
+1555	ChDungbịthương
+1556	Bách Trị
+1557	Cam Lễ
+1558	Sĩ Huy
+1559	Sĩ Phụ
+1560	Lữ Linh Khởi
+1561	Đặng Ngải
+1562	Văn Ương
+1563	Lý Phong
+1564	Tư Mã Chiêu
+1565	Tào Duệ
+1566	Hàn Đức
+1567	Hàn Anh
+1568	Hàn Giao
+1569	Hàn Quỳnh
+1570	Hàn Kỳ
+1571	Tư Mã Viêm
+1572	VươngNguyênCơ
+1573	Gia Cát Chiêm
+1574	Bồ Nguyên
+1575	Tiểu Thông Túy
+1576	Tiểu Lục Nhĩ
+1577	Tiểu Xích Khao
+1578	Tiểu Linh Minh
+1579	Binh Ngao
+1580	Hà Bá
+1581	Binh Sao Biển
+1582	Tướng Cá
+1583	Quy Thừa Tướng
+1584	Tiểu Linh Minh
+1585	Hầu Tôn
+1586	Ngọc Tang Đóa
+1587	Vương Dị
+1588	Triệu Quảng
+1589	Triệu Thống
+1590	Triệu Tương
+1591	Gia Cát Quả
+1592	Cửu Vĩ Hồ
+1593	Bạch Tố Trinh
+1594	Quỷ Diện Ác Ma
+1595	Tư Mã Chiêu
+1596	Cam phu nhân
+1597	Ngô Phổ
+1598	Tiểu Ngạc
+1599	Trương Đại Ca
+1600	Lưu Quả Phụ
+1601	Lý Lão Đầu
+1602	Khúc Lão Ma Ma
+1603	Bạch Lão Nhân
+1604	Tà Lão Đầu
+1605	Tôn Nhị
+1606	Con bác Vương
+1607	Tiểu Thôn Cô
+1608	Mã cô nương
+1609	Chú Trần
+1610	Bác Vương
+1611	A Ma
+1612	Tiểu Cửu Tử
+1613	Ngô Đại Ma
+1614	Điền.V.Ngoại
+1615	Hạng Lão Bác
+1616	Ngũ Lão Đầu
+1617	Bà Lão Trịnh
+1618	A Hổ
+1619	Vương Đại Ma
+1620	Đại Ngưu
+1621	Kim Vô Lại
+1622	Lý Lang
+1623	Hương Hương
+1624	Tiểu Lưu Manh
+1625	Bác Lổ
+1626	Tiểu Túc Tử
+1627	Ông Lão Trần
+1628	Hàn Đại Thẩm
+1629	Đại Mao
+1630	Bà Lão Mạnh
+1631	Chú Điền
+1632	Tiểu Mỹ
+1633	Pác Lang
+1634	Lưu Bình
+1635	Phạm Tiên Sinh
+1636	Tiểu Đỗ
+1637	Hầu Đại Ma
+1638	A Vinh
+1639	Lão Nhạc Sư
+1640	Mẹ Thái Sử Từ
+1641	Ngô Tiểu Muội
+1642	Phan A
+1643	Bắc Tinh Quân
+1644	Nam Tinh Quân
+1645	Loạn Dân
+1646	Vu Cát
+1647	Thôn Dân Ác Dữ
+1648	A Toàn
+1649	Duy Duy
+1650	Nạn Dân
+1651	Lão Học Cứu
+1652	Anh Bình
+1653	Bác Trần
+1654	Chú Đai
+1655	Tô Thương
+1656	Ngô Tiểu Muội
+1657	Mạc Đại Ca
+1658	Nghiêm Quả Phụ
+1659	Tà Lão Bác
+1660	Lý Ma Ma
+1661	Trịnh Lão Đầu
+1662	Cổ Tiều Phu
+1663	Quách Sanh
+1664	A Đào
+1665	Lưu Cô Nương
+1666	Lưu A Ma
+1667	Lưu Tiểu Đệ
+1668	Cao Đại Ma
+1669	Long Cô Cô
+1670	Triệu Lão Bác
+1671	Vương Lão đầu
+1672	Bà Lão Thẩm
+1673	A Long
+1674	Ngưu Đại Ma
+1675	Đại Ngốc
+1676	Tăng Tiểu Ca
+1677	Chiêm Cường
+1678	Hà Hùng
+1679	Điền Thọ
+1680	Diệp Đại Bác
+1681	Tiên Đồng
+1682	Hoa Đà
+1683	Hoàng Đại Thẩm
+1684	Đầu To
+1685	Trương Lão Lão
+1686	Chú Củng
+1687	Tiểu Anh
+1688	Hổ Cang Đường
+1689	Đỗ Bình
+1690	Tề Tiên Sinh
+1691	Tiểu Lưu
+1692	Má Trần
+1693	A Thông
+1694	Tiểu Ninh
+1695	A Chí
+1696	Vệ Đại Ca
+1697	Thương Binh
+1698	Khuâng Vác
+1699	Tiểu Diêu
+1700	Tú Tú
+1701	Cơ Cô Nương
+1702	Cô Nhũ Phân 
+1703	Chị Thẩm
+1704	Trương Ma Ma
+1705	Đoán Mệnh Tiên
+1706	Chủ LôiĐàiNgầm
+1707	Lý Phụ
+1708	Hoàng Sư Phụ
+1709	Ông Tiền
+1710	Đại Nhân
+1711	Tổng Tiêu Đầu
+1712	Tiếp Tân
+1713	Tiêu Sư
+1714	Than Tử Thủ
+1715	Đường Lão Bác
+1716	Bà Lão Vạn
+1717	Độc Cư Lão Bác
+1718	Ông Lão Hà
+1719	Bác Liễu
+1720	Lão Cư Lưu
+1721	Khuyết Tuyên
+1722	Phục Cô Nương
+1723	Quả Phụ Bình
+1724	Tiểu Hồng
+1725	Ông Thợ Lão
+1726	Nữ Nhạc Sư
+1727	Dì Trần
+1728	Bác A Thông
+1729	Tiểu Đao
+1730	Khai Khoáng
+1731	HồngThươngNhân
+1732	Vân Du Đạo Sĩ
+1733	Tử Tiểu Binh
+1734	Dân Thô Bạo
+1735	Tiểu Hoa Tinh
+1736	Tặc Hang Động
+1737	Chu Bình Dung
+1738	Thuyền Hòa
+1739	Nữ Tặc
+1740	Mao Hoàn Cơ
+1741	Tây Sơn Binh
+1742	TâySơn ĐạoNhân
+1743	Nữ Khoáng Tặc
+1744	Đạo Khoáng Ca
+1745	ĐạoKhoáng Lĩnh
+1746	Binh Bồng Bồng
+1747	BồngLaiTTrưởng
+1748	Lang Đầu Đệ
+1749	Lang Đầu Ca
+1750	Người Đạo Mộ
+1751	Luyện Xác Nhân
+1752	Bà Gọi Hồn
+1753	Vạn cô nương
+1754	SơnTrạiPhuNhân
+1755	Người Hầu
+1756	LôiĐàiTruyềnSư
+1757	Chủ Lôi Đài
+1758	Đinh Ngư Phu
+1759	Hải Đại Ca
+1760	Tiên Nhân
+1761	Cô Dệt Vải
+1762	NhàBuônQuáiLạ
+1763	Sái Hoa Đà
+1764	Lão Tiều Phu
+1765	Hỏa Đức Quân
+1766	Ti Di Hô
+1767	Y Chi Mã
+1768	Nan Thăng Mi
+1769	Ngưu Lợi
+1770	Di Mã Thăng
+1771	Nô Giai Đề
+1772	Lục Vũ
+1773	Đổng Phụng
+1774	Kiều Tiểu Muội
+1775	Hoàn Hoàn
+1776	Phụng Nghi
+1777	Linh Linh
+1778	Tiểu Thi
+1779	A Trình
+1780	Tr.Thôn Trưởng
+1781	Ông Lão Lục
+1782	A Nghĩa
+1783	Anh Tú
+1784	Lai Tiều Phu
+1785	Từ Lão Đầu
+1786	Đại Tùng
+1787	Tuệ Tuệ
+1788	Hạo Nam
+1789	Dì Giặt Đồ
+1790	Tăng Tiểu Đệ
+1791	Chu Tiểu Muội
+1792	Lữ Quý Phụ
+1793	Nghệ Nhi
+1794	Thợ mộc Hứa
+1795	Đại Hùng
+1796	Bội Bội
+1797	Tiểu Mẩn
+1798	Âu học sĩ
+1799	Đứa Con Hoang
+1800	Phù Dung
+1801	Tạ Thiếu Gia
+1802	Châu Ngư Phủ
+1803	Tiểu Hoa
+1804	Tiểu Song
+1805	Ngô Liệp Hộ
+1806	Người Mọi Lô
+1807	Châu Hiếu Liêm
+1808	Châu Mẫu
+1809	Đạo Sĩ Ác
+1810	Vương Đại Thẩm
+1811	Na Lỵ
+1812	Tâu Mã Hầu
+1813	Lỗ Tư
+1814	Lan Lan
+1815	Thổ Khố Lý
+1816	Băng Băng
+1817	Ng.Bắt Nghêu
+1818	Khùy Nương
+1819	Hiệp Nhị Ca
+1820	Chủ LoạnĐấuĐài
+1821	Châu Thị
+1822	TruyềnTốngSư
+1823	Chủ Võ Đài
+1824	Tiểu Hổ
+1825	Nguyệt Lão
+1826	Hoa Đồng
+1827	Chiêu Đãi
+1828	Ng.Công Chứng
+1829	Hồ Hoa
+1830	Quan Định
+1831	PhỏngChứcNương
+1832	Hoa Đồng
+1833	Thiên Hạc
+1834	Tiểu Tuyết 
+1835	Diêm Bắc Quân
+1836	Diêm Nam Quân
+1837	Chủ Đoàn P
+1838	Chủđài Kchiến
+1839	Huỳnh Tiểu Nhị
+1840	Thư Đồng
+1841	Kim Phu Nhân
+1842	Tiểu Thuần Ca
+1843	Thư Nhị Gia
+1844	Ông Chủ Hầu
+1845	Chú Kha
+1846	Mục nhị ca
+1847	Lương Đại Lang
+1848	Lương Nhị Lang
+1849	Lương Tam Lang
+1850	Huỳnh Tiểu Ca
+1851	A Quốc
+1852	Tiểu Lục Đậu
+1853	Dân Buôn Bán
+1854	Tửu Thốt
+1855	Dương Phong
+1856	Nhị Lão Gia
+1857	Thanh Vân
+1858	Tú Nhi
+1859	Hương Nhi
+1860	Lục Lạc
+1861	Cô Công Tôn
+1862	Thiệu Phu Nhân
+1863	Hình phu nhân 
+1864	Hồng Anh
+1865	Tiểu Lợi Tử
+1866	Tiểu Đào Tử
+1867	Bác Bánh Trưng
+1868	Người làm dữ
+1869	NVthụlýtrậnđấu
+1870	NgườiMảiNghệ
+1871	Lỗ Tạp
+1872	Dũng Sĩ Ỷ Châu
+1873	Bào Lão Gia
+1874	VGTruyềnTốngSư
+1875	Truyền Tống Sư
+1876	Bắc Hà
+1877	Chủ Lôi Đài
+1878	Tiểu Đồng
+1879	Ngưu Lang
+1880	Tầng Lương Y
+1881	Sứ gỉa hung nô
+1882	Tề phu nhân
+1883	Chu Ngư Phu
+1884	Ngô Trưởng Lão
+1885	Chủ LĐài Stồn
+1886	Phi Lang Trung
+1887	Nghệ nhân g hồ
+1888	Kim Đại Bằng
+1889	Ô Tam Quế
+1890	Lý Thiết Cân
+1891	ThườngThiếtCân
+1892	Vi Lạc Sư
+1893	Nmúa thải y
+1894	Thương Binh
+1895	Khâu Bỉ Đặc
+1896	Cam Khởi
+1897	Quyết Na
+1898	Nữ Vu Di Châu
+1899	Dưỡng Mã Quan
+1900	Phàn Thị
+1901	Khương Tiểu Đệ
+1902	Tỳ Nữ
+1903	Tạ Sư Phụ
+1904	Thuần Tượng Sư
+1905	Phạm Sư Phụ
+1906	Sa Thôn Trưởng
+1907	O Ni 
+1908	Thản Ca
+1909	Sa Da
+1910	Mã Lão Bá
+1911	Mã Nhị Thúc
+1912	Tiểu Truyền 
+1913	Hồ Nhị Bá
+1914	Ngọc Tượng 
+1915	Nha Dịch Ca
+1916	Ti Cẩu
+1917	Bào Xuất Mẫu 
+1918	DLiệpNhân 
+1919	Hoa Liệp Nhân 
+1920	Tô Nương Tử 
+1921	Bào Thành
+1922	Thái Bì Tượng
+1923	Giả Ngẫu
+1924	Cổ Đại Ma
+1925	Thiên Thần Cô 
+1926	Huyện Lệnh
+1927	Nhất Ưu ĐT
+1928	Mạnh Đại Lão
+1929	Triệu Đại Thúc
+1930	Thôn Nhân
+1931	Thôn Nhân
+1932	Triệu Nhan
+1933	Triệu Phụ
+1934	Bắc Ông
+1935	Nam Ông
+1936	Thôn Nhân 
+1937	Thôn Nhân 
+1938	Triệu Tiểu Ca
+1939	Trưng Muội Tử
+1940	Lữ cô nương
+1941	Người nuội voi
+1942	Tiểu Mục đồng
+1943	Giản thiếu phụ
+1944	Xe em bé
+1945	Người dạy bơi
+1946	Tô Lợi Á
+1947	Phổ Lâm
+1948	Tra Khắc La
+1949	Cơ Đặc La
+1950	Châu Lệ
+1951	Mạn Ni Văn
+1952	Chu Khắc
+1953	Uyển Ni
+1954	Thái Tiểu Hồng
+1955	Thái Tiểu Mai
+1956	Xảo Nương
+1957	Thợ rẽn ngựa
+1958	Ô Nhật Na
+1959	Ô Lan Đồ Nhã
+1960	A Cổ Đạt Mộc
+1961	Cáp Nhĩ Ba La
+1962	Tháp La
+1963	Gia Cát Nguyên
+1964	Lưu Bân
+1965	Bạch Bình
+1966	Bạch Phụ
+1967	Ác viên ngoại
+1968	Sa Khắc
+1969	Nạp Lí Tư
+1970	Phan Na Lai
+1971	Kiển Tông
+1972	Kỷ đại phu
+1973	Lục dật vũ giả
+1974	Tưởng tiểu đệ
+1975	Tôn A
+1976	Vợ Tưởng Tế
+1977	Nga Tần
+1978	Mã Lãng
+1979	Mẹ Khương Tự
+1980	Vợ Triệu Ngang
+1981	Bất Cư Trưng
+1982	Tắc La
+1983	Kiến Tố
+1984	Đô Mạt
+1985	Tề Lê
+1986	Hưu Mạc Bá
+1987	Tịch Trí
+1988	Gia Đặc Nô
+1989	Nùng Kỳ
+1990	Nguyên Mộng
+1991	Quân Đức
+1992	Phàm Thần
+1993	Đặng Huyền Chi
+1994	Đỗ Lỗ Ni
+1995	Liễu Thụ Xuân
+1996	KimĐao ĐạiTrù
+1997	Đỗ Hộ
+1998	Phác Hồ
+1999	Quỷ bốc
+2000	Quỷ dược
+2001	Gia tháp
+2002	Beo nha lang
+2003	Hiên viên
+2004	Hồ độ long
+2005	Chúc Đại Trùng
+2006	Mãnh Đại Đồ
+2007	Mạnh Khôi
+2008	Lam hổ nhi
+2009	A Thi Mã
+2010	A Hắc
+2011	Nhiệt bố ba la
+2012	A Chi
+2013	Biển nóng
+2014	Lão Dữu nông
+2015	Noel trù sư
+2016	Tiểuácma Noel
+2017	Tô Việt
+2018	Ngô áp ngục
+2019	Ngọc trụ
+2020	Kim phong
+2021	Ngườihoáduyên
+2022	Cônhichiếnhoả
+2023	Cônhichiếnhoả
+2024	Triết Đơn
+2025	Vu Cân
+2026	Trạch Ý
+2027	Thạch Thành
+2028	Thiết Toàn
+2029	Thạch Di
+2030	Vũ Văn Cảnh
+2031	Nguỵ Doãn
+2032	Thiết lão lão
+2033	Thạch lão lão
+2034	My tiểu muội
+2035	Tiểu quỷ vương
+2036	Tà Mã Vương
+2037	Tà Mã Vương
+2038	Ác bộc nhân
+2039	Nhiệt bố ba la
+2040	A Chi
+2041	Biển nóng
+2042	A Bảo
+2043	Xảo Nương
+2044	Chu Phối nương
+2045	Vươnglãoch.quỹ
+2046	Vương tiểu ca
+2047	Xảo Đồ Tể
+2048	Xảo Tam Nương
+2049	Bà Mối
+2050	Trị Nguyên Đa
+2051	Trị Nguyên Đa
+2052	Hạ A Mang
+2053	Hộ săn bắn
+2054	Viên ăn mày
+2055	Lương Kiền
+2056	Hạ Hầu Mậu
+2057	Chủ lôi đài
+2058	Tiểu Nhị
+2059	Chủ tiệm thuốc
+2060	Chủ Lò Rèn
+2061	Chủ tiền trang
+2062	NhàBuôn TạpHóa
+2063	Chủ Quán Trà
+2064	Chủ tiệm thuốc
+2065	Chủ tiệm thuốc
+2066	Chủ Lò Rèn
+2067	Chủ Lò Rèn
+2068	Chủ tiền trang
+2069	Chủ tiền trang
+2070	NhàBuôn TạpHóa
+2071	NhàBuôn TạpHóa
+2072	Tiểu Nhị
+2073	Tiểu Nhị
+2074	Ng.Bán Hoa Quả
+2075	Chủ Khách Sạn
+2076	NhàBuôn Xe Đẩy
+2077	NhàBuôn Xe Đẩy
+2078	Chủ Giáp Phục
+2079	Thương Nhân A
+2080	Tiền Trang 
+2081	Thươngnhân BDY
+2082	NgườiĐổiThưởng
+2083	NhàBuôn ViênTử
+2084	NgườiĐổiThưởng
+2085	NhàBuôn Dấu Ấn
+2086	NhàBuôn Dấu Ấn
+2087	Chủ Sòng Bạc
+2088	Ông Chủ Cờ Bạc
+2089	Thương Nhân
+2090	Thương Nhân
+2091	Thương Nhân
+2092	Thương Nhân
+2093	Thương Nhân
+2094	Thương Nhân
+2095	CChiếnViên
+2096	Tín Vật Viên
+2097	Hậu Tống Quan 
+2098	Hoàn Đại Thư
+2099	Hoàn Nhị Thư 
+2100	Hoàn Tam Thư
+2101	Hoàn Tiểu Muội
+2102	TChiếnViên
+2103	Tiền Trang Chủ
+2104	Quỷ Đại Phu
+2105	Đạo Sĩ
+2106	Tạp Hoá Thương
+2107	Thương Nhân
+2108	Thương Nhân
+2109	Thương Nhân
+2110	Thương Nhân
+2111	Thươngnhândmục
+2112	Tiềntrangdumục
+2113	Vu Y
+2114	Thủychiến binh
+2115	Người qlý ụtàu
+2116	Ngườilàmthuyền
+2117	Ngườibánthuyền
+2118	Thủy chiến đốc
+2119	Vũ Xương đốc
+2120	Vũ Xương Úy
+2121	Nho Tu đốc
+2122	Nho Tu úy
+2123	Sài Tang đốc
+2124	Sài Tang úy
+2125	Giang Lăng đốc
+2126	Giang Lăng úy
+2127	Công An đốc
+2128	Công an úy
+2129	Ngưu Chử đốc
+2130	Ngưu Chử úy
+2131	Thợ thuyền nhỏ
+2132	Thợ thuyền vừa
+2133	Thợ thuyền to
+2134	Quan cấp đạn
+2135	Q.cấp thủybinh
+2136	Quân giới sĩ
+2137	Chủ tiền trang
+2138	T.nhân tạp hóa
+2139	Chủ tiệm trà
+2140	Chủ tiệm thuốc
+2141	Chủ nhà trọ
+2142	Tiểu Nhị
+2143	Thương nhân
+2144	Thương nhân
+2145	Thương nhân tb
+2146	Thợ rèn NamMan
+2147	Đồ tễ Nam Man
+2148	Đồ tễ Nam Man
+2149	Quản Lý LôiĐài
+2150	Th.nhân du mục
+2151	Địa chủ du mục
+2152	Tiềntrangdumục
+2153	Thợ rèn du mục
+2154	Thợ rèn du mục
+2155	N.nhân tuỳquân
+2156	Quân Áo Giáp
+2157	Lính
+2158	Hộ Vệ
+2159	Vệ Sĩ
+2160	Vệ Binh
+2161	Dung Binh
+2162	Tiểu Lính
+2163	Sĩ Lính
+2164	Lính trưởng
+2165	Thủ Thành Binh
+2166	Binh
+2167	Tiểu Binh
+2168	Sĩ Binh
+2169	Tráng Sĩ Binh
+2170	Thiết.Gi.Quân
+2171	Hổ Náo Quân
+2172	Phi Hùng Quân
+2173	Ngự Lâm Quân
+2174	ThânVệĐTrưởng
+2175	Dâu Châu Binh
+2176	Trác Quận Binh
+2177	Đào Binh
+2178	Đào Binh
+2179	Ô Hằng T.Binh
+2180	Ô Hằng T.Lính
+2181	Dâu Châu quân
+2182	Báo quân sĩ
+2183	Thạch Hổ binh
+2184	Vân Báo Nữ
+2185	Cẩm tử quân
+2186	Hắt Hùng.D.Sĩ
+2187	Chu Nha.D.Sĩ
+2188	Báo Quân Vệ
+2189	Báo Quân Quan
+2190	Báo Võ Sĩ
+2191	Hổ Vệ Binh
+2192	Hổ Quân Vệ
+2193	Hổ Quân Trưởng
+2194	Hổ Võ Sĩ
+2195	Hổ Dũng Sĩ
+2196	Hùng Quân Vệ
+2197	Hùng.Q.Trưởng
+2198	Môn Hạ Đốc
+2199	Tướng Bộ Khúc 
+2200	Bắc Quân Hiệu
+2201	Tinh Binh
+2202	Dịch Châu Binh
+2203	Tinh Duệ Binh
+2204	Võ Duệ Binh
+2205	Phong Duệ Binh
+2206	Cường Binh
+2207	Mãnh Binh
+2208	Cường Đao Binh
+2209	Thíêt Vệ Quân
+2210	Thiết VệTrưởng
+2211	Hương Dũng
+2212	Đồng Giáp Binh
+2213	Nhất Giai Binh
+2214	Thiết Giáp Bin
+2215	PhongTrận Binh
+2216	Mãnh Giáp Sĩ
+2217	Cường Giáp Sĩ
+2218	Diêm Giáp Sĩ
+2219	Tinh Nhuệ Binh
+2220	Đấu Hạm Sĩ
+2221	TâyLĐao Binh
+2222	TâyLThuẫn Binh
+2223	TâyLThân Binh
+2224	TâyLTinh Binh
+2225	ÔHằng Đao Binh
+2226	Ô Hằng.D.Sĩ
+2227	Qu.Thanh Dịch
+2228	Ô Hằng Ch.Sĩ
+2229	QuânLầuThuyền
+2230	Hắt Giáp Sĩ
+2231	Mông Xong Quân
+2232	Xích Giáp Sĩ
+2233	Lâm tặc
+2234	Hộ Lâm Liệt Sĩ
+2235	Tử Võ Sĩ
+2236	Hắt Võ sĩ
+2237	Lam Võ Sĩ
+2238	Lục Võ Sĩ
+2239	Kinh Sư Binh
+2240	Phong Thủy Sư
+2241	Huyền Võ Binh
+2242	Kiện Võ Binh
+2243	Diệu Võ Binh
+2244	Chấn Võ Binh
+2245	Uy Võ Binh
+2246	Hùng Võ Binh
+2247	Liệt Võ Binh
+2248	Dương Võ Binh
+2249	Phấn Võ Binh
+2250	Trấn Viễn Binh
+2251	Thần Võ Binh
+2252	Tinh Võ Binh
+2253	Định Viễn Binh
+2254	Tịnh Võ Binh
+2255	Thiên Võ Binh
+2256	Quang Võ Binh
+2257	Huyền Võ Quân
+2258	Kiện Võ Quân
+2259	Diệu Võ Quân
+2260	Chấn Võ Quân
+2261	Uy Võ Quân
+2262	Liệt Võ Quân
+2263	Hùng Võ Quân
+2264	Dương Võ Quân
+2265	PhongPhàm Binh
+2266	Hỏa.Th.Binh
+2267	Chiến.Th.Binh
+2268	Diêm Võ Quân
+2269	Định Viễn Quân
+2270	Tịnh Võ Quân
+2271	Thiên Võ Quân
+2272	Quang Võ Quân
+2273	Độc Tướng
+2274	Sư Nha
+2275	Khúc Nha Nữ
+2276	Thiên.H.Sư
+2277	Thi Lệ Binh
+2278	Duyệt.Ch.Binh
+2279	Quan.Tr.Binh
+2280	Uy Viễn Quân
+2281	Phụ Viễn Binh
+2282	Đạo Đồng
+2283	HoaSơn ĐạoNhân
+2284	Bút Đao Tướng
+2285	Võ Sư
+2286	Binh Lao Sắt
+2287	Tịnh Viễn Binh
+2288	Bố Lỗ
+2289	Tượng Thanh
+2290	Phá Đao Binh
+2291	Võ Binh
+2292	Nô Lệ
+2293	QuyềnGiápSĩ
+2294	Hàn Thuẫn Binh
+2295	NgânThuẫnBinh
+2296	Tr.Trợ Quân
+2297	Bàng Giáp Sĩ
+2298	Quét Đao Binh
+2299	Thủ Kích Binh
+2300	Tr.Phụ Quân
+2301	Sư Giáp Sĩ
+2302	Binh Kích Móc
+2303	Binh Kích Gai
+2304	Tr.Tham Quân
+2305	Mộc Giáp Sĩ
+2306	Tr.Đao Binh
+2307	H.Kiếm Binh
+2308	Tr.Hộ Quân
+2309	Đội Đại Đao
+2310	Dúc Liệt sĩ
+2311	Khư Hổ Binh
+2312	Tu La Quân
+2313	Ngưu Huyền Tử
+2314	Trường Vệ Quân
+2315	Huyền Sơn Tử
+2316	Đạo Linh Tử
+2317	Sơn.Tr.Cư Sĩ
+2318	Sơn Trại Vương
+2319	Sơn Vệ Sĩ
+2320	Sơn Nữ
+2321	Lão Ẩn Sĩ
+2322	Kinh.Th.Binh
+2323	Đông Hải Tặc
+2324	Tr.Giang Đạo
+2325	Đại Hải Đạo
+2326	LươngGiangTặc
+2327	Giang Hồ Phỉ
+2328	Lan Hà Bá
+2329	Đạo Tân Tặc
+2330	Xướng Hải Đạo
+2331	Hắt Phàm Tặc
+2332	Bắc Hải Binh
+2333	Đông Quận Binh
+2334	Hạ Ti Binh
+2335	Như Đài Binh
+2336	Thọ Xuân Binh
+2337	Lô Giang Binh
+2338	Trần Lưu Binh
+2339	HứaXươngBinh
+2340	UyểnThànhBinh
+2341	LạcDươngBinh
+2342	Trường An Binh
+2343	Tây Lương Binh
+2344	Bắc Địa Binh
+2345	Cấm Vệ Binh
+2346	DâuChâuTrưởng
+2347	DịchChâuTrưởng
+2348	Th.Châu Trưởng
+2349	Từ Châu Trưởng
+2350	DuyệtCh.Trưởng
+2351	Thi Nô Trưởng
+2352	Quan.Tr.Trưởng
+2353	Hải Nô
+2354	Thâm Hải Tặc
+2355	Hải Tặc Dao
+2356	Hải Tặc.Th.Thủ
+2357	Tướng Hải Tặc
+2358	Đại Ca Hải Đạo
+2359	Hải Đạo Vương
+2360	Phi Hùng Binh
+2361	Phi Hùng Võ Sĩ
+2362	PhiHùngTQuân
+2363	Đội Áo Đen
+2364	PhiHùngQuânSĩ
+2365	PhiHùngQTrưởng
+2366	Ng.Mọi Sơn Lâm
+2367	Đại Thổ Phỉ
+2368	Kỹ Sư
+2369	Quân Sư
+2370	Mưu Sư
+2371	Mưu Sư
+2372	Sách Sư
+2373	Sách Sư
+2374	Phiến Tướng
+2375	Phiến Tướng
+2376	Phiến Tướng
+2377	Đại Mạc Binh
+2378	Đại Mạc Quân
+2379	Đại Mạc Lính
+2380	Nha Môn Tướng
+2381	Lục Lâm SơnTặc
+2382	Mộ Binh Trưởng
+2383	D.Châu Trưởng
+2384	Kiến.Ng.Binh
+2385	Ngô Quận Binh
+2386	Sơn Việt Binh
+2387	Việt Nữ Nhi
+2388	Bạch Phàm Tặc
+2389	Lục Hổ Chảo
+2390	Hồng Phàm Tặc
+2391	Hắt Giao Long
+2392	Tử Phàm Tặc
+2393	Thanh Ngạc Nha
+2394	Đức Vương Binh
+2395	Dũng Tử Sĩ
+2396	Bà Triệu Quỷ
+2397	Tuyệt Trạch Ma
+2398	Phù Diệp Binh
+2399	H.Cường Nhân
+2400	Đội Đức Vương
+2401	Quân Thiết Tặc
+2402	Hoàng Phàm Tặc
+2403	Xích Xà Lân
+2404	Hội Khi Binh
+2405	Tra Thục Binh
+2406	Sơn Việt Sĩ
+2407	Phi Nữ Lính
+2408	ThượngDao Binh
+2409	Tham Mưu
+2410	Trường Sử
+2411	Quân Sư
+2412	Tham Quân
+2413	Hộ Quân
+2414	Giám Quân
+2415	Tuyên Quân
+2416	Điển Quân
+2417	Thốt Bác
+2418	Phiến Tướng
+2419	Tì Tướng
+2420	Đô Úy
+2421	Bộ Túc
+2422	Binh Tào
+2423	Huyện Úy
+2424	Hiệu Úy
+2425	Việt Sơn Lan
+2426	Dã Hầu Quân
+2427	Phan Sơn Nữ
+2428	Huân Quỷ Mao
+2429	Việt Tráng Sĩ
+2430	HùngTộc Trưởng
+2431	Việt Cừ Sóai
+2432	Báo Vân Nữ
+2433	Liêu Đông Quân
+2434	Th.Bình Binh
+2435	Ô Hằng Binh
+2436	Liêu Tuyết Sĩ
+2437	BắcThươngBinh
+2438	Liêu Giáp Quân
+2439	Tinh Kích Binh
+2440	Phu Dư Man
+2441	Quán Nô Sĩ
+2442	Ấp Lâu Man
+2443	Tiêu Nô Binh
+2444	Ốc Tữ Man
+2445	Tuyệt Nô Lính
+2446	Người Săn Gấu
+2447	Người Săn Cọp
+2448	Tuyết Tộc Nam
+2449	Tuyết Tộc nữ
+2450	Binh Da Sói
+2451	Giác Nha Nữ
+2452	Binh Móng Sói
+2453	Huyết Dũng Sĩ
+2454	Cư Xà Mao
+2455	Bạch Sói Hầu
+2456	Báo Cơ
+2457	Sư Hao Sĩ
+2458	Hồ Nam
+2459	Đội Mao Nữ
+2460	BinhLangVương
+2461	Đơn Dư Tử Sĩ
+2462	Tướng Sói Xám
+2463	Ô Hằng Nữ
+2464	Việt Lính
+2465	Việt Sĩ
+2466	Di Châu Binh
+2467	BinhĐaoMãHàn
+2468	ThươngBinhMHàn
+2469	Võ Sĩ Mã Hàn 
+2470	Tướng Mã Hàn
+2471	Đao Phủ Thủ
+2472	Đao Phủ Thủ
+2473	Binh Thuận Nô
+2474	Binh Quế Lâu
+2475	Binh Sấu Dân
+2476	Binh Nhược Dân
+2477	Bệnh Thôn Phu 
+2478	Binh Tân Dân
+2479	Binh Tiểu Dân
+2480	Lão Lý Trưởng
+2481	Th.Lâu Ẩn Sĩ
+2482	Thủ Tiết Ẩn Sĩ
+2483	Lão Nông Phu
+2484	Trang Gia Hán
+2485	Binh.Gi.lăng
+2486	Binh Nam Quận
+2487	Tẩu Hà Thủ
+2488	Du Đình thủ
+2489	Lính Kình Châu
+2490	Giảng võ quân
+2491	Binh Giác Man 
+2492	Binh Tôn Man
+2493	Dung Binh
+2494	Phi Nữ Tôn Tộc
+2495	Tr.Quân Hiệu
+2496	Tôn Biêu Hán
+2497	ThiếtKích Quân
+2498	Đội Tiên Phong
+2499	Binh DiêuTương
+2500	Ẩn Đà Thủ
+2501	Đội Trịch Tiêu
+2502	Thăng Phàm Thủ
+2503	Binh Kỳ Hiệu
+2504	Thủy Sư Trưởng
+2505	Quân Tiền Bộ
+2506	Phục Binh
+2507	Túc Vệ Binh
+2508	Hổ Bàn Binh
+2509	Vũ Lâm Sư
+2510	Quân Ngự Doanh
+2511	Binh Sói Nuốt
+2512	Hổ Tiêu Võ Sĩ
+2513	Dịch Đao Binh
+2514	Mãnh Trảo Sĩ
+2515	Liệt Trãm Sĩ
+2516	Long Vệ
+2517	Phi Tướng
+2518	Cự Bằng Đấu Sĩ
+2519	Kinh Châu Binh
+2520	Th.Dương Binh 
+2521	Tuần Giang Sử
+2522	Khoái.Th.Binh
+2523	Hà Thương Binh
+2524	Quan Tiểu Hiệu
+2525	Quân Hà Đông
+2526	Lính Tuần La
+2527	Viêm Võ Sĩ
+2528	Khải Giáp Binh
+2529	Đốn Điền Binh 
+2530	Lam Võ Sĩ
+2531	Phản Đao Thủ
+2532	Trấn Quân Hiệu
+2533	Vũ Sơn Nữ
+2534	Dã Nhân
+2535	LínhBiênPhòng
+2536	ChủBiênPhòng
+2537	Binh Hung Nô
+2538	ThươngBinhHN
+2539	Khiết Dũng Sĩ 
+2540	Khiết Trán Sĩ
+2541	ĐaoBinhHungNô
+2542	ThủKíchHungNô
+2543	LínhTr.Thành
+2544	Tr.Thành Vệ
+2545	Lính Bình Châu
+2546	Sĩ Bình Châu
+2547	Chu Xấp Binh
+2548	Đoàn Cận Vệ
+2549	Quân Sở Duyệt
+2550	BinhThiếtTrận
+2551	ThủySưKinhSở
+2552	Giám Đấu Sĩ
+2553	QuânThiếtĐôn
+2554	Binh Đặc Trận
+2555	Võ Sĩ GiápCứng
+2556	Hắc Báo Vệ
+2557	Quân Đầu Bếp
+2558	BinhTrườngSa 
+2559	Ninh Viên Binh
+2560	Đội Đặc Kích
+2561	Trấn Nam Binh
+2562	Đồng Tùy Quân
+2563	Chu Đôn Binh
+2564	Tiểu Úy
+2565	Nam Dũng Sĩ
+2566	Khoai Đao Thủ 
+2567	Sở Hổ Sĩ
+2568	Mã Đao Thủ
+2569	Linh Lăng Binh
+2570	Tương Hương Vệ
+2571	Tuần Hãng Viên
+2572	TiểuThuyềnBinh
+2573	Q.Phản Giang
+2574	Cự Giam Binh
+2575	Binh Võ Lăng
+2576	TrạiTrậnThương
+2577	Hưng Hán Quân
+2578	Tiểu Hiệu Trại
+2579	TrườngKíchThủ
+2580	Ỷ Đạo Binh
+2581	Man Võ Dã
+2582	Cường Đôn Quân
+2583	Thủy Binh
+2584	Man Cuồng Ma
+2585	Man Cuồng Ma
+2586	Đoạt Hạm Binh
+2587	Trưởng PBinh
+2588	Tráng Sĩ Trại 
+2589	Chẩm Đao Thủ
+2590	Lương ChâuBinh
+2591	Tuần Tiêu Binh
+2592	KKhương Binh
+2593	Khương Quân Vệ
+2594	Thương Binh TN
+2595	Địch Dũng Sĩ
+2596	Mong Hổ quân
+2597	Khương Đao Thủ
+2598	Lãng Hữu Binh
+2599	Sáo Tham Trại 
+2600	LChâu Thiết Vĩ
+2601	TruânBiên Quân
+2602	Tiêm Kích Binh
+2603	PhươngTrân Đội
+2604	Thảo Nghị Quân
+2605	Liệtphong võsĩ
+2606	Điển Vi Binh
+2607	Thiết bạiBinh 
+2608	Nhung Tướng
+2609	XíchKhươngBinh
+2610	Tề Vũ Quân
+2611	LãngTrungTrại 
+2612	Kích Trận Binh
+2613	Luyện ChuyQuân
+2614	Kinh Trì Binh
+2615	Hoảng Đao Thủ
+2616	Tuần Sơn Binh
+2617	Kì SơnTrú Quân
+2618	Đội Hắc Long 
+2619	TrườngĐịnhQuân
+2620	Đội Thiết Vĩ
+2621	UngLương Binh 
+2622	Quân TiềnPhong
+2623	Binh Hổ Thân
+2624	Binh bân lang 
+2625	Trưởng binh 
+2626	Sơn Đấu Sĩ
+2627	Nhô Tiến Quân
+2628	Quân Dẫn Hỏa
+2629	Tiệt Kích Quân
+2630	KhươngTrảm Đao
+2631	QuỷKhươngTướng
+2632	MaoKhương Binh
+2633	PhiKhươngTướng
+2634	Biên Quan Quân
+2635	LChâu Du Binh
+2636	HoangMạc doanh
+2637	Chinh kỳ binh
+2638	Đội Đôn Hoàng
+2639	Tuất Biên Uy
+2640	Giác Đấu Binh
+2641	Phiếu Đô Uy
+2642	Binh Ích Châu
+2643	Thành Đô Vĩ
+2644	Hán Trung Binh
+2645	Nam Trịnh Binh
+2646	Thục Binh
+2647	ThKhương Binh
+2648	Tam Hạp Quân
+2649	TâyThục ThủySư
+2650	Phan Sơn Binh
+2651	Thục Đao Binh 
+2652	Kh Tinh Binh 
+2653	Mãn Tướng
+2654	Thiết Xoa Quân
+2655	Tr Chinh Quân
+2656	Nghiêm Hán CSĩ
+2657	Viên Trấn Binh
+2658	ĐôngChâu Binh 
+2659	Tam phụ quân
+2660	Trại Vũ Đô
+2661	TrưởngLangQuân
+2662	ThủQuan Sĩ Tốt
+2663	TrưởngTúc Quân
+2664	Thư Kích Thủ
+2665	Lạc Thành Quân
+2666	LongTương Binh
+2667	Ưng Dương Quân
+2668	Tử Binh Binh
+2669	Hãn Đấu Sĩ
+2670	Binh Bá Quận
+2671	Sí Viêm Quân
+2672	Trưởng Phủ Đội
+2673	Phó Tướng
+2674	Cấm Quân
+2675	Đội Vệ Cung
+2676	Cường Tẩu Binh
+2677	TrậnLiệt Tướng
+2678	Thục Tráng Sĩ
+2679	QuânTinh Trung
+2680	Quân Hộ Quốc
+2681	Triệu Vũ Trại
+2682	HoànThươngTrại
+2683	Nguyên Đao Thủ
+2684	Long Vũ Binh
+2685	Hưng Quốc Quân
+2686	Thành Vũ Sĩ
+2687	Trọng My Binh
+2688	Cử Thành Trại
+2689	Thượng Tướng
+2690	LãnTrung ĐBinh
+2691	LãnTrung XBinh
+2692	Hạp Đao Binh
+2693	Phàn Sơn Thủ
+2694	Hãn Khương Vĩ
+2695	TướngSơnKhương
+2696	KhươngCốc Binh
+2697	SKhương Tướng
+2698	Đoàn BiênPhòng
+2699	Người Sơn Vũ
+2700	Hào Dũng Sĩ
+2701	Truân Sở Vệ
+2702	Hiểm Đao Binh
+2703	TiểuthànhBinh 
+2704	Gấu Hổ Sĩ
+2705	Đội Huyến Giáp
+2706	Thủ Trại Binh
+2707	Trường Ải Khẩu
+2708	Củ Trấn Quân
+2709	Chương Vũ Trại
+2710	Du Kích Quân
+2711	Xung Kích Quân
+2712	Đoàn Vệ Vũ
+2713	Uy Hán Quân
+2714	TruânKhẩnBinh 
+2715	Nông Chiến Sĩ
+2716	Vô Tiền Mãn Sĩ
+2717	Nhô Tướng
+2718	Áp Lương Binh 
+2719	Đội TruyTrọng 
+2720	Phi Trạo Binh 
+2721	Thuyền QLương 
+2722	Tinh Đấu Sĩ
+2723	Đoàn Tiên Đăng
+2724	Trại ChiếcXung
+2725	Cương Trụ Binh
+2726	Nhận GiápBinh 
+2727	Giao Châu Binh
+2728	Giao Châu Binh
+2729	Giao Chỉ Binh
+2730	Giao Chỉ Binh
+2731	T.TúcDoanh
+2732	Lính Nam Binh
+2733	Loan Vệ Quân
+2734	Kỳ Phong Binh
+2735	Chiểu Quân
+2736	Bạc Thuỷ Binh
+2737	Tượng Nhân
+2738	Thủ Tượng Binh
+2739	Đại Phủ Đội
+2740	Phạt Mộc Quân
+2741	Thuẫn Vũ Binh
+2742	Điển Quân Vệ
+2743	Sĩ Tộc Binh
+2744	Sĩ Tộc Uý
+2745	Trạch Quân 
+2746	Viêm Bộ Khúc
+2747	Liệp Thú Quân
+2748	Đằng Báo Binh
+2749	Phi Báo Vệ
+2750	Báo Giáp Sĩ 
+2751	Dược Báo Quân
+2752	Mãnh Báo Đội
+2753	Thăng Hán Binh
+2754	Nam Hải Tướng
+2755	Nghĩa Sĩ
+2756	Nương Tử Quân
+2757	Thị Nữ Binh
+2758	Đầu Mục
+2759	Hãn Sơn Việt
+2760	Kích Thân Binh
+2761	Trường Đao Thủ
+2762	Vũ Xạ Quân
+2763	Bì Giáp Tướng
+2764	Sĩ Binh
+2765	Sĩ Binh
+2766	Sĩ Binh
+2767	Sĩ Binh
+2768	Mạc Bắc binh
+2769	Du Tiêu
+2770	Đội tiêm đao
+2771	Tiền tiêu binh
+2772	Mãnh tướng
+2773	Ác binh
+2774	Loan đao trảm
+2775	Giảo thú binh
+2776	Cự nha quân
+2777	Lang xỉ binh
+2778	Th.nguyêntướng
+2779	Câu kích doanh
+2780	Viện quân đội
+2781	Đội sơn tuần
+2782	Phủ bài quân
+2783	Trại tấn công
+2784	Bắc hiệu úy
+2785	Quân cướp
+2786	Đội cướp
+2787	Nha côn quân
+2788	Phục quân
+2789	Binhtiêu chuẩn
+2790	Thạch mạc binh
+2791	Quân hồ hoang
+2792	Lực đấu sĩ
+2793	Th.binh Lâm Ba
+2794	Đaobinh Lâm Ba
+2795	Th.binh PhùNam
+2796	ĐaobinhPhùNam
+2797	Lính Hồ chiểu
+2798	Phục báo nữ
+2799	Mỹ đao nữ
+2800	Thích hổ sĩ
+2801	Thái tộc binh
+2802	TượngbinhP.Nam
+2803	Chức việt nữ
+2804	Việtthườngd.sĩ
+2805	Lính quỷ ngục
+2806	TượngbinhLâmBa
+2807	Sát Đệ lợi
+2808	Trường cungthủ
+2809	Ngạnhcungthủ
+2810	Lính tuần 
+2811	Binhchèothuyền
+2812	Tây thành binh
+2813	Tâythành vệ sĩ
+2814	Đội thương tộc
+2815	Vận hóa thương
+2816	Diêmhải k.binh
+2817	Diêmhải t.binh
+2818	Đại mạc thương
+2819	Dịchvật thương
+2820	Viên Lô tướng
+2821	Thải Diễm nữ
+2822	Mạc hà binh
+2823	Hản hải binh
+2824	Ti đoạn binh
+2825	Sa thành vệ
+2826	Hạp Cốc binh
+2827	D.trạiQuảngMạc
+2828	Thúy cốc binh
+2829	Quân câm
+2830	Viêm vệ đội
+2831	Phong tốc kỵ
+2832	Quân truânbinh
+2833	Tuần cảnh kỵ
+2834	Ti lộ binh
+2835	Trưởng tuần lộ
+2836	Sa bạo tặc
+2837	Lưu sa tặc
+2838	Mê tung tặc
+2839	Hãn tặc
+2840	Lược hỏa tặc
+2841	Kiếp tặc
+2842	Bích ngọc nữ
+2843	Côn Lôn quân
+2844	Đô hộ quân
+2845	Mậu bộ binh
+2846	Đê tộc binh
+2847	Đê tộc sĩ
+2848	Đê mãnh tướng
+2849	Đê phi tướng
+2850	Thù đồ quân
+2851	Tuyệtvực tướng
+2852	ThiếtthươngVsĩ
+2853	Hồnggiáp tướng
+2854	Liên quyền sĩ
+2855	Thiên lí kỵ
+2856	NguyệtThthương
+2857	Ô Tôn thương
+2858	Loankích vệđội
+2859	Câu kích vệđội
+2860	Binh sĩ
+2861	Binh sĩ
+2862	ManBinh K.Ninh
+2863	ManbinhT.Giang
+2864	Ng.khanhbốcquỷ
+2865	Ngânkhanhvuquỷ
+2866	Giáp binh ÔQua
+2867	Đằng giáp binh
+2868	ThủbinhV.Xương
+2869	Ngốclongdãnhân
+2870	Dã lâm nữ
+2871	Lâu Man Nữ
+2872	Độn Man tốt
+2873	Điêu Man tốt
+2874	Diện Man tốt
+2875	Cự ngưu Mantốt
+2876	Báo Man tốt
+2877	Lang Man tốt
+2878	ĐộnMantùtrưởng
+2879	ĐiêuManttrưởng
+2880	DiệnManttrưởng
+2881	NgưuManttrưởng
+2882	BáoMantùtrưởng
+2883	LangManttrưởng
+2884	TinhbinhNamMan
+2885	CThuyền NamMan
+2886	Quân nhà Quan
+2887	Quangiathiếtkỵ
+2888	Bạch đế sơntặc
+2889	TâyThục T.hong
+2890	Bộ sư dã nhân
+2891	Kẻ trộm DiLăng
+2892	Bạch đế lộ bá
+2893	Hungtàchiếnmã
+2894	Sư tử mù đường
+2895	Nữ Di Lăng
+2896	BinhMan ngũkhê
+2897	Điêu nữ ngũkhê
+2898	TBinh ThảoNgô
+2899	Khẩnbinh BĐiển
+2900	Binh trưởng BĐ
+2901	Kỳ binh ĐThiện
+2902	KỳbinhTâyThiện
+2903	Nghạchtếkỳchủ
+2904	Nghạchtếkỳbinh
+2905	Nghạchnạptếtửu
+2906	Phi vân sơntặc
+2907	PV sơntặcvương
+2908	Phi vân tế tửu
+2909	Songhợpcungthủ
+2910	Songhợpđàotốt
+2911	Nữ tặc Ba Đan
+2912	Tiệm Ba Đan
+2913	Binh Tây Ninh
+2914	Binh Trưởng TN
+2915	QuanT.họcTNinh
+2916	Cường đạoTKhẩu
+2917	MãTặcTrừngKhẩu
+2918	Yến Nhiên tốt
+2919	T.trưởngYNhiên
+2920	TThiên kỳ chủ
+2921	TThiên kỳ binh
+2922	TThiên sa binh
+2923	TThiên pháp sư
+2924	Tà mã ngự sĩ
+2925	Binh Nam Trung
+2926	Manbinhkhảnghi
+2927	Trángsĩ TangCa
+2928	Kỵ binh lưthuỷ
+2929	LựcsĩNamTrung
+2930	Tuấn Mã
+2931	Ô Duy Mã
+2932	Hoàng Biêu Mã
+2933	Thanh Tông Mã
+2934	Bạch Mã
+2935	Ô Hằng Bạch Mã
+2936	Xích Thủ mã
+2937	Giang Đông Câu
+2938	Đại Uyển mã
+2939	Đích Lô mã
+2940	Tuyệt Bóng mã
+2941	Chảo.H.PhiĐiện
+2942	HạnHuyết BửuMã
+2943	Ngựa Tr.Nguyên
+2944	Ngựa Hung Nô
+2945	CônLôn ThầnCâu
+2946	CônLôn ThầnCâu
+2947	CônLôn ThầnCâu
+2948	CônLôn ThầnCâu
+2949	CônLôn ThầnCâu
+2950	Tiểu Thánh
+2951	Mộc Ngưu
+2952	Lưu Mã
+2953	Lạc đà
+2954	Võ trang lạcđà
+2955	Sói
+2956	Sói vương
+2957	Gấu
+2958	Gấu to
+2959	Báo
+2960	Báo vương
+2961	Hổ
+2962	Mãnh hổ
+2963	Sư tử
+2964	Sư vương
+2965	Thanh cúc mã
+2966	U Châu kỵ
+2967	ChiếnmãnướcOa
+2968	Kỵ Tây Ninh
+2969	Lưu Tinh
+2970	Đạp tuyết
+2971	Bạch hạc
+2972	Tử tuynh
+2973	Phi hồng
+2974	Sưtửchiếudngọc
+2975	ThiếtkỵCônLôn
+2976	ThiếtkỵCônLôn
+2977	ThiếtkỵCônLôn
+2978	Xe CTT BắcQuốc
+2979	Xe CTT BắcQuốc
+2980	Xe CTT BắcQuốc
+2981	Xe CTT BắcQuốc
+2982	Xe CTT BắcQuốc
+2983	Xe CTT BắcQuốc
+2984	Bạch Thiết Kỵ
+2985	ĐộcGiácThiếtKị
+2986	BửuMãThiếtKị
+2987	Hắc Thiết Kị
+2988	TửLanThiếtKị
+2989	BạchLangB.Quốc
+2990	TầnLam ThiếtKị
+2991	VănCác ThiếtKị
+2992	Hắc Côn Lôn
+2993	Cân Đẩu Vân
+2994	CTT Bắc Quốc
+2995	Thiên Khải TK
+2996	XíchThốThiếtKỵ
+2997	HạnHuyết Th.Kỵ
+2998	TuyệtẢnh Th.Kỵ
+2999	Mãnh hổ
+3000	Đạp Tuyết TK
+3001	Ô Vân TK
+3002	Hoàng Đế
+3003	Tiểu Thái Giám
+3004	Thần Quan
+3005	Trương Nhượng
+3006	Triệu Trung
+3007	Hạ Quân
+3008	Quách Thắng
+3009	Hầu Lữm
+3010	Trúc Thạc
+3011	Trình Khoáng
+3012	Đoạn Quý
+3013	Cao Vọng
+3014	Tào Tiết
+3015	Hàn Ly
+3016	Tống Điển
+3017	Tôn Chương
+3018	Tả Phong
+3019	Lính Ngục
+3020	Lính Ngục
+3021	Lính Ngục
+3022	Lính Ngục
+3023	Thái Giám
+3024	SĩTiết Tr.Đình
+3025	Trương Bí
+3026	Phong Quan
+3027	Quan Đốc Chiến
+3028	Quan Hậu Tống
+3029	QuanTuầnThành
+3030	Người Quản Kho
+3031	Ngải Nhi
+3032	?
+3033	Phục Hoàng Hậu
+3034	Phục Hoàn
+3035	Cung Nữ
+3036	Ngự Mã giám
+3037	Trung Quân Hạm
+3038	Kim Vệ
+3039	Điêu Kỷ
+3040	Vệ Hoảng
+3041	Cát Mạo
+3042	Cát Miêu
+3043	Thiếu phủ giám
+3044	Nội phủ giám
+3045	Trân khố giám
+3046	Hương đạo quan
+3047	Phục Hoàng Hậu
+3048	Phục Hoàn
+3049	Đổng quý nhân
+3050	Đổng Thừa
+3051	Tổ Bật
+3052	Tào hoàng hậu
+3053	Đ.TQ TrấnTriều
+3054	Quân nhu quan
+3055	Khiêu Đ.Trưởng
+3056	Ngô thái hậu
+3057	Môn lại
+3058	Thùng Báu Vật
+3059	VàngBạc Đá Quý
+3060	Tổ Thứu Điêu
+3061	BảorươngHeovàn
+3062	Loạn thạch đồi
+3063	Bảorươngnămmới
+3064	Xe Đầu Đá
+3065	Liên Cung
+3066	Quả Đông Quái
+3067	BaDoYau
+3068	BaDoYau
+3069	BaDoYau
+3070	BaDoYau
+3071	Bánh Bao Trứng
+3072	Bánh Bao Thịt
+3073	Vua Bánh Bao
+3074	Cải Cao Lệ
+3075	Thủy Tinh Quái
+3076	KhoángChìQuái
+3077	Người Rơm
+3078	Bá Vương Sâm
+3079	Dã Sơn Sâm
+3080	Đại Nhân Sâm
+3081	Bao Cải Vàng
+3082	Bao Thịt Lớn
+3083	Vua Cải Cao Lệ
+3084	Bó Rơm
+3085	Dã Nhân Sâm
+3086	Nhân Sâm
+3087	Bánh Trứng
+3088	Vua Bánh Trứng
+3089	Bánh Trung Thu
+3090	Bánh Đậu Xanh
+3091	Cải Cao Lệ
+3092	Bao Siêu Hạng
+3093	Ba Đậu Yêu
+3094	BaDoYauTúiĐeo
+3095	Ác Ma BĐY
+3096	ÁcMaTiểuĐậuYêu
+3097	Thạch Thải 
+3098	Thuỷ Linh
+3099	Phi Viêm
+3100	Thổi Tuyết
+3101	Tâm Tâm
+3102	Mã Sâm
+3103	Mã Sâm Vương
+3104	CácPhổSáiYêu
+3105	Người Gôm
+3106	BĐY Hoàng Kim
+3107	Thần BáĐậuYêu
+3108	Thần BáĐậuYêu
+3109	Thần BáĐậuYêu
+3110	Thần BáĐậuYêu
+3111	Hộ Ba Đậu Yêu
+3112	Chiếm Đậu Yêu
+3113	Bao Đậu Yêu 
+3114	BĐY Hoàng Kim
+3115	BĐY Hoàng Kim
+3116	BĐY Hoàng Kim
+3117	BĐY Hoàng Kim
+3118	Hương Đậu Yêu
+3119	Hương Đậu Yêu
+3120	Hương Đậu Yêu
+3121	Hương Đậu Yêu
+3122	Cửu Vĩ Hồ
+3123	Ái Thần BĐY
+3124	Ái Thần BĐY
+3125	Ái Thần BĐY
+3126	Ái Thần BĐY
+3127	Cửa Đá Cơ Quan
+3128	BĐY vui vẻ
+3129	Tiểu Ái Đậu
+3130	Bảng Đường
+3131	Bảng thông báo
+3132	Bảng công bố
+3133	Bảng xếp hạng
+3134	Cây cối
+3135	Khoáng Mạch
+3136	Thẻ đường
+3137	Bảng lưu ngôn
+3138	Bảng công bố
+3139	Bảng xếp hạng
+3140	Gỗ
+3141	Mạch khoángsản
+3142	Trúc Tường
+3143	Bảng công bố
+3144	Bảng công bố
+3145	Đồng Tước
+3146	Đài Trác
+3147	CộtCbốquảtrứng
+3148	Bảngbốcáodidân
+3149	Khoáng.N.Thạch
+3150	Khoáng Vàng
+3151	Thủy Tinh Đỏ
+3152	Thủy Tinh Tím
+3153	Khoáng Bạc
+3154	Khoáng Đồng
+3155	Khoáng Sắt
+3156	Khoáng Chì
+3157	Khoáng.N.Thạch
+3158	Khoáng Vàng
+3159	Thủy Tinh Đỏ
+3160	Thủy Tinh Tím
+3161	Khoáng Bạc
+3162	Khoáng Đồng
+3163	Khoáng Sắt
+3164	Khoáng Chì
+3165	Khoáng.N.Thạch
+3166	Khoáng Vàng
+3167	Thủy Tinh Đỏ
+3168	Thủy Tinh Tím
+3169	Khoáng Bạc
+3170	Khoáng Đồng
+3171	Khoáng Sắt
+3172	Khoáng Chì
+3173	Khoáng.N.Thạch
+3174	Khoáng Vàng
+3175	Thủy Tinh Đỏ
+3176	Thủy Tinh Tím
+3177	Khoáng Bạc
+3178	Khoáng Đồng
+3179	Khoáng Sắt
+3180	Khoáng Chì
+3181	Khoáng.N.Thạch
+3182	Khoáng Vàng
+3183	Thủy Tinh Đỏ
+3184	Thủy Tinh Tím
+3185	Khoáng Bạc
+3186	Khoáng Đồng
+3187	Khoáng Sắt
+3188	Khoáng Chì
+3189	Khoáng.N.Thạch
+3190	Khoáng Vàng
+3191	Thủy Tinh Đỏ
+3192	Thủy Tinh Tím
+3193	Khoáng Bạc
+3194	Khoáng Đồng
+3195	Khoáng Sắt
+3196	Khoáng Chì
+3197	Khoáng.N.Thạch
+3198	Khoáng Vàng
+3199	Thủy Tinh Đỏ
+3200	Thủy Tinh Tím
+3201	Khoáng Bạc
+3202	Khoáng Đồng
+3203	Khoáng Sắt
+3204	Khoáng Chì
+3205	Khoáng.N.Thạch
+3206	Khoáng Vàng
+3207	Thủy Tinh Đỏ
+3208	Thủy Tinh Tím
+3209	Khoáng Bạc
+3210	Khoáng Đồng
+3211	Khoáng Sắt
+3212	Khoáng Chì
+3213	Khoáng Đá
+3214	Khoáng Đá
+3215	Khoáng Đá
+3216	Khoáng Đá
+3217	Khoáng Đá
+3218	Khoáng Đá
+3219	Khoáng Đá
+3220	Khoáng Đá
+3221	Khoáng Đá
+3222	Khoáng Chì
+3223	Khoáng Sắt
+3224	Khoáng Đồng
+3225	Khoáng Bạc
+3226	Khoáng.N.Thạch
+3227	Thủy Tinh Đỏ
+3228	Thủy Tinh Tím
+3229	Khoáng Vàng
+3230	Khoáng Đá
+3231	Khoáng Chì
+3232	Khoáng Sắt
+3233	Khoáng Đồng
+3234	Khoáng Bạc
+3235	Khoáng.N.Thạch
+3236	Thủy Tinh Đỏ
+3237	Thủy Tinh Tím
+3238	Khoáng Vàng
+3239	Khoáng Đá
+3240	Khoáng Chì
+3241	Khoáng Sắt
+3242	Khoáng Đồng
+3243	Khoáng Bạc
+3244	Khoáng.N.Thạch
+3245	Thủy Tinh Đỏ
+3246	Thủy Tinh Tím
+3247	Khoáng Vàng
+3248	Khoáng Đá
+3249	Khoáng Chì
+3250	Khoáng Sắt
+3251	Khoáng Đồng
+3252	Khoáng Bạc
+3253	Khoáng.N.Thạch
+3254	Thủy Tinh Đỏ
+3255	Thủy Tinh Tím
+3256	Khoáng Vàng
+3257	Khoáng Đá
+3258	Khoáng Chì
+3259	Khoáng Sắt
+3260	Khoáng Đồng
+3261	Khoáng Bạc
+3262	Khoáng.N.Thạch
+3263	Thủy Tinh Đỏ
+3264	Thủy Tinh Tím
+3265	Khoáng Vàng
+3266	Khoáng Đá
+3267	Khoáng Chì
+3268	Khoáng Sắt
+3269	Khoáng Đồng
+3270	Khoáng Bạc
+3271	Khoáng.N.Thạch
+3272	Thủy Tinh Đỏ
+3273	Thủy Tinh tím
+3274	Khoáng Vàng
+3275	Khoáng Đá
+3276	Khoáng Chì
+3277	Khoáng Sắt
+3278	Khoáng Đồng
+3279	Khoáng Bạc
+3280	Khoáng.N.Thạch
+3281	Thủy Tinh Đỏ
+3282	Thủy Tinh Tím
+3283	Khoáng Vàng
+3284	Khoáng Đá
+3285	Khoáng Chì
+3286	Khoáng Sắt
+3287	Khoáng Đồng
+3288	Khoáng Bạc
+3289	Khoáng.N.Thạch
+3290	Thủy Tinh Đỏ
+3291	Thủy Tinh Tím
+3292	Khoáng Vàng
+3293	Khoáng Đá
+3294	Khoáng Chì
+3295	Khoáng Sắt
+3296	Khoáng Đồng
+3297	Khoáng Bạc
+3298	Khoáng.N.Thạch
+3299	Thủy Tinh Đỏ
+3300	Thủy Tinh Tím
+3301	Khoáng Vàng
+3302	Khoáng Đá
+3303	Khoáng Chì
+3304	Khoáng Sắt
+3305	Khoáng Đồng
+3306	Khoáng Bạc
+3307	Khoáng.N.Thạch
+3308	Thủy Tinh Đỏ
+3309	Thủy Tinh Tím
+3310	Khoáng Vàng
+3311	Thạch Quảng
+3312	Tích Quảng
+3313	Thiết Quảng
+3314	Đồng Quảng
+3315	Ngân Quảng
+3316	NgọcThạchQuảng
+3317	Đỏ Thủy Tinh 
+3318	Tử Thuỷ Tinh
+3319	Kim Quảng
+3320	Thạch Quảng
+3321	Khoáng Chì
+3322	Thiết Quảng
+3323	Đồng Quảng
+3324	Ngân Quảng
+3325	NgọcThạchQuảng
+3326	Đỏ Thủy Tinh 
+3327	Tử Thuỷ Tinh
+3328	Kim Quảng
+3329	Thạch Khoáng
+3330	Dương Khoáng
+3331	Thiết Khoáng
+3332	Đồng Khoáng
+3333	Ngân Khoáng
+3334	Ngọc Khoáng
+3335	Hồng Thuỷ Tinh
+3336	Tử Thuỷ Tinh
+3337	Kim Khoáng
+3338	Khoáng thạch
+3339	Khoáng thiếc
+3340	Khoáng sắt
+3341	Khoáng đồng
+3342	Khoáng bạc
+3343	Kh.ngọc thạch
+3344	Thủy tinh hồng
+3345	Thủy tinh tím
+3346	Khoáng vàng
+3347	Khoáng thạch
+3348	Khoáng thiếc
+3349	Khoáng sắt
+3350	Khoáng đồng
+3351	Khoáng bạc
+3352	Kh.ngọc thạch
+3353	Thủy tinh hồng
+3354	Thủy tinh tím
+3355	Khoáng vàng
+3356	Khoáng thạch
+3357	Khoáng kẽm
+3358	Khoáng sắt
+3359	Khoáng đồng
+3360	Khoáng bạc
+3361	Kh. ngọc thạch
+3362	Thuỷ tinh đỏ
+3363	Thuỷ tinh tím
+3364	Khoáng vàng
+3365	Khoáng thạch
+3366	Khoáng kẽm
+3367	Khoáng sắt
+3368	Khoáng đồng
+3369	Khoáng bạc
+3370	Kh. ngọc thạch
+3371	Thuỷ tinh đỏ
+3372	Thuỷ tinh tím
+3373	Khoáng vàng
+3374	Khoáng thạch
+3375	Khoáng kẽm
+3376	Khoáng sắt
+3377	Khoáng đồng
+3378	Khoáng bạc
+3379	Kh.ngọc thạch
+3380	Thuỷ tinh đỏ
+3381	Thuỷ tinh tím
+3382	Khoáng vàng
+3383	Khoáng thạch
+3384	Khoáng kẽm
+3385	Khoáng sắt
+3386	Khoáng đồng
+3387	Khoáng bạc
+3388	Kh. ngọc thạch
+3389	Thuỷ tinh đỏ
+3390	Thuỷ tinh tím
+3391	Khoáng vàng
+3392	K.Thạchđầurồng
+3393	K.Kẽm đầu rồng
+3394	K.Sắt đầu rồng
+3395	K.Đồng đầurồng
+3396	K.Bạc đầu rồng
+3397	K.Ngọctđầurồng
+3398	TT đỏ đầu rồng
+3399	TT Tím đầurồng
+3400	K.Vàng đầurồng
+3401	Tàu Chiến
+3402	ThuyềnLiênHoàn
+3403	TàoNhân thuyền
+3404	CamNinh thuyền
+3405	T.Trung thuyền
+3406	Đ Nghi thuyền
+3407	Lưu Bàn thuyền
+3408	TháiMạo thuyền
+3409	Thuyền T.Đương
+3410	ThuyềnHànĐương
+3411	Thuyền ChuThái
+3412	Thuyền LýThông
+3413	Lữ Kiền thuyền
+3414	Thuyền ChuLinh
+3415	VănSính thuyền
+3416	Vu Cấm thuyền
+3417	Thuyền LạcTiến
+3418	CửakhẩuĐịaNgục
+3419	Thchiến VThiệu
+3420	ThchiếnTrầnLan
+3421	Thchiến TrHuân
+3422	TC Tôn Quyền
+3423	Thchiến ĐPhiền
+3424	ThchiếnCh.Hoàn
+3425	ThHảitặcLýNgọc
+3426	H.Cái môngxung
+3427	TrìnhPhổđấuhạm
+3428	Thuyền Chu Du
+3429	Thchiến TrDuẫn
+3430	ThchiếnVănSính
+3431	Thchiến LCương
+3432	ThchiếnLưuHuân
+3433	Thuyền vậnbinh
+3434	Thuyền cấp đạn
+3435	Thuyềnquângiới
+3436	Thuyền Tô Phi
+3437	Thuyền Tạ Kỳ
+3438	TàoPhi LThuyền
+3439	Tôn Thiều CT
+3440	Đinh Phụng CT
+3441	Tôn Sách CT
+3442	Ng Bạch Hổ CT
+3443	Nghiêm Dư CT
+3444	NgôQuậnBinh CT
+3445	Vương Lãng CT
+3446	Test CT
+3447	Ngọc Đế
+3448	TháiThượngQuân
+3449	Thái Bạch Quân
+3450	Nhị Lang Thần
+3451	HaoThiênKhuyển
+3452	Na Tra
+3453	Chức Nữ
+3454	Thần Tài
+3455	Quy Tiên
+3456	Linh Quy
+3457	Tiên Nữ
+3458	Tiểu Tiên Đồng
+3459	Địa ThiênTướng
+3460	Thủy.Th.Tướng
+3461	Hỏa ThiênTướng
+3462	Phong.Th.Tướng
+3463	Địa Thiên Binh
+3464	Thủy ThiênBinh
+3465	Hỏa Thiên Binh
+3466	Phong.Th.Binh
+3467	ChiêuTàiĐồngTử
+3468	Hằng Nga
+3469	Ngô Cương
+3470	NguyệnHoaĐồng
+3471	Tam nhãn tướng
+3472	Long Thái Tử
+3473	Quỷ Quan
+3474	Quỷ Soa
+3475	Nhân Hổ Tiên
+3476	Lão Tiên Bà
+3477	Vương Mẫu 
+3478	Cửu Âm Mị Cơ
+3479	Tà Ảnh Qủy Sứ
+3480	Cây Tiên Ông
+3481	Hầu Tinh Vương
+3482	Hầu Tinh 
+3483	Lợi Trảo  Nhân
+3484	Khoáng dã nhân
+3485	Khảo Lỗ
+3486	Mễ Nã
+3487	Na Âu
+3488	Sa Au Sa
+3489	Đo chi linh hồ
+3490	Khảm Y
+3491	Nại Nại
+3492	Do Y
+3493	Hí Đối
+3494	Gấu Di Nô 
+3495	Tô Nô Xà
+3496	Mạc quỷ
+3497	U Quỷ
+3498	Thần Thí Lộc
+3499	Hiến Thụy sư
+3500	Thánh Thần Quy
+3501	Diệu Thần Quy
+3502	Chu Công
+3503	Điều 
+3504	Hốt 
+3505	Diêm La Vương
+3506	Ngưu Đầu 
+3507	Mã Diện
+3508	Hắc Vô Thường
+3509	Bạch Vô Thường
+3510	Minhbức Vương
+3511	Minh Sai
+3512	Minh Sai
+3513	Minh Sai
+3514	Minh Sai
+3515	Hủ Lang Nhân
+3516	Cốt Yêu Nữ
+3517	Dị Biến Thi
+3518	Cương Linh
+3519	Huyết Nha Quỷ 
+3520	Đãng Du Hồn
+3521	Thanh Trảo Hầu
+3522	Bạch Khô Lâu
+3523	Hoang Thần
+3524	Tai Thần
+3525	Sắc Lang
+3526	Nữ Oa
+3527	TháiDương Quân
+3528	Thái Âm Quân
+3529	Ng.Thuỷ Xà Túc
+3530	Bạo Phá Tà Quỷ
+3531	Kinh
+3532	Hách
+3533	Khốn
+3534	Miên
+3535	Phán Quan
+3536	Càn Thi
+3537	Đấu Bồng Ma
+3538	Kho cốt nam
+3539	Khô cốt nữ
+3540	Sinhthôn lnhân
+3541	Tiệt quyền thú
+3542	Mùi hôi
+3543	Mùi dưa
+3544	Trủng giác Quỷ
+3545	Thiết diện Quỷ
+3546	Cửu Vĩ Hồ
+3547	Độc tín Xà
+3548	Phiêu hỏa Quỷ
+3549	Cươnghoạt nhân
+3550	Quỷ luyện ngục
+3551	TuLa yêu tướng
+3552	TuLa yêu tướng
+3553	Tu La ma vương
+3554	TâySở Bá Vương
+3555	ĐàoLâm Tiên nữ
+3556	DaoTrì Tiên nữ
+3557	LuyệnLô Tiênnữ
+3558	ĐằngVân Tiênnữ
+3559	Nhiễu tâm Ma
+3560	Thôi tâm Ma
+3561	Phá tâm Ma
+3562	Đảo tâm Ma
+3563	Nhiếp tâm Ma
+3564	Huyễn tâm Ma
+3565	Quỷ tâm Ma
+3566	Ám tâm Ma
+3567	ThDươngthtướng
+3568	CựcÂmthầntướng
+3569	CựcDươngttướng
+3570	ThiếuÂmthtướng
+3571	Ngu Cơ
+3572	Long Thả
+3573	Chung Ly Muội
+3574	Thủy Quỷ
+3575	Đông thiênbinh
+3576	Nam thiên binh
+3577	Tây thiên binh
+3578	Bắc thiên binh
+3579	DungChâu tđồng
+3580	Mã la đạo
+3581	TâySở Bá Vương
+3582	TâySở Bá Vương
+3583	TâySở Bá Vương
+3584	GiangĐông tửđệ
+3585	GiangĐông tửđệ
+3586	Ngọc Đế chi nữ
+3587	T.Đấu Trọngtài
+3588	TiênĐấu Bảo vệ
+3589	ThiênGiai vệsĩ
+3590	TiênĐấu Bảo vệ
+3591	TiênĐấu Bảo vệ
+3592	KT Tiểu Tiên
+3593	Quỷ Diện Tả Từ
+3594	Kẻ hủy diệt
+3595	Cứu thục quan
+3596	Quỷ Li Tang
+3597	Quỷ Mê Tử
+3598	Hồn Mạng Liêu
+3599	Ma lượng tà
+3600	Đảo chủ Đổ Ác
+3601	Ông già phụcba
+3602	Phục Hy
+3603	Nghệnhân M.Phủ
+3604	Lão thụ tiên
+3605	Nữ Bạt
+3606	Nữ Bạt
+3607	Mạnh bà
+3608	Vương tiểu nhị
+3609	C.H.VươngT.Nhị
+3610	MaT.VươngT.Nhị
+3611	Dạ miêu tử
+3612	Quỷ hắc hổ
+3613	Yêu miêu tử
+3614	Lôi Công
+3615	Lôi Mẫu
+3616	ĐôngHảiL.Vương
+3617	NamHải L.Vương
+3618	Tây HảiL.Vương
+3619	BắcHải L.Vương
+3620	Thạch thẩm nhi
+3621	Nhưỡngtửutiên
+3622	TiênNhânL.Thủ
+3623	Trì Quốc Thiên
+3624	Đa Văn Thiên
+3625	QuảngMụcThiên
+3626	Tăng Tr Thiên
+3627	Thạch hỷ nộ
+3628	Kim thạch hỷnộ
+3629	Thạch ái lạc
+3630	Kimthạcháilạc
+3631	Vân sinh thú
+3632	Địa long . HĐ
+3633	Thuỷ Long . DĐ
+3634	Hỏa Long . TL
+3635	PhongLong . KL
+3636	LãoLV.NgânGiác
+3637	LãoL.V.KimGiác
+3638	T.RằmT7thầnbí
+3639	Địa long
+3640	Thuỷ long
+3641	Hỏa long
+3642	Phong long
+3643	Cương long
+3644	Ứnglong mahài
+3645	Tiêntửngọcthố
+3646	Dã Sơn Hầu
+3647	Mãnh Hổ
+3648	Gấu Trưng
+3649	Hạc Trắng
+3650	Con Ó
+3651	Rắn
+3652	Mèo Vân Hổ
+3653	Mèo Thái Cực
+3654	Rắn Độc
+3655	Thanh Trúc Thi
+3656	Rắn Hổ Mang
+3657	Rắn Đen
+3658	Bông Mai Rùa
+3659	Gấu Xám
+3660	Gấu Đậu Đỏ
+3661	Gấu Đậu Xanh
+3662	Ó Đỏ
+3663	Ó Trắng
+3664	Xương Ưng
+3665	Ưng Vương
+3666	Mèo.Th.Nguyệt
+3667	Mèo Cua Lua
+3668	Rắn Chú Độc
+3669	Gấu Khái Mã
+3670	Cọp Liêu Đông
+3671	Mèo Tuyết
+3672	Đại Bàng Lớn
+3673	Rắn Hổ Đất
+3674	Ban Ban
+3675	Rắn Tử Độc
+3676	Hắc Xà Vương
+3677	ThanhLongQuái
+3678	Xà Vương
+3679	Sơn Hầu Vương
+3680	HắcGấu Dị Châu
+3681	Gấu Trúc
+3682	Thứu Điêu
+3683	ĐạiBàng ưng tử
+3684	HeoRừng DịChâu
+3685	Động Vật
+3686	Động Vật
+3687	Động Vật
+3688	Động Vật
+3689	Gấu Lĩnh Nam
+3690	Rắn mang bành
+3691	Dơi hút máu
+3692	Đại thủy Lộc
+3693	Thỏ
+3694	Rùa
+3695	Yên Chi Hầu
+3696	Heo
+3697	Hổ 
+3698	Tiểu hải tinh
+3699	Khổng Tước
+3700	MaCổLa ChimƯng
+3701	Dơi hồng viêm
+3702	Kim Lai phúc
+3703	Động vật
+3704	Động vật
+3705	BạchTượngtcống
+3706	Dã phiêu hổ 
+3707	Phiêu hổ vương
+3708	TamGiangđộcxà
+3709	T.Giangxàvương
+3710	Khỉhoangnúisâu
+3711	Khỉthôlỗnúisâu
+3712	Lạc đà trắng
+3713	 
+3714	Gấu ngựa ác
+3715	Vươngấungựaác
+3716	Mèo đen
+3717	Mãnh hổ
+3718	Mãnh hổ vương
+3719	Tiểu Lão hổ
+3720	Tường Thành
+3721	Hàng Rào Gỗ
+3722	Tường Gỗ
+3723	Lầu Cung Tên
+3724	Xe Lương Thực
+3725	Lầu Cung Tên
+3726	XạThủ Xe Lương
+3727	Xe Trọng Lương
+3728	Xe Mã
+3729	Phi nỗ xe
+3730	TỉnhLanTiễnĐội
+3731	Xe phách đao
+3732	Tháp cao tiễn
+3733	Xe luyện xung 
+3734	Xe phích lịch
+3735	Hiền sĩ xa
+3736	Hiệp khách xa
+3737	Đích tiên xa
+3738	Bá vương xa
+3739	Tuyết Khiêu
+3740	Hiền sĩ xa 2
+3741	HiệpKhách xa 2
+3742	Đích tiên xa 2
+3743	Bá vương xa 2
+3744	Chiến Tượng
+3745	Chiến Tượng
+3746	Chiến Tượng
+3747	Chiến Tượng
+3748	Chiến Tượng
+3749	Chiến Tượng
+3750	Vô Hình
+3751	Bóng Biển
+3752	Quỷ biến thân
+3753	TrúcTườngPTiễn
+3754	CổnLuânĐ.Tường
+3755	Thuốc nổ
+3756	SiêuĐạiC.Thạch
+3757	Chủ tiệm net
+3758	Máy Bán Hàng
+3759	Máy Bán Hàng
+3760	Chuyển đản cơ
+3761	Chuyển đản cơ
+3762	Chuyển đản cơ
+3763	Vòng quay BĐY
+3764	GM
+3765	GM
+3766	GM
+3767	GM
+3768	Luyện công 20
+3769	Luyện công 60
+3770	Luyện công 100
+3771	Luyện công 150
+3772	Luyện công 200
+3773	Luyện công 250
+3774	Bàng Cổ Cự Thú
+3775	Bàng Cổ Cự Thú
+3776	Bàng Cổ Cự Thú
+3777	Bàng Cổ Cự Thú
+3778	Chảo Quỷ binh
+3779	Chiểu Quỷ binh
+3780	Cự Quỷ binh
+3781	Mộ Quỷ binh
+3782	Cung.S.Cự Thú
+3783	Cung.S.Cự Thú
+3784	Cung.S.Cự Thú
+3785	Cung.S.Cự Thú
+3786	Khoáng Đá Quái
+3787	Thạch TháiHành
+3788	Hùng Cự Hán
+3789	Hổ Cự Hán
+3790	Ngưu Cự Hán
+3791	Tượng Cự Hán
+3792	Sơn Quái
+3793	Nham Quái
+3794	Nữ Thủy Thần
+3795	Hỏa Xà Tinh
+3796	Ph.ma thần thú
+3797	Tiểu Nham Quái
+3798	NhamthạchQuái
+3799	Hoang Thần Xứ
+3800	Liệt Hỏa Xà
+3801	Phong Quỷ Binh
+3802	Thanh Long
+3803	Hữu Long Trảo 
+3804	Tả Long Trảo
+3805	Bí Hí
+3806	Hữu Bí Hí Trảo
+3807	Tả Bí Hí Trảo
+3808	Phong Địa Yêu
+3809	Họa thủy yêu
+3810	Phần thiên yêu
+3811	Táp lâm yêu
+3812	AnhHồn ChiếnSĩ
+3813	Vonglinhchithủ
+3814	Vonglinhchithủ
+3815	Vonglinhchithủ
+3816	Mãnh Bạo Trư
+3817	Cấp Đống Hổ
+3818	Nộ Hỏa Hung
+3819	Bức Dực Xà
+3820	Bác
+3821	Bác
+3822	Bác
+3823	Bác
+3824	A Lí Tạp Vương
+3825	A Lí Tạp Cai
+3826	A Lí Tạp Cai
+3827	Bạch hổ
+3828	Móng hổ phải
+3829	Móng hổ trái
+3830	A Lí Tạp Vương
+3831	A Lí Tạp Cai
+3832	A Lí Tạp Cai
+3833	Bạch xà
+3834	Bạch Đế
+3835	Bộ Binh Nhẹ
+3836	Binh Vũ Trang
+3837	TrọngKhải Binh
+3838	BinhCườngGiáp
+3839	Binh nhẹ
+3840	Vũ trang binh
+3841	Trọng Binh
+3842	Cường Giáp
+3843	Hàng Rào Gỗ
+3844	Xe Tịnh Lan
+3845	Xe Tông
+3846	Xe Đao
+3847	Xe Cung
+3848	Xe ném đá
+3849	Tháp Cung
+3850	Trạm Tiền Sáo
+3851	Cửa Thành
+3852	Trạm Tiền Sáo
+3853	Cửa Thành
+3854	Tường Thành
+3855	Tường Thành
+3856	Tường Gỗ
+3857	Tường Gỗ
+3858	Kiên mộc lan
+3859	Xe Tịnh Lan
+3860	Ngưu đầu xa
+3861	Xe Đao
+3862	Xe Liên Cung
+3863	Xe ném đá lớn
+3864	Tháp thần tiễn
+3865	Cây Noel Lớn
+3866	Cây Noel
+3867	Người Tuyết
+3868	Người Tuyết
+3869	Quà 
+3870	Quà 
+3871	Vua Bánh Noel
+3872	Vua Kẹo Noel
+3873	Quái Vật Noel
+3874	Thú Thiên Niên
+3875	Quỷ Bí Vàng
+3876	Bìn Bìn Quái
+3877	Bọc Hải Binh
+3878	Tiểu Quỷ Binh
+3879	Hỏa Quỷ Binh
+3880	Quái Cà Chua
+3881	Nhân Quỷ Vương
+3882	Địa Quỷ Vương
+3883	ThiênQuỷVương
+3884	TiểuMuộiBánHoa
+3885	ĐưaHoaTiểuYêu
+3886	Ngọc Thố
+3887	ThánhQủy Vương
+3888	Thánh Qủy Binh
+3889	Phi Xà Yêu
+3890	Hỏa Am Quỷ 
+3891	Quỷ Hổ Tướng
+3892	Nam Quả Yêu
+3893	Tiện tiện quái
+3894	Cà Chua Tinh
+3895	Đèn Hoa Sen
+3896	Giáng Sinh lộc
+3897	Ông già Noel
+3898	Ông già Noel
+3899	Ông già Noel
+3900	Ông già Noel
+3901	NguyênTiêuChủ
+3902	NguyênTiểuMuội
+3903	ChèXôiNướcBạch
+3904	ChèXôiNướcHồng
+3905	Đại Ca Nguyên
+3906	Nhị Ca Nguyên
+3907	Hương Binh
+3908	Tân Binh Lai
+3909	Hương Sĩ
+3910	Cường Binh
+3911	Tân Bình 
+3912	Tốt Bá
+3913	Ngũ Trưởng
+3914	Binh Trưởng
+3915	Thập Trưởng
+3916	Tiểu Hiệu
+3917	Đoàn Trưởng
+3918	Đănglung Muội
+3919	Tuần La Binh
+3920	TắcNgoại K.N.K
+3921	TrNguyên K.N.K
+3922	Cao Lệ K.N.K
+3923	Tang Đoá
+3924	Tư Nhàn
+3925	B.trôinướcIndo
+3926	Sừng hươu Noel
+3927	Tiên sứ Noel
+3928	Tuyết nữ Noel
+3929	Tiểu Thánh
+3930	L.đèn tinhquái
+3931	L.đèn gâyphiền
+3932	Pháp Hải
+3933	Vô Tưởng
+3934	Vô Lượng
+3935	Bạch Tố Trinh
+3936	Tiểu Thanh
+3937	Hứa Tiên
+3938	Chú tiểu
+3939	Chú tiểu
+3940	Chú tiểu
+3941	Chú tiểu
+3942	VongCốt ĐTQuân
+3943	Thập TLão Nhân
+3944	Mật sứ V.Thành
+3945	Võsĩ hoànggiáp
+3946	Võ sĩ lam giáp
+3947	Võ sĩ xíchgiáp
+3948	Võsĩ thanhgiáp
+3949	Võ sĩ hắc giáp
+3950	 
+3951	 
+3952	TiểuquỷH.Loan
+3953	Hươnggiếtngười
+3954	HungTinhVănĐán
+3955	 
+3956	 
+3957	Đạitiênheovàng
+3958	Cự long
+3959	Tiểu quỷ
+3960	VongLinh th.kỵ
+3961	Lôi phthủtướng
+3962	Lôi ph thủbinh
+3963	Hoàng kim BDY
+3964	Hương bao BDY
+3965	Ác Ma BĐY
+3966	Chiêm tinh BDY
+3967	Ái Thần BĐY
+3968	Lưu Bị
+3969	Quan Vũ
+3970	Trương Phi
+3971	Gia Cát Lượng
+3972	Mã Siêu
+3973	Triệu Vân
+3974	Hoàng Trung
+3975	Tôn Sách
+3976	Chu Thái
+3977	Chu Du
+3978	Thái Sử Từ
+3979	Cam Ninh
+3980	Lục Tốn
+3981	Tào Tháo
+3982	Quách Gia
+3983	Hạ Hầu Đôn
+3984	Hạ Hầu Uyên
+3985	Hứa Chử
+3986	Trương Liêu
+3987	Điển Vi
+3988	VongcốtướngTần
+3989	NgọcThgiãthuốc
+3990	NgọcThgiãthuốc
+3991	Ông già Noel
+3992	Ông già Noel
+3993	ÔnggiàNoel xấu
+3994	Kẻ trộm Noel
+3995	Xe CTT BắcQuốc
+3996	Tuyếtquái Noel
+3997	Tuần lộc Noel
+3998	Thiên Niên Thú
+3999	ÔnggiàNoel xấu
+4000	Kẻ trộm Noel
+4001	TuyếtquáiNoel
+4002	Tuần lộc Noel
+4003	Tuần lộc Noel
+4004	Chu Tước
+4005	Tả Tước Trảo
+4006	Hữu Tước Trảo
+4007	NiênTháiĐạiTrù
+4008	Thử lão gia
+4009	Thử phu nhân
+4010	Thử thiên kim
+4011	A Lang
+4012	Viêm Đế
+4013	Vân Trung Quân
+4014	Phong bá thần
+4015	Bích Thần
+4016	Miếu ông
+4017	Miếu bà
+4018	Thiên lý nhãn
+4019	ThuậnPhongNhĩ
+4020	Thiết Cốt Tam
+4021	Đồng bì tứ
+4022	Phi thiên ngũ
+4023	Đại đầu lục
+4024	Trườngcướcthất
+4025	Độn địa bát
+4026	Đại đỗ cửu
+4027	Ái Khốc Thập
+4028	Ngườigỗphongma
+4029	Ngườicỏphongma
+4030	Ngườibùn ph.ma
+4031	Thỏ Phục Sinh
+4032	Thỏ Phục Sinh
+4033	Thành ĐạiHuyện
+4034	Thành Lâm Lưu
+4035	Thành ChânĐịnh
+4036	Thành Lang Gia
+4037	Thành Đại Mạc
+4038	Thần Mộc Lộ
+4039	Rượu Tiên 
+4040	Cẩm Hợp
+4041	Sá Đệ Lợi Sĩ
+4042	Sá Đệ Lợi Binh
+4043	Phạm Sư Mạn
+4044	Tăng Già Bà La
+4045	Mạn Đà La
+4046	Diêm Ma
+4047	A Tu La 
+4048	Hắc Trư Huyết
+4049	Khổng Tước
+4050	Tham quan ÂmTi
+4051	Diêm La O Sứ
+4052	Hoàng Kỵ Sĩ 
+4053	Thanh Kỵ Sĩ
+4054	Xích Kỵ Sĩ
+4055	Bạch Mã Kỵ Sĩ
+4056	Cẩm Hạp
+4057	Trảm đao lữ
+4058	Hoành kích lữ
+4059	Song kích lữ
+4060	Bảng phủ liên
+4061	Thích th. liên
+4062	Khảm đao liên
+4063	Cự thuẫn liên
+4064	Truândoanhbinh
+4065	Túc doanh binh
+4066	Điểndoanh binh
+4067	Vệ doanh binh
+4068	Thiênkìtinhbồn
+4069	Cửa đá cơ quan
+4070	Điền Tố Nhật
+4071	Điền Tố Nguyệt
+4072	Lục Túy Nga
+4073	Lục Tố Nga
+4074	Thẩm Nguyệt Cô
+4075	Tử Tố Trinh
+4076	TrươngKimĐịnh
+4077	Hoa Ái Châu
+4078	Địađôngcátmiêu
+4079	Thủy vân ảo cơ
+4080	Hỏa cô bảo bảo
+4081	PhongDực L.Nhi
+4082	HàmOánTầnBinh
+4083	HàmOánTầnTướng
+4084	Hàm oán Tần kỵ
+4085	Quỷ Thừa Tướng
+4086	Quỷ Thừa Tướng
+4087	Bình hoa
+4088	BìnhHoa MẫuĐơn
+4089	Mộc bồn
+4090	Thủy sư G.Đông
+4091	ThủybinhG.Đông
+4092	ChuDuthiếuniên
+4093	VânTrungLãoĐạo
+4094	Hoa quả báthầu
+4095	Hoa quả hầuyêu
+4096	PhụcbinhN.Khẩu
+4097	BưukỵNamTrịnh
+4098	Quỷvươngyêukim
+4099	Tiểuquỷyêukim
+4100	Bọn quỷ vương 
+4101	Phì Di
+4102	Ấu thú Phì Di 
+4103	Sơn thú toái
+4104	Thặng hoàng
+4105	Ấuthú Th.Hoàng
+4106	Ấuthú th.hoàng
+4107	ThủbinhP.H.Đài
+4108	TinhbinhP.HĐài
+4109	Mộbinhcơquan
+4110	Mộbinhcơquan
+4111	TướngL mộ giáp
+4112	Tiểuquỷdạxoa
+4113	Tiểuquỷdạxoa
+4114	Ácthủquầnyêu
+4115	TiểuThăngHoàng
+4116	Tiểu Phì Di
+4117	Cựthú Th.Hoàng
+4118	Cự thú Phì Di
+4119	Láibuônx.quyệt
+4120	Mi Phương
+4121	Phó sĩ nhân
+4122	Báttrậnth.nhân
+4123	Thuẫnb N.Trung
+4124	CươngD mộc thú
+4125	Sĩ An
+4126	Hề Nê
+4127	Đằng giáp quân
+4128	Ngột Đột Cốt
+4129	Đằnggiáptướng
+4130	KỵbinhNamTrung
+4131	ThôngT sa tặc
+4132	ThôngT sa tặc
+4133	ThôngT sơn đạo
+4134	ThôngT sơn đạo
+4135	Thông T ma thú
+4136	ThôngT quỷbinh
+4137	ThôngT mụcnhân
+4138	ThôngT mụcnhân
+4139	Thông T Kỳ Chủ
+4140	Thông T Ma Chủ
+4141	 
+4142	 
+4143	Hồn Phù Tô
+4144	Hồn Lý Tư
+4145	An Kỳ Sinh
+4146	Hồn Mông Điềm
+4147	Tử Anh
+4148	Quan TầnHoàng 
+4149	ThiếtkỵđạiTần
+4150	Quanlạixămmình
+4151	Quanlạicắtmũi
+4152	Quanlạicắtchân
+4153	Quanlạivọtroi
+4154	Quanlạichặtđầu
+4155	Tư Mã Hân
+4156	Đổng Ế
+4157	Hàn phi
+4158	Nguỵ phi
+4159	Sở phi
+4160	Yến phi
+4161	Tề phi
+4162	Vương Ly
+4163	Hồn Triệu phi
+4164	Hồn Triệu Cao
+4165	Quỷ Tần vương
+4166	Cơquan Tầnbinh
+4167	Tần binh CLệnh
+4168	Cungnữbồitáng
+4169	Mađầu địa ngục
+4170	Yêu Trư T.Đồng
+4171	Tô Giác
+4172	Thiệp Gian
+4173	Hồ Hợi
+4174	Phục sinh
+4175	Mao Tiêu
+4176	Ngọc Cơ
+4177	Quỷ Tần vương
+4178	Quỷ Tần vương
+4179	VongcốtướngTần
+4180	ĐịnhHải T.Châm
+4181	Tang Bá
+4182	Trương Liêu
+4183	Phi Tương Binh
+4184	Tào Tính
+4185	Hách Manh
+4186	Phi Tương Binh
+4187	Cao Thuận
+4188	Hầu Thành
+4189	Ngụy Tục
+4190	Tống Hiến
+4191	Hãm Trận Binh
+4192	Lữ Bố
+4193	Trần Cung
+4194	Phi Tương Binh
+4195	Tào Tính
+4196	Hách Manh
+4197	Lữ Bố
+4198	Trần Cung
+4199	Trương Liêu
+4200	Cao Thuận
+4201	Tang Bá
+4202	Phi Tương Binh
+4203	Hầu Thành
+4204	Ngụy Tục
+4205	Tống Hiến
+4206	Tào Tháo
+4207	Điển Vi
+4208	Lý Điển
+4209	Trương Anh
+4210	Ngưu Chử Binh
+4211	Thái Sử Từ
+4212	DươngChâu Binh
+4213	Lưu Diêu
+4214	D Châu Trưởng
+4215	Lưu Diêu
+4216	Thái Sử Từ
+4217	DươngChâu Binh
+4218	Vu Mi
+4219	Phàn Năng
+4220	DươngChâu Binh
+4221	Lưu Diêu
+4222	Trạch Dung
+4223	D Châu Trưởng
+4224	Nghiêm Bạch Hổ
+4225	Nghiêm Dư
+4226	Ngô Quận Binh
+4227	Vương Lãng
+4228	Hội Kê binh
+4229	Tôn Sách
+4230	Chu Du
+4231	Trương Hoành
+4232	Trình Phổ
+4233	Hoàng Cái
+4234	Tổ Mậu
+4235	Sơn Tặc
+4236	Phi Tặc
+4237	Đạo Tặc
+4238	Dâm Tặc
+4239	Đại Sơn Tặc
+4240	Hùng Võ Binh
+4241	Liệt Võ Binh
+4242	Phẫn Võ Binh
+4243	Dương Võ Binh
+4244	Khổng Tú
+4245	Tường Thành
+4246	Khai Giáp Binh
+4247	Đồn Điền Binh
+4248	Tráng Sĩ Binh
+4249	Hổ Vệ Binh
+4250	Mưu Sư
+4251	Hàn Phúc
+4252	Mãnh Thãn
+4253	Trạm Tiền Sáo
+4254	Đao Thủ Phủ
+4255	Đao Thủ Phủ
+4256	Đao Thủ Phủ
+4257	Đao Thủ Phủ
+4258	Đao Khách
+4259	Đao Khách
+4260	Đao Khách
+4261	Đao Khách
+4262	Hà Hỷ
+4263	Diệu Võ Quân
+4264	Kiến Võ Quân
+4265	Chấn Võ Quân
+4266	Huyền Võ Quân
+4267	Diệu Võ Tướng
+4268	Kiến Võ Tướng
+4269	Chấn Võ Tướng
+4270	Huyền Võ Tướng
+4271	Vương Trực
+4272	Sơn Đấu Sĩ
+4273	Đức Liệt Sĩ
+4274	Hàn Tráng Sĩ
+4275	Lam Võ Sĩ
+4276	Quân Sư
+4277	Quân Sư
+4278	Quân Sư
+4279	Quân Sư
+4280	Trần Kỷ
+4281	Hạ Hầu Đôn
+4282	Triệu Nga
+4283	Ti Di Hô
+4284	Trương Giác
+4285	Triệu V.Khương
+4286	Di Di
+4287	Na Lỵ
+4288	Quách Đại
+4289	Tôn Trọng
+4290	Hàn Trung
+4291	Vu Độc
+4292	Bạch Nhiễu
+4293	Lý Đại Mục
+4294	Đại Hồng
+4295	Tân Tì
+4296	Tôn Càn
+4297	Mi Trúc
+4298	Mi Phương
+4299	Giản Ung
+4300	Công Tôn Toản
+4301	Tông Bảo
+4302	Khâu Lực Cư
+4303	Điển Vi
+4304	Hạ Hầu Đôn
+4305	Hạ Hầu Uyên
+4306	Tào Nhân
+4307	Tuân Úc
+4308	Tào Tháo
+4309	Quách Gia
+4310	Trình Dục
+4311	Hứa Chử
+4312	Trương Liêu
+4313	Từ Hoảng
+4314	Trương Hợp
+4315	Tào Phi
+4316	Tào Thực
+4317	Tư Mã Ý
+4318	Tào Chương
+4319	Giả Hủ
+4320	Tuân Du
+4321	Bàng Đức
+4322	Thái Văn Cơ
+4323	Vu Cấm
+4324	Chân Mật
+4325	Tư Mã Huy
+4326	Từ Thứ
+4327	Chu Thương
+4328	Quan Bình
+4329	Triệu Vân
+4330	Trương Phi
+4331	Quan Vũ
+4332	Gia Cát Lượng
+4333	Bàng Thống
+4334	Lưu Bị
+4335	Hoàng Trung
+4336	Ngụy Diên
+4337	Mã Siêu
+4338	Pháp Chính
+4339	HoàngNguyệtAnh
+4340	Khương Duy
+4341	Quan Hưng
+4342	Trương Bào
+4343	Hướng Sủng
+4344	Nghiêm Nhan
+4345	Thái Sử Từ
+4346	Cam Ninh
+4347	Lữ Mông
+4348	Chu Thái
+4349	Tôn Sách
+4350	Tôn Quyền
+4351	Chu Du
+4352	Từ Thịnh
+4353	Lục Tốn
+4354	Trình Phổ
+4355	Lăng Thống
+4356	Chu Nhiên
+4357	Hoàng Cái
+4358	Tưởng Khâm
+4359	Hám Trạch
+4360	Lỗ Túc
+4361	Tiểu Kiều
+4362	TônThượngHương
+4363	Lữ Bố
+4364	Điêu Thuyền
+4365	Đổng Trác
+4366	Thương Thăng
+4367	Nhan Lương
+4368	Văn Xú
+4369	Lý Nho
+4370	Cao Thuận
+4371	Võ An Quốc
+4372	Thư Thụ
+4373	Dư Phu La
+4374	Tang Bá
+4375	Đại Kiều
+4376	Mã Đằng
+4377	Trương Bảo
+4378	Trương Lương
+4379	TrươngMạnThành
+4380	Mã Ng Nghĩa
+4381	Mã Tương
+4382	Trần Bại
+4383	Trương Tu
+4384	Ngưu Kim
+4385	Đinh Phụng
+4386	Lý Điển
+4387	Tưởng Cán
+4388	Viên Thiệu
+4389	Nghiêm Bạch Hổ
+4390	BĐY Hoàng Kim
+4391	Trương Chiêu
+4392	Điền Phong
+4393	Đạp Đốn
+4394	Trần Cung
+4395	Thôi Châu Bình
+4396	Tào Hồng
+4397	Mã Lương 
+4398	Lưu Diệp
+4399	Quan Ngân Bình
+4400	Tưởng Tế
+4401	Cao Lãm
+4402	Phùng Kỷ
+4403	Ngu Phiên
+4404	Điền Dự
+4405	Lâu Khuê
+4406	Liêu Hóa
+4407	Gia Cát Quân
+4408	Lỗ Tạp
+4409	Trương Hoành
+4410	Nhạc Tiến
+4411	Ti Nô Mẫu Li
+4412	Tiểu Kim
+4413	Tôn Dực
+4414	Tào Hưu
+4415	Trần Đáo
+4416	Thẩm Phối 
+4417	Tổ Mậu
+4418	Giả Quỳ
+4419	Hí Chí Tài
+4420	Quách Nữ Vương
+4421	Tôn Kiên
+4422	Thôi Diễm
+4423	Gia Cát Cẩn 
+4424	Tả Hiền Vương
+4425	Lý Thông
+4426	Diêm Nhu
+4427	Trần Võ
+4428	Hoa Hùng
+4429	Mã Đại
+4430	Văn Sính
+4431	Thach Q Nguyên
+4432	Trần Quần
+4433	Hàn Đương
+4434	Mã Tắc
+4435	Hoắc Tuấn
+4436	Dương Tu
+4437	Tào Xung
+4438	Trương Tùng
+4439	Kỷ Linh
+4440	Tống Kiến
+4441	Hứa Thiệu
+4442	Hứa Du
+4443	Lý Nghiêm
+4444	Viên Thuật 
+4445	Chu Hoàn
+4446	Tào Chân
+4447	Lưu Phong
+4448	Trương Nhượng
+4449	Hứa Tĩnh
+4450	Hoàng Phủ Tung
+4451	Ngô Ý
+4452	Trương Lỗ
+4453	Lưu Ba
+4454	HoàngThừaNgạn
+4455	Ti Cẩu
+4456	Đổng Chiêu
+4457	Tôn Du
+4458	Xa Trụ
+4459	Liêu Lập 
+4460	Tưởng Nghĩa Cừ
+4461	Quách Đồ
+4462	Thái Mạo
+4463	Hạ Tề
+4464	Bàng Dục
+4465	Phổ Tịnh
+4466	Mạnh Đạt
+4467	Bào Xuất
+4468	Lưu lang BĐY
+4469	Trương Nhậm
+4470	Quan Tác
+4471	Bào Tam Nương
+4472	Phụng Nhi
+4473	Điệp Nhi
+4474	Ngô Sán
+4475	Tân Bình
+4476	Dương Hoằng
+4477	Phó Cán
+4478	Mãn Sủng
+4479	Lý Thuật
+4480	Trương Ôn
+4481	Lương Tập
+4482	Y Tịch
+4483	Hàn Mãnh
+4484	Hàn Hạo
+4485	Sa Ma Kha
+4486	Dương Phong
+4487	Triệu Nghiễm
+4488	Quách Viện
+4489	Lạc Thống
+4490	Đỗ Kỳ
+4491	Tiên Vu Phụ
+4492	Lý Khôi
+4493	Bành Dạng
+4494	Viên Hoán
+4495	Phụ Khuông
+4496	Tôn Thiệu
+4497	Đổng Việt
+4498	Từ Vinh
+4499	Tôn Kiểu
+4500	Đổng Tập
+4501	Điển Mãn
+4502	Hạ Hầu Thượng
+4503	Mã Thiết
+4504	Hách Phổ
+4505	TrươngXuân Hoa
+4506	Công Tôn Dương
+4507	Trần Kiểu
+4508	Hoàng Quyền
+4509	Tả Linh
+4510	Lý Túc
+4511	Trương Phấn
+4512	Lữ Đại
+4513	Cố Ung
+4514	Phan Chương
+4515	Đổng Hòa
+4516	Trương Nghi
+4517	Hà Quỳ
+4518	Lý Phu
+4519	Thuần Vu Quỳnh
+4520	Trình Bỉnh
+4521	Lục Tích
+4522	Hàn Toại
+4523	Chung Diêu
+4524	Trần Đăng
+4525	Tào Thuần
+4526	Tưởng Uyển
+4527	Mạnh Công Uy
+4528	Trương Dực
+4529	Khiên Chiêu
+4530	Phàn Trù
+4531	Ngô Phạm
+4532	Quách Tỷ
+4533	Trương Kí
+4534	Lý Giác
+4535	Bàng Đức Công
+4536	Trương Tế
+4537	Đổng Hoàng
+4538	Ngưu Phụ
+4539	Tôn Thiều
+4540	Dương Phụ
+4541	Lữ Kiền
+4542	Chu Phù
+4543	Mã Hưu
+4544	Lại Cung
+4545	Khảo Lỗ
+4546	Mễ Nã
+4547	Na Âu
+4548	Sa Âu Sa
+4549	Ti Trạm
+4550	Viên Thượng
+4551	Tư Mã Lãng
+4552	Trình Tư
+4553	Diêm Tượng
+4554	Sĩ Hữu
+4555	Chu Linh
+4556	Lộ Chiêu
+4557	Cao Nhu
+4558	Phùng Tập
+4559	Triệu Luy
+4560	Sĩ Võ
+4561	Diêm Phố
+4562	Chu Thiện
+4563	Quản Ninh
+4564	Mộng Mai cư sĩ
+4565	Võ Châu
+4566	Tự Hộc
+4567	Đổng Mân
+4568	Tô Do
+4569	Trương Thừa
+4570	Cát Bình
+4571	Thái Sử Hưởng
+4572	Chu Tuấn
+4573	Chu Quang
+4574	Trịnh Hồn
+4575	Lưu Nhược
+4576	Trương Hỷ
+4577	Xạ Viên
+4578	Hướng Lãng
+4579	Phó Đồng
+4580	Trương Nam
+4581	Phạm Tầm
+4582	Triệu Ngung
+4583	Phạm Sư Mạn
+4584	Lưu Quý
+4585	Tống Thế Lâm
+4586	Thị Uy
+4587	Phạm Hùng
+4588	Toàn Tông
+4589	Khu Liên
+4590	Thành Công Anh
+4591	Phù La Hàn
+4592	Lưu Triển
+4593	Tây Na Bà Địa
+4594	Trịnh Độ
+4595	Kha Tỉ Năng
+4596	Sĩ Tiếp
+4597	Công Tôn Tập
+4598	Đặng Chi
+4599	Tự Tông
+4600	Tập Trinh
+4601	Quách Hoài
+4602	Dương Nhâm
+4603	Thái Dương
+4604	Lôi Đồng
+4605	Tát Ba Địa Qua
+4606	Hồ Tống
+4607	Nhiêu Trợ
+4608	Nhan Liền
+4609	Bộ Độ Căn
+4610	Tôn Hoán
+4611	Tiên Vu Đơn
+4612	Hoàng Bỉnh
+4613	Ngô Chất
+4614	Tuân Uẩn
+4615	Bộ Chất
+4616	Tần Mật
+4617	Bàng Hi
+4618	Triệu Ngang
+4619	Hình Đạo Vinh
+4620	Sử Hoán
+4621	Tiết Quy Nê
+4622	Phất La
+4623	Tông Dự
+4624	Dương Hồng
+4625	Vương Bình
+4626	Ngô Ban
+4627	Trần Thức
+4628	Phí Quan
+4629	Xa Tuấn
+4630	Dương Tùng
+4631	Trương Tú
+4632	Quản Hợi
+4633	Quản Lộ
+4634	Toàn Nhu
+4635	Tôn Lãng
+4636	Trương Duẫn
+4637	Bỉnh Nguyên
+4638	Vi Khang
+4639	Mã Lãng
+4640	Đặng Hiền
+4641	Mạn Đà La
+4642	Trần Chấn
+4643	Ngô Lan
+4644	Lữ Nghĩa
+4645	Doãn Giai
+4646	Cao Cán
+4647	Vương Sán
+4648	Trương Huân
+4649	Vương Liên
+4650	Chu Trị
+4651	Lữ Phạm
+4652	Vương Phủ
+4653	Khoái Việt
+4654	Vương Lãng
+4655	Hồng Minh
+4656	Lưu Kỳ
+4657	Tô Phi
+4658	Hô Trù Tuyền
+4659	Triệu ThụTruân
+4660	Chu Bình Dung
+4661	Lan Mộc La Na
+4662	Khổng Dung
+4663	Nguyễn Vũ
+4664	Thái Ung
+4665	Tuân Thái
+4666	NhạnĐiêuTuyết
+4667	KimĐao ĐạiTrù
+4668	Yêu Quỷ Vương
+4669	Đỗ Lỗ Ni
+4670	Liễu Thụ Xuân
+4671	Vương Song
+4672	Hách Chiêu
+4673	Nhất Ưu ĐT
+4674	Khứ Ti
+4675	Hồ Xa Nhi
+4676	Dương Ngang
+4677	Trương Vệ
+4678	Hồ Xích Nhi
+4679	Vương Đồ
+4680	Lý Mông
+4681	Nhĩ Chi
+4682	Quản Thừa
+4683	Đậu Mậu
+4684	Lang Trĩ
+4685	Trình Ngân
+4686	Kiều Nhuỵ
+4687	Phí Sạn
+4688	Lương Hưng
+4689	Nguỵ Tục
+4690	Bá NgọcBắcCung
+4691	Thiên vạn
+4692	Văn Tắc
+4693	Dương Phụng
+4694	Lưu Huân
+4695	Ân Quan
+4696	Dương Nghi
+4697	Lưu Ung
+4698	Hoàng Tự
+4699	Hồ Ban
+4700	Mạnh Hoạch
+4701	Chúc Dung
+4702	Ngột Đột Cốt
+4703	Lữ Khải
+4704	Ma Cổ Lạp
+4705	Tăng Già Bà La
+4706	BĐY Hoàng Kim
+4707	BĐY Hoàng Kim
+4708	BĐY Hoàng Kim
+4709	BĐY Hoàng Kim
+4710	Lưu Tử Bân
+4711	Thiết Mộc Gia
+4712	Thạch Thí
+4713	Vũ Văn Chí
+4714	Lữ Linh Khởi
+4715	Đặng Ngải
+4716	Văn Ương
+4717	Tư Mã Chiêu
+4718	Tào Duệ
+4719	Lý Phong
+4720	Tư Mã Sư
+4721	Bồ Nguyên
+4722	Gia Cát Chiêm
+4723	Lữ Bố
+4724	Lữ Bố
+4725	Lữ Bố
+4726	Qua Luân Tri
+4727	Ất Địa Gia Lan
+4728	Ngọc Tang Đóa
+4729	Gia Cát Quả
+4730	Tâm Tâm
+4731	Vương Dị
+4732	Triệu Quảng
+4733	Triệu Thống
+4734	Triệu Tương
+4735	VươngNguyênCơ
+4736	Y Lị
+4737	BKhănVàng 
+4738	BKhănVàng 
+4739	BKhănVàng 
+4740	BKhănVàng 
+4741	Binh Trưởng
+4742	Binh Trưởng
+4743	Binh Trưởng
+4744	Binh Trưởng
+4745	Dũng Sĩ
+4746	Tráng Sĩ
+4747	Quỷ Tốt
+4748	Tế tửu KhVàng
+4749	Ba Tài 
+4750	Quách Đại 
+4751	Bốc Kỷ
+4752	Ngô Bá
+4753	Đỗ Viễn
+4754	Triệu Chỉ
+4755	Mã Tương
+4756	Bành Thoát
+4757	Đỗ Trưởng 
+4758	Đào Thăng 
+4759	Đặng Mậu
+4760	Trình Viễn Chí
+4761	Trương Thuần
+4762	Trương Cử
+4763	Thái Bình Xa
+4764	Chiến Sĩ
+4765	Chiến Sĩ
+4766	Chiến Sĩ
+4767	Chiến Sĩ
+4768	Tử Sĩ
+4769	Tử Sĩ
+4770	Tử Sĩ
+4771	Tử Sĩ
+4772	Phương Tướng 
+4773	Phương Tướng 
+4774	Phương Tướng 
+4775	Phương Tướng 
+4776	Lai Đạt 
+4777	Quan Cốc 
+4778	Trương Nhiêu
+4779	Trương Tu
+4780	Thánh Nõ Xa
+4781	Quỷ Đao Binh
+4782	Quỷ Binh
+4783	Quỷ Hoả Binh
+4784	Quỷ Câu Binh
+4785	Đới Phong
+4786	Trương Bá
+4787	Hoàng Nhương
+4788	Trung Ninh
+4789	La Thị
+4790	Lôi Công
+4791	Phong Tư
+4792	Từ Phụng 
+4793	Lý Đại Mục
+4794	Trượng Bát
+4795	Trương Yến
+4796	Vạn Bỉnh
+4797	Lang Nữ 
+4798	Tử Huyễn Sư
+4799	Thiết Đội
+4800	Xán Giáp Binh
+4801	Hoàng Thiệu
+4802	Hà Mạn
+4803	Hà Nghi
+4804	Mã Ng Nghĩa
+4805	Triệu Hoằng
+4806	Tôn Trọng
+4807	Hàn Trung
+4808	TrươngMạnThành
+4809	Lưu Tích
+4810	Cung Đô 
+4811	Chu Thương
+4812	Liêu Hoá
+4813	Đường Chu
+4814	Đại Hồng
+4815	Biện Hỉ
+4816	Cao Thăng
+4817	Nghiêm Chính
+4818	Mãnh Vệ Sĩ
+4819	Thánh Binh
+4820	Truyền Đạo Sư
+4821	Báo Nữ
+4822	Ngưu Giác
+4823	Bạch Tước
+4824	Ngũ Lộc
+4825	Tư Mã Đều
+4826	Quản Hợi
+4827	Vu Độc
+4828	Lưu Thạch
+4829	Trần Bại
+4830	Triệu V.Khương
+4831	Bùi Ng Thiệu
+4832	Từ Hòa
+4833	Trương Giác
+4834	Trương Bảo
+4835	Trương Lương
+4836	Triệu Từ
+4837	Khổ Tù
+4838	Trương Khải
+4839	Bạch Nhiễu
+4840	Huy Cố
+4841	Dư Phu La
+4842	Trương Lỗ
+4843	Ngoại Môn 
+4844	Chính Môn
+4845	O Hoàn Binh
+4846	O Hoàn Binh
+4847	O Hoàn Binh
+4848	O Hoàn Binh
+4849	O Hoàn Tướng
+4850	O Hoàn Tướng
+4851	O Diên
+4852	Lầu Ban
+4853	Liêu Đông Hổ
+4854	Nan Lâu
+4855	Phổ Phú Hỗ
+4856	Tô Bộc Diên
+4857	Đạp Đốn
+4858	Binh L Châu
+4859	Binh L Châu
+4860	Binh L Châu
+4861	Binh L Châu
+4862	ThiếtGiáp Quân
+4863	ThiếtGiáp Quân
+4864	ThiếtGiáp Quân
+4865	ThiếtGiáp Quân
+4866	L.C BinhTrưởng
+4867	L.C BinhTrưởng
+4868	L.C BinhTrưởng
+4869	L.C BinhTrưởng
+4870	Lý Mông
+4871	Vương Phương
+4872	Hồ Phong
+4873	Cao Thạc
+4874	T.Thạch Đại Xa
+4875	Trảm Mã Quân
+4876	Cương Xoa Binh
+4877	Cự Phủ Xa
+4878	Khoái Đao Binh
+4879	Lý Ưng
+4880	Trương Bao
+4881	Lưu Ngải
+4882	Ngũ Tập
+4883	Dương Phụng
+4884	Hồ Xa Nhi
+4885	Cận Vệ Quân
+4886	Thân Vệ Quân
+4887	Cấm Vệ Quân
+4888	Cung Vệ Quân
+4889	Trương Tú
+4890	Tống Quả
+4891	Trương Long
+4892	Lý Túc
+4893	Hồ Chuẩn
+4894	Triệu Sầm
+4895	Hoa Hùng
+4896	TỵThuỷQThủBinh
+4897	Cao Thuận
+4898	Nguỵ Tục
+4899	Tào Tính
+4900	Thành Liêm
+4901	Tang Bá
+4902	Tống Hiến
+4903	Hầu Thành
+4904	Hách Manh
+4905	Lữ Bố
+4906	HổLao QThủBinh
+4907	P.H ThươngBinh
+4908	P.H Kích Binh
+4909	P.H Đao Binh
+4910	P.H Câu Binh
+4911	Từ Vinh
+4912	Điền Cảnh
+4913	Hạ Dục
+4914	Dương Định
+4915	Giả Hủ
+4916	Tần Nghị
+4917	Trần Vệ
+4918	Lý Hắc
+4919	Đổng Việt
+4920	LDươngTThủBinh
+4921	Trương Tế
+4922	Tả Linh
+4923	Thôi Dũng
+4924	Phàn Trù
+4925	Phùng Phương
+4926	Hạ Mâu
+4927	Quách Tỷ
+4928	Lưu Hiêu
+4929	Vương Xương
+4930	Lý Giác
+4931	Lý Biệt
+4932	Lý Xiêm
+4933	Lữ Bố
+4934	Lữ Bố
+4935	Lữ Bố
+4936	Điêu Thuyền
+4937	Đổng Trác
+4938	Lý Nho
+4939	Ngưu Phụ
+4940	Đổng Mân
+4941	Đổng Hoàng
+4942	Mạch Thành TB
+4943	Hợp Phì TB
+4944	Hoàn Thành TB
+4945	Thủ binh N.T
+4946	Tư Mã Ý
+4947	Lục Tốn
+4948	Gia Cát Lượng
+4949	Triệu Vân
+4950	Triệu Thống
+4951	Triệu Quảng
+4952	Tào Duệ
+4953	Âm Hồn Binh Sĩ
+4954	ÂmHồn ChiếnSĩ
+4955	Tiểuquỷyêukim
+4956	QủyVươngY.Kim 
+4957	QủyVươngY.Kim
+4958	QủyVươngY.Kim
+4959	QủyVươngY.Kim
+4960	Chè Trôi Nước
+4961	MúaLân HoanHỷ
+4962	Thiên Niên Thú
+4963	Diêm Ma
+4964	A Tu La
+4965	Khô Cốt Nam
+4966	Khô Cốt Nữ
+4967	Dạ Ác Lang
+4968	Binh Đoàn
+4969	Trương Phi
+4970	Quan Vũ
+4971	Hoàng Trung
+4972	Đại Sư Đoàn
+4973	Bánh Củ Cải
+4974	Diêm La Vương
+4975	Bạch Hổ
+4976	Tả Hổ Trảo
+4977	Hữu Hổ Trảo
+4978	Quỷ Bạch Hổ
+4979	Tang Đóa
+4980	Yêu Miêu Tử
+4981	Quỷ hắc hổ
+4982	Dạ miêu tử 
+4983	Dạ Hổ Vương
+4984	Niên Tống Sư
+4985	Bách Niên Xà
+4986	Tiểu Lạc Hùng
+4987	Lộc Lực
+4988	Mộc Nhân Vương
+4989	Dạ Mộc Vương
+4990	Nhật Mộc Vương
+4991	Tiểu Mộc Nhân
+4992	Đại Mộc Nhân
+4993	Bách Mộc Nhân
+4994	Ngột Đột Cốt
+4995	A Hội Nam
+4996	Đới Lai Chủ
+4997	Mộc Lộc Vương
+4998	Đóa Tư Vương
+4999	MạnhNhaTrường
+5000	Mạnh Ưu
+5001	Kim Đoàn Kết
+5002	Quân Man Di
+5003	Mê Hồ Ly
+5004	Tiểu Hồ Ly
+5005	Lô Kiếm Đoàn
+5006	Lô Thương Đoàn
+5007	Đao Binh Đội
+5008	Đại Đao Đội
+5009	ThươngBinhĐội
+5010	Kích Binh Đội
+5011	Hoàn Đao Đoàn
+5012	Thủ Kích Đoàn
+5013	Trảm Đao Đoàn
+5014	Mâu Đoàn
+5015	Binh đoàn
+5016	Binh đoàn
+5017	HTrậnDPhủBinh
+5018	HTrậnDTiểuHiệu
+5019	P.H ThiênTướng
+5020	P.H Trùy Binh
+5021	P.H Mâu Binh
+5022	P.H Sách Sĩ
+5023	Binh đoàn
+5024	Binh đoàn
+5025	Độiđao hải tặc
+5026	Độikích hảitặc
+5027	BinhđoànTamPhụ
+5028	Bđoàn ĐôngChâu
+5029	Bđoàn Thành Đô
+5030	Bđoàn ThụcQuận
+5031	PhủbinhHoàiNam
+5032	Kíchbinh H.Nam
+5033	Tiểuhiệu H.Nam
+5034	Kiếmbinh H.Nam
+5035	BđoànThuyềntốc
+5036	Bđoàn Thuyềnto
+5037	Binh đoàn
+5038	Binh đoàn
+5039	Binh đoàn
+5040	Binh đoàn
+5041	Đ.vệ binh Thục
+5042	Đoàn vệ binh
+5043	M.S Nhuệ Châu
+5044	Đội hộ vệ TC
+5045	T.binh Vũ Lâm
+5046	D.S Giang Đông
+5047	TinhbinhNTrịnh
+5048	ĐoànkiếmbinhTL
+5049	ĐoànbúaBinh TL
+5050	TinhBinh GĐông
+5051	Ngự LQ TâyPhục
+5052	Tướngsĩgiaochi
+5053	GiápBinhĐạiTần
+5054	ThuẫnbinĐạiTần
+5055	Quansứngũhình
+5056	TinhanhquânTần
+5057	Ma Đồng
+5058	Ngạ Qủy
+5059	Atula Vạn
+5060	Hoa Cửu Công
+5061	Tiểu Qủy
+5062	Tiểu Qủy
+5063	Tiểu Qủy
+5064	Tiểu Qủy
+5065	Xà Ma
+5066	Quy Ma
+5067	Lang Ma
+5068	Trư Ma
+5069	Long Ma
+5070	Kim Sí Điểu
+5071	BDY Quỷ Diện
+5072	Thiết Miêu
+5073	Đồng Tinh
+5074	Vi Kinh Thế
+5075	Phi Yêu
+5076	Giang Quỷ Điện
+5077	La Sát Điện Bà
+5078	La Sát Tấn Lôi
+5079	Quỷ La Sát
+5080	Hạnh Bộc
+5081	Cáp Bộc
+5082	BạchMi SưVương
+5083	HátSátSưVương
+5084	Địa Trưởng Lão
+5085	ThiênTrưởngLão
+5086	NhânTrưởngLão
+5087	Tiểu Quỷ
+5088	NguyênLãoVương
+5089	ThanhNguyênLão
+5090	Lão Tà Thần
+5091	HồngNguyênLão
+5092	Hắc Sát Ng.Lão
+5093	TâyQuyềnThành
+5094	Khổ Thiền
+5095	Chấp Tr.Ng.Lão
+5096	Chưởng Thuẫn
+5097	ĐôngTiều TúPhu
+5098	Lôi Sát Quỷ
+5099	Thượng Quân 
+5100	Tả Quân
+5101	Hữu Quân
+5102	Thượng Lương
+5103	Tả Lương
+5104	Hữu Lương
+5105	Hoàng Phủ Tung
+5106	Tả Lương Xa
+5107	Hữu Lương Xa
+5108	Viên Thiệu
+5109	Viên Thuật 
+5110	ThchiếnTônSách
+5111	Trương Giác
+5112	Lý Nho
+5113	Phùng Kỷ
+5114	Quách Đồ
+5115	Cao Thuận
+5116	Nghiêm Bạch Hổ
+5117	Cao Lãm
+5118	Triệu V.Khương
+5119	Trương Chiêu
+5120	Hám Trạch
+5121	Ngu Phiên
+5122	Ngô Sán
+5123	Hoàng Cái
+5124	Từ Thịnh
+5125	Tưởng Khâm
+5126	Chu Nhiên
+5127	Trình Dục
+5128	Trần Quần
+5129	Lâu Khuê
+5130	Thái Văn Cơ
+5131	Tào Hồng
+5132	Vu Cấm
+5133	Điền Dự
+5134	Lý Thông
+5135	Từ Thứ
+5136	Ti Nô Mẫu Li
+5137	Gia Cát Quân
+5138	Liêu Lập
+5139	Mã Đằng
+5140	Chu Thương
+5141	Hướng Sủng
+5142	Hoắc Tuấn
+5143	Thẩm Phối
+5144	Tiểu Kiều
+5145	Tân Bình
+5146	Lý Thuật
+5147	Văn Xú
+5148	Quách Viện
+5149	TrươngMạnThành
+5150	Hàn Mãnh
+5151	Trương Hoành
+5152	Ti Di Hô
+5153	Dương Hoằng
+5154	Trương Ôn
+5155	Tào Nhân
+5156	Kỷ Linh
+5157	Văn Sính
+5158	Lăng Thống
+5159	Giả Hủ
+5160	Giả Quỳ
+5161	Phó Cán
+5162	Diêm Nhu
+5163	Nhạc Tiến
+5164	Lý Điển
+5165	Lương Tập
+5166	Hàn Hạo
+5167	Tư Mã Huy
+5168	Mã Tắc
+5169	Mãn Sủng
+5170	Y Tịch
+5171	Đạp Đốn
+5172	Đại Kiều
+5173	Trấn Đáo
+5174	Liêu Hóa
+5175	Thôi Châu Bình
+5176	Lỗ Tạp
+5177	Chân Mật
+5178	Tôn Sách
+5179	Tuân Úc
+5180	Điển Vi
+5181	Mã Lương
+5182	Ngụy Diên
+5183	Thư Thụ
+5184	Mã Siêu
+5185	Hứa Thiệu
+5186	Tả Hiền Vương
+5187	Điền Phong
+5188	Hạ Hầu Đôn
+5189	Tào Thực
+5190	Ti Cẩu
+5191	Trần Cung
+5192	Nhan Lương
+5193	ThạchQ.Nguyên
+5194	Tổ Mậu
+5195	Tưởng Tế
+5196	Hàn Đương
+5197	Hí Chí Tài
+5198	Quan Bình
+5199	Trương Lỗ
+5200	Hoa Hùng
+5201	Lỗ Túc
+5202	Tôn Dực
+5203	Hứa Du
+5204	Bàng Dục
+5205	HoàngNguyệtAnh
+5206	Mạnh Đạt
+5207	Lưu Diệp
+5208	TrươngXuânHoa
+5209	Triệu Nghiễm
+5210	Tả Linh
+5211	Mã Đại
+5212	Tưởng Nghĩa Cừ
+5213	Lý Túc
+5214	Dư Phu La
+5215	Trương Bảo
+5216	Lưu Ba
+5217	Lạc Thống
+5218	Trình Bỉnh
+5219	Tôn Kiểu
+5220	Trần Võ
+5221	Đinh Phụng
+5222	Đổng Tập
+5223	Tào Phi
+5224	Trương Lương
+5225	Trần Đăng
+5226	HoàngThừaNgạn
+5227	Tào Chân
+5228	Hoàng Phủ Tung
+5229	Tào Thuần
+5230	Phan Chương
+5231	Tưởng Uyển
+5232	Hoàng Quyền
+5233	Mạnh Công Uy
+5234	Lý Khôi
+5235	Trình Phổ
+5236	Ngô Ý
+5237	Lưu Phong
+5238	Ngưu Kim
+5239	Thôi Diễm
+5240	Lưu Bị
+5241	Đổng Chiêu
+5242	Hà Quỳ
+5243	Khiên Chiêu
+5244	Tư Mã Lãng
+5245	Tào Chương
+5246	Tống Kiến
+5247	Đổng Hoàng
+5248	Thuần Vu Quỳnh
+5249	Ti Trạm
+5250	Viên Thượng
+5251	Chu Du
+5252	Công Tôn Dương
+5253	Trương Phấn
+5254	Gia Cát Cẩn
+5255	Chu Thiện
+5256	Lục Tích
+5257	Thái Sử Từ
+5258	Điêu Thuyền
+5259	Hàn Toại
+5260	Tôn Du
+5261	Chu Hoàn
+5262	Hạ Tề
+5263	Quách Gia
+5264	Quản Ninh
+5265	Trương Kí
+5266	Đỗ Kỳ
+5267	Trần Kiểu
+5268	Chung Diêu
+5269	Trương Phi
+5270	Điển Mãn
+5271	Xa Trụ
+5272	Lữ Kiền
+5273	Chu Linh
+5274	Lộ Chiêu
+5275	Pháp Chính
+5276	Lại Cung
+5277	Bàng Đức Công
+5278	Bành Dạng
+5279	Đổng Hòa
+5280	Triệu Luy
+5281	Tôn Quyền
+5282	Nghiêm Nhan
+5283	Quan Ngân Bình
+5284	Viên Thiệu
+5285	Trương Nghi
+5286	Phụ Khuông
+5287	Dương Tu
+5288	Võ Châu
+5289	Lý Phu
+5290	Trương Nhậm
+5291	Lưu Quý
+5292	Thái Dương
+5293	Lữ Mông
+5294	Trương Thừa
+5295	Cát Bình
+5296	Sa Ma Kha
+5297	Tôn Thiều
+5298	Thái Mạo
+5299	Tào Tháo
+5300	Chu Quang
+5301	Cố Ung
+5302	Trương Liêu
+5303	Hạ Hầu Thượng
+5304	Hình Đạo Vinh
+5305	Trương Tùng
+5306	Trình Độ
+5307	Hướng Lãng
+5308	Quan Vũ
+5309	Tang Bá
+5310	Phí Quan
+5311	Tự Hộc
+5312	Quản Hợi
+5313	Dương Tùng
+5314	Đổng Việt
+5315	Toàn Nhu
+5316	Quách Tỷ
+5317	Tôn Lãng
+5318	Tôn Hoán
+5319	Bộ Chất
+5320	Chu Trị
+5321	Cao Nhu
+5322	Sử Hoán
+5323	Trần Chấn
+5324	Ngô Ban
+5325	Lữ Phạm
+5326	Lữ Nghĩa
+5327	Cam Ninh
+5328	TônThượngHương
+5329	Tào Xung
+5330	Triệu Nga
+5331	Triệu Vân
+5332	Bảo Xuất
+5333	Bàng Đức
+5334	Di Di
+5335	Phàn Trù
+5336	Diêm Phố
+5337	Võ An Quốc
+5338	Mã Tương
+5339	Thương thăng
+5340	Vu Độc
+5341	Tông Bảo
+5342	Lý Đại Mục
+5343	Trương Nhượng
+5344	Thái Sử Hưởng
+5345	Tát Ba Địa Qua
+5346	Bộ Độ Căn
+5347	Tiên Vu Đơn
+5348	Hứa Tĩnh
+5349	Quách Đại
+5350	Đại Hồng
+5351	Tôn Thiệu
+5352	Lữ Đại
+5353	Công Tôn Toản
+5354	Bỉnh Nguyên
+5355	Tiên Vu Phụ
+5356	Phù La Hàn
+5357	Khâu Lực Cư
+5358	Tôn Trọng
+5359	Tân Tì
+5360	Tưởng Cán
+5361	Trần Bại
+5362	Vương Bình
+5363	Tây Na Bà Địa
+5364	Na Lỵ
+5365	Tôn Càn
+5366	Giản Ung
+5367	Hàn Trung
+5368	Bạch Nhiễu
+5369	Mã Thiết
+5370	Tông Dự
+5371	Khảo Lỗ
+5372	Mễ Nã
+5373	Na Âu
+5374	Sa Âu Sa
+5375	Trương Hợp
+5376	Hạ Hầu Uyên
+5377	Hoàng Trung
+5378	Chu Thái
+5379	Từ Hoảng
+5380	Hứa Chử
+5381	Tư Mã Ý
+5382	Lục Tốn
+5383	Bàng Thống
+5384	Gia Cát Lượng
+5385	Lữ Linh Khởi
+5386	Đặng Ngải
+5387	Văn Ương
+5388	Tư Mã Chiêu
+5389	Tào Duệ
+5390	Quan Tác
+5391	Bào Tam Nương
+5392	Chu Tuấn
+5393	Chu Bình Dung
+5394	Chu Phù
+5395	Lý Phong
+5396	NhạnĐiêuTuyết
+5397	Tôn Kiên
+5398	Cao Cán
+5399	Doãn Giai
+5400	Qua Luân Tri
+5401	Ất Địa Gia Lan
+5402	Lý Nghiêm
+5403	Lữ Khải
+5404	Ngọc Tang Đóa
+5405	Thỏ Phục Sinh
+5406	Thỏ Phục Sinh
+5407	Quách Nữ Vương
+5408	Bồ Nguyên
+5409	Lữ Bố
+5410	Lữ Bố
+5411	Lữ Bố
+5412	Lữ Bố
+5413	Tiểu Tang Đóa
+5414	Nhĩ Chi
+5415	Lang Trĩ
+5416	Vương Song
+5417	Tư Mã Sư
+5418	Vương Dị
+5419	Triệu Quảng
+5420	Triệu Thống
+5421	Triệu Tương
+5422	Gia Cát Quả
+5423	VươngNguyênCơ
+5424	Khương Duy
+5425	Viên Thuật
+5426	Công Tôn Tập
+5427	Tâm Tâm
+5428	PTS Online
+5429	PTS Online
+5430	Vương Dị
+5431	PTS Online
+5432	Quản Lộ
+5433	Yêu Quỷ Vương
+5434	Đổng Trác
+5435	Mạnh Hoạch
+5436	Chúc Dung
+5437	Ngột Đột Cốt
+5438	Y Lị
+5439	Ng giương buồm
+5440	Người lái
+5441	Trường kiếm sĩ
+5442	Bảng phủ tướng
+5443	Thiết dân đoàn
+5444	Nộ dân đoàn
+5445	Khoáiđaotnương
+5446	Điệnkiếmtnương
+5447	Trụ giáp quân
+5448	Nhiễu tr. binh
+5449	Huyễn đạo quân
+5450	Thánh pháp sư
+5451	Tả chấn binh
+5452	Trì vũ quân
+5453	Đồ đao binh
+5454	Hoàngiáp doanh
+5455	Tấn Quỷ doanh
+5456	Phấn kích sĩ
+5457	H. thương đoàn
+5458	Song kích đoàn
+5459	Doanh binh
+5460	Phươngđaotướng
+5461	Trunglũy doanh
+5462	Thiếtbích quân
+5463	Tỏa giáp binh
+5464	Cườngnhận quân
+5465	Thương Lão đạo
+5466	Khai Lão đạo
+5467	Quận điển binh
+5468	Ngũ doanh úy
+5469	Hữu chấn binh
+5470	T.truân t.hiệu
+5471	Lữ vệ đội
+5472	Tr.quyền tử sĩ
+5473	Nôngdân đi bừa
+5474	Nôngdân đi cày
+5475	Túc vệ đội
+5476	Truân tác sĩ
+5477	Đandương thcân
+5478	Chiếcxung binh
+5479	Trườngthủybinh
+5480	Mã nhàn binh
+5481	Huấn bổ doanh
+5482	Hương lí binh
+5483	Cườngviệt binh
+5484	Việtdũng tướng
+5485	Việt hãn binh
+5486	Quánh việt sĩ
+5487	Việt đao binh
+5488	Việt linh sư
+5489	Bạc trung đạo
+5490	Thiết hoàn tặc
+5491	Tả điển quân
+5492	Thích binhđoàn
+5493	Hữu điển quân
+5494	Liênkhải doanh
+5495	Phùthuyền binh
+5496	Trọng tưởng sĩ
+5497	Giươngbuồmbinh
+5498	Tuần đĩnh quân
+5499	Đại hạm doanh
+5500	Trángsĩ ném đá
+5501	Hổ lâm quân
+5502	Độ trạch binh
+5503	Bá quyền đội
+5504	Xuyênsơn tướng
+5505	Tấn tinh binh
+5506	Truân sở tướng
+5507	Yết tử sĩ
+5508	Yết mãnh tướng
+5509	Trú bắc quân
+5510	Vọnglâuthtướng
+5511	Trừ thảo nữ
+5512	Tráng nông dân
+5513	Dật thế ẩn sĩ
+5514	Hồng nho ẩn sĩ
+5515	Cườngcung binh
+5516	Phi thỉ binh
+5517	Tr.thuẫn doanh
+5518	Hám sơn dũngsĩ
+5519	Yếu tắc quân
+5520	Thànhphòngbinh
+5521	Báo kỵ binh
+5522	Hổ kỵ binh
+5523	Huyệt vệ sĩ
+5524	Thiết kỵ binh
+5525	Bôn tập doanh
+5526	Trọng kỵ binh
+5527	Du Tham
+5528	Kim trụ binh
+5529	Hùng hổ quân
+5530	Tật chuẩn binh
+5531	Đăng hạm doanh
+5532	Áp thương binh
+5533	Thủy quân hiệu
+5534	Nham lực sĩ
+5535	Hoảng kiếm đội
+5536	QTrung thiếtkỵ
+5537	Hắc trụ binh
+5538	UngLương th.kỵ
+5539	ThiênđànTiênHổ
+5540	Th.đàn LinhQuy
+5541	Th.đànLangNhân
+5542	Th.đànHùngMiêu
+5543	Cường hóa quái
+5544	Cường hóa quái
+5545	Cường hóa quái
+5546	Cường hóa quái
+5547	Mã hàn Cận Phu
+5548	Lục Ác Quỷ
+5549	Ác nữ Mã Hàn
+5550	Tà Âm Dương
+5551	Sa Tặc Tư Hổ
+5552	Lộng Xà Nữ
+5553	Hỏa Nhân Hổ
+5554	Vũ Phi Xà
+5555	TinhbinhĐ.Giáp
+5556	ChiếnTượng N.M
+5557	Hổ Man nhân
+5558	Mãnh hổ NamMan
+5559	ChiếnTượng NK
+5560	Mantốtphệnhân
+5561	Độcxàphệhuyết
+5562	ManTướngĐ.Giáp
+5563	Địa nhẫn tướng
+5564	Thuỷnhẫntướng
+5565	Hỏa nhẫn tướng
+5566	Phongnhẫntướng
+5567	Đạothuậtnênhân
+5568	Mộcnhânphụhồn
+5569	Đầulâuyêu huật
+5570	Mãnh sư tàkhải
+5571	Búa quỷ
+5572	Phiến tinh
+5573	Thương linh
+5574	Sách hồn
+5575	Nam thiên binh
+5576	Bắc thiên binh
+5577	Thi tiên nữ
+5578	Thư tiên nữ
+5579	Lễ tiên nữ
+5580	Lạc Tiên Nữ
+5581	Tây thiên binh
+5582	Đông thiênbinh
+5583	Thầntinhtiênkỵ
+5584	TháiBạchtiênkỵ
+5585	HuỳnhHoặcT.kỵ
+5586	Tuếtinhtiênkỵ
+5587	Cầm Trung Tiên
+5588	Kỳ Trung Tiên
+5589	Thư Trung Tiên
+5590	Họa Trung Tiên
+5591	Bánh đậu
+5592	Ân Quan
+5593	Dương Nghi
+5594	Dương Hồng
+5595	Bửu Mã
+5596	Thanh Mã
+5597	Lam Mã
+5598	Kim Mã
+5599	Bánh đậu xanh
+5600	Bánh đậu đỏ
+5601	Bánh Củ Cải
+5602	Phạm Tầm
+5603	Công Tôn Tập
+5604	Bánh Đậu Đen
+5605	Tiểu Hắc Mão
+5606	Tiểu Kim Mão
+5607	Tiểu Lam Mão
+5608	Tiểu Hùng
+5609	Gấu Lạc Mẹ
+5610	Hắc Mão
+5611	Sâm Cao Ly
+5612	Sâm Ngọc Linh
+5613	BinhHùngDuệ
+5614	Kẻ Hiếp Dâm
+5615	Tiểu Binh Bột
+5616	Kẻ Cướp Của
+5617	Bạch Binh Bộ
+5618	Bạch Tư Bộ
+5619	Hổ Dữ
+5620	Giác Hổ Cốt
+5621	Khỉ Bóng Biển
+5622	Đại Hầu Tử
+5623	Cát Hầu Tử
+5624	Tiểu Sư Vương
+5625	Đại Sư Vương
+5626	HTĐT.BMa Vương
+5627	Phí Điểu
+5628	Kim Sí Điểu
+5629	PhúcHải ĐTG.MV
+5630	Khu Thần ĐTNNV
+5631	ThiếcPhànNgưu
+5632	Phiến Ngưu Bì
+5633	Các Ngưu Bì
+5634	Ngưu Ma Vương
+5635	Ngọc Diện HồLy
+5636	Lang Diện ÁcMa
+5637	Lục Mỹ Hầu Tử
+5638	Nhị Thiếu Long
+5639	Nhất Kha Long
+5640	Tam Triệu Long
+5641	Trác Kình Long
+5642	Tứ Vạn Long
+5643	VạnniênQuytiên
+5644	Địa thiêntướng
+5645	Ngô Cương
+5646	Cửu Âm Mị Cơ
+5647	MinhhàBứcvương
+5648	Hoang Thần
+5649	HaothiênKhuyển
+5650	Ngọc Đế
+5651	Đô chi linh Hồ
+5652	TháiTh.LãoQuân
+5653	Chức nữ
+5654	Thủythiêntướng
+5655	Tam nhãn tướng
+5656	VươngMẫuNNương
+5657	ThiêncơthầnQuy
+5658	TháiBạchT.Quân
+5659	Na Tra
+5660	Hỏa thiêntướng
+5661	Nhân Hổ Tiên
+5662	Diêm la Vương
+5663	Mã la đạo
+5664	Nam Tinh Quân
+5665	Nhị Lang Thần
+5666	Th.NiênLinhQuy
+5667	Phong th.tướng
+5668	Hằng Nga
+5669	LongThần Vg.tử
+5670	Bắc Tinh Quân
+5671	Chu Công
+5672	Lôi Công
+5673	Lôi Mẫu
+5674	ĐôngHảiL.Vương
+5675	NamHải L.Vương
+5676	TâyHải L.Vương
+5677	BắcHải L.Vương
+5678	Trì Quốc Thiên
+5679	Đa Văn Thiên
+5680	QuảngMụcThiên
+5681	Tăng Tr Thiên
+5682	NgọcThốtiêntử
+5683	Tần Thuỷ Hoàng
+5684	Lã Bất Vi
+5685	Vương Tiễn
+5686	Xương Văn Quân
+5687	XươngBìnhQuân
+5688	Lý Tín
+5689	QuảngLạcTTướng
+5690	HoàngLạcTBinh
+5691	XíchCướcĐTiên
+5692	GiaQuanTTướng
+5693	Dạ Du Thần
+5694	Nhật Du Thần
+5695	Úy Liêu
+5696	Mông Ngao
+5697	Mông Vũ
+5698	Vương Bí
+5699	Tam Nhãn Tướng
+5700	ThDươngthtướng
+5701	Chu Công
+5702	ĐạiLựcKimCang
+5703	QuảngMụcThiên
+5704	Tăng Tr Thiên
+5705	Đa Văn Thiên
+5706	Trì Quốc Thiên
+5707	Đông Tinh Quân
+5708	Tây Tinh Quân
+5709	Hữu Môn Thần
+5710	Tả Môn Thần
+5711	ThiếuÂmTtướng
+5712	CựcÂmthầntướng
+5713	CựcDươngTTướng
+5714	ĐôngThiênTướng
+5715	TâyThiênTướng
+5716	NamThiênTướng
+5717	BắcThiênTướng
+5718	Quy Tiên
+5719	GiaLực KimCang
+5720	DuDịchLinhQuan
+5721	DựcThánhC.Quân
+5722	T.RằmT7thầnbí
+5723	VạnniênQuytiên
+5724	Nhân Hổ Tiên
+5725	Th.đànLangNhân
+5726	Th.đànHùngMiêu
+5727	Thiên Lý Nhãn
+5728	ThuậnPhongNhĩ
+5729	Viêm Đế
+5730	Kim Đồng
+5731	Ngọc Nữ
+5732	Toại Nhân Thị
+5733	Hiên Viên Thị
+5734	Kim Thiên Thị
+5735	Cao Dương Thị
+5736	Bàn Cổ Thị
+5737	Hữu Sào Thị
+5738	Chúc Dung Thị
+5739	Hậu Thổ
+5740	Huyền Minh
+5741	Đế Nghiêu
+5742	Đế Chí
+5743	Đế Thuấn
+5744	Đế Vũ
+5745	Đế Khốc
+5746	Diêm Nam Quân
+5747	Diêm Bắc Quân
+5748	Lão Thụ Tiên
+5749	Văn Khúc Tinh
+5750	Chân Vũ
+5751	Kim Long
+5752	Tiên Nữ
+5753	Lý Na Tra
+5754	Lôi Chấn Tử
+5755	Điện Mẫu
+5756	Phong Bà Bà 
+5757	Phong Thần
+5758	Kim Tra
+5759	Mộc Tra
+5760	Thổ Hành Tôn
+5761	ĐặngThiềnNgọc
+5762	Hỏa Đức Quân
+5763	Thủy Đức Quân
+5764	Trung Đẩu Quân
+5765	Thái Âm Quân
+5766	TháiDương Quân
+5767	Thái Tuế Quân
+5768	Hoa Đà
+5769	Thuần Vu Ý
+5770	BảoSanh Đại Đế
+5771	Tôn Tư Mạc
+5772	Lý Thời Trân
+5773	TrươngTr.Cảnh
+5774	Từ Phúc
+5775	Biến Thước
+5776	Đổng Chân Quân
+5777	Cửu Thiên H.Nữ
+5778	Nguyệt Lão
+5779	Thần Tài
+5780	TrươngĐạoLăng
+5781	Táo Thần
+5782	Khương Tử Nha
+5783	Võ Khúc Tinh
+5784	Lôi Tổ
+5785	VănXươngĐếQuân
+5786	Diêm Tây Quân
+5787	Diêm Đông Quân
+5788	VũĐức TinhQuân
+5789	HữuThánhC.Nhân
+5790	Đổng Sự T.Đoàn
+5791	KhánhĐứcT.Đoàn
+5792	PhúcĐứcC.Thần
+5793	ĐôngVươngCông
+5794	TháiẤtChânNhân
+5795	QuảngTrạchTV
+5796	Hữu Bật
+5797	Tả Phụ
+5798	Thường Nga
+5799	Hậu Nghệ
+5800	Hình Thiên
+5801	Thương Hiệt
+5802	Tát Chân Nhân
+5803	TửDươngC.Nhân
+5804	Thiên Lung
+5805	Địa Á
+5806	Xi Vưu
+5807	Cung Công Thị
+5808	Lụy Tổ
+5809	Hi Hòa
+5810	Hạ Vũ
+5811	Khoa Phụ Thị
+5812	Đẩu Mẫu N.Quân
+5813	Lê Sơn Bảo Mẫu
+5814	Tôn Tẫn C.Nhân
+5815	ChungQùyC.Nhân
+5816	Thẩm Điện TĐ
+5817	Phục Hy Thị
+5818	Thái Tuế Thần
+5819	ĐịaQuan ĐạiĐế
+5820	ThiênQuanĐạiĐế
+5821	ThủyQuan ĐạiĐế
+5822	Mã Tướng Quân
+5823	NamCực TiênÔng
+5824	Ông Tơ
+5825	Bà Nguyệt
+5826	Thần Hoàng
+5827	ĐôngQuan ĐạiĐế
+5828	SởTiêu KimCang
+5829	Nữ Oa
+5830	Hoan Hỷ Phật
+5831	ÁcLaiPhậtThạch
+5832	HoàngThiênCẩu
+5833	Lam Thiên Xà
+5834	Hỗn Thiên Lang
+5835	Húc Thiên Hầu
+5836	Lực Thiên Hợi
+5837	Nhiễu Tâm Tiên
+5838	Bắc Môn Thần
+5839	Nam Môn Thần
+5840	Tiểu Quỷ
+5841	Hoàng Lạc
+5842	Địa Môn Thần
+5843	Quỷ Môn Thần
+5844	Đức Môn Thần
+5845	Phủ Điền
+5846	Tiểu Quỷ
+5847	Tây Phủ
+5848	Nam Phủ
+5849	Trung Phủ
+5850	Bắc Phủ
+5851	Đông Phủ
+5852	Tiểu Quỷ
+5853	Tỷ Ấn
+5854	Kỷ Ấn
+5855	Văn Phong
+5856	Võ Tông
+5857	Hỗn Âm Tào
+5858	Mộng Ma
+5859	ATuLa Phàn Duệ
+5860	Âm Tử
+5861	Chiến Tử
+5862	Lã Trị
+5863	Dực Thi
+5864	Bạch Ngạ Quý
+5865	Tần Lang Thị 
+5866	Luyện Ngục Quỷ
+5867	Thảo Phủ Thị 
+5868	Di Đình
+5869	Tôn Tẩn
+5870	Lam Thẩm Quỷ
+5871	Tế Ông
+5872	Thần Thị
+5873	Bí Hí
+5874	Hữu Bí Hí Trảo
+5875	Tu La Ma Vương
+5876	TuLa yêu tướng
+5877	TuLa yêu tướng
+5878	Quỷ luyện ngục
+5879	Nhiếp tâm Ma
+5880	Huyễn tâm Ma
+5881	Quỷ tâm Ma
+5882	Lưu Bị
+5883	Quan Vũ
+5884	Trương Phi
+5885	Thục Binh
+5886	Thục Binh
+5887	Mã Siêu
+5888	Triệu Vân
+5889	Hoàng Trung
+5890	Pháp Chính
+5891	Trương Tùng
+5892	Quan Bình
+5893	Chu Thương
+5894	HoàngNguyệtAnh
+5895	Gia Cát Lượng
+5896	Bàng Thống
+5897	Quan Hưng
+5898	Mã Lương
+5899	Mã Tắc
+5900	Lý Nghiêm
+5901	Gia Cát Quân
+5902	Trương Bào
+5903	Triệu Quảng
+5904	Triệu Thống
+5905	Khương Duy
+5906	Gia Cát Chiêm
+5907	Gia Cát Quả
+5908	Lữ Khải
+5909	Vương Bình
+5910	Trương Nghi
+5911	Lý Phong
+5912	Mã Đại
+5913	Lữ Bố
+5914	Đổng Trác
+5915	Lý Nho
+5916	Trần Cung
+5917	Điêu Thuyền
+5918	Cao Thuận
+5919	Ngưu Phụ
+5920	NhạnĐiêuTuyết
+5921	Lữ Linh Khởi
+5922	Lữ Bố
+5923	Lữ Bố
+5924	Lữ Bố
+5925	Lữ Bố
+5926	Hoa Hùng
+5927	Hoàng Cái
+5928	Tôn Kiên
+5929	Trình Phổ
+5930	Hàn Đương
+5931	Tổ Mậu
+5932	Chu Tuấn
+5933	Trình Bỉnh
+5934	Tôn Thiệu
+5935	Phan Chương
+5936	Hạ Tề
+5937	Ngô Binh
+5938	Ngô Binh
+5939	Lỗ Túc
+5940	Tôn Quyền
+5941	Lục Tốn
+5942	TônThượngHương
+5943	Lữ Mông
+5944	Thái Sử Hưởng
+5945	Gia Cát Cẩn
+5946	Trương Hoành
+5947	Từ Thịnh
+5948	Chu Thái
+5949	Chu Du
+5950	Tôn Sách
+5951	Trương Chiêu
+5952	Tiểu Kiều
+5953	Cam Ninh
+5954	Đại Kiều
+5955	Lăng Thống
+5956	Lý Thuật
+5957	Tôn Dực
+5958	Thái Sư Từ
+5959	Ngụy Diên
+5960	Tào Nhân
+5961	Tuân Úc
+5962	Giả Hủ
+5963	Bàng Dục
+5964	Hạ Hầu Đôn
+5965	Hạ Hầu Uyên
+5966	Từ Thứ
+5967	Vương Dị
+5968	Bàng Đức
+5969	Ngụy Binh
+5970	Ngụy Binh
+5971	Văn Sính
+5972	Tào Thực
+5973	Tào Xung
+5974	Tào Phi
+5975	Dương Tu
+5976	Chân Mật
+5977	Tào Duệ
+5978	Văn Ương
+5979	Đặng Ngải
+5980	Vương Song
+5981	Hạ Hầu Bá
+5982	Ám tâm Ma
+5983	Thôi tâm Ma
+5984	Quỷ Mẫu
+5985	Nữ Bạt
+5986	Cứu Thục Quan
+5987	Quỷ Diện Tả Từ
+5988	Quỷ Mê Tử
+5989	Hồn Mạng Liêu
+5990	Ma lượng tà
+5991	Mã la đạo
+5992	Quỷ Li Tang
+5993	Lôi phthủtướng
+5994	Lôi ph thủbinh
+5995	Lôi Phủ Quan
+5996	Tả Bí Hí Trảo
+5997	Khai Chương
+5998	Nhạc Vũ
+5999	Tây Tần
+6000	TấnBảo TiênNữ
+6001	Tư Mã Ý
+6002	Tào Tháo
+6003	Quách Gia
+6004	Trương Liêu
+6005	Hứa Chử
+6006	Điển Vi
+6007	Tư Mã Chiêu
+6008	Trương Hợp
+6009	Từ Hoảng
+6010	Tư Mã Sư
+6011	Kim Cang
+6012	Triệu Quảng
+6013	Triệu Thống
+6014	Triệu Tương
+6015	ĐT.DiHầuVương
+6016	ĐT.Sư Đà Vương
+6017	LưuQuanTrương
+6018	ĐấuSĩ KhVàng
+6019	VệSĩ KhVàng
+6020	SơnBinh KhVàng
+6021	QuânSư KhVàng
+6022	Trương Giác
+6023	Trương Lương
+6024	Trương Bảo
+6025	Vu Độc
+6026	TrươngMạnThành
+6027	Triệu V.Khương
+6028	Bạch Nhiễu
+6029	Đại Hồng
+6030	Binh Khăn Vàng
+6031	Binh Khăn Vàng
+6032	Binh Khăn Vàng
+6033	Binh Khăn Vàng
+6034	Đằng Giáp Binh
+6035	Đằng Giáp Binh
+6036	Đằng Giáp Binh
+6037	Đằng Giáp Binh
+6038	Mạnh Hoạch
+6039	Chúc Dung
+6040	M.Hoạch Ph.Nộ
+6041	Hồn N.Đ.Cốt
+6042	C.Dung Ph.Nộ
+6043	QuáiVật G.Sinh
+6044	Lâm Quỷ Chảo
+6045	Lam Quỷ Chảo
+6046	Hồng Quỷ Chảo
+6047	Lục Quỷ Chảo
+6048	Bạt Thiệt
+6049	Tiễn Đao
+6050	Thiết Thụ
+6051	Nghiệt Kính
+6052	Chung Lưng
+6053	Lục Th.Quỷ
+6054	Lâm Th.Quỷ
+6055	Lam Th.Quỷ
+6056	Hồng Th.Quỷ
+6057	Đồng Trụ
+6058	Đao Sơn
+6059	Băng Sơn
+6060	Dầu Oa
+6061	Ngưu Khanh
+6062	Lâm Ám Long
+6063	Hồng Ám Long
+6064	Lam Ám Long
+6065	Lục Ám Long
+6066	Thạch Áp
+6067	Thung Cữu
+6068	Huyết Trì
+6069	Uổng Tử
+6070	Trách Hình
+6071	Ám Tâm Ma
+6072	Hỏa Sơn
+6073	Quang Tâm Ma
+6074	Thạch Ma
+6075	Đao Cư
+6076	TuLa M.Vương
+6077	TuLa M.Hậu
+6078	Hổ Vương Tinh
+6079	Hổ Tinh
+6080	Hổ Tinh
+6081	Hổ Tinh
+6082	Hổ Tinh
+6083	Tiểu Yêu Quái
+6084	Tiểu Yêu Quái
+6085	Tiểu Yêu Quái
+6086	Tiểu Yêu Quái
+6087	Xà Vương Tinh
+6088	Xà Tinh
+6089	Xà Tinh
+6090	Xà Tinh
+6091	Xà Tinh
+6092	Phi Điểu Vương
+6093	Địa Long Tinh
+6094	Gấu Vương Tinh
+6095	Gấu Tinh
+6096	Gấu Tinh
+6097	Gấu Tinh
+6098	Gấu Tinh
+6099	Hầu Vương Tinh
+6100	Hầu Tinh
+6101	Hầu Tinh
+6102	Hầu Tinh
+6103	Hầu Tinh
+6104	Kỳ Lân Vương
+6105	Bạch Lộc Tinh
+6106	Bạch Cốt Vương
+6107	Bạch Cốt Hậu
+6108	Trư Tinh
+6109	Trư Tinh
+6110	Sói Tinh
+6111	Sói Tinh
+6112	Tượng Tinh
+6113	Tượng Tinh
+6114	Đại Bàng Tinh
+6115	Đại Bàng Tinh
+6116	Cung Sư Vương
+6117	Cung Sư Tinh
+6118	Cung Sư Tinh
+6119	Ma Cốt Vương
+6120	Vong Cốt Vương
+6121	Vong Cốt Tinh
+6122	Sói Tinh
+6123	CôNhiChiếnHoả
+6124	CôNhiChiếnHoả
+6125	CôNhiChiếnHoả
+6126	CôNhiChiếnHoả
+6127	CôNhiChiếnHoả
+6128	CôNhiChiếnHoả
+6129	CôNhiChiếnHoả
+6130	CôNhiChiếnHoả
+6131	CôNhiChiếnHoả
+6132	CôNhiChiếnHoả
+6133	CôNhiChiếnHoả
+6134	CôNhiChiếnHoả
+6135	CôNhiChiếnHoả
+6136	CôNhiChiếnHoả
+6137	CôNhiChiếnHoả
+6138	CôNhiChiếnHoả
+6139	CôNhiChiếnHoả
+6140	CôNhiChiếnHoả
+6141	CôNhiChiếnHoả
+6142	CôNhiChiếnHoả
+6143	CôNhiChiếnHoả
+6144	CôNhiChiếnHoả
+6145	CôNhiChiếnHoả
+6146	CôNhiChiếnHoả
+6147	CôNhiChiếnHoả
+6148	CôNhiChiếnHoả
+6149	CôNhiChiếnHoả
+6150	CôNhiChiếnHoả
+6151	CôNhiChiếnHoả
+6152	CôNhiChiếnHoả
+6153	CôNhiChiếnHoả
+6154	CôNhiChiếnHoả
+6155	CôNhiChiếnHoả
+6156	CôNhiChiếnHoả
+6157	CôNhiChiếnHoả
+6158	CôNhiChiếnHoả
+6159	CôNhiChiếnHoả
+6160	CôNhiChiếnHoả
+6161	CôNhiChiếnHoả
+6162	CôNhiChiếnHoả
+6163	Tưởng Cán
+6164	Triệu Nga
+6165	Na Lỵ
+6166	Công Tôn Toản
+6167	Diêm Phố
+6168	Tôn Thiệu
+6169	Văn Sính
+6170	Từ Thịnh
+6171	Trình Bỉnh
+6172	Tào Phi
+6173	Lý Nho
+6174	Quách Viện
+6175	Cao Lãm
+6176	Gia Cát Quân
+6177	Viên Thiệu
+6178	Trương Nghi
+6179	Thái Văn Cơ
+6180	Di Di
+6181	TrươngXuânHoa
+6182	Tây Na Bà Địa
+6183	Lữ Linh Khởi
+6184	Đặng Ngải
+6185	Văn Ương
+6186	Cao Thuận
+6187	Mã Tắc
+6188	Tào Nhân
+6189	Chu Phù
+6190	Pháp Chính
+6191	Bồ Nguyên
+6192	Trương Giác
+6193	Trương Lương
+6194	Trương Bảo
+6195	Tôn Dực
+6196	Quan Bình
+6197	HoàngNguyệtAnh
+6198	Trương Hợp
+6199	Trình Dục
+6200	Chu Thương
+6201	Trương Hoành
+6202	Bàng Dục
+6203	Hứa Chử
+6204	Tào Xung
+6205	Ngụy Diên
+6206	Miên.TQNguyên
+6207	ThạchQ.Nguyên
+6208	Chu Du
+6209	Trương Liêu
+6210	Hoàng Trung
+6211	Kỷ Linh
+6212	Vương Dị
+6213	Lưu Bị
+6214	Quan Vũ
+6215	Trương Phi
+6216	VõThần Quan Vũ
+6217	YếnNhân Tr.Phi
+6218	Cát Bình
+6219	Thái Sử Từ
+6220	Tôn Sách
+6221	Gia Cát Cẩn
+6222	Tiểu Kiều
+6223	Đại Kiều
+6224	Từ Thứ
+6225	Thẩm Phối
+6226	Cam Ninh
+6227	Triệu Vân
+6228	Triệu Quảng
+6229	Triệu Thống
+6230	NhạnĐiêuTuyết
+6231	Điêu Thuyền
+6232	Trần Cung
+6233	Mã Đại
+6234	Hạ Hầu Uyên
+6235	Hạ Hầu Đôn
+6236	Tôn Quyền
+6237	Bàng Đức
+6238	Tuân Úc
+6239	Quách Gia
+6240	Tôn Kiên
+6241	Chân Mật
+6242	Tào Tháo
+6243	Mã Siêu
+6244	Lỗ Tạp
+6245	Thư Thụ
+6246	Điển Vi
+6247	Cẩm Mã Siêu
+6248	Văn Xú
+6249	Tưởng Tế
+6250	Công Tôn Tập
+6251	Khảo Lỗ
+6252	Na Âu
+6253	Lữ Phụng Tiên
+6254	Viên Thuật
+6255	Từ Hoảng
+6256	Bộ Chất
+6257	Ti Di Hô
+6258	TônThượngHương
+6259	Hoa Hùng
+6260	Chu Thái
+6261	Bành Dạng
+6262	Lỗ Túc
+6263	Lữ Mông
+6264	Tào Thực
+6265	Nhan Lương
+6266	Trương Chiêu
+6267	Hứa Thiệu
+6268	Hoàng Cái
+6269	Bộ Độ Căn
+6270	Tả Hiền Vương
+6271	Sa Ma Kha
+6272	Phù La Hàn
+6273	Lý Điển
+6274	VươngNguyênCơ
+6275	Nhạc Tiến
+6276	HoàngThừaNgạn
+6277	Hứa Du
+6278	Tào Chân
+6279	Tào Hồng
+6280	Trần Quần
+6281	Hàn Đương
+6282	Điển Mãn
+6283	Hoàng Phủ Tung
+6284	Giả Hủ
+6285	Điền Phong
+6286	Triệu V.Khương
+6287	Đổng Hoàng
+6288	Đổng Việt
+6289	Đổng Chiêu
+6290	Tưởng Nghĩa Cừ
+6291	Trương Nhượng
+6292	Quách Nữ Vương
+6293	Nghiêm Bạch Hổ
+6294	Trương Nhậm
+6295	Đổng Hòa
+6296	Ngô Ý
+6297	Mã Thiết
+6298	Lữ Khải
+6299	Bàng Đức Công
+6300	Tang Bá
+6301	Mã Đằng
+6302	Đạp Đốn
+6303	Hí Chí Tài
+6304	Lưu Diệp
+6305	Lại Cung
+6306	Tư Mã Huy
+6307	Mạnh Đạt
+6308	Trình Phổ
+6309	Vương Bình
+6310	Tưởng Uyển
+6311	Mã Lương
+6312	Nghiêm Nhan
+6313	Trương Lỗ
+6314	Tống Kiến
+6315	Quan Tác
+6316	Thôi Châu Bình
+6317	Tào Chương
+6318	Thôi Diễm
+6319	Lý Nghiêm
+6320	Mễ Nã
+6321	Bào Xuất
+6322	Trương Tùng
+6323	Dương Tu
+6324	Ti Cẩu
+6325	Vu Cấm
+6326	Sa Âu Sa
+6327	Trương Phấn
+6328	Ất Địa Gia Lan
+6329	Lưu Ba
+6330	Bào Tam Nương
+6331	Quản Lộ
+6332	Công Tôn Dương
+6333	Hứa Tĩnh
+6334	Đổng Trác
+6335	Mạnh Hoạch
+6336	Chúc Dung
+6337	Ngột Đột Cốt
+6338	Lý Thuật
+6339	Bá Ngôn
+6340	Trọng Đạt
+6341	Sỹ Nguyên
+6342	Khổng Minh
+6343	Tư Mã Ý
+6344	Lục Tốn
+6345	Bàng Thống
+6346	Gia Cát Lượng
+6347	Tống Dũng
+6348	Tống Nhân
+6349	Cửu Vĩ Hồ
+6350	Lưu Bị
+6351	Trương Phi
+6352	Quan Vũ
+6353	Đổng Trác
+6354	Lữ Bố
+6355	Tào Tháo
+6356	Gia Cát Lượng
+6357	Tào Duệ
+6358	Vương Song
+6359	Y Lị
+6360	Lý Phong
+6361	Qua Luân Tri
+6362	Tát Ba Địa Qua
+6363	Lữ Bố
+6364	Lữ Bố
+6365	Lữ Bố
+6366	Lữ Bố
+6367	Đại Mỹ Nhân
+6368	Tẩu khả
+6369	Du đĩnh
+6370	Mông Xung
+6371	Hải cốt
+6372	Đấu hạm
+6373	Lâu thuyền
+6374	Thuyền chiến
+6375	N.Cchiếnthuyền
+6376	N.Cchiếnthuyền
+6377	N.Cchiếnthuyền
+6378	ĐuathuyềnĐ.Ngọ
+6379	ĐuathuyềnĐ.Ngọ
+6380	ĐuathuyềnĐ.Ngọ
+6381	ĐuathuyềnĐ.Ngọ
+6382	  
+6383	Tẩukhả thủytặc
+6384	Duđĩnh thủytặc
+6385	MôngxungTh.Tặc
+6386	Hảicốt thủytặc
+6387	MôngxungTrâuĐà
+6388	Hảicốt V.Thịnh
+6389	Môngxung LữHợp
+6390	Hảicốt TầnLang
+6391	ĐấuhạmHoàngLLa
+6392	Đấuhạm HứaCông
+6393	MôngxungBDương
+6394	Hảicốt BàDương
+6395	ĐấuhạmTiềnĐồng
+6396	Đấuhạm Chu Bột
+6397	LâuthuyềnNg.Dư
+6398	LâuthuyềnN.BHổ
+6399	Đấuhạm BàDương
+6400	Thchiến kẻđịch
+6401	Thchiến kẻđịch
+6402	Thchiến kẻđịch
+6403	Tiêu Chu
+6404	Gia nô Từ Phúc
+6405	Đồng Nam
+6406	Đồng Nữ
+6407	Từ Phúc phẫnnộ
+6408	Thương nhân tb
+6409	Thương nhân tb
+6410	Thương nhân tb
+6411	Tâm Ma
+6412	Lữ Bố
+6413	Lữ Bố
+6414	Lữ Bố
+6415	Lữ Bố
+6416	Điêu Thuyền
+6417	Đổng Trác
+6418	Lã Linh Khởi
+6419	Quách Gia
+6420	Hứa Chử
+6421	Tào Tháo
+6422	Tư Mã Ý
+6423	Long Tộc
+6424	Gi.Đông TửBinh
+6425	Hạng Vũ A.Dũng
+6426	QuảngĐứcTTướng
+6427	Phù Tô
+6428	Chân Mật
+6429	Lữ Mông
+6430	Tả Hiền Vương
+6431	Bàng Thống
+6432	Thái Sư Từ
+6433	Từ Thứ
+6434	Sa Ma Kha
+6435	Gia Cát Cẩn
+6436	Hạ Hầu Đôn
+6437	Thái Văn Cơ
+6438	Lục Tốn
+6439	Hoàng Cái
+6440	Ti Di Hô
+6441	ThạchQ.Nguyên
+6442	Ngưu Đầu
+6443	Mã Diện
+6444	Mạnh Bà
+6445	Phán Quan
+6446	SởGiangVương
+6447	Tống Đế Vương
+6448	NgũQuanVương
+6449	HoàngNguyệtAnh
+6450	Tuân Úc
+6451	Tào Thống
+6452	Quách Nữ Vương
+6453	Hạ Hầu Bá
+6454	Tống Giang
+6455	Trương Hợp
+6456	Đăng Ngải
+6457	ThếĐứcTh.Binh
+6458	LạcThầnChânCơ
+6459	Lưu Bị
+6460	Tào Thực
+6461	VõThầnQuanVũ
+6462	YếnNhânTr.Phi
+6463	Cẩm Mã Siêu
+6464	Khương Duy
+6465	Ngụy Diên
+6466	Mã Tắc
+6467	Tôn Nhị Nương
+6468	Lư Tuấn Nghĩa
+6469	Lý Quỳ
+6470	Lỗ Trí Thâm
+6471	Võ Tòng
+6472	Ngô Dụng
+6473	ThếTâmTh.Binh
+6474	Lã Bá Sa
+6475	Gia Đinh Bá Sa
+6476	Gia Đinh Bá Sa
+6477	Gia Đinh Bá Sa
+6478	Gia Đinh Bá Sa
+6479	Lã Bá Sa
+6480	Hồn gia đinh
+6481	Hồn gia đinh
+6482	Hồn gia đinh
+6483	Hồn gia đinh
+6484	Tôn Ngộ Không
+6485	Cam Ninh
+6486	Tôn Sách
+6487	Ngô Chủ
+6488	Chu Du
+6489	TônThượngHương
+6490	Trương Hoành
+6491	Chu Thái
+6492	Thái Sư Từ
+6493	Lục Tốn
+6494	Chân Mật
+6495	Tào Nhân
+6496	Tào Thực
+6497	Tào Phi
+6498	Ngụy Chủ
+6499	Trương Liêu
+6500	Hứa Chử
+6501	Quách Gia
+6502	Trương Hợp
+6503	Tư Mã Ý
+6504	Tào Xung
+6505	Tào Duệ
+6506	Chúc Dung
+6507	Mạnh Hoạch
+6508	Thục Chủ
+6509	Quan Vũ
+6510	Trương Phi
+6511	Bàng Thống
+6512	Gia Cát Lượng
+6513	Triệu Vân
+6514	Mã Siêu
+6515	Khương Duy
+6516	Viên Thuật
+6517	Viên Thượng
+6518	Trương Bảo
+6519	Trương Lương
+6520	Trương Giác
+6521	Phạm Tầm
+6522	Phạm Sư Mạn
+6523	Ất Địa Gia Lan
+6524	Tát Ba Địa Qua
+6525	Tây Na Bà Địa
+6526	Phạm Chiên
+6527	Phạm Trường
+6528	Pham Kim Sinh
+6529	Xà Gia Bạt La
+6530	TrìLêĐàBạtMa
+6531	Lưu Đà Bạt Ma
+6532	Liễu Điệp
+6533	Hỗn Điền
+6534	TầnQuảngVương
+6535	Hắc Vô Thường
+6536	Bạch Vô Thường
+6537	BiệnThànhVương
+6538	Thái Sơn Vương
+6539	BìnhĐẳngVương
+6540	DiêmLaThiênTử
+6541	Đô Thị Vương
+6542	Ch.LuânVương
+6543	BìnhĐẳngVương
+6544	BửuMãThiếtKị
+6545	Na Lỵ
+6546	Ti Di Hô
+6547	Di Di
+6548	Ti Cẩu
+6549	Na Âu
+6550	Sa Âu Sa
+6551	Ti Nô Mẫu Li
+6552	Mễ Nã
+6553	Khảo Lỗ
+6554	Yêu Quỷ Vương
+6555	KhaiTâmBDY
+6556	Quỷ Diện Ác Ma
+6557	Thần.HKimBDY
+6558	Chiêm Tinh BDY
+6559	BDY Hoàng Kim
+6560	BDY Hoàng Kim
+6561	BDY Hoàng Kim
+6562	BDY Hoàng Kim
+6563	BáchNiênĐậuYêu
+6564	ÁiLạcTiểuĐậu
+6565	Hồn Phù Tô
+6566	Hồn Lý Tư
+6567	Hồn Hồ Hợi
+6568	Thổ Thần
+6569	Thổ Công
+6570	Thổ Địa
+6571	Đại Thổ Công
+6572	Thổ Gia Công
+6573	Khỉ Già
+6574	Hồng Nhi
+6575	Tranh Nhi
+6576	Tử Nhi
+6577	Lục Nhi
+6578	TửLan TiênTử
+6579	Lam Nhi
+6580	Thanh Nhi
+6581	Hoàng Nhi
+6582	HắcHùngTinh
+6583	ĐạiHùngTinh
+6584	HeoRừng DịGiới
+6585	ThỏRừng DịGiới
+6586	Sư Tử Dị Giới
+6587	SưVươngDịGiới
+6588	MãnhHổ DịGiới
+6589	HổVương DịGiới
+6590	Rogers
+6591	Hầu Tôn
+6592	BạchTượngDG
+6593	HắcTượngDG
+6594	HoàngTượngDG
+6595	LamTượngDG
+6596	Dương Nhị Lang
+6597	Cửu Vĩ Hồ
+6598	TháiT.DươngHộ
+6599	NamHoa LãoTiên
+6600	Ô Giác Tả Từ
+6601	Ám*Vương Mẫu
+6602	Chức Nữ
+6603	Ngô Cương
+6604	Triệu Quảng
+6605	Triệu Thống
+6606	A Cổ Cầm
+6607	Tiểu Sư La Hán
+6608	TháiTuếT.Quân
+6609	LaHầuTinhQuân
+6610	KếĐôTinhQuân
+6611	ThủyĐứcT.Quân
+6612	Thiên Môn Thần
+6613	Cự Linh Thần
+6614	BíchDu TiênTử
+6615	Bạch Liên Hoa
+6616	ThámThủ LaHán
+6617	QuáGiang LaHán
+6618	HàngLong LaHán
+6619	Bố Đại La Hán
+6620	Tọa Lộc La Hán
+6621	KhánhHỷ LaHán
+6622	Cử Bát La Hán
+6623	ThácTháp LaHán
+6624	TĩnhTọa LaHán
+6625	KỵTượng LaHán
+6626	Trầm Tư La Hán
+6627	KhoáiNhĩ LaHán
+6628	Ba Tiêu La Hán
+6629	TrườngMi LaHán
+6630	KhánMôn LaHán
+6631	Phục Hổ La Hán
+6632	Xá Lợi Phất
+6633	Mục Kiền Liên
+6634	Ma Ha Ca Diếp
+6635	A Na Luật
+6636	Phú Lâu Na
+6637	Ca Chiên Diên
+6638	Tu Bồ Đề
+6639	Ưu Bà Li
+6640	La Hầu La
+6641	A Nan Đà
+6642	Gấu Trúc DG
+6643	Tiểu Xà DG
+6644	KhaiTâm LaHán
+6645	Na Lỵ
+6646	Triệu Nga
+6647	Chúc Dung
+6648	TônThượngHương
+6649	HồnMa CungNữ
+6650	Tôn Kiên
+6651	Hoàng Trung
+6652	XíchKhaoMãHầu
+6653	Lục Nhĩ Mỹ Hầu
+6654	ThôngTúyV.Hầu
+6655	LinhMinhTh.Hầu
+6656	LinhMinhTh.Hầu
+6657	Thôn Cô
+6658	Di Lặc
+6659	(Ẩn danh)

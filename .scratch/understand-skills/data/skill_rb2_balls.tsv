@@ -1,0 +1,33 @@
+element	element_name	slot	id	id_hex	name	type
+1	Địa / Kim	0	10027	0x272B	Vô Gian Chấn Ba	1
+1	Địa / Kim	1	10028	0x272C	Cát Thiên Hồn Phủ	1
+1	Địa / Kim	2	10029	0x272D	Lưu Tinh Thiết Pháo	1
+1	Địa / Kim	3	10030	0x272E	Lang Tinh Pháo	1
+1	Địa / Kim	4	10031	0x272F	Kim Chung Tráo	1
+1	Địa / Kim	5	10032	0x2730	ChiếnTượngTrùngPhong	1
+1	Địa / Kim	6	10033	0x2731	Sa Bộc Cầm	1
+1	Địa / Kim	7	10034	0x2732	Đồ Nham Vương Sát	1
+2	Thủy	0	11027	0x2B13	Thiên Hồi Băng Vũ	2
+2	Thủy	1	11028	0x2B14	Sương Lôi Quyền	2
+2	Thủy	2	11029	0x2B15	Siêu Hồi Ma Thuật	2
+2	Thủy	3	11030	0x2B16	Thiên Giáng Cam Lâm	2
+2	Thủy	4	11031	0x2B17	SiêuTrạng Giải Thuật	2
+2	Thủy	5	11032	0x2B18	Minh Hà Vô Tưởng	2
+2	Thủy	6	11033	0x2B19	Trảm Kỵ Nhất Thiểm	2
+2	Thủy	7	11034	0x2B1A	Lục Hồi Thiên BăngVũ	2
+3	Hỏa	0	12027	0x2EFB	Hỏa Bạo Nhất Kích	3
+3	Hỏa	1	12028	0x2EFC	Liệt Thuật Hào Hỏa	3
+3	Hỏa	2	12029	0x2EFD	Xích Long Cự	3
+3	Hỏa	3	12030	0x2EFE	Lôi Hỏa Thiệu Lâm	3
+3	Hỏa	4	12031	0x2EFF	Dương Viêm	3
+3	Hỏa	5	12032	0x2F00	Chúc Dung Phần Dã	3
+3	Hỏa	6	12033	0x2F01	Long Bá Liệt Trảm	3
+3	Hỏa	7	12034	0x2F02	Long Vương Chấn Hề	3
+4	Phong	0	13027	0x32E3	Phong Huyễn Thần Ly	4
+4	Phong	1	13026	0x32E2	Băng Lôi	4
+4	Phong	2	13028	0x32E4	Trảm Kỵ Phi Kiếm	4
+4	Phong	3	13029	0x32E5	Sơn Lam	4
+4	Phong	4	13030	0x32E6	Thức Qủy Hấp Hồn	4
+4	Phong	5	13031	0x32E7	Phong Kình Lôi Minh	4
+4	Phong	6	13032	0x32E8	Ẩn Phân Thân Thuật	4
+4	Phong	7	13033	0x32E9	Chấn Điện	4

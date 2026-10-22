@@ -1,0 +1,119 @@
+# Sub-op nao client THAT SU gui frame C->S, va do dai payload.
+# Nguon: asm_cs*_builders.asm.txt + cs*_jmptbl*.hex (Ghidra dump).
+# frameLen = so byte payload (ShortString cap truoc _PStrNCat) — CHI LA DO DAI, chua phai noi dung.
+# mainOp	subOp	builderAddr	frameLen	ghiChu	nhom
+0x10	0	0		epilogue — KHÔNG gửi	quiz Day-55 / kênh GM
+0x10	1	7871130		jmptbl[1]	quiz Day-55 / kênh GM
+0x10	2	7871265		jmptbl[2]	quiz Day-55 / kênh GM
+0x10	3	7871397		jmptbl[3]	quiz Day-55 / kênh GM
+0x10	4	7871529		jmptbl[4]	quiz Day-55 / kênh GM
+0x10	5	7871661		jmptbl[5]	quiz Day-55 / kênh GM
+0x10	6	7871793		jmptbl[6]	quiz Day-55 / kênh GM
+0x10	7	7871925		jmptbl[7]	quiz Day-55 / kênh GM
+0x10	8	7872057		jmptbl[8]	quiz Day-55 / kênh GM
+0x10	9	7872189		jmptbl[9]	quiz Day-55 / kênh GM
+0x10	10	7872321		jmptbl[10]	quiz Day-55 / kênh GM
+0x10	11	7872453		jmptbl[11]	quiz Day-55 / kênh GM
+0x10	12	7872581		jmptbl[12]	quiz Day-55 / kênh GM
+0x10	13	7872809		jmptbl[13]	quiz Day-55 / kênh GM
+0x10	14	7873097		jmptbl[14]	quiz Day-55 / kênh GM
+0x10	15	7873252		jmptbl[15]	quiz Day-55 / kênh GM
+0x10	16	7873407		jmptbl[16]	quiz Day-55 / kênh GM
+0x10	17	7873562		jmptbl[17]	quiz Day-55 / kênh GM
+0x10	18	7873647		jmptbl[18]	quiz Day-55 / kênh GM
+0x10	19	7873732		jmptbl[19]	quiz Day-55 / kênh GM
+0x10	20	7873817		jmptbl[20]	quiz Day-55 / kênh GM
+0x10	21	7873902		jmptbl[21]	quiz Day-55 / kênh GM
+0x10	22	7873987		jmptbl[22]	quiz Day-55 / kênh GM
+0x10	23	7874142		jmptbl[23]	quiz Day-55 / kênh GM
+0x10	24	7874227		jmptbl[24]	quiz Day-55 / kênh GM
+0x10	25	7874382		jmptbl[25]	quiz Day-55 / kênh GM
+0x10	26	7874537		jmptbl[26]	quiz Day-55 / kênh GM
+0x10	27	7874692		jmptbl[27]	quiz Day-55 / kênh GM
+0x10	28	7874920		jmptbl[28]	quiz Day-55 / kênh GM
+0x10	29	7875075		jmptbl[29]	quiz Day-55 / kênh GM
+0x10	30	7875230		jmptbl[30]	quiz Day-55 / kênh GM
+0x10	31	7875385		jmptbl[31]	quiz Day-55 / kênh GM
+0x10	32	7875540		jmptbl[32]	quiz Day-55 / kênh GM
+0x10	33	7875695		jmptbl[33]	quiz Day-55 / kênh GM
+0x10	34	7875830		jmptbl[34]	quiz Day-55 / kênh GM
+0x10	35	7875965		jmptbl[35]	quiz Day-55 / kênh GM
+0x10	36	7876100		jmptbl[36]	quiz Day-55 / kênh GM
+0x27	0	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	1	7894086		jmptbl[1]	bang hội / công thành
+0x27	2	7894202		jmptbl[2]	bang hội / công thành
+0x27	3	7894330		jmptbl[3]	bang hội / công thành
+0x27	4	7894495		jmptbl[4]	bang hội / công thành
+0x27	5	7894689		jmptbl[5]	bang hội / công thành
+0x27	6	7894852		jmptbl[6]	bang hội / công thành
+0x27	7	7894937		jmptbl[7]	bang hội / công thành
+0x27	8	7895065		jmptbl[8]	bang hội / công thành
+0x27	9	7895150		jmptbl[9]	bang hội / công thành
+0x27	10	7895266		jmptbl[10]	bang hội / công thành
+0x27	11	7895394		jmptbl[11]	bang hội / công thành
+0x27	12	7895522		jmptbl[12]	bang hội / công thành
+0x27	13	7895650		jmptbl[13]	bang hội / công thành
+0x27	14	7895815		jmptbl[14]	bang hội / công thành
+0x27	15	7895980		jmptbl[15]	bang hội / công thành
+0x27	16	7896090		jmptbl[16]	bang hội / công thành
+0x27	17	7896305		jmptbl[17]	bang hội / công thành
+0x27	18	7896434		jmptbl[18]	bang hội / công thành
+0x27	19	7896571		jmptbl[19]	bang hội / công thành
+0x27	20	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	21	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	22	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	23	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	24	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	25	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	26	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	27	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	28	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	29	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	30	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	31	7896681		jmptbl[31]	bang hội / công thành
+0x27	32	7896791		jmptbl[32]	bang hội / công thành
+0x27	33	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	34	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	35	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	36	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	37	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	38	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	39	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	40	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	41	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	42	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	43	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	44	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	45	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	46	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	47	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	48	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	49	0		epilogue — KHÔNG gửi	bang hội / công thành
+0x27	50	7896876		jmptbl[50]	bang hội / công thành
+0x27	51	7896961		jmptbl[51]	bang hội / công thành
+0x27	52	7897046		jmptbl[52]	bang hội / công thành
+0x27	53	7897156		jmptbl[53]	bang hội / công thành
+0x27	54	7897266		jmptbl[54]	bang hội / công thành
+0x27	55	7897351		jmptbl[55]	bang hội / công thành
+0x27	56	7897483		jmptbl[56]	bang hội / công thành
+0x14	4	7876860		JZ @0x00783027	chuyển map / kịch bản sự kiện
+0x14	6	7877102		JZ @0x0078302F	chuyển map / kịch bản sự kiện
+0x14	9	7877201		JZ @0x00783037	chuyển map / kịch bản sự kiện
+0x29	1	7897772		JZ @0x0078828D	kênh công thành
+0x29	2	7897901		JZ @0x00788291	kênh công thành
+0x29	3	7897986		JZ @0x00788299	kênh công thành
+0x29	4	7898118		JZ @0x007882A1	kênh công thành
+0x2A	1	7898270		JZ @0x0078848F	fan-out sự kiện
+0x2A	2	7898446		JZ @0x00788493	fan-out sự kiện
+0x2D	1	7899534		JZ @0x0078896F	thông báo sự kiện theo mùa
+0x2D	2	7899644		JZ @0x00788973	thông báo sự kiện theo mùa
+0x2D	3	7899754		JZ @0x0078897B	thông báo sự kiện theo mùa
+0x2D	4	7899925		JZ @0x00788983	thông báo sự kiện theo mùa
+0x3F	1	7902551		JZ @0x00789540	lôi đài + thủy chiến (điều khiển)
+0x3F	2	7902683		JZ @0x00789544	lôi đài + thủy chiến (điều khiển)
+0x3F	3	7902858		JZ @0x0078954C	lôi đài + thủy chiến (điều khiển)
+0x40	1	7903010		JZ @0x00789713	thủy chiến (chiến đấu)
+0x40	2	7903231		JZ @0x00789717	thủy chiến (chiến đấu)
+0x46	1	7905157		JNZ->epilogue; builder la lenh tiep theo @0x00789F85	đua thuyền rồng
+0xC7	4	7906092		JZ @0x0078A31D	kênh GM
+0xC7	6	7906350		JZ @0x0078A321	kênh GM

@@ -1,0 +1,3505 @@
+# BANGS MAP ID -> TEN MAP (giai ma Scene.Dat)
+# map_id	so_ban_ghi	kinds	ten(gop)
+10851	1	3	QuảngTrườngTrácQuận
+10852	1	3	QuảngTrườngTrácQuận
+10853	1	3	QuảngTrườngTrácQuận
+10854	1	3	QuảngTrườngTrácQuận
+10855	1	3	QuảngTrườngTrácQuận
+10856	1	3	QuảngTrườngTrácQuận
+10857	1	3	QuảngTrườngTrácQuận
+10858	1	3	QuảngTrườngTrácQuận
+10859	1	3	QuảngTrườngTrácQuận
+10860	1	3	QuảngTrườngTrácQuận
+10861	1	3	QuảngTrườngTrácQuận
+10862	1	3	QuảngTrườngTrácQuận
+10863	1	3	QuảngTrườngTrácQuận
+10864	1	3	QuảngTrườngTrácQuận
+10865	1	3	QuảngTrườngTrácQuận
+10866	1	3	QuảngTrườngTrácQuận
+10867	1	3	QuảngTrườngTrácQuận
+10868	1	3	QuảngTrườngTrácQuận
+10869	1	3	QuảngTrườngTrácQuận
+10870	1	3	QuảngTrườngTrácQuận
+10952	1	1	QuảngTrườngTrácQuận
+10963	1	1	Vùng đất băng giá
+10964	1	1	Vùng đất băng giá
+10965	1	1	Lô Long Khẩu
+10966	1	1	Lô Long Khẩu
+10982	2	1,2	Quảng Hàn Động | Thôn Bồng Lai
+10983	2	1,2	Quảng Hàn Động
+10984	2	1,2	Quảng Hàn Động
+10985	1	1	Quảng Hàn Động
+10986	2	1,2	Tàn tích Bột Hải | Mê cung Vạn Thắng
+10987	1	1	Mê cung Vạn Thắng
+10988	2	1,2	Mê cung Quỷ Vương
+10989	2	1,2	Mê cung Quỷ Vương | Tàn tích Bột Hải
+10991	17	1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17	QuảngTrườngTrácQuận | Mê cung sinh tồn
+10992	2	2,3	Vùng đất băng giá
+10993	1	1	U Châu
+10994	1	1	QuảngTrườngTrácQuận
+10995	3	1,2,3	Cửa thành Trác Quận | Thiên Đình | Rừng đào Thất Tịch
+10996	1	1	Cửa thành Trác Quận
+10997	2	1,2	Cửa thành Trác Quận | Thông đạo Lôi Phong
+11000	21	1,2,3,4,6,7,8,9,10,11,12,14,15,16,17,18,19,20,21,22,25	Ký Châu | Rừng Bồng Lai | Duyện Châu | Rừng Đông Quận | Động Hải Tặc | Thôn Bồng Lai | Bột Hải | Động Thái Sơn | Động Quỷ Thần | Sơn động Khoa Châu | Vi Sơn lương đình | Khổng Miếu | Đông Hải | Rừng bia Lang Gia | Rừng Đôn Khưu | Rừng Vi Sơn | Bờ biển Ký Châu | Núi Lang Gia | Đường mòn
+11001	2	1,2	Đường lớn Đông Quân | Rừng Đông Quận
+11002	9	1,2,3,4,5,6,7,8,9	Cửa thành Đông Quận | Lò rèn | Bần hộ | Khách sạn | Quan phủ | Ngoại Thành ĐôngQuan | Tiền trang
+11003	2	3,4	Đường lớn Đông Quân | Mỏ khoáng Đông Quận
+11011	2	1,2	Thanh Châu | Đường lớn Bắc Hải
+11012	7	1,2,3,4,5,6,7	Cửa thành Bắc Hải | Rừng Bắc Hải | Bần hộ | Nhà thuốc | Khách sạn
+11013	2	1,2	Động Quỷ Thần | Đường lớn Bắc Hải
+11021	5	1,2,3,4,5	Thanh Châu | Nhà tranh | Phòng nghèo | Bần hộ | Quảng Hàn Động
+11031	1	5	Vương thành bí đạo
+11041	1	5	Vương thành bí đạo
+11047	2	1,2	Thanh Châu | Lã Gia Thôn
+11048	3	1,2,3	Đường mòn | Nhà Lã Bá Sa | Nhà bếp
+11049	1	1	Lã Gia Thôn
+11050	1	1	Lã Gia Thôn
+11101	1	1	Đường lớn Bắc Hải
+11131	1	1	Đường lớn Đông Quân
+11132	1	1	Đường lớn Bắc Hải
+11133	1	1	Thôn Bồng Lai
+11171	1	1	Đường lớn Đông Quân
+11172	1	1	Đường lớn Bắc Hải
+11173	1	1	Thôn Bồng Lai
+11174	1	1	Thôn Bồng Lai
+11201	1	1	Đường lớn Đông Quân
+11221	1	1	Đường lớn Bắc Hải
+11241	1	1	Đường lớn Đông Quân
+11242	1	1	Đường lớn Bắc Hải
+11261	1	1	Đường lớn Đông Quân
+11301	1	1	Đường lớn Đông Quân
+11302	1	1	Đường lớn Đông Quân
+11401	1	1	Thanh Châu
+11411	1	1	Thanh Châu
+11421	2	1,2	Thanh Châu | Núi Lang Gia
+11422	2	1,2	Núi Lang Gia | Lang Gia cung
+11423	2	1,2	Núi Lang Gia | Tiểu ốc núi Lang Gia
+11424	1	1	Lang Gia cung
+11431	2	1,2	Động Thái Sơn | Ngủ đại phủ tung
+11432	1	1	Rừng Thái Sơn
+11501	1	1	Thanh Châu
+11502	1	1	Tầng 1 động Thái Sơn
+11503	2	1,3	Tầng 2 động Thái Sơn | HướngNgũĐạiPhủTung
+11504	1	3	Tầng 4 động Thái Sơn
+11505	1	1	Tầng 3 động Thái Sơn
+11506	1	2	Tầng 5 động Thái Sơn
+11508	1	2	Tầng 4 động Thái Sơn
+11509	1	1	Tầng 4 động Thái Sơn
+11512	1	2	Tầng 2 động Thái Sơn
+11513	1	2	Tầng 3 động Thái Sơn
+11514	1	1	Rừng Thái Sơn
+11521	2	1,2	Động Thái Sơn
+11531	3	1,2,3	Thanh Châu | Động Quỷ Thần
+11532	4	1,2,3,4	Động Quỷ Thần
+11533	3	1,2,3	Động Quỷ Thần
+11534	2	1,2	Động Quỷ Thần | Rừng Bắc Hải
+11535	3	1,2,3	Động Quỷ Thần
+11536	4	1,2,3,4	Động Quỷ Thần
+11537	1	1	Động Quỷ Thần
+11538	1	1	Động Quỷ Thần
+11539	3	1,2,3	Động Quỷ Thần
+11540	2	1,2	Động Quỷ Thần
+11541	4	1,2,3,4	Động Quỷ Thần
+11542	2	1,2	Động Quỷ Thần
+11543	3	1,2,3	Động Quỷ Thần
+11544	1	1	Động Quỷ Thần
+11551	3	1,2,3	Động Quỷ Thần
+11552	4	1,2,3,4	Động Quỷ Thần
+11553	3	1,2,3	Động Quỷ Thần
+11554	3	1,2,3	Động Quỷ Thần
+11555	3	1,2,3	Động Quỷ Thần
+11556	3	1,2,3	Động Quỷ Thần
+11557	2	1,2	Động Quỷ Thần
+11558	2	1,2	Động Quỷ Thần | Thanh Châu
+11559	3	1,2,3	Động Quỷ Thần
+11560	1	1	Động Quỷ Thần
+11561	2	1,2	Động Quỷ Thần
+11562	3	1,2,3	Động Quỷ Thần
+11563	1	1	Động Quỷ Thần
+11564	1	1	Động Quỷ Thần
+11565	3	1,2,3	Động Quỷ Thần
+11566	1	1	Động Quỷ Thần
+11567	1	1	Động Quỷ Thần
+11568	2	1,2	Động Quỷ Thần
+11569	1	1	Động Quỷ Thần
+11570	2	1,2	Động Quỷ Thần
+11571	2	1,2	Bột Hải | Động Quỷ Thần
+11581	3	1,2,3	Mỏ khoáng Đông Quận | Ngoại Thành ĐôngQuan
+11582	2	1,2	Mỏ khoáng Đông Quận
+11583	2	1,2	Mỏ khoáng Đông Quận
+11584	1	1	Mỏ khoáng Đông Quận
+11585	1	1	Mỏ khoáng Đông Quận
+11586	2	1,2	Mỏ khoáng Đông Quận
+11587	2	1,2	Mỏ khoáng Đông Quận
+11801	3	1,2,3	Thanh Châu | Rừng Đông Quận | Cửa thành Đông Quận
+11802	1	1	Rừng Đông Quận
+11811	1	1	Thanh Châu
+11821	3	1,2,3	Rừng Bồng Lai | Thanh Châu
+11822	1	1	Rừng Bồng Lai
+11823	1	1	Rừng Bồng Lai
+11831	2	1,2	Thanh Châu | Rừng bia Lang Gia
+11832	1	1	Rừng bia Lang Gia
+11841	1	1	Thanh Châu
+12000	37	1,2,3,4,5,6,7,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,28,29,30,31,32,33,39,40,41,42,43,44	Thôn Lâu Tang | Cửa thành Trác Quận | CửaThành NghiệpThành | Trại Lê Dương | Giới Kiều | Bia Chi Lâm | Thanh Châu | Thôn Thường Sơn | Cửa thành Cự Lộc | Cửathành Bình Nguyên | Kiệt Thạch Sơn | Lô Long Khẩu | Hồ Quan | Rừng cây vô tận | Rừng Trung Sơn | Bờ biển Hoàng Hà | Động Đại Hưng Sơn | Đường Từ Vô Sơn | Nội Hoàng thụ lâm | Rừng Tây Sơn | Rừng Hà Nội | Rừng Triều Ca | Rừng Mục Dã | Rừng Dịch Huyện | Bờ biển Ký Châu | Duyện Châu | Ký Châu | Tàn tích Bột Hải | Quân trướng | Thôn Ẩn Thế | Ghi danh Đoan Ngọ | QuảngTrường ĐoànViên
+12001	21	1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21	U Châu | Rừng ngoại ô | Nhà Trương Phi | Vườn Đào | Lò rèn | Bần hộ | Khách sạn Duyệt Lai | Phủ Quách Dịch | Cầu Thất Tịch | Nhà thuốc | Tiền trang | Đường lớn Trác Quận | Phú hộ | NguyênTiêu nhạc viên | Chiếntrường dũng giả | Nguyên Tiêu ký vực | Tháp Lôi Phong | Rừng đào Thất Tịch
+12002	5	1,2,3,4,5	Tiệm trà | Cửa thành Trác Quận | Quan phủ | Bần hộ | QuảngTrườngTrácQuận
+12003	15	1,2,3,4,5,6,7,8,9,10,11,12,13,14,15	Đường lớn Trác Quận | Rừng Trác Quận | Bần hộ | Khách sạn Duyệt Lai | Sòng bạc | Lôi đài thôn thực | Lôi đài 5 vs 5 | LôiĐàiHỏiĐápNămMới | Tầng 1 Tâm Ma tháp | Nhà tranh
+12004	1	1	Cửa thành Trác Quận
+12005	5	1,3,4,5,6	Cửa thành Trác Quận | Hội thi nướng thịt | Thôn tuyết Bắc Quốc
+12007	1	1	Cửa thành Trác Quận
+12009	1	1	Cửa thành Trác Quận
+12011	13	1,2,3,4,5,6,7,8,9,10,11,12,13	Ký Châu | Lò rèn | Bần hộ | Khách sạn | Quan phủ | Lôi đài tỉ võ | Tiệm trà | Tiền trang | Tiệm thuốc | Rừng Cự Lộc | Tế đàn Cự Lộc
+12012	4	1,2,3,4	Cửa thành Cự Lộc | Địa huyệt Khăn Vàng | Tế đàn Cự Lộc
+12013	2	1,2	Tế đàn Cự Lộc | Mỏ khoáng Cự Lộc
+12014	2	1,2	Tế đàn Cự Lộc | Cửa thành Cự Lộc
+12015	1	1	Cửa thành Trác Quận
+12018	1	1	Đường lớn Trác Quận
+12021	2	1,1	Ký Châu | Cửathành Bình Nguyên
+12022	7	2,3,4,5,6,7,8	Lò rèn | Khách sạn | Bần hộ | Quan phủ | Phú hộ | Điểm binh đài | Nhà giam Bình Nguyên
+12023	1	1	ĐườngLớn Bình Nguyên
+12031	3	2,3,4	Nhà Lưu Bị | Bần hộ | U Châu
+12041	3	1,2,3	Ký Châu | Nhà Triệu Vân | Rừng Thường Sơn
+12042	2	1,2	Thôn Thường Sơn | Mỏ khoáng Thường Sơn
+12051	3	1,2,3	Ký Châu | Quan phủ | Mộ địa vạn thắng
+12061	11	1,2,3,4,5,6,7,8,9,10,11	Ký Châu | ĐườngLớn NghiệpThành | Khách sạn Thiên Vạn | Bần hộ | Lò rèn | Lôi đài tỉ võ | Khách sạn | Đồng Tước đài | Tháp thí luyện
+12062	7	1,2,3,4,5,6,7	CửaThành NghiệpThành | HoàngCungNghiệpThành | Tiệm thuốc | Tiệm trà | Phú hộ | Tiền trang | Bần hộ
+12063	3	1,2,3	ĐườngLớn NghiệpThành | Đại điện chư hầu | Q Trường NghiệpThành
+12064	3	1,2,3	HoàngCungNghiệpThành | Lễ đường kết hôn | ĐườngTắt NghiệpThành
+12065	5	1,2,3,4,5	Q Trường NghiệpThành | Phú hộ | Tào Phủ Nghiệp Thành | QuánDịch NghiệpThành
+12071	1	5	Vương thành bí đạo
+12081	1	5	Vương thành bí đạo
+12091	2	1,2	CửaThành NghiệpThành | Thông đạo Đổng Tước
+12092	2	1,2	Đồng Tước đài | Đại điện Đổng Tước
+12093	2	1,2	Thông đạo Đổng Tước | Cầu vượt Đổng Tước
+12094	4	1,2,3,4	Đại điện Đổng Tước | Đồng Tước đài | Phòng Tào Thực | Phòng Tào Phi
+12095	1	1	Đồng Tước đài
+12096	3	1,2,3	Đồng Tước đài | Cầu vượt Đổng Tước
+12097	4	1,2,3,4	Đồng Tước đài | Phòng QuáchNữVương | Phòng Chân Mật | Đỉnh Đổng Tước
+12101	1	1	ĐườngLớn NghiệpThành
+12102	1	1	QuảngTrườngTrácQuận
+12103	1	1	ĐườngTắt NghiệpThành
+12104	1	1	ĐườngTắt NghiệpThành
+12105	1	1	Đồng Tước đài
+12106	1	1	Đồng Tước đài
+12107	1	1	Đồng Tước đài
+12108	1	1	Đồng Tước đài
+12131	1	1	CửaThành NghiệpThành
+12132	1	1	CửaThành NghiệpThành
+12133	1	1	Cửa thành Cự Lộc
+12134	1	1	Đường lớn BìnhNguyên
+12135	1	1	Thôn Thường Sơn
+12136	1	1	Đường lớn Trác Quận
+12137	1	1	QuảngTrườngTrácQuận
+12138	1	1	ĐườngTắt NghiệpThành
+12139	1	1	Cửa thành Trác Quận
+12171	1	1	CửaThành NghiệpThành
+12172	1	1	ĐườngLớn NghiệpThành
+12173	1	1	Cửa thành Cự Lộc
+12174	1	1	Cửa thành Cự Lộc
+12175	1	1	ĐườngLớn Bình Nguyên
+12177	1	1	Thôn Lâu Tang
+12179	1	1	QuảngTrườngTrácQuận
+12180	2	1,2	QuảngTrườngTrácQuận | Chợ P-TS Online
+12201	1	1	CửaThành NghiệpThành
+12202	1	1	Cửa thành Cự Lộc
+12203	1	1	ĐườngLớn Bình Nguyên
+12204	1	1	Cửa thành Trác Quận
+12221	1	1	ĐườngLớn NghiệpThành
+12222	1	1	Cửa thành Cự Lộc
+12223	1	1	Cửa thành Trác Quận
+12241	1	1	CửaThành NghiệpThành
+12242	1	1	Cửa thành Cự Lộc
+12243	1	1	ĐườngLớn Bình Nguyên
+12261	1	1	ĐườngLớn NghiệpThành
+12262	1	1	Cửa thành Cự Lộc
+12263	1	1	Cửa thành Trác Quận
+12281	1	1	ĐườngLớn NghiệpThành
+12282	1	1	Cửa thành Cự Lộc
+12301	1	1	HoàngCungNghiệpThành
+12302	1	1	Cửa thành Cự Lộc
+12303	1	1	ĐườngLớn Bình Nguyên
+12304	1	1	Đường lớn Trác Quận
+12305	1	1	ĐườngLớn Bình Nguyên
+12310	1	1	Tàn tích Bột Hải
+12401	2	1,2	U Châu | Đường mòn Từ Vô Sơn
+12402	2	1,2	TừVôSơn sơn đạo | Đỉnh Từ Vô Sơn
+12403	4	1,2,3,4	Đường mòn Từ Vô Sơn | Phòng nhỏ Từ Vô Sơn | Ký Châu
+12404	1	1	Đỉnh Từ Vô Sơn
+12405	3	1,2,3	Đỉnh Từ Vô Sơn | TừVôSơn TrắcPhong
+12406	4	1,2,3,4	Đường Từ Vô Sơn | TừVôSơn TrắcPhong | Hương Dữu cự tháp
+12407	2	1,2	TừVôSơn TrắcPhong
+12408	3	1,2,3	TừVôSơn TrắcPhong | Hương Dữu cự tháp
+12409	1	1	Hương Dữu cự tháp
+12411	2	1,2	Ký Châu | Kiệt Thạch Sơn
+12412	2	1,2	Kiệt Thạch Sơn | Đỉnh Kiệt Thạch Sơn
+12413	1	1	Kiệt Thạch Sơn
+12418	4	1,2,3,4	Đường Từ Vô Sơn | TừVôSơn TrắcPhong | Hương Dữu cự tháp
+12419	2	1,2	TừVôSơn TrắcPhong
+12421	5	1,2,3,4,5	U Châu | Đất tuyết Lô Long | Bộ lạc Giáng Sinh | Thôn Giáng Sinh
+12431	4	1,2,3,4	Ký Châu | Thông đạo Hồ Quan
+12432	2	1,4	Hồ Quan | Sa mạc Hồ Quan
+12433	3	2,3,4	Nông trường | Trướng binh sĩ
+12441	2	1,2	U Châu | Ký Châu
+12501	2	1,2	U Châu | Động Đại Hưng Sơn
+12502	5	1,2,3,4,5	Động Đại Hưng Sơn
+12503	2	1,2	Động Đại Hưng Sơn
+12504	2	1,2	Động Đại Hưng Sơn
+12505	2	1,2	Động Đại Hưng Sơn
+12506	1	1	Động Đại Hưng Sơn
+12507	1	1	Động Đại Hưng Sơn
+12508	2	1,2	Động Đại Hưng Sơn
+12511	5	1,2,3,4,5	Rừng Thường Sơn | Mỏ khoáng Thường Sơn
+12512	1	1	Mỏ khoáng Thường Sơn
+12513	1	1	Mỏ khoáng Thường Sơn
+12514	1	1	Mỏ khoáng Thường Sơn
+12515	1	1	Mỏ khoáng Thường Sơn
+12516	2	1,2	Mỏ khoáng Thường Sơn
+12517	2	1,2	Mỏ khoáng Thường Sơn
+12518	2	1,2	Mỏ khoáng Thường Sơn
+12519	2	1,2	Mỏ khoáng Thường Sơn
+12521	5	1,2,3,4,5	Mỏ khoáng Cự Lộc | Địa huyệt Khăn Vàng
+12522	2	1,2	Mỏ khoáng Cự Lộc
+12523	6	1,2,3,4,5,6	Mỏ khoáng Cự Lộc
+12524	2	1,2	Mỏ khoáng Cự Lộc
+12525	2	1,2	Mỏ khoáng Cự Lộc
+12526	4	1,2,3,4	Mỏ khoáng Cự Lộc
+12527	2	1,2	Mỏ khoáng Cự Lộc
+12528	2	1,2	Mỏ khoáng Cự Lộc
+12529	2	1,2	Mỏ khoáng Cự Lộc
+12530	2	1,2	Mỏ khoáng Cự Lộc
+12531	2	1,2	Mỏ khoáng Cự Lộc
+12532	2	1,2	Mỏ khoáng Cự Lộc
+12533	2	1,2	Mỏ khoáng Cự Lộc
+12534	1	1	Mỏ khoáng Cự Lộc
+12535	2	1,2	Mỏ khoáng Cự Lộc
+12536	1	1	Mỏ khoáng Cự Lộc
+12537	1	1	Mỏ khoáng Cự Lộc
+12538	2	1,2	Mỏ khoáng Cự Lộc
+12539	1	1	Mỏ khoáng Cự Lộc
+12540	2	1,2	Mỏ khoáng Cự Lộc
+12541	1	1	Mỏ khoáng Cự Lộc
+12542	1	1	Mỏ khoáng Cự Lộc
+12543	1	1	Mỏ khoáng Cự Lộc
+12544	4	1,2,3,4	Mỏ khoáng Cự Lộc
+12545	2	1,2	Mỏ khoáng Cự Lộc
+12546	2	1,2	Mỏ khoáng Cự Lộc
+12547	3	1,2,3	Mỏ khoáng Cự Lộc
+12548	2	1,2	Mỏ khoáng Cự Lộc
+12549	3	1,2,3	Mỏ khoáng Cự Lộc
+12550	2	1,2	Mỏ khoáng Cự Lộc
+12551	2	1,2	Mỏ khoáng Cự Lộc
+12552	1	1	Mỏ khoáng Cự Lộc
+12553	2	1,2	Mỏ khoáng Cự Lộc
+12554	2	1,2	Mỏ khoáng Cự Lộc
+12555	1	1	Mỏ khoáng Cự Lộc
+12556	1	1	Mỏ khoáng Cự Lộc
+12557	1	1	Mỏ khoáng Cự Lộc
+12558	3	1,2,3	Mỏ khoáng Cự Lộc
+12559	2	1,2	Mỏ khoáng Cự Lộc
+12560	2	1,2	Mỏ khoáng Cự Lộc
+12561	2	1,2	Mỏ khoáng Cự Lộc
+12562	1	1	Mỏ khoáng Cự Lộc
+12563	2	1,2	Mỏ khoáng Cự Lộc
+12564	2	1,2	Mỏ khoáng Cự Lộc
+12565	2	1,2	Mỏ khoáng Cự Lộc
+12566	2	1,2	Mỏ khoáng Cự Lộc
+12567	2	1,2	Mỏ khoáng Cự Lộc | Ký Châu
+12568	2	1,2	Mỏ khoáng Cự Lộc
+12569	2	1,2	Mỏ khoáng Cự Lộc
+12570	2	1,2	Mỏ khoáng Cự Lộc
+12571	2	1,2	Mỏ khoáng Cự Lộc
+12581	2	1,2	Huyệt mộ Triều Ca | Rừng Triều Ca
+12582	3	1,2,3	Huyệt mộ Triều Ca
+12583	3	1,2,3	Huyệt mộ Triều Ca
+12584	3	1,2,3	Huyệt mộ Triều Ca
+12585	3	1,2,3	Huyệt mộ Triều Ca
+12586	1	1	Huyệt mộ Triều Ca
+12587	1	1	Huyệt mộ Triều Ca
+12588	2	1,2	Huyệt mộ Triều Ca
+12589	2	1,2	Huyệt mộ Triều Ca
+12591	2	1,2	Rừng Trác Quận | Mỏ khoáng Trác Quận
+12592	2	1,2	Mỏ khoáng Trác Quận
+12593	1	1	Mỏ khoáng Trác Quận
+12701	6	1,2,3,4,5,6	Võ đài Hương Dũng | Đại trướng | Quân trướng | Binh trướng
+12702	1	1	Binh trướng
+12703	1	1	Binh trướng
+12704	1	1	Binh trướng
+12705	1	1	Binh trướng
+12706	1	1	Binh trướng
+12711	9	1,2,3,4,5,6,7,8,9	Cửa thành Trác Quận | Tiền tiêu Cự Lộc | Tiền tiêu ĐạiHưngSơn | Tiền tiêu Hổ Lao | Tiền tiêu Hồ BàDương
+12721	4	1,2,3,4	Ký Châu | Rừng Ấn Thế | Nhà cỏ Ẩn Thế
+12722	1	1	Thôn Ẩn Thế
+12723	1	1	Thôn Ẩn Thế
+12724	1	1	Thôn Ẩn Thế
+12801	2	1,2	U Châu | Rừng bia Đường Lâm
+12804	2	1,2	Bia Chi Lâm
+12805	1	1	Rừng bia Đường Lâm
+12806	2	1,2	U Châu | Rừng Lâu Tang
+12808	4	1,2,3,4	QuảngTrườngTrácQuận | Mỏ Khoáng Trác Quận | Phong Ma Trận
+12809	2	1,2	Thông đạo Hồ Quan | Sơn động Hồ Quan
+12811	1	1	U Châu
+12815	4	1,2,3,4	Lô Long Khẩu | Đất tuyết Lô Long | Liêu Đông
+12816	2	1,2	Đất tuyết Lô Long
+12817	2	1,2	Đất tuyết Lô Long
+12818	2	1,2	Đất tuyết Lô Long
+12819	2	1,2	Đất tuyết Lô Long
+12820	2	1,2	Đất tuyết Lô Long
+12821	2	1,2	U Châu | Mỏ khoáng Vương Ốc
+12822	2	1,2	Rừng Trung Sơn
+12823	2	1,2	Mỏ khoáng Vương Ốc | Rừng Trung Sơn
+12824	1	1	Rừng Trung Sơn
+12825	3	1,1,2	Thôn Lâu Tang | Rừng Lâu Tang
+12826	2	1,2	Rừng Lâu Tang
+12827	2	1,2	Rừng Lâu Tang
+12828	2	1,2	Rừng Lâu Tang
+12829	2	1,2	Rừng Lâu Tang
+12830	2	1,2	Rừng Lâu Tang | Rừng Dịch Huyện
+12831	1	1	Ký Châu
+12841	1	1	Rừng Tây Sơn
+12842	2	1,2	Ký Châu | Rừng Tây Sơn
+12851	2	1,2	Ký Châu | Rừng Lê Dương
+12852	2	1,2	Rừng Lê Dương | Ký Châu
+12853	3	1,2,3	Rừng Lê Dương | Quân trướng
+12854	1	1	Rừng Lê Dương
+12855	1	1	Rừng Lê Dương
+12861	3	1,2,3	Ký Châu | Huyệt mộ Triều Ca | Rừng Triều Ca
+12862	1	1	Rừng Triều Ca
+12871	1	1	Ký Châu
+12881	2	1,2	Ký Châu | Rừng Hà Nội
+12882	1	1	Rừng Hà Nội
+12901	1	1	Ký Châu
+12911	1	1	Q Trường NghiệpThành
+12921	2	1,2	ĐườngLớn NghiệpThành | Tháp thí luyện 1
+12922	1	2	Tháp thí luyện 2
+12923	1	2	Tháp thí luyện 3
+12924	1	2	Tháp thí luyện 4
+12925	1	2	Tháp thí luyện 5
+12926	1	2	Tháp thí luyện 6
+12927	1	2	Tháp thí luyện 7
+12928	1	2	Tháp thí luyện 8
+12929	1	2	Tháp thí luyện 9
+12930	1	2	Tháp thí luyện 10
+12931	1	2	Tháp thí luyện 11
+12932	1	2	Tháp thí luyện 12
+12933	1	2	Tháp thí luyện 13
+12934	1	2	Tháp thí luyện 14
+12935	2	1,2	Tháp thí luyện 13 | Tháp thí luyện 15
+12936	2	1,2	Tháp thí luyện 14 | Tháp thí luyện 16
+12937	2	1,2	Tháp thí luyện 15 | Tháp thí luyện 17
+12938	2	1,2	Tháp thí luyện 16 | Tháp thí luyện 18
+12939	3	1,2,3	Tháp thí luyện 17 | CửaThành NghiệpThành | Khu chuẩn bị
+12941	2	1,1	Lôi Phong bảo điện | Tháp Lôi Phong
+12942	2	1,2	Đỉnh Lôi Phong | Lôi Phong thôngđạo
+12943	1	2	Bảo điện Lôi Phong
+12944	2	1,2	Tháp thí luyện 18 | Tháp thí luyện 19
+12945	2	1,2	Khu chuẩn bị | Tháp thí luyện 20
+12946	2	1,2	Tháp thí luyện 19 | Tháp thí luyện 21
+12947	2	1,2	Tháp thí luyện 20 | Tháp thí luyện 22
+12948	2	1,2	Tháp thí luyện 21 | Tháp thí luyện 23
+12949	2	1,2	Tháp thí luyện 22 | CửaThành NghiệpThành
+12990	1	1	CửaThành NghiệpThành
+12992	3	1,2,3	U Châu | Doanh binh | TiềnTuyếnLôLongKhẩu
+12993	2	1,2	QuảngTrườngTrácQuận | Tầng 2 Tâm Ma tháp
+12994	2	1,2	Tầng 1 Tâm Ma tháp | Tầng 3 Tâm Ma tháp
+12995	2	1,2	Tầng 2 Tâm Ma tháp | Tầng 4 Tâm Ma tháp
+12996	2	1,2	Tầng 3 Tâm Ma tháp | Tầng 5 Tâm Ma tháp
+12997	2	1,2	Tầng 4 Tâm Ma tháp | Tầng 6 Tâm Ma tháp
+12998	2	1,2	Tầng 5 Tâm Ma tháp | Tầng 7 Tâm Ma tháp
+12999	2	1,1	Tầng 6 Tâm Ma tháp | Tầng 8 Tâm Ma tháp
+13000	30	1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,31	Ký Châu | Thanh Châu | Quan Trung | Sơn động Thước Vĩ | Quan Độ Tào doanh | Mạnh Tân | Bến đò Mạnh Tân | Tiêu Quan | Rừng Hàm Cốc | Vũ Quan | Đầm Dược Long | Tỵ Thủy quan | Thành Lạc Dương | Đại trại Quan Độ | Rừng Trần Lưu | Thành Hứa Xương | Rừng Nhữ Nam | Núi Hoàn Viên | Uyển Thành | Cát Pha Ổ | Rừng Huỳnh Dương | Rừng Dương Thành | Rừng Dĩnh Xuyên | Sơn động Hứa Xương | Nhương Sơn | Rừng Vũ Âm | Động Thiên Độc | Rung Dặc Dương | Sơn trại Ngoạ Ngưu
+13001	3	1,2,3	Cầu Tỵ Thuỷ | Đường lớn Lạc Dương | Thụ Thiên Đài
+13002	14	1,2,3,4,5,6,7,8,9,10,11,12,13,14	Cửa thành Lạc Dương | Lò rèn | Tiền trang | Khách sạn | Bần hộ | Tiệm thuốc | Phú hộ | Tiệm trà | Quan phủ | Hoàng cung Lạc Dương | QuảngTrường LạcDương
+13003	3	1,2,3	Đường lớn Lạc Dương | Đại điện Hoàng Cung | Duyện Châu
+13004	7	1,2,3,4,5,6,7	Đường lớn Lạc Dương | Lôi đài Lạc Dương | Bần hộ | Phú hộ | Đại lao Lạc Dương
+13005	1	1	Lôi đài Lạc Dương
+13011	2	1,2	Đường lớn Hứa Xương | Duyện Châu
+13012	9	1,2,3,4,5,6,7,8,9	Phú hộ | Quan phủ | Bần hộ | Tiệm thuốc | Lò rèn | Khách sạn | Hứa Xương thứ nhai | Cửa thành Hứa Xương | Điểm binh đài
+13013	9	1,2,3,4,5,6,7,8,9	Bần hộ | Nhà Tào Tháo | Tiền trang | Phú hộ | Đường lớn Hứa Xương | Hoàng cung Hứa Xương | Đường tắt Hứa Xương | Hẻm nhỏ Hứa Xương
+13014	1	1	Đường lớn Hứa Xương
+13015	3	1,2,3	Hứa Xương thứ nhai | Hoàng cung Hứa Xương | Vườn hoa Hứa Xương
+13016	6	1,2,3,4,5,6	Hứa Xương thứ nhai | Bần hộ | Phú hộ | Tiệm trà
+13017	1	1	Hoàng cung Hứa Xương
+13018	3	1,2,3	Hứa Xương thứ nhai | Phú hộ | Đường sau Hứa Xương
+13019	2	1,2	Hẻm nhỏ Hứa Xương | Nhà Dương Tu
+13021	2	1,2	Đường lớn Uyển Thành | Duyện Châu
+13022	7	1,2,3,4,5,6,7	Cửa thành Uyển Thành | Bần hộ | Tiệm thuốc | Khách sạn | Phổ hộ | Phú hộ | Cửa động Thiên Độc
+13023	3	1,2,3	Đường lớn Uyển Thành | Động Thiên Độc | Rừng Uyển Thành
+13031	2	1,2	Đường lớn Trần Lưu | Rừng Trần Lưu
+13032	7	1,2,3,4,5,6,7	Cửa thành Trần Lưu | Lò rèn | Khách sạn | Quan phủ | Bần hộ | Phổ hộ | Trần Lưu nhai đạo
+13033	7	1,2,3,4,5,6,7	Bần hộ | Phổ hộ | Tiền trang | Phú hộ | Tiệm trà | Đường lớn Trần Lưu
+13041	2	1,2	Đường lớn Nhữ Nam | Rừng Nhữ Nam
+13042	6	1,2,3,4,5,6	Cửa thành Nhữ Nam | Mỏ khoáng Nhữ Nam | Tiệm thuốc | Khách sạn | Phú hộ | Bần hộ
+13043	2	1,2	Đường lớn Nhữ Nam | Mỏ khoáng Nhữ Nam
+13051	10	1,2,3,4,5,6,7,8,9,10	Rừng Dĩnh Xuyên | Tiệm trà | Bần hộ | Phú hộ | Khách sạn
+13061	6	1,2,3,4,5,6	Duyện Châu | Phú hộ | Bần hộ | Nhà gỗ Cát Pha
+13071	1	1	Cửa thành Lạc Dương
+13101	1	1	Đường lớn Lạc Dương
+13102	1	1	Đường lớn Lạc Dương
+13103	1	1	Hứa Xương thứ nhai
+13104	1	1	Hứa Xương thứ nhai
+13105	1	1	Đường lớn Uyển Thành
+13106	1	1	Đường lớn Nhữ Nam
+13107	1	1	Thôn Dĩnh Xuyên
+13108	1	1	Thôn Dĩnh Xuyên
+13109	1	1	Cát Pha Ổ
+13110	1	1	Đường tắt Hứa Xương
+13111	1	1	Đường tắt Hứa Xương
+13112	1	1	Trần Lưu nhai đạo
+13113	1	1	Hứa Xương thứ nhai
+13114	1	1	Đường lớn Lạc Dương
+13115	1	1	Đường sau Hứa Xương
+13131	1	1	Đường lớn Lạc Dương
+13132	1	1	Đường lớn Hứa Xương
+13133	1	1	Đường lớn Uyển Thành
+13134	1	1	Đường lớn Trần Lưu
+13135	1	1	Thôn Dĩnh Xuyên
+13136	1	1	Cát Pha Ổ
+13137	1	1	QuảngTrường LạcDương
+13138	1	1	QuảngTrường LạcDương
+13139	1	1	Cát Pha Ổ
+13140	1	1	Đường tắt Hứa Xương
+13141	1	1	Trần Lưu nhai đạo
+13142	1	1	Trần Lưu nhai đạo
+13143	1	1	Hẻm nhỏ Hứa Xương
+13151	2	1,2	Đại điện Hoàng Cung | ĐạiĐiệnHoàngCungMới
+13171	1	1	Đường lớn Lạc Dương
+13172	1	1	Đường lớn Hứa Xương
+13173	1	1	Hứa Xương thứ nhai
+13174	1	1	Đường lớn Uyển Thành
+13175	1	1	Đường lớn Trần Lưu
+13176	1	1	Đường lớn Nhữ Nam
+13177	1	1	Thôn Dĩnh Xuyên
+13178	1	1	Thôn Dĩnh Xuyên
+13179	1	1	Cát Pha Ổ
+13180	1	1	Cát Pha Ổ
+13181	1	1	QuảngTrường LạcDương
+13182	1	1	QuảngTrường LạcDương
+13183	1	1	Thôn Dĩnh Xuyên
+13184	1	1	Đường tắt Hứa Xương
+13185	1	1	Trần Lưu nhai đạo
+13201	1	1	Đường lớn Lạc Dương
+13202	1	1	Đường lớn Hứa Xương
+13203	1	1	Đường lớn Trần Lưu
+13221	1	1	Đường lớn Lạc Dương
+13222	1	1	Đường lớn Hứa Xương
+13223	1	1	Đường lớn Uyển Thành
+13224	1	1	Đường lớn Nhữ Nam
+13241	1	1	Đường lớn Lạc Dương
+13242	1	1	Đường lớn Hứa Xương
+13243	1	1	Đường lớn Uyển Thành
+13244	1	1	Đường lớn Trần Lưu
+13245	1	1	Đường lớn Nhữ Nam
+13246	1	1	Thôn Dĩnh Xuyên
+13261	1	1	Đường lớn Hứa Xương
+13262	1	1	Hứa Xương thứ nhai
+13263	1	1	Trần Lưu nhai đạo
+13281	2	1,2	Đường lớn Lạc Dương
+13282	1	1	Thôn Dĩnh Xuyên
+13283	1	1	Đường tắt Hứa Xương
+13284	1	1	Trần Lưu nhai đạo
+13301	1	2	Đường lớn Lạc Dương
+13302	1	1	Đường lớn Lạc Dương
+13303	1	1	Đường lớn Hứa Xương
+13304	1	1	Đường lớn Trần Lưu
+13305	1	1	Quan phủ
+13308	2	1,2	Hoàng cung Hứa Xương | Gian phòng Hoàng Đế
+13309	1	1	QuảngTrường LạcDương
+13310	2	1,2	Đường lớn Hứa Xương | Gian phòng Hoàng Đế
+13401	2	1,4	Rừng Hàm Cốc | Thông đạo Hàm Cốc
+13402	2	1,2	Hàm Cốc Quan | Thông đạo Hàm Cốc
+13403	2	1,2	Thông đạo Hàm Cốc | Đường lớn Kinh Triệu
+13404	3	1,2,3	Hàm Cốc Quan | Rừng Võ Quan | Đồng Quan
+13405	2	1,2	Đường lớn Kinh Triệu | Thông đạo Hàm Cốc
+13406	2	1,2	Hàm Cốc Quan | Thông đạo Hàm Cốc
+13407	2	1,2	Thông đạo Hàm Cốc | Rừng Hàm Cốc
+13411	2	1,2	Hẻm núi Hoàn Viên | Thông Đạo Võ Quan
+13412	2	1,2	Vũ Quan | Rừng Võ Quan
+13413	2	1,2	Rừng Võ Quan | Thông Đạo Võ Quan
+13414	2	1,2	Võ Quan | Hẻm núi Hoàn Viên
+13421	2	1,2	Duyện Châu | ThôngĐạo TỵThuỷ quan
+13422	2	1,2	Quân doanh Tỵ Thuỷ | Tỵ Thuỷ Quan
+13423	5	1,2,3,4,5	Hổ Lao Quan | Quân trướng | Tỵ Thuỷ Quan
+13424	1	1	Quân doanh Tỵ Thuỷ
+13425	1	1	Quân doanh Tỵ Thuỷ
+13426	1	1	Quân doanh Tỵ Thuỷ
+13427	2	1,2	Quân doanh Tỵ Thuỷ | ThôngĐạo TỵThuỷ quan
+13428	2	1,2	Tỵ Thuỷ Quan | Duyện Châu
+13431	2	1,2	Quân doanh Tỵ Thuỷ | ThôngĐạo Hổ Lao Quan
+13432	2	1,2	ĐườngLớn Hổ Lao Quan | Hổ Lao Quan
+13433	4	1,2,3,4	Hổ Lao Quan | Hoàng Lăng | Rừng Hổ Lao | Cầu Tỵ Thuỷ
+13434	2	1,2	ĐườngLớn Hổ Lao Quan | Cửa thành Lạc Dương
+13435	2	1,2	Hoàng Lăng động quật | ĐườngLớn Hổ Lao Quan
+13436	2	1,2	Động Hổ Lao Sơn | ĐườngLớn Hổ Lao Quan
+13437	2	1,2	ĐườngLớn Hổ Lao Quan | ThôngĐạo Hổ Lao Quan
+13438	2	1,2	Hổ Lao Quan | Tỵ Thuỷ Quan
+13441	2	1,2	Duyện Châu | Trại lớn Quan Độ
+13442	6	1,2,3,4,5,6	Cửa trại Quan Độ | Quân doanh Quan Độ | Quân trướng | Đại trướng
+13443	3	1,2,3	Quân trướng | Trại lớn Quan Độ
+13444	1	1	Trại lớn Quan Độ
+13445	1	1	Trại lớn Quan Độ
+13446	1	1	Trại lớn Quan Độ
+13447	1	1	Trại lớn Quan Độ
+13448	1	1	Quân doanh Quan Độ
+13449	1	1	Quân doanh Quan Độ
+13451	2	1,2	Duyện Châu | Đường hầm Ngoạ Ngưu
+13452	2	1,2	Chân núi Ngoạ Ngưu | Sườn núi Ngoạ Ngưu
+13453	2	1,2	Đường hầm Ngoạ Ngưu | Sơn trại Ngoạ Ngưu
+13454	4	1,2,3,4	Sườn núi Ngoạ Ngưu | Quân trướng
+13455	1	1	Sơn trại Ngoạ Ngưu
+13456	1	1	Sơn trại Ngoạ Ngưu
+13457	1	1	Sơn trại Ngoạ Ngưu
+13461	2	1,2	Duyện Châu | Cầu treo Hoàn Viên
+13462	2	1,2	Đường núi Hoàn Viên | Đỉnh Hoàn Viên
+13463	3	1,2,5	Cầu treo Hoàn Viên | Hẻm núi Hoàn Viên | Đỉnh Hoàn Viên
+13464	2	1,2	Đỉnh Hoàn Viên | Vũ Quan
+13465	1	1	Đỉnh Hoàn Viên
+13471	7	1,2,3,4,5,6,7	Duyện Châu | Trướng Tào Tháo | Quân trướng | Binh trướng | Kho lương Ô Sào | Chiến trường Quan Độ
+13472	3	1,2,3	Quan Độ Tào doanh | Quân trướng | Quan Độ Viên trại
+13473	5	1,2,3,4,5	Kho lương Ô Sào | Binh trướng | Quân trướng | Trướng Viên Thiệu
+13474	1	1	QuanĐộ Tào Doanh
+13475	1	1	QuanĐộ Tào Doanh
+13476	1	1	QuanĐộ Tào Doanh
+13477	1	1	QuanĐộ Tào Doanh
+13478	1	1	Kho lương Ô Sào
+13479	1	1	QuanĐộ Viên Trại
+13480	1	1	QuanĐộ Viên Trại
+13481	1	1	QuanĐộ Viên Trại
+13482	1	1	QuanĐộ Viên Trại
+13483	2	1,2	QuanĐộ Viên Trại | Chiếntrường Quan Độ
+13484	1	1	Chiếntrường Quan Độ
+13491	2	1,2	Duyện Châu
+13496	1	1	Duyện Châu
+13501	2	1,2	Duyện Châu | Mê cung Hứa Xương
+13502	2	1,2	Mê cung Hứa Xương
+13503	2	1,2	Mê cung Hứa Xương
+13504	2	1,2	Mê cung Hứa Xương | Duyện Châu
+13505	2	1,2	Mê cung Hứa Xương
+13506	2	1,2	Mê cung Hứa Xương
+13507	2	1,2	Mê cung Hứa Xương
+13511	2	1,2	Cửa động Thiên Độc | Động Thiên Độc
+13512	4	1,2,3,4	Động Thiên Độc
+13513	4	1,2,3,4	Động Thiên Độc
+13514	1	1	Động Thiên Độc
+13515	2	1,2	Động Thiên Độc
+13516	2	1,2	Động Thiên Độc
+13517	2	1,2	Động Thiên Độc
+13518	1	1	Động Thiên Độc
+13519	1	1	Động Thiên Độc
+13520	2	1,2	Động Thiên Độc
+13521	3	1,2,3	Động Thiên Độc
+13522	1	1	Động Thiên Độc
+13523	3	1,2,3	Động Thiên Độc
+13524	1	1	Động Thiên Độc
+13525	1	1	Động Thiên Độc
+13526	1	1	Động Thiên Độc
+13527	1	1	Động Thiên Độc
+13528	2	1,2	Động Thiên Độc
+13541	1	1	Mỏ khoáng Nhữ Nam
+13561	3	1,2,2	Sơn động Hoàng Lăng | Hoàng Lăng
+13562	2	1,2	Sơn động Hoàng Lăng
+13563	2	1,2	Sơn động Hoàng Lăng
+13564	2	1,2	Sơn động Hoàng Lăng
+13565	2	1,2	Sơn động Hoàng Lăng
+13566	1	1	Sơn động Hoàng Lăng
+13571	3	1,2,3	Sơn động Hoàng Lăng | Rừng Hổ Lao
+13572	2	1,2	Động Hổ Lao Sơn
+13573	2	1,2	Động Hổ Lao Sơn
+13574	5	1,2,3,4,5	Động Hổ Lao Sơn
+13575	1	1	Động Hổ Lao Sơn
+13576	1	1	Động Hổ Lao Sơn
+13577	1	1	Động Hổ Lao Sơn
+13578	4	1,2,3,4	Động Hổ Lao Sơn
+13579	1	1	Động Hổ Lao Sơn
+13580	1	1	Động Hổ Lao Sơn
+13581	2	1,2	Động Hổ Lao Sơn
+13582	2	1,2	Động Hổ Lao Sơn
+13583	3	1,2,3	Động Hổ Lao Sơn
+13584	1	1	Động Hổ Lao Sơn
+13585	4	1,2,3,4	Động Hổ Lao Sơn
+13586	1	1	Động Hổ Lao Sơn
+13587	1	1	Động Hổ Lao Sơn
+13588	1	1	Động Hổ Lao Sơn
+13801	3	1,2,3	Duyện Châu | Rừng Huỳnh Dương
+13802	2	1,2	Rừng Huỳnh Dương | Đại trướng
+13803	1	1	Rừng Huỳnh Dương
+13804	1	1	Rừng Huỳnh Dương
+13806	1	1	Cửa động Thiên Độc
+13811	3	1,2,3	Rừng Trần Lưu | Duyện Châu | Cửa thành Trần Lưu
+13812	1	1	Rừng Trần Lưu
+13821	3	1,2,3	Cửa thành Nhữ Nam | Duyện Châu | Rừng Nhữ Nam
+13822	1	1	Rừng Nhữ Nam
+13831	2	1,2	Duyện Châu | Rung Dặc Dương
+13841	3	1,2,3	Duyện Châu | Động Nhương Sơn | Rừng Nhương Sơn
+13842	2	1,2	Rừng Nhương Sơn | Động Nhương Sơn
+13843	1	1	Động Nhương Sơn
+13844	1	1	Rừng Nhương Sơn
+13851	3	1,2,3	Duyện Châu | Thôn Dĩnh Xuyên | Rừng Dĩnh Xuyên
+13852	3	1,2,3	Thôn Dĩnh Xuyên | Rừng Dĩnh Xuyên | Lều căng
+13853	1	1	Rừng Dĩnh Xuyên
+13854	2	1,2	Rừng Dĩnh Xuyên | Nhà tranh
+13855	2	1,2	Rừng Dĩnh Xuyên | Nhà tranh
+13856	1	1	Nhà tranh
+13857	1	1	Rừng Dĩnh Xuyên
+13861	1	1	Duyện Châu
+13871	3	1,2,3	Duyện Châu | Quân trướng | Rừng Dương Thành
+13872	1	1	Rừng Dương Thành
+13873	1	1	Rừng Dương Thành
+13881	5	1,2,3,4,5	Duyện Châu | Rừng Hàm Cốc | Quân trướng | Binh trướng | Hàm Cốc Quan
+13882	1	1	Rừng Hàm Cốc
+13883	1	1	Rừng Hàm Cốc
+13884	1	1	Rừng Hàm Cốc
+13885	2	1,2	Kinh Triệu đại đạo | Rừng Kinh Triệu
+13886	1	1	Rừng Kinh Triệu
+13891	3	1,2,3	Rừng Võ Quan | Kinh Triệu đại đạo | Vũ Quan
+13892	2	1,2	Rừng Võ Quan
+13893	1	1	Rừng Võ Quan
+13990	2	1,2	QuảngTrường LạcDương | Vườn hoa Lạc Dương
+14000	19	1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19	Duyện Châu | Làng Thiễm Bắc | Cửa thành Trường An | Mỏ khoáng Lam Điền | Chân núi Chung Nam | Hẻm núi Tử Ngọ | Hẻm núi Tà Cốc | Rừng Hoa Sơn | Rừng Bắc Địa | Sơn động Thành Bắc | Tận cùng Hoàng Hà | Cửa trại Trần Thương | Đồng Quan | Tán Quan | CửaVào ThuỷHoàngLăng | Rừng Tân Phong
+14001	2	1,2	Đường lớn Trường An | Quan Trung
+14002	9	1,2,3,4,5,6,7,8,9	Cửa thành Trường An | Quan phủ | Tiệm trà | Phú hộ | Tiệm thuốc | Khách sạn | Bần hộ | Trường An thứ nhai
+14003	5	1,2,3,4,5	Đường lớn Trường An | Tiền trang | Lò rèn | Phổ hộ | Phú hộ
+14011	6	1,2,3,4,5,6	Quan Trung | Phổ hộ | Bần hộ | Nhà tranh | Động Diêu Động
+14101	1	1	Đường lớn Trường An
+14102	1	1	Trường An thứ nhai
+14103	1	1	Đường lớn Trường An
+14131	1	1	Trường An thứ nhai
+14132	1	1	Làng Thiễm Bắc
+14171	1	1	Đường lớn Trường An
+14172	1	1	Làng Thiễm Bắc
+14173	1	1	Làng Thiễm Bắc
+14174	1	1	Làng Thiễm Bắc
+14201	1	1	Trường An thứ nhai
+14221	1	1	Đường lớn Trường An
+14241	1	1	Đường lớn Trường An
+14261	1	1	Trường An thứ nhai
+14281	1	1	Đường lớn Trường An
+14301	1	1	Đường lớn Trường An
+14401	4	1,2,3,4	Đường lớn Kinh Triệu | Thông đạo Đồng Quan | Đồng Quan
+14402	2	1,2	Quan Trung | Đồng Quan
+14403	2	2,4	Thông đạo Đồng Quan | Quan Trung
+14404	2	1,2	Đồng Quan | Đường lớn Kinh Triệu
+14411	2	1,2	Quan Trung | Thông đạo Tán Quan
+14412	2	1,2	Rừng Tán Quan | Tán Quan
+14413	2	1,2	Thông đạo Tán Quan | Rừng Tán Quan
+14414	2	1,2	Quan Trung | Tán Quan
+14421	2	1,2	Quan Trung | Eo Chung Nam Sơn
+14422	2	1,2	Eo Chung Nam Sơn
+14423	2	1,2	Eo Chung Nam Sơn
+14424	2	1,2	Eo Chung Nam Sơn | Nhà tranh
+14425	1	1	Đỉnh Chung Nam Sơn
+14431	1	1	Quan Trung
+14441	2	1,2	Quan Trung
+14501	3	1,2,3	Quan Trung | Động Bắc Địa
+14502	2	1,2	Động Bắc Địa
+14503	2	1,2	Động Bắc Địa
+14504	2	1,2	Động Bắc Địa
+14505	2	1,2	Động Bắc Địa
+14506	2	1,2	Quan Trung | Động Bắc Địa
+14507	2	1,2	Động Bắc Địa
+14508	2	1,2	Động Bắc Địa
+14509	3	1,2,3	Động Bắc Địa
+14510	2	1,2	Động Bắc Địa
+14511	2	1,2	Động Bắc Địa
+14521	2	1,2	Quan Trung | Động Mỹ Dương
+14522	2	1,2	Động Mỹ Dương
+14523	2	1,2	Quan Trung | Động Mỹ Dương
+14524	4	1,2,3,4	Động Mỹ Dương
+14525	1	1	Động Mỹ Dương
+14526	2	1,2	Động Mỹ Dương
+14527	1	1	Động Mỹ Dương
+14528	1	1	Động Mỹ Dương
+14529	1	1	Động Mỹ Dương
+14530	2	1,2	Động Mỹ Dương
+14531	1	1	Động Mỹ Dương
+14532	1	1	Động Mỹ Dương
+14533	3	1,2,3	Động Mỹ Dương
+14534	3	1,2,3	Động Mỹ Dương
+14535	4	1,2,3,4	Động Mỹ Dương
+14536	4	1,2,3,4	Động Mỹ Dương
+14537	2	1,2	Động Mỹ Dương
+14538	2	1,2	Động Mỹ Dương
+14541	3	1,2,3	Mỏ khoáng Lam Điền | Quan Trung
+14542	2	1,2	Mỏ khoáng Lam Điền
+14543	1	1	Mỏ khoáng Lam Điền
+14544	2	1,2	Mỏ khoáng Lam Điền
+14545	1	1	Mỏ khoáng Lam Điền
+14551	3	1,2,3	Làng Thiễm Bắc | Sơn động Diêu Động
+14552	3	1,2,3	Sơn động Diêu Động
+14553	3	1,2,3	Sơn động Diêu Động
+14554	1	1	Sơn động Diêu Động
+14555	3	1,2,3	Sơn động Diêu Động
+14556	1	1	Sơn động Diêu Động
+14557	3	1,2,3	Sơn động Diêu Động
+14558	1	1	Sơn động Diêu Động
+14559	3	1,2,3	Sơn động Diêu Động
+14560	4	1,2,3,4	Sơn động Diêu Động | Đồng Tâm
+14561	1	1	Sơn động Diêu Động
+14562	3	1,2,3	Sơn động Diêu Động
+14563	1	1	Sơn động Diêu Động
+14564	3	1,2,3	Sơn động Diêu Động
+14565	1	1	Sơn động Diêu Động
+14571	2	1,2	Sơn động Diêu Động | Tầng 1 Tần Lăng
+14572	2	1,2	Tầng 1 Tần Lăng
+14573	3	1,2,3	Tầng 1 Tần Lăng
+14574	2	1,2	Tầng 1 Tần Lăng
+14575	2	1,2	Tầng 1 Tần Lăng
+14576	3	1,2,3	Tầng 1 Tần Lăng
+14577	3	1,2,3	Tầng 1 Tần Lăng
+14578	3	1,2,3	Tầng 1 Tần Lăng
+14579	2	1,2	Tầng 1 Tần Lăng
+14580	2	1,2	Tầng 1 Tần Lăng
+14581	2	1,2	Tầng 1 Tần Lăng
+14582	2	1,2	Tầng 1 Tần Lăng
+14583	2	1,2	Tầng 1 Tần Lăng | Tầng 2 Tần Lăng
+14584	2	1,2	Tầng 1 Tần Lăng | Tầng 2 Tần Lăng
+14585	4	1,2,3,4	Tầng 2 Tần Lăng
+14586	1	1	Tầng 2 Tần Lăng
+14587	1	1	Tầng 2 Tần Lăng
+14588	3	1,2,3	Tầng 2 Tần Lăng
+14589	3	1,2,3	Tầng 2 Tần Lăng
+14590	1	1	Tầng 2 Tần Lăng
+14591	3	1,2,3	Tầng 2 Tần Lăng
+14592	1	1	Tầng 2 Tần Lăng
+14593	3	1,2,3	Tầng 2 Tần Lăng
+14594	4	1,2,3,4	Tầng 2 Tần Lăng
+14595	1	1	Tầng 2 Tần Lăng
+14596	1	1	Tầng 2 Tần Lăng
+14597	2	1,2	Tầng 2 Tần Lăng
+14598	2	1,2	Tầng 2 Tần Lăng
+14599	2	1,2	Tầng 2 Tần Lăng | Tầng 3 Tần Lăng
+14600	2	1,2	Tầng 2 Tần Lăng | Tầng 3 Tần Lăng
+14601	3	1,2,3	Tầng 3 Tần Lăng
+14602	4	1,2,3,4	Tầng 3 Tần Lăng
+14603	1	1	Tầng 3 Tần Lăng
+14604	1	1	Tầng 3 Tần Lăng
+14605	4	1,2,3,4	Tầng 3 Tần Lăng
+14606	1	1	Tầng 3 Tần Lăng
+14607	1	1	Tầng 3 Tần Lăng
+14608	2	1,2	Tầng 3 Tần Lăng
+14609	2	1,2	Tầng 3 Tần Lăng
+14610	4	1,2,3,4	Tầng 3 Tần Lăng | Mật đạo Hoàng Lăng
+14611	2	1,2	Tầng 3 Tần Lăng
+14612	2	1,2	Tầng 3 Tần Lăng
+14613	2	1,2	Tầng 3 Tần Lăng
+14614	2	1,2	Quan Trung | Tầng 3 Tần Lăng
+14615	2	1,2	Tầng 3 Tần Lăng | Mật đạo Hoàng Lăng
+14616	2	1,2	Mật đạo Hoàng Lăng
+14617	2	1,2	Mật đạo Hoàng Lăng | LăngMộ TầnThuỷHoàng
+14618	2	1,2	Hoàng Lăng mật đạo | Tầng 4 Tần Lăng
+14619	2	1,2	ThôngĐạoLăngMộ TTH | LăngMộ TầnThuỷHoàng
+14620	7	1,2,3,4,5,6,7	Tầng 4 Tần Lăng
+14621	6	1,2,3,4,5,6	Tầng 4 Tần Lăng
+14622	7	1,2,3,4,5,6,7	Tầng 4 Tần Lăng
+14623	1	1	Tầng 4 Tần Lăng
+14624	1	1	Tầng 4 Tần Lăng
+14625	1	1	Tầng 4 Tần Lăng
+14626	1	1	Tầng 4 Tần Lăng
+14627	1	1	Tầng 4 Tần Lăng
+14628	1	1	Tầng 4 Tần Lăng
+14629	1	1	Tầng 4 Tần Lăng
+14630	1	1	Tầng 4 Tần Lăng
+14631	1	1	Tầng 4 Tần Lăng
+14632	4	1,2,3,4	Tầng 4 Tần Lăng
+14633	1	1	Tầng 4 Tần Lăng
+14634	2	1,2	Tầng 5 Tần Lăng | Tầng 4 Tần Lăng
+14635	2	1,2	Tầng 5 Tần Lăng | Tầng 4 Tần Lăng
+14636	6	1,2,3,4,5,6	Tầng 5 Tần Lăng
+14637	4	1,2,3,4	Tầng 5 Tần Lăng
+14638	5	1,2,3,4,5	Tầng 5 Tần Lăng
+14639	4	1,2,3,4	Tầng 5 Tần Lăng
+14640	5	1,2,3,4,5	Tầng 5 Tần Lăng
+14641	4	1,2,3,4	Tầng 5 Tần Lăng
+14642	4	1,2,3,4	Tầng 5 Tần Lăng
+14643	5	1,2,3,4,5	Tầng 5 Tần Lăng
+14644	4	1,2,3,4	Tầng 5 Tần Lăng
+14645	5	1,2,3,4,5	Tầng 5 Tần Lăng
+14646	4	1,2,3,4	Tầng 5 Tần Lăng
+14647	6	1,2,3,4,5,6	Tầng 5 Tần Lăng
+14648	2	1,2	Tầng 5 Tần Lăng | Tầng 6 Tần Lăng
+14649	3	1,2,3	Tầng 6 Tần Lăng | Tầng 5 Tần Lăng
+14650	2	1,2	Tầng 6 Tần Lăng
+14651	2	1,2	Tầng 6 Tần Lăng
+14652	2	1,2	Tầng 6 Tần Lăng
+14653	2	1,2	Tầng 6 Tần Lăng
+14654	2	1,2	Tầng 6 Tần Lăng
+14655	2	1,2	Tầng 6 Tần Lăng
+14656	2	1,2	Tầng 6 Tần Lăng
+14657	2	1,2	Tầng 6 Tần Lăng
+14658	2	1,2	Tầng 6 Tần Lăng
+14659	2	1,2	Tầng 6 Tần Lăng
+14660	2	1,2	Tầng 6 Tần Lăng
+14661	3	1,2,3	Tầng 6 Tần Lăng | Tầng 7 Tần Lăng
+14662	2	1,2	Tầng 6 Tần Lăng
+14663	2	1,2	Tầng 6 Tần Lăng
+14664	2	1,2	Tầng 6 Tần Lăng
+14665	2	1,2	Tầng 6 Tần Lăng
+14666	2	1,2	Tầng 6 Tần Lăng
+14667	2	1,2	Tầng 6 Tần Lăng
+14668	2	1,2	Tầng 6 Tần Lăng
+14669	2	1,2	Tầng 6 Tần Lăng
+14670	1	1	Tầng 6 Tần Lăng
+14671	1	1	Tầng 6 Tần Lăng
+14672	1	1	Tầng 6 Tần Lăng
+14673	1	1	Tầng 6 Tần Lăng
+14674	1	1	Tầng 6 Tần Lăng
+14675	1	1	Tầng 6 Tần Lăng
+14676	1	1	Tầng 6 Tần Lăng
+14677	1	1	Tầng 6 Tần Lăng
+14678	1	1	Tầng 6 Tần Lăng
+14679	1	1	Tầng 6 Tần Lăng
+14680	1	1	Tầng 6 Tần Lăng
+14681	1	1	Tầng 6 Tần Lăng
+14682	2	1,2	Tầng 7 Tần Lăng
+14683	2	1,2	Tầng 7 Tần Lăng | Tầng 6 Tần Lăng
+14684	2	1,2	Tầng 7 Tần Lăng
+14685	3	1,2,3	Tầng 7 Tần Lăng
+14686	1	1	Tầng 7 Tần Lăng
+14687	2	1,2	Tầng 7 Tần Lăng | Tầng 8 Tần Lăng
+14688	2	1,2	Tầng 7 Tần Lăng | Tầng 8 Tần Lăng
+14689	1	1	Tầng 8 Tần Lăng
+14690	2	1,2	Tầng 8 Tần Lăng
+14691	2	1,2	Tầng 8 Tần Lăng
+14692	5	1,2,3,4,5	Tầng 8 Tần Lăng | Phù Tô phủ
+14693	2	1,2	Tầng 8 Tần Lăng
+14694	2	1,2	Tầng 8 Tần Lăng
+14695	3	1,2,3	Tầng 8 Tần Lăng | Đại lao
+14696	2	1,2	Tầng 8 Tần Lăng
+14697	1	1	Tầng 8 Tần Lăng
+14698	1	1	Tầng 8 Tần Lăng
+14699	1	1	Tầng 8 Tần Lăng
+14801	3	1,2,3	Quan Trung | Thổ Thành Bắc Địa | Rừng Bắc Địa
+14802	3	1,2,3	Rừng Bắc Địa | Quân trướng | Binh trướng
+14803	1	1	Thổ Thành Bắc Địa
+14804	1	1	Thổ Thành Bắc Địa
+14805	1	1	Rừng Bắc Địa
+14811	2	1,2	Quan Trung | Rừng Hoa Sơn
+14812	2	1,2	Rừng Hoa Sơn
+14813	2	1,2	Rừng Hoa Sơn
+14814	3	1,2,3	Rừng Hoa Sơn | Đỉnh Hoa Sơn | Nhà tranh
+14815	1	1	Rừng Hoa Sơn
+14816	1	1	Rừng Hoa Sơn
+14821	3	1,2,3	Quan Trung | Hẻm núi Tử Ngọ
+14822	3	1,2,3	Hẻm núi Tử Ngọ
+14823	2	1,2	Hẻm núi Tử Ngọ | Ích Châu
+14824	1	1	Hẻm núi Tử Ngọ
+14825	1	1	Hẻm núi Tử Ngọ
+14831	3	1,2,3	Quan Trung | Hẻm núi Tà Cốc
+14832	4	1,2,3,4	Hẻm núi Tà Cốc
+14833	3	1,2,3	Hẻm núi Tà Cốc | Quân trướng
+14834	1	1	Hẻm núi Tà Cốc
+14835	1	1	Hẻm núi Tà Cốc
+14836	2	1,2	Hẻm núi Tà Cốc | Ích Châu
+14837	1	1	Hẻm núi Tà Cốc
+14838	1	1	Hẻm núi Tà Cốc
+14841	2	1,2	Quan Trung | Rừng Trần Thương
+14842	3	1,2,3	Cửa trại Trần Thương | Rừng Trần Thương
+14843	3	1,2,3	Rừng Trần Thương | Binh trướng | Quân trướng
+14844	1	1	Rừng Trần Thương
+14845	1	1	Rừng Trần Thương
+14846	2	1,2	Rừng Trần Thương | Trướng Trần Thương
+14847	1	1	Rừng Trần Thương
+14851	3	1,2,3	Quan Trung | Tầng 1 Tần Lăng | Rừng Tần Lăng
+14852	1	1	Rừng Tần Lăng
+14861	2	1,2	Rừng Tán Quan | Tán Quan
+14862	2	1,2	Rừng Tán Quan | Lương Châu
+14871	2	1,2	Rừng Tân Phong | Quan Trung
+14872	2	1,2	Rừng Tân Phong | Quân trướng
+14873	1	1	Rừng Tân Phong
+15000	35	1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,30,31,32,33,34,35,36,37,38	Sơn động Khoa Châu | Thanh Châu | Giang Đông | Tiêu Quan | Núi Mang Thương | Quảng Lăng | Thôn Tiểu Bái | Hạ Bì Thổ Sơn MêCung | Hạ Bì | Thành Từ Châu | Rừng Hoài Âm | Thành Thọ Xuân | Thuỷ động Hư Di | Rừng Tương Huyện | Thiên Trụ Sơn | Rừng Hạ Thái | Đầm lầy Thành Đức | Phế thuyền Thái Hồ | Nhu Tu Ổ | Rừng Thạch Đình | Phòng nhỏ Đông Hải | Thuỷ Trại Lư Giang | Từ Châu-MêCung Hư Di | Bến đò Hoàn Thành | Giáp Thạch Sơn | Trại Hoàn Thành | Rừng Ngưu Chữ | Trại Hợp Phì | Rừng Lâm Hoài | Hồ Hồng Trạch | Cửa vào Ngưu Chữ | Cửa vào Nhu Tu | Cầu gảy Tiêu Sư | Trại TàoPhi GiangBắc
+15001	2	1,2	Đường lớn Từ Châu | Từ Châu
+15002	9	1,2,3,4,5,6,7,8,9	Cửa thành Từ Châu | Khách sạn | Tiền trang | Tiệm thuốc | Phổ hộ | Quan phủ | Bần hộ | Từ Châu nhai đạo
+15003	3	1,2,4	Đường lớn Từ Châu | Quan đệ Lữ Bố | Rừng Tông Thế
+15011	2	1,2	Đường lớn Hạ Bì | Từ Châu
+15012	8	1,2,3,4,5,6,7,8	Khách sạn | Lò rèn | Bần hộ | Phú hộ | Phổ hộ | Cửa thành Hạ Bì | Cửa Bắc Hạ Bì | Hạ Bì nhai đạo
+15013	1	1	Đường lớn Hạ Bì
+15014	3	1,2,3	Đường lớn Hạ Bì | Phú hộ | Quan phủ
+15021	2	1,2	Đường lớn Thọ Xuân | Từ Châu
+15022	9	1,2,3,4,5,6,7,8,9	Cửa thành Thọ Xuân | Lò rèn | Khách sạn | Phổ hộ | Quan phủ | Bần hộ | Rừng Thọ Xuân | Thọ Xuân nhai đạo
+15023	2	1,2	Đường lớn Thọ Xuân | Sơn động Thọ Xuân
+15024	2	1,2	Đường lớn Thọ Xuân | Tiền trang
+15025	9	1,2,3,4,5,6,7,8,9	Cửa thành Thọ Xuân | Lò rèn | Khách sạn | Phổ hộ | Quan phủ | Bần hộ | Rừng Thọ Xuân | Thọ Xuân nhai đạo
+15031	6	1,2,3,4,5,6	Từ Châu | Quan phủ | Phú hộ | Phổ hộ | Bần hộ
+15101	1	1	Đường lớn Hạ Bì
+15102	1	1	Thôn Tiểu Bái
+15103	1	1	Từ Châu nhai đạo
+15104	1	1	Hạ Bì nhai đạo
+15131	1	1	Đường lớn Từ Châu
+15132	1	1	Đường lớn Hạ Bì
+15133	1	1	Đường lớn Thọ Xuân
+15134	1	1	Thôn Tiểu Bái
+15135	1	1	Từ Châu nhai đạo
+15136	1	1	Đường lớn Thọ Xuân
+15171	1	1	Đường lớn Từ Châu
+15172	1	1	Đường lớn Hạ Bì
+15173	2	1,2	Đường lớn Thọ Xuân
+15174	1	1	Thôn Tiểu Bái
+15201	1	1	Đường lớn Hạ Bì
+15202	1	1	Đường lớn Thọ Xuân
+15221	1	1	Đường lớn Từ Châu
+15241	1	1	Đường lớn Từ Châu
+15242	1	1	Đường lớn Hạ Bì
+15243	1	1	Đường lớn Thọ Xuân
+15261	1	1	Đường lớn Từ Châu
+15262	1	1	Thọ Xuân nhai đạo
+15301	1	1	Đường lớn Từ Châu
+15302	1	1	Đường lớn Thọ Xuân
+15303	1	1	Thôn Tiểu Bái
+15304	1	1	Từ Châu nhai đạo
+15306	1	1	Thôn Tiểu Bái
+15307	1	1	Hạ Bì nhai đạo
+15401	2	1,2	Từ Châu | Thông Đạo Tiêu Quan
+15402	2	1,2	Duyện Châu | Tiêu Quan
+15403	2	1,2	Thông Đạo Tiêu Quan | Duyện Châu
+15404	2	1,2	Tiêu Quan | Từ Châu
+15411	2	1,2	Từ Châu | Sơn trại Mang Thương
+15412	3	1,2,3	Sơn trại Mang Thương
+15413	1	1	Sơn trại Mang Thương
+15414	2	1,2	Sơn trại Mang Thương
+15415	1	1	Sơn trại Mang Thương
+15421	2	1,2	Từ Châu | Thiên Trụ Sơn
+15422	2	1,2	Thiên Trụ Sơn | Đỉnh Thiên Trụ Sơn
+15423	2	1,2	Thiên Trụ Sơn | Đỉnh Thiên Trụ Sơn
+15424	1	1	Đỉnh Thiên Trụ Sơn
+15431	2	1,2	Giáp Thạch Sơn | Từ Châu
+15432	2	1,2	Giáp Thạch Sơn
+15433	3	1,2,3	Giáp Thạch Sơn | PhòngNhỏGiápThạchSơn
+15434	1	1	Giáp Thạch Sơn
+15435	2	1,2	Đỉnh Giáp Thạch Sơn | PhòngNhỏGiápThạchSơn
+15436	1	1	Đỉnh Giáp Thạch Sơn
+15441	2	1,2	Thuỷ trại Hư Di | Từ Châu
+15442	5	1,2,3,4,5	Thuỷ trại Hư Di | Thuỷ động Hư Di | Binh trướng
+15443	1	1	Thuỷ trại Hư Di
+15444	1	1	Thuỷ trại Hư Di
+15445	1	1	Thuỷ trại Hư Di
+15451	3	1,2,4	Trại Nhu Tu | Từ Châu | Tào doanh Nhu Tu
+15452	7	1,2,3,4,5,6,7	ThạchĐộng Chung Nhũ | Quân trướng | Đại trướng | Nhu Tu Ổ | Trại Nhu Tu | Binh trướng
+15453	1	1	Nhu Tu Ổ
+15454	1	1	Nhu Tu Ổ
+15455	1	1	ThạchĐộng Chung Nhũ
+15456	2	1,2	ThạchĐộng Chung Nhũ | Nhu Tu ninh chiểu
+15457	4	1,2,3,4	Đại trướng | Quân trướng | Trại Nhu Tu
+15458	1	1	Trại Nhu Tu
+15459	1	1	Trại Nhu Tu
+15460	1	1	Trại Nhu Tu
+15461	1	1	Từ Châu
+15462	1	1	Đường vào Nhu Tu Ổ
+15463	1	1	Rừng Nhu Tu
+15464	1	1	Trại Nhu Tu
+15471	2	1,2	Phòng nhỏ Đông Hải | Từ Châu
+15472	1	1	Phòng nhỏ Đông Hải
+15481	4	1,2,3,4	Từ Châu | Phế thuyền Thái Hồ | Giang Đông
+15491	2	1,2	Từ Châu | Rừng Hoàn Thành
+15492	2	1,2	Trại Hoàn Thành | Bến đò Hoàn Thành
+15493	3	1,2,3	Rừng Hoàn Thành | Đại trướng | Từ Châu
+15494	1	1	Trại Hoàn Thành
+15501	2	1,2	MêCungSĐộng KhoaChâu
+15502	2	1,2	MêCungSĐộng KhoaChâu
+15503	2	1,2	MêCungSĐộng KhoaChâu
+15504	2	1,2	MêCungSĐộng KhoaChâu
+15505	2	1,2	MêCungSĐộng KhoaChâu
+15506	3	1,2,3	MêCungSĐộng KhoaChâu
+15507	2	1,2	Thanh Châu | MêCungSĐộng KhoaChâu
+15508	2	1,2	MêCungSĐộng KhoaChâu
+15509	2	1,2	MêCungSĐộng KhoaChâu
+15510	2	1,2	MêCungSĐộng KhoaChâu | Từ Châu
+15511	2	1,2	MêCungSĐộng KhoaChâu
+15512	2	1,2	MêCungSĐộng KhoaChâu
+15513	2	1,2	MêCungSĐộng KhoaChâu
+15514	3	1,2,3	MêCungSĐộng KhoaChâu
+15515	2	1,2	MêCungSĐộng KhoaChâu
+15516	3	1,2,3	MêCungSĐộng KhoaChâu
+15517	2	1,2	MêCungSĐộng KhoaChâu
+15518	3	1,2,3	MêCungSĐộng KhoaChâu
+15521	2	1,2	Hạ Bì Thổ Sơn MêCung | Từ Châu
+15522	2	1,2	Hạ Bì Thổ Sơn MêCung
+15523	3	1,2,3	Hạ Bì Thổ Sơn MêCung
+15524	4	1,2,3,4	Hạ Bì Thổ Sơn MêCung | Rừng Hạ Bì
+15525	3	1,2,3	Hạ Bì Thổ Sơn MêCung
+15526	2	1,2	Hạ Bì Thổ Sơn MêCung
+15527	2	1,2	Hạ Bì Thổ Sơn MêCung
+15528	1	1	Hạ Bì Thổ Sơn MêCung
+15529	1	1	Hạ Bì Thổ Sơn MêCung
+15541	3	1,2,3	Thuỷ động Hư Di | Từ Châu
+15542	4	1,2,3,4	Thuỷ động Hư Di
+15543	4	1,2,3,4	Thuỷ động Hư Di
+15544	4	1,2,3,4	Thuỷ động Hư Di
+15545	2	1,2	Thuỷ động Hư Di
+15546	2	1,2	Thuỷ động Hư Di
+15547	2	1,2	Thuỷ động Hư Di
+15548	1	1	Thuỷ động Hư Di
+15549	1	1	Thuỷ động Hư Di
+15550	1	1	Thuỷ động Hư Di
+15551	1	1	Thuỷ động Hư Di
+15552	3	1,2,3	Thuỷ động Hư Di
+15553	1	1	Thuỷ động Hư Di
+15554	1	1	Thuỷ động Hư Di
+15555	2	1,2	Thuỷ động Hư Di
+15561	2	1,2	Sơn động Thọ Xuân | Rừng Thọ Xuân
+15562	4	1,2,3,4	Sơn động Thọ Xuân
+15563	2	1,2	Sơn động Thọ Xuân
+15564	2	1,2	Sơn động Thọ Xuân
+15565	1	1	Sơn động Thọ Xuân
+15566	2	1,2	Sơn động Thọ Xuân
+15567	2	1,2	Sơn động Thọ Xuân
+15568	1	1	Sơn động Thọ Xuân
+15569	2	1,2	Sơn động Thọ Xuân
+15570	2	1,2	Sơn động Thọ Xuân
+15571	1	1	Sơn động Thọ Xuân
+15581	2	1,2	Nhu Tu Ổ | Rừng Nhu Tu
+15582	2	1,2	Rừng Nhu Tu | Nhu Tu Ổ
+15591	1	1	Đầm lầy Thành Đức
+15701	2	1,2	Trại Hợp Phì | Từ Châu
+15702	5	1,2,3,4,5	Trại Hợp Phì | Binh trướng
+15703	1	1	Trại Hợp Phì
+15704	1	1	Trại Hợp Phì
+15705	1	1	Trại Hợp Phì
+15706	1	1	Trại Hợp Phì
+15711	1	1	Từ Châu
+15801	2	1,2	Từ Châu | Rừng Quảng Lăng
+15802	4	1,2,3,4	Cửa trại Quảng Lăng | Thuỷ động Quảng Lăng | Quân trướng | Rừng Quảng Lăng
+15803	1	1	Rừng Quảng Lăng
+15804	1	1	Rừng Quảng Lăng
+15805	1	1	Rừng Quảng Lăng
+15811	2	1,2	Hạ Bì Thổ Sơn MêCung | Ha Bi Thổ Sơn
+15812	1	1	Ha Bi Thổ Sơn
+15821	3	1,2,3	Từ Châu | Rừng Tương Huyện
+15822	1	1	Rừng Tương Huyện
+15823	2	1,2	Rừng Tương Huyện
+15824	1	1	Rừng Tương Huyện
+15831	2	1,4	Từ Châu | Rừng Hoài Âm
+15832	1	1	Rừng Hoài Âm
+15841	2	1,2	Rừng Lư Giang | Từ Châu
+15843	3	1,2,3	Trại Lư Giang | Thuy Trại Lư Giang | Rừng Lư Giang
+15844	4	1,2,3,4	Đại trướng | Quân trướng | Rừng Lư Giang
+15845	1	1	Trại Lư Giang
+15846	1	1	Trại Lư Giang
+15847	1	1	Trại Lư Giang
+15848	1	1	Rừng Lư Giang
+15851	3	1,2,3	Dương Châu | Rừng Thạch Đình
+15852	1	1	Rừng Thạch Đình
+15853	1	1	Rừng Thạch Đình
+15861	2	1,2	Từ Châu | Rừng Hạ Thái
+15862	2	1,2	Rừng Hạ Thái | Quân trướng
+15863	1	1	Rừng Hạ Thái
+15871	2	1,2	Từ Châu | Sơn động Thành Đức
+15881	1	1	Từ Châu
+15891	3	1,2,3	Từ Châu | Trướng Tào Phi | Bến tàu Giang Bắc
+15892	2	1,2	TrạiTàoTháo GiangBắc | C.Trường TrườngGiang
+15893	3	1,2,3	Bến tàu Giang Bắc | TrạiTừThịnh GiangNam | Thuyền rồng Tào Phi
+15894	1	1	C.Trường TrườngGiang
+15895	1	1	TrạiTàoTháo GiangBắc
+15896	1	1	C.Trường TrườngGiang
+15901	1	1	Từ Châu
+16000	9	1,2,3,4,5,6,7,8,9	A Lí Sơn Thần Mộc | Động Hoả Sơn | Sơn động Di Châu | Giang Đông | Rừng cây Ti Nam | Rừng Tây Lạp Nhã | Thôn KhảiĐạtCáchLan | Đỉnh núi Mỹ Luân
+16001	4	1,2,3,4	Phổ hộ | Di Châu
+16101	1	1	Thôn KhảiĐạtCáchLan
+16131	1	1	Thôn KhảiĐạtCáchLan
+16132	1	1	Thôn KhảiĐạtCáchLan
+16401	2	1,2	Di Châu | A Lí Sơn Thần Mộc
+16402	1	1	A Lí Sơn Thần Mộc
+16412	2	1,2	Di Châu | Nham động Lý Tập
+16501	3	1,2,3	Di Châu | Sơn động Di Châu
+16502	1	1	Sơn động Di Châu
+16503	3	1,2,3	Sơn động Di Châu
+16504	3	1,2,3	Sơn động Di Châu
+16505	1	1	Sơn động Di Châu
+16506	4	1,2,3,4	Sơn động Di Châu
+16507	1	1	Sơn động Di Châu
+16508	1	1	Sơn động Di Châu
+16509	3	1,2,3	Sơn động Di Châu
+16510	4	1,2,3,4	Sơn động Di Châu | Di Châu
+16511	1	1	Sơn động Di Châu
+16512	1	1	Sơn động Di Châu
+16521	3	1,2,4	Di Châu | Động Hoả Sơn
+16522	2	1,2	Động Hoả Sơn
+16523	1	3	Động Hoả Sơn
+16524	2	1,2	Động Hoả Sơn
+16525	2	1,2	Động Hoả Sơn
+16526	2	1,2	Động Hoả Sơn
+16527	1	1	Động Hoả Sơn
+16528	3	1,2,3	Động KhảiĐạtCáchLan
+16529	2	1,2	Động KhảiĐạtCáchLan
+16530	3	1,2,3	Động KhảiĐạtCáchLan
+16531	3	1,2,3	Rừng Tây Lạp Nhã | Mỏ Tây Lạp Nhã
+16532	2	1,2	Mỏ Tây Lạp Nhã
+16533	2	1,2	Mỏ Tây Lạp Nhã
+16534	2	1,2	Mỏ Tây Lạp Nhã
+16535	1	1	Mỏ Tây Lạp Nhã
+16536	2	1,2	Mỏ Tây Lạp Nhã
+16537	2	1,2	Mỏ Tây Lạp Nhã
+16538	2	1,2	Mỏ Tây Lạp Nhã
+16539	1	1	Mỏ Tây Lạp Nhã
+16540	1	1	Động KhảiĐạtCáchLan
+16541	3	1,2,3	Di Châu | Động KhảiĐạtCáchLan
+16542	1	2	Động KhảiĐạtCáchLan
+16551	2	1,2	Đỉnh núi Mỹ Luân
+16801	2	1,2	Di Châu | Rừng Ti Nam
+16802	1	1	Rừng Ti Nam
+16811	2	1,2	Di Châu | Mỏ Tây Lạp Nhã
+17000	2	1,2	Biển cả mênh mông | Đông Hải
+18000	39	1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39	Cửa thành Ngô Quận | Đường lớn KiếnNghiệp | Bãỉ cát Muối Biển | Tiền đường LươngĐình | Thôn Đông Dã | Thôn Vĩnh Ninh | Thôn Trữ La | Cửa thành Hội Kê | Trên chân núi TâyTạc | Chân núi ThượngNhiễu | Chân núi Kinh Huyện | Chân núi Bắc Cố | Sườn núi Kiến An | Rừng Ngưu Chữ | Đầm lầy Dư Diêu | Cửa Trại Bà Dương | Trại Dự Chương | Trại Sài Tang | Đầm lầy Bành Trạch | Đầm lầy Ô Trình | Rừng Đan Dương | Rừng Tuyên Thành | Vườn hoa An Lạc | Sơn động An Lạc | Sơn động Dư Hàng | Ngoài biển Từ Châu | Rừng Vĩnh Khang | Biển lớn Uông Dương | Trường Giang | Rừng Lư Lăng | Chân núi Lâm Lịch | Giao Châu | Cửa khẩu Sài Tang | TrạiTừThịnh GiangNam
+18001	8	1,2,3,4,5,6,7,8	Lôi đài Kiến Nghiệp | Dương Châu | Kiến Nghiệp nhai đạo | Quan phủ | Khách sạn | Tiền trang | Phổ hộ | Phú hộ
+18002	8	1,2,3,4,5,6,7,8	Rừng Kiến Nghiệp | Đường lớn KiếnNghiệp | Phú hộ | Phổ hộ | Tiệm thuốc | Lò rèn | Bần hộ
+18003	6	1,2,3,4,5,6	Lôi đài Kiến Nghiệp | Lễ đường kết hôn | Quần anh quán | Bần hộ | Phú hộ | Chu phủ Kiến Nghiệp
+18011	2	1,2	Dương Châu | Đường lớn Ngô Quận
+18012	8	1,2,3,4,5,6,7,8	Cửa thành Ngô Quận | Rừng Ngô Quận | Lò rèn | Khách sạn | Phổ hộ | Quan phủ | Bần hộ | Ngô Quận nhai đạo
+18013	6	1,2,3,4,5,6	Đường lớn Ngô Quận | Phú hộ | Phổ hộ | Bần hộ
+18021	2	1,2	Dương Châu | Đường lớn Hội Kê
+18022	9	1,2,3,4,5,6,7,8,9	Rừng Hội Kê | Cửa thành Hội Kê | Khách sạn | Tiền trang | Tiệm thuốc | Quan phủ | Phú hộ | Phổ hộ | Bần hộ
+18031	8	1,2,3,4,5,6,7,8	Dương Châu | Phổ hộ | Phú hộ | Bần hộ | Nhà gỗ Trư La | Lò rèn
+18041	4	1,2,3,4	Dương Châu | Phổ hộ | Phú hộ | Nhà gỗ Động Đá
+18051	5	1,2,3,4,5	Dương Châu | Phú hộ | Nhà gỗ Vĩnh Ninh | Phổ hộ | Bần hộ
+18061	8	1,2,3,4,5,6,7,8	Đỉnh núi Kiến An | Phổ hộ | Phú hộ | Nhà gỗ Kiến An | Bần hộ
+18071	8	1,2,3,4,5,6,7,8	Đỉnh núi ThượngNhiễu | Phổ hộ | Phú hộ | Bần hộ | Nhà gỗ Thượng Nhiễu
+18081	5	1,2,3,4,5	Rừng Kinh Triệu | Nhà gỗ Kinh Triệu | Bần hộ | Phổ hộ | Phú hộ
+18101	1	1	Kiến Nghiệp nhai đạo
+18102	1	1	Kiến Nghiệp nhai đạo
+18103	1	1	Đường lớn Hội Kê
+18104	1	1	Thôn Trữ La
+18105	1	1	Thôn Trữ La
+18106	2	1,2	Thôn Đông Dã | Dương Châu
+18107	1	1	Thôn Vĩnh Ninh
+18108	1	1	Bộ lạc Kiến An
+18109	1	1	Bộ lạc Kiến An
+18110	1	1	Bộ lạc Thượng Nhiễu
+18111	1	1	Bộ lạc Thượng Nhiễu
+18112	1	1	Bộ lạc Kinh Huyện
+18113	1	1	Kiến Nghiệp nhai đạo
+18114	1	1	Đường lớn KiếnNghiệp
+18115	1	1	Đường lớn KiếnNghiệp
+18116	1	1	Lễ đường kết hôn
+18117	1	1	Ngô Quận nhai đạo
+18118	1	1	Ngô Quận nhai đạo
+18131	1	1	Đường lớn KiếnNghiệp
+18132	1	1	Kiến Nghiệp nhai đạo
+18133	1	1	Đường lớn Ngô Quận
+18134	1	1	Đường lớn Hội Kê
+18135	1	1	Thôn Trữ La
+18136	1	1	Thôn Trữ La
+18137	1	1	Thôn Đông Dã
+18138	1	1	Thôn Vĩnh Ninh
+18139	1	1	Bộ lạc Kiến An
+18140	1	1	Bộ lạc Kiến An
+18141	1	1	Bộ lạc Thượng Nhiễu
+18142	1	1	Bộ lạc Thượng Nhiễu
+18143	1	1	Bộ lạc Kinh Huyện
+18144	1	1	Ngô Quận nhai đạo
+18171	1	1	Kiến Nghiệp nhai đạo
+18172	1	1	Đường lớn Ngô Quận
+18173	1	1	Đường lớn Hội Kê
+18174	1	1	Thôn Trữ La
+18175	1	1	Thôn Trữ La
+18176	1	1	Thôn Đông Dã
+18177	1	1	Thôn Vĩnh Ninh
+18178	1	1	Thôn Vĩnh Ninh
+18179	1	1	Bộ lạc Kiến An
+18180	1	1	Bộ lạc Kiến An
+18181	1	1	Bộ lạc Kiến An
+18182	1	1	Bộ lạc Thượng Nhiễu
+18183	1	1	Bộ lạc Thượng Nhiễu
+18184	1	1	Bộ lạc Thượng Nhiễu
+18185	1	1	Bộ lạc Kinh Huyện
+18186	1	1	Bộ lạc Kinh Huyện
+18187	1	1	Đường lớn KiếnNghiệp
+18188	1	1	Ngô Quận nhai đạo
+18189	1	1	Ngô Quận nhai đạo
+18201	2	1,1	Kiến Nghiệp nhai đạo
+18202	1	1	Đường lớn Ngô Quận
+18203	1	1	Thôn Trữ La
+18221	2	1,1	Kiến Nghiệp nhai đạo
+18222	1	1	Đường lớn Hội Kê
+18241	1	1	Đường lớn KiếnNghiệp
+18242	1	1	Đường lớn Ngô Quận
+18243	1	1	Đường lớn Hội Kê
+18261	1	1	Đường lớn KiếnNghiệp
+18262	1	1	Đường lớn Hội Kê
+18301	1	1	Đường lớn KiếnNghiệp
+18302	1	1	Đường lớn Ngô Quận
+18303	1	1	Đường lớn Hội Kê
+18304	2	1,2	Kiến Nghiệp nhai đạo | Đông Phong
+18305	1	1	Kiến Nghiệp nhai đạo
+18401	2	1,2	Dương Châu | Sườn núi Bắc Cố
+18402	2	1,2	Sườn núi Bắc Cố | Cam Lộ Tự
+18403	3	1,2,3	Sườn núi Bắc Cố | Trong Cam Lộ Tự | Đỉnh núi Bắc Cố
+18404	1	1	Cam Lộ Tự
+18405	1	1	Cam Lộ Tự
+18411	1	1	Dương Châu
+18421	2	1,2	Giang Đông | Eo núi Tây Tặc
+18422	2	1,2	Đỉnh núi Tây Tặc | Chân núi Tây Tặc
+18423	2	1,2	Eo núi Tây Tạc | Núi Tây Tạc
+18424	1	1	Đỉnh núi Tây Tặc
+18431	2	1,2	Dương Châu | Sườn núi Kiến An
+18432	2	1,2	Dương Châu | Đỉnh núi Kiến An
+18433	3	1,2,4	Sườn núi Kiến An | Bộ lạc Kiến An | Cầu treo Kiến An
+18434	1	1	Sơn động Dư Hàng
+18435	2	1,2	Đỉnh núi Kiến An | Chân núi Kiến An
+18436	2	1,2	Dương Châu | Cầu treo Kiến An
+18441	2	1,2	Dương Châu | ThácNước ThượngNhiễu
+18442	2	1,3	Chân núi ThượngNhiễu | Đỉnh núi ThượngNhiễu
+18443	2	1,2	Chân núi ThượngNhiễu | Đỉnh núi ThượngNhiễu
+18444	3	1,2,3	ThácNước ThượngNhiễu | Bộ lạc Thượng Nhiễu | Rừng Thượng Nhiễu
+18451	2	1,2	Dương Châu | Sườn núi Kinh Huyện
+18452	2	1,2	Sườn núi Kinh Huyện | Đỉnh núi Kinh Huyện
+18453	4	1,2,3,4	Sườn núi Kinh Huyện | Đỉnh núi Kinh Huyện | Bộ lạc Kinh Huyện | Rừng Kinh Huyện
+18454	1	1	Đỉnh núi Kinh Huyện
+18455	1	1	Rừng Kinh Huyện
+18461	2	1,2	Chân núi Lâm Lịch | Dương Châu
+18462	1	1	Chân núi Lâm Lịch
+18501	2	1,2	Thuỷ động Thái Hồ | Rừng Kiến Nghiệp
+18502	3	1,2,3	Thuỷ động Thái Hồ
+18503	1	1	Thuỷ động Thái Hồ
+18504	2	1,2	Thuỷ động Thái Hồ
+18505	2	1,2	Thuỷ động Thái Hồ
+18506	2	1,2	Rừng Ngô Quận | Thuỷ động Thái Hồ
+18511	2	1,2	Dương Châu | Sơn động Dư Hàng
+18512	2	1,2	Sơn động Dư Hàng
+18513	3	1,2,3	Sơn động Dư Hàng | Thần Mộc Sơn Việt
+18514	2	1,2	Sơn động Dư Hàng
+18515	2	1,2	Sơn động Dư Hàng
+18516	2	1,2	Sơn động Dư Hàng
+18517	2	1,2	Sơn động Dư Hàng
+18518	2	1,2	Sơn động Dư Hàng
+18519	2	1,2	Rừng Vĩnh Khang | Sơn động Dư Hàng
+18521	2	1,2	Sơn động An Lạc | Dương Châu
+18522	2	1,2	Sơn động An Lạc
+18523	4	1,2,3,4	Sơn động An Lạc
+18524	2	1,2	Sơn động An Lạc
+18525	1	1	Sơn động An Lạc
+18526	2	1,2	Sơn động An Lạc
+18527	1	1	Sơn động An Lạc
+18528	2	1,2	Sơn động An Lạc
+18529	2	1,2	Sơn động An Lạc
+18530	2	1,2	Sơn động An Lạc
+18531	1	1	Sơn động An Lạc
+18541	3	1,2,3	Rừng Hội Kê | Mỏ khoáng Hội Kê
+18542	3	1,2,3	Mỏ khoáng Hội Kê
+18543	1	1	Mỏ khoáng Hội Kê
+18544	1	1	Mỏ khoáng Hội Kê
+18545	3	1,2,3	Mỏ khoáng Hội Kê
+18546	1	1	Mỏ khoáng Hội Kê
+18547	1	1	Mỏ khoáng Hội Kê
+18701	1	1	Bến tàu Giang Bắc
+18702	2	1,2	TrạiTàoPhi GiangNam | C.Trường TrườngGiang
+18703	3	1,2,3	Bến tàu Giang Bắc | TrạiTừThịnh GiangNam | Thuyền rồng Tào Phi
+18704	3	1,2,3	C.Trường TrườngGiang | Dương Châu | Trướng Từ Thịnh
+18705	1	1	C.Trường TrườngGiang
+18706	1	1	TrạiTừThịnh GiangNam
+18801	4	1,2,3,4	Bến đò  Ngưu Chữ | Rừng Ngưu Chữ | Quân trướng
+18802	1	1	Rừng Ngưu Chữ
+18803	2	1,2	Rừng Ngưu Chữ | Dương Châu
+18804	1	1	Rừng Ngưu Chữ
+18805	1	1	Trại Bà Dương
+18806	2	1,2	Dương Châu | Trại Bà Dương
+18807	7	1,2,3,4,5,6,7	Cửa Trại Bà Dương | Binh trướng | Đại trướng | Bến tàu Bà Dương | Trại Bà Dương
+18808	1	1	Trại Bà Dương
+18809	1	1	Trại Bà Dương
+18810	1	1	Trại Bà Dương
+18811	2	1,2	Dương Châu | Rung Tuyên Thành
+18812	1	1	Rung Tuyên Thành
+18814	3	1,2,3	Trại Sài Tang | Trướng Sài Tang
+18815	1	1	Trại Sài Tang
+18816	4	1,2,3,4	Trướng Sài Tang | Trại Sài Tang | Dương Châu
+18817	1	1	Trại Sài Tang
+18818	4	1,2,3,4	Trại Sài Tang | Dương Châu | Bến tàu Sài Tang | Rừng Lư Sơn
+18819	1	1	Trại Sài Tang
+18820	1	1	Trại Sài Tang
+18821	4	1,2,3,4	Dương Châu | Đầm lầy Bành Trạch
+18822	1	1	Đầm lầy Bành Trạch
+18823	1	1	Đầm lầy Bành Trạch
+18824	1	1	Đầm lầy Bành Trạch
+18826	3	1,2,3	Dương Châu | Trướng Dự Chương | Trại Dự Chương
+18827	1	1	Trại Dự Chương
+18828	1	1	Trại Dự Chương
+18831	2	1,2	Dương Châu | Rừng Đan Dương
+18832	1	1	Rừng Đan Dương
+18837	1	1	Trại Bà Dương
+18838	1	1	Trại Bà Dương
+18841	3	1,2,3	Dương Châu | Đầm lầy Ô Trình
+18842	2	1,2	Đầm lầy Ô Trình
+18843	1	1	Đầm lầy Ô Trình
+18844	1	1	Đầm lầy Ô Trình
+18846	2	1,2	Sơn động Dư Hàng | Dương Châu
+18851	1	1	Dương Châu
+18856	1	1	Dương Châu
+18861	3	1,2,3	Đầm lầy Dư Diêu | Dương Châu
+18862	2	1,2	Binh trướng | Đầm lầy Dư Diêu
+18863	1	1	Đầm lầy Dư Diêu
+18864	1	1	Đầm lầy Dư Diêu
+18871	2	1,2	Thuỷ động Thái Hồ | Kiến Nghiệp nhai đạo
+18881	2	1,2	Đường lớn Ngô Quận | Thuỷ động Thái Hồ
+18891	3	1,2,3	Đường lớn Hội Kê | Mỏ khoáng Hội Kê | Rừng Hội Kê
+18892	1	1	Rừng Hội Kê
+18990	2	1,2	Đường lớn KiếnNghiệp | Kiến Nghiệp nhai đạo
+18991	3	1,2,3	Rừng Lư Sơn | Hang hổ Lư Sơn | Trại Sài Tang
+18992	2	1,2	Phòng nhỏ Lư Sơn | Rừng Lư Sơn
+18993	1	1	Rừng Lư Sơn
+18994	1	1	Rừng Lư Sơn
+19000	15	1,2,3,4,5,6,7,8,9,10,12,13,14,16,17	Tuyết địa Bắc Phong | Tuyết địa Tân Xương | Tuyết địa Liêu Toại | Thôn Vọng Bình | Cửa thành Tương Bình | Tuyết địa Xương Lê | Bộ lạc Ô Hoàn | Tuyết động LiêuThành | Tuyết địa Lô Long | Sơn động Đan Vu | Mỏ khoáng Phù Du
+19001	3	1,2,3	Liêu Đông | Tương Bình nhai đạo | Phổ hộ
+19002	7	1,2,3,4,5,6,7	Cửa thành Tương Bình | Quan phủ | Tiền trang | Bần hộ | Phú hộ | Khách sạn | Phổ hộ
+19011	5	1,2,3,4,5	Liêu Đông | Bần hộ | Nhà thuốc | Phổ hộ | Nhà gỗ Vọng Bình
+19021	6	1,2,3,4,5,6	Liêu Đông | Binh trướng | Đại trướng
+19031	1	5	Vương thành bí đạo
+19101	1	1	Tương Bình nhai đạo
+19131	1	1	Tương Bình nhai đạo
+19132	1	1	Thôn Vọng Bình
+19133	1	1	Cửa thành Tương Bình
+19171	1	1	Tương Bình nhai đạo
+19172	1	1	Thôn Vọng Bình
+19173	1	1	Thôn Vọng Bình
+19174	1	1	Thôn Vọng Bình
+19175	1	1	Bộ lạc Ô Hoàn
+19176	1	1	Bộ lạc Ô Hoàn
+19177	1	1	Bộ lạc Ô Hoàn
+19178	1	1	Bộ lạc Ô Hoàn
+19179	1	1	Bộ lạc Ô Hoàn
+19241	1	1	Tương Bình nhai đạo
+19261	1	1	Tương Bình nhai đạo
+19301	1	1	Tương Bình nhai đạo
+19401	1	1	Tuyết địa TrườngBạch
+19411	2	1,1	Tuyết địa Bạch Lang | Đỉnh Bạch Lang Sơn
+19412	1	1	Bạch Lang Sơn
+19413	2	1,2	Tuyết địa Bạch Lang
+19501	3	1,2,3	Liêu Đông | Tuyết động Liêu Đông
+19502	2	1,2	Tuyết động Liêu Đông
+19503	2	1,2	Tuyết động Liêu Đông
+19504	2	1,2	Tuyết động Liêu Đông
+19505	2	1,2	Tuyết động Liêu Đông
+19506	1	1	Tuyết động Liêu Đông
+19507	2	1,2	Tuyết động Liêu Đông
+19508	2	1,2	Tuyết động Liêu Đông
+19509	2	1,2	Tuyết động Liêu Đông | Tuyết địa TrườngBạch
+19511	2	1,2	Tuyết động LiêuThành | Liêu Đông
+19512	2	1,2	Tuyết động LiêuThành
+19513	2	1,2	Liêu Đông | Tuyết động LiêuThành
+19521	2	1,2	Tuyết động Bạch Lang | Liêu Đông
+19522	2	1,2	Tuyết động Bạch Lang
+19523	2	1,2	Tuyết động Bạch Lang
+19524	3	1,2,3	Tuyết động Bạch Lang
+19525	1	1	Tuyết động Bạch Lang
+19526	4	1,2,3,4	Tuyết động Bạch Lang | Tuyết địa Bạch Lang
+19527	2	1,2	Tuyết động Bạch Lang
+19528	1	1	Tuyết động Bạch Lang
+19529	2	1,2	Tuyết động Bạch Lang
+19530	1	1	Tuyết động Bạch Lang
+19531	1	1	Sơn động Đan Vu
+19532	2	1,2	Sơn động Đan Vu
+19533	2	1,2	Sơn động Đan Vu
+19534	2	1,2	Sơn động Đan Vu
+19535	3	1,2,3	Sơn động Đan Vu | Liêu Đông
+19541	2	1,2	Liêu Đông | Mỏ khoáng Phù Du
+19542	4	1,2,3,4	Mỏ khoáng Phù Du
+19543	1	1	Mỏ khoáng Phù Du
+19544	1	1	Mỏ khoáng Phù Du
+19545	3	1,2,3	Mỏ khoáng Phù Du
+19546	3	1,2,3	Mỏ khoáng Phù Du
+19547	1	1	Mỏ khoáng Phù Du
+19548	1	1	Mỏ khoáng Phù Du
+19549	3	1,2,3	Mỏ khoáng Phù Du
+19550	1	1	Mỏ khoáng Phù Du
+19551	1	1	Mỏ khoáng Phù Du
+19801	2	1,2	Liêu Đông | Tuyết địa Xương Lê
+19802	1	1	Tuyết địa Xương Lê
+19811	2	1,2	Tuyết địa Liêu Toại | Liêu Đông
+19812	2	1,2	Tuyết địa Liêu Toại | Trướng Liêu Toại
+19813	1	1	Tuyết địa Liêu Toại
+19821	2	1,2	Tuyết địa Tân Xương | Liêu Đông
+19822	1	1	Tuyết địa Tân Xương
+19831	2	1,2	Liêu Đông | Tuyết địa Bắc Phong
+19832	1	1	Tuyết địa Bắc Phong
+19841	3	1,2,3	Tuyết động LiêuThành | Trướng Liêu Thành | Liêu Đông
+19842	1	1	Trại Liêu Thành
+19851	3	1,2,3	Tuyết động Bạch Lang | Bạch Lang Sơn | Bạch Lang Sơn đạo
+19861	2	1,2	Tuyết động LiêuThành | Thiên Trì
+20000	17	1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17	Rừng Cửu Nguyên | Sơn động Vân Trung | Bộ lạc Nam Hung Nô | Rừng Tấn Dương | Sơn động Tây Hà | Rừng Bình Dương | Rừng Lâm Phần | Thôn Giải Lương | Chân núi Thủ Dương | Rừng Hà Đông | Mỏ khoáng Vương Ốc | Rừng Cao Đô | Rừng Truân Lưu | Cửa thành ThượngĐảng | Sơn động Hồ Quan | Nhạn Môn Quan
+20001	2	1,2	Tịnh Châu | Đường lớn ThượngĐảng
+20002	9	1,2,3,4,5,6,7,8,9	Cửa thành ThượngĐảng | Tiền trang | Quan phủ | Phổ hộ | Thượng Đảng nhai đạo | Khách sạn | Tiệm thuốc | Rừng Thượng Đảng
+20003	2	1,2	Đường lớn ThượngĐảng | Phú hộ
+20011	2	1,2	Rừng Hà Đông | Đường lớn Hà Đông
+20012	6	1,2,3,4,5,6	Cửa thành Hà Đông | Lò rèn | Khách sạn | Nhà gỗ Hà Đông | Bần hộ | Quan phủ
+20021	5	1,2,3,4,5	Phổ hộ | Phú hộ | Quan Trạch | Tiệm trà | Tịnh Châu
+20031	6	1,2,3,4,5,6	Binh trướng | Trướng Đơn Vu | Tịnh Châu
+20101	1	1	Thượng Đảng nhai đạo
+20102	1	1	Thôn Giải Lương
+20131	1	1	Đường lớn ThượngĐảng
+20132	1	1	Đường lớn ThượngĐảng
+20133	1	1	Thôn Giải Lương
+20171	1	1	Đường lớn Hà Đông
+20172	1	1	Đường lớn Hà Đông
+20173	1	1	Thôn Giải Lương
+20174	1	1	Bộ lạc Nam Hung Nô
+20175	1	1	Bộ lạc Nam Hung Nô
+20176	1	1	Bộ lạc Nam Hung Nô
+20177	1	1	Bộ lạc Nam Hung Nô
+20178	1	1	Bộ lạc Nam Hung Nô
+20201	1	1	Đường lớn Hà Đông
+20221	1	1	Đường lớn ThượngĐảng
+20241	1	1	Đường lớn ThượngĐảng
+20242	1	1	Đường lớn Hà Đông
+20261	1	1	Đường lớn ThượngĐảng
+20281	1	1	Thôn Giải Lương
+20301	1	1	Đường lớn ThượngĐảng
+20302	1	1	Đường lớn Hà Đông
+20401	2	1,2	T.Đạo Nhạn Môn Quan | Tịnh Châu
+20402	2	1,2	Nhạn Môn Quan | Tắc Ngoại
+20403	2	1,2	T.Đạo Nhạn Môn Quan | Tắc Ngoại
+20404	2	1,2	Tịnh Châu | Nhạn Môn Quan
+20411	2	1,2	Eo núi Thủ Dương | Tịnh Châu
+20412	2	1,2	Chân núi Thủ Dương | Đỉnh núi Thủ Dương
+20413	2	1,2	Eo núi Thủ Dương | Nhà gỗ Thủ Dương
+20414	1	1	Đỉnh núi Thủ Dương
+20501	3	1,2,3	Sa mạc Hồ Quan | Sơn động Hồ Quan
+20502	3	1,2,3	Sơn động Hồ Quan
+20503	3	1,2,3	Sơn động Hồ Quan | Tịnh Châu
+20504	2	1,2	Sơn động Hồ Quan
+20505	1	1	Sơn động Hồ Quan
+20506	2	1,2	Sơn động Hồ Quan
+20507	1	1	Sơn động Hồ Quan
+20508	2	1,2	Sơn động Hồ Quan
+20509	1	1	Sơn động Hồ Quan
+20511	3	1,2,3	Mỏ khoáng Vương Ốc | Tịnh Châu
+20512	2	1,2	Mỏ khoáng Vương Ốc
+20513	2	1,2	Mỏ khoáng Vương Ốc
+20514	1	1	Mỏ khoáng Vương Ốc
+20515	1	1	Mỏ khoáng Vương Ốc
+20521	2	1,2	Sơn động Tây Hà | Tịnh Châu
+20522	3	1,2,3	Sơn động Tây Hà
+20523	3	1,2,3	Sơn động Tây Hà
+20524	3	1,2,3	Sơn động Tây Hà
+20525	1	1	Sơn động Tây Hà
+20526	1	1	Sơn động Tây Hà
+20527	3	1,2,3	Sơn động Tây Hà
+20528	1	1	Sơn động Tây Hà
+20529	1	1	Sơn động Tây Hà
+20530	2	1,2	Sơn động Tây Hà | Tịnh Châu
+20541	3	1,2,3	Sơn động Vân Trung | Tịnh Châu
+20542	2	1,2	Sơn động Vân Trung
+20543	1	1	Sơn động Vân Trung
+20544	2	1,2	Sơn động Vân Trung
+20545	1	1	Sơn động Vân Trung
+20801	2	1,2	Tịnh Châu | Rừng Cửu Nguyên
+20802	1	1	Rừng Cửu Nguyên
+20811	2	1,2	Rừng Truân Lưu | Tịnh Châu
+20812	1	1	Rừng Truân Lưu
+20821	2	1,2	Rừng Cao Đô | Tịnh Châu
+20822	1	1	Rừng Cao Đô
+20831	2	1,2	Cửa thành Hà Đông | Tịnh Châu
+20841	3	1,2,3	Tịnh Châu | Rừng Tấn Dương
+20842	1	1	Rừng Tấn Dương
+20843	1	1	Rừng Tấn Dương
+20851	3	1,2,3	Thông đạo Bình Dương | Tịnh Châu | Rừng Tấn Dương
+20852	2	1,2	Rừng Tấn Dương
+20853	1	1	Thông đạo Bình Dương
+20854	1	1	Rừng Tấn Dương
+20861	2	1,2	Tịnh Châu | Rừng Lâm Phần
+20862	1	1	Rừng Lâm Phần
+20871	1	1	Đường lớn ThượngĐảng
+21000	42	1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42	Rung Tín Dương | Bác Vọng Ba | Sơn động Thước Vĩ | Thôn Tân Dã | Cửa Trại Phiền Thành | Núi Võ Đang | Thuy Kính Trang | Đầm lầy Tầng Khẩu | Cửa Trại Thượng Dũng | Rừng Trúc Ngoạ Long | Cửa thành TươngDương | Cửa Trại Di Lăng | Rừng Mạch Thành | Sơn động Cảnh Sơn | Rừng Giang Lăng | Phong Hoả Đài | Hoa Dung Đạo | Lâm Giang Đình | Cầu Trường Bản | Trường Giang | Cửa Trại Giang Hạ | Trường Bản Ba | Đường nhỏ Đàn Khê | Rừng Hạ Khẩu | Trại Công An | Hán Trại | Thuỷ trại Tào Doanh | Cửa ĐôngNgô ThuỷTrại | Kinh Nam | Ích Châu | Tam Giang Khẩu | Thôn Phong Dương | Rừng Hiện Sơn | Chiến thuyền ĐôngNgô | Cửa vào Giang Lăng | Cửa vào Công An | Cửa vào Vũ Xương | Bến tàu Lục Khẩu | Rừng Tương Dương
+21001	2	1,2	QTrường Tương Dương | Kinh Bắc
+21002	7	1,2,3,4,5,6,7	Tiền trang | Lò rèn | Khách sạn | Tiệm thuốc | Cửa thành TươngDương | Tương Dương thứ nhai
+21003	8	1,2,3,4,5,6,7,8	QTrường Tương Dương | Phú hộ | Phổ hộ | Tiệm trà | Bần hộ | Suối Đàn
+21004	2	1,2	QTrường Tương Dương | Quan phủ
+21011	2	1,2	Rừng Giang Lăng | Đường lớn Giang Lăng
+21012	11	1,2,3,4,5,6,7,8,9,10,11	Cửa thành Giang Lăng | Phổ hộ | Phú hộ | Khách sạn | Bần hộ | Tiệm trà | Quan phủ | Giang Lăng nhai đạo | Điểm binh đài
+21013	5	1,2,3,4,5	Đường lớn Giang Lăng | Phú hộ | Tiệm thuốc | Tiền trang | Rừng Giang Lăng
+21014	1	1	Đường lớn Giang Lăng
+21015	7	1,2,3,4,5,6,7	Đường lớn Giang Lăng | Bần hộ | Phổ hộ | Phú hộ
+21016	1	1	Rừng Giang Lăng
+21021	6	1,2,3,4,5,6	Bần hộ | Phổ hộ | Quan phủ | Kinh Bắc
+21031	4	1,2,3,4	Phú hộ | Kinh Bắc | Rừng Bạch Đế | Tế đàn Xuất Sư
+21041	2	1,2	Rừng Trúc Ngoạ Long | Long Trung thảo lư
+21042	2	1,2	Ngoạ Long Cương | Nhà cỏ Long Trung
+21043	1	1	Long Trung thảo lư
+21051	1	1	Rừng Mạch Thành
+21061	4	1,2,3,4	Kinh Bắc | Phổ hộ | Bần hộ | Quan phủ
+21101	1	1	Tương Dương nhai đạo
+21102	1	1	Tương Dương nhai đạo
+21103	1	1	Đường lớn Giang Lăng
+21104	1	1	Giang Lăng nhai đạo
+21105	1	1	Thuy Kính Trang
+21106	1	1	Đường lớn Giang Lăng
+21107	1	1	Giang Lăng nhai đạo
+21108	1	1	Giang Lăng nhai đạo
+21131	1	1	Giang Lăng nhai đạo
+21132	1	1	Thôn Tân Dã
+21133	1	1	Đường lớn Giang Lăng
+21134	1	1	Thôn Tân Dã
+21135	1	1	Giang Lăng nhai đạo
+21136	1	1	Giang Lăng nhai đạo
+21137	1	1	Thôn Tân Dã
+21138	1	1	Giang Lăng nhai đạo
+21171	1	1	Tương Dương nhai đạo
+21172	1	1	Tương Dương nhai đạo
+21173	1	1	Đường lớn Giang Lăng
+21174	1	1	Thôn Tân Dã
+21175	1	1	Thôn Tân Dã
+21176	1	1	Giang Lăng nhai đạo
+21177	1	1	Thôn Tân Dã
+21201	1	1	QTrường Tương Dương
+21221	1	1	QTrường Tương Dương
+21222	1	1	Giang Lăng nhai đạo
+21241	1	1	QTrường Tương Dương
+21242	1	1	Đường lớn Giang Lăng
+21261	1	1	QTrường Tương Dương
+21262	1	1	Giang Lăng nhai đạo
+21281	1	1	Tương Dương nhai đạo
+21282	1	1	Đường lớn Giang Lăng
+21301	1	1	Tương Dương nhai đạo
+21302	1	1	Đường lớn Giang Lăng
+21303	1	1	Thôn Tân Dã
+21304	1	1	Thôn Phong Dương
+21401	2	1,2	Kinh Bắc | Trường Giang
+21411	2	1,2	Trường Bản Ba | Kinh Bắc
+21421	3	1,2,3	Kinh Bắc | Quân trướng | Binh trướng
+21422	1	1	Phong Hoả Đài
+21423	1	1	Phong Hoả Đài
+21431	2	1,2	Núi Võ Đang | Kinh Bắc
+21432	2	1,2	Núi Võ Đang
+21433	2	1,2	Núi Võ Đang | Phòng nhỏ núi VõĐang
+21434	1	1	Núi Võ Đang
+21441	2	1,2	Tương Dương nhai đạo | Đường nhỏ Đàn Khê
+21442	2	1,2	Suối Đàn | Kinh Bắc
+21451	1	1	Bến tàu Lục Khẩu
+21452	2	1,2	Dinh Lục Khẩu | Kinh Bắc
+21501	2	1,2	Sơn động Thước Vĩ | Duyện Châu
+21502	3	1,2,3	Sơn động Thước Vĩ
+21503	2	1,2	Sơn động Thước Vĩ
+21504	3	1,2,3	Sơn động Thước Vĩ
+21505	2	1,2	Sơn động Thước Vĩ | Kinh Bắc
+21506	2	1,2	Sơn động Thước Vĩ
+21507	3	1,2,3	Sơn động Thước Vĩ
+21508	1	1	Sơn động Thước Vĩ
+21509	1	1	Sơn động Thước Vĩ
+21510	2	1,2	Sơn động Thước Vĩ
+21511	2	1,2	Sơn động Thước Vĩ
+21512	1	1	Sơn động Thước Vĩ
+21521	2	1,2	Sơn động Cảnh Sơn | Kinh Bắc
+21522	3	1,2,3	Sơn động Cảnh Sơn
+21523	4	1,2,3,4	Sơn động Cảnh Sơn
+21524	2	1,2	Sơn động Cảnh Sơn
+21525	2	1,2	Sơn động Cảnh Sơn
+21526	2	1,2	Sơn động Cảnh Sơn
+21527	1	1	Sơn động Cảnh Sơn
+21528	2	1,2	Sơn động Cảnh Sơn
+21529	2	1,2	Sơn động Cảnh Sơn
+21530	3	1,2,3	Sơn động Cảnh Sơn
+21531	1	1	Sơn động Cảnh Sơn
+21532	1	1	Sơn động Cảnh Sơn
+21533	2	1,2	Sơn động Cảnh Sơn
+21534	2	1,2	Sơn động Cảnh Sơn
+21535	2	1,2	Sơn động Cảnh Sơn
+21536	1	1	Sơn động Cảnh Sơn
+21537	2	1,2	Sơn động Cảnh Sơn | Kinh Bắc
+21541	4	1,2,3,4	Mỏ khoáng Giang Lăng | Rừng Giang Lăng
+21542	2	1,2	Mỏ khoáng Giang Lăng
+21543	2	1,2	Mỏ khoáng Giang Lăng
+21544	2	1,2	Mỏ khoáng Giang Lăng
+21545	1	1	Mỏ khoáng Giang Lăng
+21546	2	1,2	Mỏ khoáng Giang Lăng
+21547	2	1,2	Mỏ khoáng Giang Lăng
+21548	2	1,2	Mỏ khoáng Giang Lăng
+21549	1	1	Mỏ khoáng Giang Lăng
+21550	2	1,2	Mỏ khoáng Giang Lăng
+21551	2	1,2	Mỏ khoáng Giang Lăng
+21552	2	1,2	Mỏ khoáng Giang Lăng
+21553	1	1	Mỏ khoáng Giang Lăng
+21701	2	1,2	TrạiĐôngNgô XíchBích | Kinh Bắc
+21702	6	1,2,3,4,5,6	Cửa trại Đông Ngô | Trại Đông Ngô XBích | Trướng Hoàng Cái | Trướng Cam Ninh | Bến tàu thuyền cỏ
+21703	1	1	Trại Đông Ngô XBích
+21704	1	1	Trại Đông Ngô XBích
+21705	2	1,2	Trại Đông Ngô XBích | Trên sông thuyền cỏ
+21706	6	1,2,3,4,5,6	Điểm binh đài | Trướng Ngô Binh | Bến tàu Chiến Thuyền | Trại Đông Ngô XBích | Thuyền nhỏ Gia Cát
+21707	1	1	Trại Đông Ngô XBích
+21708	1	1	Trại Đông Ngô XBích
+21709	1	1	Trại Đông Ngô XBích
+21710	1	1	Trại Đông Ngô XBích
+21711	2	1,2	Trại Đông Ngô XBích | Trong tàu
+21712	1	1	Thuyền nhỏ Gia Cát
+21713	5	1,2,3,4,5	Trại Đông Ngô XBích | Trướng Chu Du | Bến tàu Chiến Thuyền | Trại lớn Chu Du
+21714	1	1	Trại Đông Ngô XBích
+21715	1	1	Trại Đông Ngô XBích
+21716	6	1,2,3,4,5,6	Trại Đông Ngô XBích | Trướng Lỗ Túc | Trướng Ngô Binh | Đại trướng | Trướng Trình Phổ
+21717	1	1	Trại lớn Chu Du
+21718	1	1	Trại lớn Chu Du
+21719	1	1	Trại lớn Chu Du
+21720	1	1	Trại lớn Chu Du
+21721	1	1	Trại lớn Chu Du
+21722	4	1,2,3,4	Cầu treo Tây Sơn | Trướng Gia Cát Cẩn | Trại Đông Ngô XBích | Thất Tinh Đàn
+21723	1	1	Trại Đông Ngô XBích
+21724	2	1,2	Trại Đông Ngô XBích | Am Tây Sơn
+21725	2	1,2	Cầu treo Tây Sơn | Trong Am
+21726	1	1	Am Tây Sơn
+21727	1	1	Trại Tào Nguỵ XBích
+21731	2	1,2	Trại Tào Nguỵ XBích | Thuỷ trại Tào Doanh
+21732	8	1,2,3,4,5,6,7,8	Cửa ThuỷTrạiTàoDoanh | Trướng Tào Binh | Trướng Trình Dục | Trại Tào Nguỵ XBích | Trướng Truong Liêu
+21733	1	1	Trại Tào Nguỵ XBích
+21734	1	1	Trại Tào Nguỵ XBích
+21735	1	1	Trại Tào Nguỵ XBích
+21736	1	1	Trại Tào Nguỵ XBích
+21737	7	1,2,3,4,5,6,7	Trại Tào Nguỵ XBích | Trướng Tào Binh | Bến tàu Chiến Thuyền | Trướng Thái Mạo | Trướng Vu Cấm
+21738	1	1	Trại Tào Nguỵ XBích
+21739	1	1	Trại Tào Nguỵ XBích
+21740	1	1	Trại Tào Nguỵ XBích
+21741	1	1	Trại Tào Nguỵ XBích
+21742	1	1	Trại Tào Nguỵ XBích
+21743	1	1	Trại Tào Nguỵ XBích
+21744	5	1,2,3,4,5	Trại Tào Nguỵ XBích | Kho lương TửThiếtSơn | Trướng Từ Thứ | Trướng Tào Binh | Hán Trại
+21745	1	1	Trại Tào Nguỵ XBích
+21746	1	1	Trại Tào Nguỵ XBích
+21747	2	1,2	Trại Tào Nguỵ XBích | Phòng kho lương
+21748	1	1	Kho lương TửThiếtSơn
+21749	2	1,2	Trại Tào Nguỵ XBích | Kinh Bắc
+21750	9	1,2,3,4,5,6,7,8,9	Trại Tào Nguỵ XBích | Luyện binh trận | Trướng Hứa Chử | Trướng Tào Binh | Trướng Tào Tháo | Trướng Tưởng Cán | Lâu Thuyền | Trại lớn Tào Tháo
+21751	1	1	Trại Tào Nguỵ XBích
+21752	1	1	Trại Tào Nguỵ XBích
+21753	1	1	Trại Tào Nguỵ XBích
+21754	1	1	Trại Tào Nguỵ XBích
+21755	1	1	Trại Tào Nguỵ XBích
+21756	1	1	Trại Tào Nguỵ XBích
+21757	1	1	Trại Tào Nguỵ XBích
+21758	2	1,2	Đại trướng | Trại Tào Nguỵ XBích
+21759	1	1	Trại lớn Tào Tháo
+21760	1	1	Kinh Bắc
+21761	2	1,2	Trên tàu thuyền cỏ | Bến tàu thuyền cỏ
+21762	1	1	Bến tàu thuyền cỏ
+21763	2	1,2	Cửa trại Tào doanh | Trường Giang
+21771	1	1	Kinh Bắc
+21801	4	1,2,3,4	Bác Vọng Ba | Kinh Bắc
+21802	1	1	Bác Vọng Ba
+21803	1	1	Bác Vọng Ba
+21804	1	1	Bác Vọng Ba
+21806	4	1,2,3,4	Phòng nhỏ Tín Dương | Kinh Bắc | Rung Tín Dương
+21807	1	1	Rung Tín Dương
+21808	1	1	Rung Tín Dương
+21809	1	1	Rung Tín Dương
+21811	2	1,2	Trại Phiền Thành | Kinh Bắc
+21812	3	1,2,3	Cửa Trại Phiền Thành | Trướng Phiền Thành | Trại Phiền Thành
+21813	1	1	Trại Phiền Thành
+21814	3	1,2,3	Trại Phiền Thành | Trướng Phiền Thành | Đường núi PhiềnThành
+21815	1	1	Trại Phiền Thành
+21816	3	1,2,3	Ngoạ Long Cương | Kinh Bắc | Rừng Trúc Ngoạ Long
+21817	1	1	Rừng Trúc Ngoạ Long
+21818	2	1,2	Quân doanh | Trại Phiền Thành
+21819	1	1	Đường núi PhiềnThành
+21820	2	1,2	Cửa Trại Thượng Dũng | Trướng Thượng Dung
+21821	3	1,2,3	Thông đạo ThượngDung | Kinh Bắc | Trại Thượng Dũng
+21822	2	1,2	Cửa Trại Thượng Dũng | Trại Thượng Dũng
+21823	2	1,2	Thông đạo ThượngDung | Trướng Thượng Dung
+21824	1	1	Trại Thượng Dũng
+21825	1	1	Trại Thượng Dũng
+21826	2	1,2	Trướng Công An | Kinh Bắc
+21827	1	1	Trướng Công An
+21831	3	1,2,3	Trường Bản Ba | Kinh Bắc
+21832	2	1,2	Trường Bản Ba
+21833	2	1,2	Trường Bản Ba | Cầu Trường Bản
+21834	1	1	Trường Bản Ba
+21836	2	1,2	Rừng Hạ Khẩu | Kinh Bắc
+21837	1	1	Rừng Hạ Khẩu
+21841	4	1,2,3,4	Binh trướng | Quân trướng | Đầm lầy Tầng Khẩu | Kinh Bắc
+21842	1	1	Đầm lầy Tầng Khẩu
+21843	1	1	Đầm lầy Tầng Khẩu
+21844	1	1	Đầm lầy Tầng Khẩu
+21846	2	1,2	Kinh Bắc | Rừng Hiện Sơn
+21847	3	1,2,3	Rừng Hiện Sơn
+21848	1	1	Rừng Hiện Sơn
+21851	2	1,2	Trại Di Lăng | Kinh Bắc
+21852	4	1,2,3,4	Cửa Trại Di Lăng | Binh trướng | Trại Di Lăng
+21853	1	1	Trại Di Lăng
+21854	1	1	Trại Di Lăng
+21855	3	1,2,3	Trại Di Lăng | Quân trướng | Đại trướng
+21856	1	1	Trại Di Lăng
+21857	1	1	Trại Di Lăng
+21861	3	1,2,3	Hoa Dung Đạo | Kinh Bắc
+21862	2	1,2	Hoa Dung Đạo
+21863	2	1,2	Hoa Dung Đạo
+21864	3	1,2,3	Hoa Dung Đạo | Kinh Bắc
+21871	4	1,2,3,4	Trại Giang Hạ | Kinh Bắc
+21872	2	1,2	Cửa Trại Giang Hạ | Quân trướng
+21873	1	1	Trại Giang Hạ
+21874	2	1,2	Cửa Trại Giang Hạ | Quân trướng
+21875	1	1	Trại Giang Hạ
+21876	2	1,2	Cửa Trại Giang Hạ | Trướng Giang Hạ
+21877	1	1	Trại Giang Hạ
+21881	3	1,2,3	Cửa thành Giang Lăng | Rừng Giang Lăng | Kinh Bắc
+21882	2	1,2	Quân trướng | Rừng Giang Lăng
+21883	1	1	Rừng Giang Lăng
+21884	4	1,2,3,4	Mỏ khoáng Giang Lăng | Giang Lăng nhai đạo | Vườn hoa Giang Lăng | Rừng Giang Lăng
+21885	1	1	Rừng Giang Lăng
+21891	3	1,2,3	Mạch Thành | Kinh Bắc | Rừng Mạch Thành
+21892	1	1	Rừng Mạch Thành
+21896	1	1	Kinh Bắc
+21901	1	1	Rừng Hiện Sơn
+21902	3	1,2,3	Bờ Trường Giang | Binh trướng | Rừng Hiện Sơn
+21903	1	1	Rừng Hiện Sơn
+22000	21	1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21	Duyện Châu | Làng Thiễm Bắc | Cửa thành Trường An | Mỏ khoáng Lam Điền | Chung Nam Sơn | Hẻm núi Tử Ngọ | Hẻm núi Tà Cốc | Rừng Hoa Sơn | Rừng Bắc Địa | Sơn động Bắc Địa | Sơn động Mỹ Dương | Tận cùng Hoàng Hà | Cửa trại Trần Thương | Đồng Quan | Tán Quan | Lăng Thuỷ Hoàng | Rừng Tân Phong | Bồ Phản Tân
+23000	27	1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27	Kinh Bắc | Rừng bia KhuấtNguyên | Rừng Ích Dương | Động đá Kinh Môn | Hẻm núi Di Đạo | Trại Võ Lăng | Rừng Nguyên Lăng | Đào Hoa Nguyên | Thành Linh Lăng | Rừng Tương Nam | Chân núi Thuấn Hoàng | Thiên Diện Ma động | Rừng Lâm Hà | Thôn Quế Dương | Rừng Lai Dương | Bào Gia Trang | Mỏ khoáng Khách Lĩnh | Hẻm núi Lễ Lăng | Thành Trường Sa | MaVươngĐồiMộHuyệt | Trại Ba Khâu | Trại Vân Mộng | Giao Châu
+23001	2	1,2	Đường lớn Trường Sa | Kinh Nam
+23002	9	1,2,3,4,5,6,7,8,9	Cửa Thành Trường Sa | Phổ hộ | Phú hộ | Bần hộ | Lò rèn | Quan phủ | Khách sạn | Trường Sa nhai đạo
+23003	5	1,2,3,4,5	Đường lớn Trường Sa | Tiệm trà | Tiền trang | Tiệm thuốc | Bần hộ
+23011	2	1,2	Đường lớn Linh Lăng | Kinh Nam
+23012	5	1,2,3,4,5	Cửa thành Linh Lăng | Bần hộ | Phổ hộ | Khách sạn | Tiền trang
+23021	5	1,2,3,4,5	Đường núi KinhMônSơn | Bần hộ
+23031	5	1,2,3,4,5	Rừng Đào Hoa Nguyên | Nhà gỗ ĐàoHoa Nguyên | Phú hộ | Phổ hộ
+23041	5	1,2,3,4,5	Quan phủ | Phú hộ | Bần hộ | Phổ hộ | Kinh Nam
+23051	4	1,2,3,4	Đại sảnh Bào Gia | Gian phòng Bào Gia | Kinh Nam
+23101	1	1	Đường lớn Trường Sa
+23102	1	1	Thôn Đào Hoa Nguyên
+23103	1	1	Thôn Đào Hoa Nguyên
+23104	1	1	Thôn Quế Dương
+23105	1	1	Bào Gia Trang
+23106	1	1	Bào Gia Trang
+23107	1	1	Bào Gia Trang
+23131	1	1	Đường lớn Trường Sa
+23132	1	1	Đường lớn Trường Sa
+23133	1	1	Đường lớn Linh Lăng
+23134	1	1	Thôn Đào Hoa Nguyên
+23135	1	1	Thôn Đào Hoa Nguyên
+23136	1	1	Thôn Quế Dương
+23171	1	1	Đường lớn Trường Sa
+23172	1	1	Trường Sa nhai đạo
+23173	1	1	Đường lớn Linh Lăng
+23174	1	1	Bộ lạc Kinh Môn Sơn
+23175	1	1	Bộ lạc Kinh Môn Sơn
+23176	1	1	Bộ lạc Kinh Môn Sơn
+23177	1	1	Bộ lạc Kinh Môn Sơn
+23178	1	1	Thôn Quế Dương
+23179	1	1	Hẻm núi Di Đạo
+23180	1	1	Rừng bia KhuấtNguyên
+23201	1	1	Đường lớn Trường Sa
+23221	1	1	Trường Sa nhai đạo
+23241	1	1	Đường lớn Trường Sa
+23242	1	1	Đường lớn Linh Lăng
+23261	1	1	Trường Sa nhai đạo
+23262	1	1	Đường lớn Linh Lăng
+23281	1	1	Trường Sa nhai đạo
+23301	1	1	Đường lớn Trường Sa
+23302	1	1	Thôn Quế Dương
+23401	2	1,2	Rừng Đào Hoa Nguyên | Kinh Nam
+23402	3	1,2,3	Đào Hoa Nguyên | Ao nước Hoa Đào | Thôn Đào Hoa Nguyên
+23403	1	1	Rừng Đào Hoa Nguyên
+23411	2	1,2	Động đá Kinh Môn Sơn | Bộ lạc Kinh Môn Sơn
+23421	2	1,2	Sườn núi Thuấn Hoàng | Kinh Nam
+23422	4	1,2,3,4	Chân núi Thuấn Hoàng | Gỗ Thông Thuấn Hoàng | Đỉnh núi Thuấn Hoàng | Tân Kinh Nam
+23423	3	1,2,3	Sườn núi Thuấn Hoàng | Nam Thiên Môn | Đấu trường Tiên Đấu
+23424	1	1	Sườn núi Thuấn Hoàng
+23431	2	1,2	MaVươngĐồiMộHuyệt | Kinh Nam
+23501	2	1,2	Động đá Kinh Môn Sơn | Kinh Nam
+23502	3	1,2,3	Động đá Kinh Môn Sơn
+23503	2	1,2	Động đá Kinh Môn Sơn
+23504	2	1,2	Động đá Kinh Môn Sơn
+23505	1	1	Động đá Kinh Môn Sơn
+23506	2	1,2	Động đá Kinh Môn Sơn | Đường núi KinhMônSơn
+23511	2	1,2	Hẻm núi Di Đạo | Sơn động Di Đạo
+23512	3	1,2,3	Sơn động Di Đạo
+23513	2	1,2	Sơn động Di Đạo
+23514	3	1,2,3	Sơn động Di Đạo
+23515	1	1	Sơn động Di Đạo
+23516	1	1	Sơn động Di Đạo
+23517	2	1,2	Sơn động Di Đạo
+23518	2	1,2	Sơn động Di Đạo
+23519	1	1	Sơn động Di Đạo
+23521	2	1,2	Thiên Diện Ma động | Kinh Nam
+23522	3	1,2,3	Thiên Diện Ma động
+23523	4	1,2,3,4	Thiên Diện Ma động
+23524	1	1	Thiên Diện Ma động
+23525	1	1	Thiên Diện Ma động
+23526	3	1,2,3	Thiên Diện Ma động
+23527	2	1,2	Thiên Diện Ma động
+23528	2	1,2	Thiên Diện Ma động
+23529	1	1	Thiên Diện Ma động
+23530	3	1,2,3	Thiên Diện Ma động | Kinh Nam
+23531	1	1	Thiên Diện Ma động
+23532	4	1,2,3,4	Thiên Diện Ma động
+23533	1	1	Thiên Diện Ma động
+23534	1	1	Thiên Diện Ma động
+23535	3	1,2,3	Thiên Diện Ma động
+23536	2	1,2	Thiên Diện Ma động
+23537	2	1,2	Thiên Diện Ma động
+23538	1	1	Thiên Diện Ma động
+23539	3	1,2,3	Thiên Diện Ma động | Kinh Nam
+23540	1	1	Thiên Diện Ma động
+23551	2	1,2	Mỏ Khách Lĩnh Sơn | Kinh Nam
+23552	3	1,2,3	Mỏ Khách Lĩnh Sơn
+23553	2	1,2	Mỏ Khách Lĩnh Sơn
+23554	1	1	Mỏ Khách Lĩnh Sơn
+23555	2	1,2	Mỏ Khách Lĩnh Sơn
+23556	1	1	Mỏ Khách Lĩnh Sơn
+23561	3	1,2,3	CửaMaVươngĐồiMộHuyệt | MaVươngĐồiMộHuyệt
+23562	2	1,2	MaVươngĐồiMộHuyệt
+23563	2	1,2	MaVươngĐồiMộHuyệt
+23564	4	1,2,3,4	MaVươngĐồiMộHuyệt
+23565	3	1,2,3	MaVươngĐồiMộHuyệt
+23566	3	1,2,3	MaVươngĐồiMộHuyệt
+23567	1	1	MaVươngĐồiMộHuyệt
+23568	2	1,2	MaVươngĐồiMộHuyệt
+23569	1	1	MaVươngĐồiMộHuyệt
+23801	2	1,2	Trại Ba Khâu | Kinh Nam
+23802	2	1,2	Cửa Trại Ba Khâu | Trại Ba Khâu
+23803	2	1,2	Trại Ba Khâu
+23804	1	1	Trại Ba Khâu
+23806	3	1,2,3	Trại Vân Mộng | Bến tàu Vân Mộng | Kinh Nam
+23807	1	1	Trại Vân Mộng
+23808	2	1,2	Trại Vân Mộng
+23809	1	1	Trại Vân Mộng
+23811	3	1,2,3	Hẻm núi Lễ Lăng | Kinh Nam
+23812	1	1	Hẻm núi Lễ Lăng
+23821	2	1,2	Rừng Lai Dương | Kinh Nam
+23822	1	1	Rừng Lai Dương
+23831	1	1	Kinh Nam
+23841	2	1,2	Rừng Lai Dương | Kinh Nam
+23842	1	1	Rừng Lai Dương
+23851	1	1	Kinh Nam
+23861	3	1,2,3	Hẻm núi Di Đạo | Sơn động Di Đạo | Kinh Nam
+23862	2	1,2	Nhà cỏ Di Đạo | Hẻm núi Di Đạo
+23871	2	1,2	Trại Võ Lăng | Kinh Nam
+23872	2	1,2	Cửa Trại Võ Lăng | Trại Võ Lăng
+23873	1	1	Trại Võ Lăng
+23881	4	1,2,3,4	Rừng Nguyên Lăng | Kinh Nam
+23882	1	1	Rừng Nguyên Lăng
+23883	1	1	Rừng Nguyên Lăng
+23891	2	1,2	Nhà cỏ Bi Lâm | Kinh Nam
+24000	31	1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31	Cửa thành Thiên Thuỷ | Đồn Võ Uy | Cửa thành Đôn Hoàng | Rừng Ký Huyện | Trại Kỳ Sơn | Chân núi Lồng Sắt | ThượngPhương CốcKhẩu | Thông đạo Ngọc Môn | Thông đạo Chiêu Võ | Rừng Lịch Thành | Đường nhỏ An Định | Nhai đình Thổ Sơn | Trại Nam An | Rừng Lâm Truy | Hẻm núi Hoàng Trung | Hẻm núi Kì Cốc | Mỏ Kháng Kỳ Liên Sơn | Sơn động Lâm Truy | Sơn động Địch Đạo | Rừng Tán Quan | Bộ lạc Khương Nhân | Thôn Tửu Tuyền | Trại Cự Diên | Biển đảo Chim Khương | Ngọc Môn Quan | Sa mạc Hiển Mỹ | Thượng Nhai
+24001	2	1,2	Đường lớn Thiên Thuỷ | Lương Châu
+24002	5	1,2,3,4,5	Cửa thành Thiên Thuỷ | Thiên Thuỷ nhai đạo | Tiền trang | Khách sạn | Phổ hộ
+24003	4	1,2,3,4	Đường lớn Thiên Thuỷ | Phú hộ | Quan phủ | Bần hộ
+24011	2	1,2	Đường lớn Đôn Hoàng | Lương Châu
+24012	5	1,2,3,4,5	Cửa thành Đôn Hoàng | Đôn Hoàng nhai đạo | Bần hộ | Khách sạn | Tiền trang
+24013	5	1,2,3,4,5	Đường lớn Đôn Hoàng | Sa mạc Đôn Hoàng | Tiệm thuốc | Phổ hộ | Phú hộ
+24021	6	1,2,3,4,5,6	Rừng Ký Huyện | Bần hộ | Phổ hộ | Phú hộ | Quan phủ | Khách sạn
+24031	4	1,2,3,4	Trướng Khương Nhân | Trướng Khương Vương | Lương Châu
+24041	3	1,2,3	Binh trướng | Lương Châu
+24051	4	1,2,3,4	Bần hộ | Phổ hộ | Phú hộ | Lương Châu
+24101	1	1	Thiên Thuỷ nhai đạo
+24102	1	1	Đôn Hoàng nhai đạo
+24103	1	1	Thôn Ký Huyện
+24104	1	1	Bộ lạc Khương Nhân
+24105	1	1	Đồn Võ Uy
+24106	1	1	Thôn Tửu Tuyền
+24131	1	1	Đường lớn Thiên Thuỷ
+24132	1	1	Đôn Hoàng nhai đạo
+24133	1	1	Thôn Ký Huyện
+24134	1	1	Bộ lạc Khương Nhân
+24135	1	1	Bộ lạc Khương Nhân
+24136	1	1	Thôn Tửu Tuyền
+24171	1	1	Thiên Thuỷ nhai đạo
+24172	1	1	Đường lớn Đôn Hoàng
+24173	1	1	Thôn Ký Huyện
+24174	1	1	Đồn Võ Uy
+24175	1	1	Thôn Tửu Tuyền
+24221	1	1	Đôn Hoàng nhai đạo
+24241	1	1	Đường lớn Thiên Thuỷ
+24242	1	1	Đường lớn Đôn Hoàng
+24243	1	1	Thôn Ký Huyện
+24261	1	1	Đường lớn Thiên Thuỷ
+24262	1	1	Đường lớn Đôn Hoàng
+24301	1	1	Thiên Thuỷ nhai đạo
+24302	1	1	Thôn Ký Huyện
+24401	3	1,2,3	Quân trướng | Binh trướng | Lương Châu
+24402	1	1	Trại Cự Diên
+24403	1	1	Trại Cự Diên
+24411	2	1,2	Trại Kỳ Sơn | Lương Châu
+24412	2	1,2	Trại Kỳ Sơn | Trại lớn Kỳ Sơn
+24413	5	1,2,3,4,5	Trại Kỳ Sơn | Trại lớn Kỳ Sơn | Quân trướng | Binh trướng
+24414	1	1	Trại lớn Kỳ Sơn
+24415	1	1	Trại lớn Kỳ Sơn
+24416	1	1	Trại lớn Kỳ Sơn
+24417	1	1	Trại lớn Kỳ Sơn
+24421	2	1,2	Sườn núi Lòng Sắt | Lương Châu
+24422	2	1,2	Sườn núi Lòng Sắt | Đỉnh núi Lồng Sắt
+24423	1	1	Sườn núi Lòng Sắt
+24431	2	1,2	Thượng Phương Cốc | Lương Châu
+24432	1	1	Cửa ThượngPhương Cốc
+24441	2	1,2	Thông đạo Ngọc Môn | Lương Châu
+24442	2	1,2	Ngọc Môn Quan | Tây Vực
+24443	2	1,2	Thông đạo Ngọc Môn | Tây Vực
+24444	2	1,2	Ngọc Môn Quan | Lương Châu
+24501	2	1,2	Sơn động Địch Đạo | Lương Châu
+24502	3	1,2,3	Sơn động Địch Đạo
+24503	2	1,2	Sơn động Địch Đạo
+24504	3	1,2,3	Sơn động Địch Đạo
+24505	2	1,2	Sơn động Địch Đạo | Lương Châu
+24506	1	1	Sơn động Địch Đạo
+24507	2	1,2	Sơn động Địch Đạo
+24508	3	1,2,3	Sơn động Địch Đạo
+24509	2	1,2	Sơn động Địch Đạo | Lương Châu
+24510	1	1	Sơn động Địch Đạo
+24511	4	1,2,3,4	Sơn động Lâm Kính | Lương Châu
+24512	3	1,2,3	Sơn động Lâm Kính
+24513	1	1	Sơn động Lâm Kính
+24514	1	1	Sơn động Lâm Kính
+24515	3	1,2,3	Sơn động Lâm Kính
+24516	1	1	Sơn động Lâm Kính
+24517	1	1	Sơn động Lâm Kính
+24521	2	1,2	Mỏ khoáng Kỳ LiênSơn | Lương Châu
+24522	3	1,2,3	Mỏ khoáng Kỳ LiênSơn
+24523	2	1,2	Mỏ khoáng Kỳ LiênSơn
+24524	2	1,2	Mỏ khoáng Kỳ LiênSơn
+24525	2	1,2	Mỏ khoáng Kỳ LiênSơn
+24531	2	1,2	Trại An Định
+24801	2	1,2	Sa mạc Ngọc Môn | Lương Châu
+24802	2	1,2	Sa mạc Ngọc Môn | Thông đạo Ngọc Môn
+24803	1	1	Sa mạc Ngọc Môn
+24806	2	1,2	Thôn Ký Huyện
+24807	2	1,2	Lương Châu
+24811	2	1,2	Thông đạo Chiêu Võ | Lương Châu
+24812	1	1	Thông đạo Chiêu Võ
+24816	1	1	Lương Châu
+24821	2	1,2	Lương Châu | Rừng Lịch Thành
+24822	1	1	Rừng Lịch Thành
+24831	2	1,2	Trại An Định | Lương Châu
+24832	3	1,2,3	Trướng An Định | Đường nhỏ An Định | Thông đạo An Định
+24833	1	1	Trại An Định
+24834	2	1,2	Thông đạo An Định | An Định Quan
+24835	2	1,2	Trại An Định | Tây Ninh
+24841	3	1,2,3	Nhai đình Thổ Sơn | Lương Châu
+24842	1	1	Nhai đình Thổ Sơn
+24843	1	1	Nhai đình Thổ Sơn
+24851	3	1,2,3	Hẻm núi Kì Cốc | Lương Châu
+24852	3	1,2,3	Trướng Kỳ Cốc | Hẻm núi Kì Cốc
+24853	1	1	Hẻm núi Kì Cốc
+24854	2	1,2	Hẻm núi Kì Cốc
+24855	3	1,2,3	Trướng Kỳ Cốc | Hẻm núi Kì Cốc | Dương Bình Quan
+24856	1	1	Hẻm núi Kì Cốc
+24857	1	1	Hẻm núi Kì Cốc
+24861	3	1,2,3	Binh trướng | Quân trướng | Lương Châu
+24862	1	1	Trại Nam An
+24863	1	1	Trại Nam An
+24871	1	1	Lương Châu
+24881	2	1,2	Hẻm núi Hoàng Trung | Lương Châu
+24882	1	1	Hẻm núi Hoàng Trung
+24891	1	1	Đôn Hoàng nhai đạo
+24901	1	1	Lương Châu
+25000	53	1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53	Hẻm núi Tà Cốc | Hẻm núi Tử Ngọ | Mỏ Đồng Lương Sơn | Doanh Lưu Chương | Rừng Từ Trung | Chân núi Định Quân | Chân núi Bắc Sơn | Cửa Trại Nham Cừ | Hẻm nhỏ Âm Bình | Hẻm núi Hạ Biện | Rừng Nam Quảng | Rừng Đức Dương | Sơn động Miên Trúc | Ba Quận nhai đạo | Rừng Lãng Trung | Dương Bình Quan | Gia Manh Quan | Rừng Gia Manh | Sơn động Tây Sung | Rừng Ba Quận | Cửa thành Lạc Thành | Thành Đô | Rừng Nam Trịnh | Bát Trận Đồ | Sơn đạo Cù Đường | Chân núi Thanh Thành | Chân núi Nga My | Đô Giang Yến | Chân núi Thiên Đãng | Sơn động Âm Bình | Bạch Thuỷ Quan | Rừng Bạch Thuỷ | Chân núi Cẩm Bình | Sơn động Quan Thành | Ngoạ Khẩu Quan | Rừng Ngoạ Khẩu | Kiếm Các sơn đạo | Rừng Kiếm Các | Kinh Bắc | Rừng Sông Dương | Chân núi Phong Đồ | Rừng Ba Sơn | Nam Trung | Bờ Hán Thuỷ | Tế đàn Hán Vương
+25001	2	1,2	Đường lớn Thành Đô | Ích Châu
+25002	13	1,2,3,4,5,6,7,8,9,10,11,12,13	Cửa thành Thành Đô | Thành Đô nhai đạo | Quan phủ | Phú hộ | QuảngTrường ThànhĐô | Tiệm thuốc | Tiền trang | Khách sạn | Bần hộ | Lò rèn | Tiệm trà
+25003	8	1,2,3,4,5,6,7,8	Đường lớn Thành Đô | Hoàng cung Thành Đô | Phổ hộ | Bần hộ
+25004	3	1,2,3	QuảngTrường ThànhĐô | Hành lang | Phủ thừa tướng
+25005	3	1,2,3	Quan phủ | Phổ hộ | Đường lớn Thành Đô
+25006	2	1,2	Bên trong phủ tướng | Hoàng cung Thành Đô
+25011	2	1,2	Đường lớn Nam Trịnh | Rừng Nam Trịnh
+25012	8	1,2,3,4,5,6,7,8	Cửa thành Nam Trịnh | Nam Trịnh nhai đạo | Tiền trang | Khách sạn | Bần hộ | Phổ hộ | Quan phủ
+25013	8	1,2,3,4,5,6,7,8	Đường lớn Nam Trịnh | Phổ hộ | Phú hộ | Tiệm thuốc | Quan phủ | Lò rèn | Bần hộ | Điểm binh đài
+25014	1	1	Nam Trịnh nhai đạo
+25021	2	1,2	Hẻm núi Cù Đường | Đường lớn Bạch Đế
+25022	7	1,2,3,4,5,6,7	Cửa thành Bạch Đế | Phổ hộ | Tiền trang | Khách sạn | Tiệm trà | Bần hộ | Hoàng Cung Bạch Đế
+25023	2	1,2	Đường lớn Bạch Đế | Hành lang Hoàng Cung
+25031	2	1,2	Rừng Ba Quận | Đường lớn Ba Quận
+25032	9	1,2,3,4,5,6,7,8,9	Cửa thành Ba Quận | Khách sạn | Quan phủ | Tiền trang | Phổ hộ | Phú hộ | Ba Quận nhai đạo
+25033	6	1,2,3,4,5,6	Đường lớn Ba Quận | Tiệm trà | Tiệm thuốc | Lò rèn | Bần hộ | Phổ hộ
+25041	2	1,2	Đường lớn Lạc Thành | Ích Châu
+25042	6	1,2,3,4,5,6	Cửa thành Lạc Thành | Phổ hộ | Phú hộ | Tiền trang | Quan phủ | Khách sạn
+25051	8	1,2,3,4,5,6,7,8	Rừng Lãng Trung | Tiền trang | Bần hộ | Phổ hộ | Phú hộ | Quan phủ | Khách sạn
+25052	1	1	Ích Châu
+25101	1	1	Đường lớn Thành Đô
+25102	1	1	Đường lớn Thành Đô
+25103	1	1	Đường lớn Thành Đô
+25104	1	1	Nam Trịnh nhai đạo
+25105	1	1	Đường lớn Ba Quận
+25106	1	1	Đường lớn Ba Quận
+25107	1	1	Đường lớn Lạc Thành
+25108	1	1	Thôn Lãng Trung
+25131	1	1	QuảngTrường Thành Đô
+25132	1	1	QuảngTrường Thành Đô
+25133	1	1	QuảngTrường Thành Đô
+25134	1	1	Thành Đô nhai đạo
+25135	1	1	Đường lớn Nam Trịnh
+25136	1	1	Nam Trịnh nhai đạo
+25137	1	1	Đường lớn Bạch Đế
+25138	1	1	Đường lớn Ba Quận
+25139	1	1	Đường lớn Ba Quận
+25140	1	1	Đường lớn Lạc Thành
+25141	1	1	Thôn Lãng Trung
+25142	1	1	Phủ thừa tướng
+25143	1	1	Ba Quận nhai đạo
+25151	1	1	Hoàng cung Thành Đô
+25171	1	1	Đường lớn Thành Đô
+25172	1	1	QuảngTrường Thành Đô
+25173	1	1	QuảngTrường Thành Đô
+25174	1	1	QuảngTrường Thành Đô
+25175	1	1	Đường lớn Nam Trịnh
+25176	1	1	Đường lớn Nam Trịnh
+25177	1	1	Nam Trịnh nhai đạo
+25178	1	1	Đường lớn Bạch Đế
+25179	1	1	Ba Quận nhai đạo
+25181	1	1	Thôn Lãng Trung
+25182	1	1	Thôn Lãng Trung
+25183	1	1	Rừng Từ Trung
+25201	1	1	Đường lớn Thành Đô
+25202	1	1	Đường lớn Nam Trịnh
+25203	1	1	Ba Quận nhai đạo
+25221	1	1	Đường lớn Thành Đô
+25222	1	1	Nam Trịnh nhai đạo
+25223	1	1	Ba Quận nhai đạo
+25241	1	1	Đường lớn Thành Đô
+25242	1	1	Đường lớn Nam Trịnh
+25243	1	1	Đường lớn Bạch Đế
+25244	1	1	Đường lớn Ba Quận
+25245	1	1	Đường lớn Lạc Thành
+25246	1	1	Thôn Lãng Trung
+25261	1	1	Đường lớn Thành Đô
+25262	1	1	Đường lớn Nam Trịnh
+25263	1	1	Đường lớn Bạch Đế
+25264	1	1	Đường lớn Ba Quận
+25265	1	1	Đường lớn Lạc Thành
+25266	1	1	Thôn Lãng Trung
+25281	1	1	Đường lớn Thành Đô
+25282	1	1	Đường lớn Bạch Đế
+25283	1	1	Ba Quận nhai đạo
+25301	1	1	Đường lớn Thành Đô
+25302	1	1	Thành Đô nhai đạo
+25303	2	1,2	Hoàng cung Thành Đô | Đại điện
+25304	2	1,2	Hành lang | Tẩm cung Lưu Bị
+25305	1	1	Đường lớn Nam Trịnh
+25306	1	1	Nam Trịnh nhai đạo
+25307	2	1,2	Hoàng Cung Bạch Đế | Tam Điện
+25308	1	1	Hành lang Hoàng Cung
+25309	1	1	Đường lớn Ba Quận
+25310	1	1	Đường lớn Lạc Thành
+25311	1	1	Thôn Lãng Trung
+25401	2	1,2	Thông đạo Dương Bình | Ích Châu
+25402	2	1,2	Dương Bình Quan | Thông đạo Dương Bình
+25403	2	1,2	Thông đạo Dương Bình | Hẻm núi Kì Cốc
+25404	2	1,2	Thông đạo Dương Bình | Hẻm núi Kì Cốc
+25405	2	1,2	Dương Bình Quan | Thông đạo Dương Bình
+25406	2	1,2	Thông đạo Dương Bình | Ích Châu
+25411	2	1,2	Thông đạo Gia Manh | Ích Châu
+25412	2	1,2	Gia Manh Quan | Rừng Gia Manh
+25413	2	1,2	Thông đạo Gia Manh | Rừng Gia Manh
+25414	2	1,2	Gia Manh Quan | Ích Châu
+25415	3	2,3,4	Trướng Gia Manh | Gia Manh sơn đạo | Gia Manh Quan
+25416	1	1	Rừng Gia Manh
+25417	2	1,2	Rừng Gia Manh | Gia Manh sơn đạo
+25418	2	1,2	Gia Manh sơn đạo | Rừng Gia Manh
+25419	3	1,2,3	Gia Manh sơn đạo | Trướng Gia Manh | Ích Châu
+25420	1	1	Rừng Gia Manh
+25421	2	1,2	Thông đạo Kiếm Các | Kiếm Các sơn đạo
+25422	2	1,2	Kiếm Các Quan | Rừng Kiếm Các
+25423	2	1,2	Thông đạo Kiếm Các | Rừng Kiếm Các
+25424	2	1,2	Kiếm Các Quan | Kiếm Các sơn đạo
+25425	3	1,2,3	Rừng Kiếm Các | Kiếm Các Quan | Ích Châu
+25426	2	1,2	Kiếm Các Quan | Ích Châu
+25427	1	1	Rừng Kiếm Các
+25431	2	1,2	Thông đạo Bạch Thuỷ | Ích Châu
+25432	2	1,2	Bạch Thuỷ Quan | Rừng Bạch Thuỷ
+25433	2	1,2	Thông đạo Bạch Thuỷ | Rừng Bạch Thuỷ
+25434	2	1,2	Bạch Thuỷ Quan | Ích Châu
+25435	3	1,2,3	Đường mòn Lạc Thành | Bạch Thuỷ sơn đạo | Bạch Thuỷ Quan
+25436	2	1,2	Rừng Bạch Thuỷ | Sườn núi Lạc Phượng
+25437	2	1,2	Đường mòn Lạc Thành | Rừng Bạch Thuỷ
+25438	2	1,2	Rừng Bạch Thuỷ | Bạch Thuỷ sơn đạo
+25439	2	1,2	Bạch Thuỷ sơn đạo | Rừng Bạch Thuỷ
+25440	4	1,2,3,4	Sườn núi Lạc Phượng | Bạch Thuỷ sơn đạo | Sơn động Âm Bình | Ích Châu
+25441	2	1,2	Thông đạo Ngoạ Khẩu | Ích Châu
+25442	2	1,2	Ngoạ Khẩu Quan | Ngoạ Khẩu sơn đạo
+25443	2	1,2	Thông đạo Ngoạ Khẩu | Ngoạ Khẩu sơn đạo
+25444	2	1,2	Ngoạ Khẩu Quan | Ích Châu
+25445	2	1,2	Ngoạ Khẩu sơn đạo | Ngoạ Khẩu Quan
+25446	2	1,2	Ngoạ Khẩu sơn đạo | Rừng Ngoạ Khẩu
+25447	4	1,2,3,4	Đại trướng | Ngoạ Khẩu sơn đạo | Ngoạ Khẩu Quan | Ích Châu
+25448	1	1	Rừng Ngoạ Khẩu
+25449	1	1	Rừng Ngoạ Khẩu
+25451	2	1,2	Hẻm núi Cù Đường | Ích Châu
+25452	3	1,2,3	Bát Trận Đồ | Cửa thành Bạch Đế | Sơn đạo Cù Đường
+25453	2	1,2	Hẻm núi Cù Đường | Sơn đạo Cù Đường
+25454	2	1,2	Sơn đạo Cù Đường | Ích Châu
+25461	2	1,2	Chân núi Cẩm Bình | Ích Châu
+25462	2	1,2	Đỉnh núi Cẩm Bình | Chân núi Cẩm Bình
+25463	3	1,2,3	Sơn Ốc | Chân núi Cẩm Bình
+25464	1	1	Đỉnh núi Cẩm Bình
+25465	1	1	Đỉnh núi Cẩm Bình
+25471	2	1,2	Đỉnh núi Cẩm Bình | Ích Châu
+25472	2	1,2	Chân núi Thanh Thành | Sơn Ốc
+25473	1	1	Chân núi Thanh Thành
+25481	3	1,2,3	Hồ núi Nga My | Thần mộc núi Nga My | Ích Châu
+25482	1	1	Chân núi Nga My
+25483	1	1	Chân núi Nga My
+25491	2	1,2	Ích Châu
+25501	2	1,2	Sơn động Âm Bình | Ích Châu
+25502	3	1,2,3	Sơn động Âm Bình
+25503	1	1	Sơn động Âm Bình
+25504	2	1,2	Sơn động Âm Bình | Rừng Bạch Thuỷ
+25511	3	1,2,3	Sơn động Quan Thành | Ích Châu
+25512	2	1,2	Sơn động Quan Thành
+25513	1	1	Sơn động Quan Thành
+25514	3	1,2,3	Sơn động Quan Thành
+25515	3	1,2,3	Sơn động Quan Thành | Ích Châu
+25516	2	1,2	Sơn động Quan Thành
+25517	1	1	Sơn động Quan Thành
+25518	2	1,2	Sơn động Quan Thành | Ích Châu
+25521	2	1,2	Sơn động Miên Trúc | Ích Châu
+25522	3	1,2,3	Sơn động Miên Trúc
+25523	1	1	Sơn động Miên Trúc
+25524	3	1,2,3	Sơn động Miên Trúc | Ích Châu
+25525	3	1,2,3	Sơn động Miên Trúc
+25526	1	1	Sơn động Miên Trúc
+25527	2	1,2	Sơn động Miên Trúc | Ích Châu
+25531	3	1,2,3	Sơn động Tây Sung | Ích Châu
+25532	3	1,2,3	Sơn động Tây Sung
+25533	2	1,2	Sơn động Tây Sung
+25534	2	1,2	Sơn động Tây Sung
+25535	3	1,2,3	Sơn động Tây Sung
+25536	3	1,2,3	Sơn động Tây Sung
+25537	2	1,2	Sơn động Tây Sung
+25538	1	1	Sơn động Tây Sung
+25539	2	1,2	Sơn động Tây Sung
+25540	1	1	Sơn động Tây Sung
+25541	2	1,2	Mỏ Đồng Lương Sơn | Ích Châu
+25542	3	1,2,3	Mỏ Đồng Lương Sơn
+25543	1	1	Mỏ Đồng Lương Sơn
+25544	1	1	Mỏ Đồng Lương Sơn
+25551	2	1,2	Hẻm núi Hạ Biện | Sơn động Hạ Biện
+25552	3	1,2,3	Sơn động Hạ Biện
+25553	1	1	Sơn động Hạ Biện
+25554	1	1	Sơn động Hạ Biện
+25701	6	1,2,3,4,5,6	Đại trướng | Trướng Trương Liêu | Binh trướng | Doanh Lưu Bị | Ích Châu
+25702	1	1	Doanh Lưu Bị
+25703	1	1	Doanh Lưu Bị
+25704	1	1	Doanh Lưu Bị
+25705	1	1	Doanh Lưu Bị
+25706	5	1,2,3,4,5	Doanh Lưu Bị | Binh trướng | Trướng Hoàng Trung | Đại trướng | Trướng Bàng Thống
+25707	1	1	Doanh Lưu Bị
+25708	1	1	Doanh Lưu Bị
+25709	1	1	Doanh Lưu Bị
+25710	1	1	Doanh Lưu Bị
+25711	2	1,2	Cửa thành Phong Đồ | Ích Châu
+25712	2	1,2	Chân núi Phong Đồ | Quỷ Môn Quan
+25731	3	1,2,3	Cửa thành Nam Trịnh | Nam Trịnh sơn đạo | Ích Châu
+25732	2	1,2	Trại Nam Trịnh | Rừng Nam Trịnh
+25733	1	1	Nam Trịnh sơn đạo
+25801	2	1,2	Đỉnh núi Thiên Đãng | Ích Châu
+25802	2	1,2	Chân núi Thiên Đãng | Trướng ThiênĐãngSơn
+25803	1	1	Đỉnh núi Thiên Đãng
+25806	2	1,2	Phòng nhỏ Tư Trung | Ích Châu
+25807	2	1,2	Ích Châu | Trại Mạnh Đạt Ba Sơn
+25808	1	1	Rừng Ba Sơn
+25811	2	1,2	Eo nui Định Quân | Ích Châu
+25812	2	1,2	Chân núi Định Quân | Đỉnh núi Định Quân
+25813	4	1,2,3,4	Eo nui Định Quân | Binh trướng | Đường mòn Định Quân
+25814	1	1	Đỉnh núi Định Quân
+25815	1	1	Đỉnh núi Định Quân
+25816	2	1,2	Trại Dương Bình | Đường mòn Bắc Sơn
+25817	2	1,2	Dương Bình Quan | Quân trướngDươngBình
+25818	1	1	Trại Dương Bình
+25819	2	1,2	Bờ Hán Thuỷ | Ích Châu
+25820	2	1,2	Bờ Hán Thuỷ | Ích Châu
+25821	3	1,2,3	Trại Bắc Sơn | Ích Châu | Rừng Bắc Sơn
+25822	5	1,2,3,4,5	Chân núi Bắc Sơn | Binh trướng | Đại trướng
+25823	1	1	Trại Bắc Sơn
+25824	1	1	Trại Bắc Sơn
+25825	1	1	Trại Bắc Sơn
+25826	1	1	Trại Bắc Sơn
+25827	2	1,2	Đường mòn Bắc Sơn | Chân núi Bắc Sơn
+25828	2	1,2	Cửa Trại Dương Bình | Rừng Bắc Sơn
+25831	2	1,2	Sơn động Hạ Biện | Ích Châu
+25832	2	1,2	Đỉnh núi Định Quân | Định Quân thâm sơn
+25833	1	1	Đường mòn Định Quân
+25836	1	1	Ích Châu
+25841	2	1,2	Trại Nham Cừ | Ích Châu
+25842	2	1,2	Cửa Trại Nham Cừ | Trại Nham Cừ
+25843	2	1,2	Trại Nham Cừ
+25844	1	1	Trại Nham Cừ
+25846	1	1	Ích Châu
+25851	2	1,2	Thôn Lãng Trung | Ích Châu
+25861	4	1,2,3,4	Cửa thành Ba Quận | Rừng Ba Quận | Trướng Ba Quận | Ích Châu
+25862	1	1	Rừng Ba Quận
+25863	2	1,2	Ba Quận nhai đạo | Rừng Ba Quận
+25864	2	1,2	Rừng Ba Quận | Ba Quận nhai đạo
+25865	2	1,2	Ba Quận nhai đạo | Ích Châu
+25871	1	1	Ích Châu
+25881	2	1,2	Hẻm nhỏ Âm Bình | Ích Châu
+25882	1	1	Hẻm nhỏ Âm Bình
+25891	3	1,2,3	Rừng Đạp Trung | Binh trướng | Đại trướng
+25892	1	1	Rừng Đạp Trung
+25893	1	1	Rừng Đạp Trung
+25894	2	1,2	Rừng Đạp Trung | Ma Thiên Lĩnh
+25895	2	1,2	Rừng Đạp Trung | Rừng Giang Du
+25896	2	1,2	Ma Thiên Lĩnh | Ích Châu
+26000	33	1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33	Dương Châu | Bến tàu Phiên Ngu | Rừng Quảng Tín | Đầm lầy Cao Lương | Thuỷ động Đam Nhĩ | Rừng Trúc Chu Nhai | Sơn động Quỳnh Sơn | Thôn Hợp Phố | Trại Cửu Chân | Thành Giao Chỉ | Trấn Nam Quan | Rừng Long Biên | Bia Mã Viện | Mỏ khoáng Tượng Sơn | Rừng Hoài An | Sơn động Lệ Phổ | Ngự thuyền Quế Lâm | Thôn Thương Ngô | Kinh Nam | Mỏ khoáng Quế Sơn | Rừng Trung Túc | Đầm lầy Long Xuyên | Sơn động Tăng Thành | Trại Nam Hải | Thành Phiên Ngu | Rừng Giao Chỉ | Lĩnh Nam | Đảo Vô Danh | Thông đạo Giao Châu
+26001	2	1,2	Đường lớn Phiên Ngu | Giao Châu
+26002	10	1,2,3,4,5,6,7,8,9,10	Cửa thành Phiên Ngu | Bến tàu Phiên Ngu | Phiên Ngu nhai đạo | Phú hộ | Phổ hộ | Bần hộ | Tiền trang | Quan phủ | Khách sạn
+26003	5	1,2,3,4,5	Đường lớn Phiên Ngu | Tiệm trà | Tiệm thuốc | Phú hộ | Bần hộ
+26004	2	1,2	Đường lớn Phiên Ngu | Giao Châu
+26011	2	1,2	Đường lớn Giao Chỉ | Giao Châu
+26012	8	1,2,3,4,5,6,7,8	Cửa thành Giao Chỉ | Lò rèn | Khách sạn | Quan phủ | Tiền trang | Bần hộ | Phổ hộ | Phú hộ
+26021	7	1,2,3,4,5,6,7	Phổ hộ | Bần hộ | Phú hộ | Giao Châu
+26031	5	1,2,3,4,5	Bần hộ | Phổ hộ | Phú hộ | Giao Châu
+26041	5	1,2,3,4,5	Rừng Lệ Phổ | Phổ hộ | Bần hộ
+26051	8	1,2,3,4,5,6,7,8	Rừng Quỳnh Sơn | Phổ hộ | Bần hộ | Phú hộ
+26101	1	1	Đường lớn Phiên Ngu
+26102	1	1	Phiên Ngu nhai đạo
+26103	1	1	Đường lớn Giao Chỉ
+26104	1	1	Thôn Thương Ngô
+26105	1	1	Thôn Thương Ngô
+26106	1	1	Thôn Hợp Phố
+26107	1	1	Thôn Lệ Phỗ
+26108	1	1	Thôn Quỳnh Sơn
+26109	1	1	Thôn Quỳnh Sơn
+26110	1	1	Đảo Vô Danh
+26131	1	1	Đường lớn Phiên Ngu
+26132	1	1	Đường lớn Giao Chỉ
+26133	1	1	Thôn Thương Ngô
+26134	1	1	Thôn Thương Ngô
+26135	1	1	Thôn Hợp Phố
+26136	1	1	Thôn Hợp Phố
+26137	1	1	Thôn Lệ Phỗ
+26138	1	1	Thôn Lệ Phỗ
+26139	1	1	Thôn Quỳnh Sơn
+26140	1	1	Thôn Quỳnh Sơn
+26171	1	1	Đường lớn Phiên Ngu
+26172	1	1	Đường lớn Phiên Ngu
+26173	1	1	Phiên Ngu nhai đạo
+26174	1	1	Đường lớn Giao Chỉ
+26175	1	1	Thôn Thương Ngô
+26176	1	1	Thôn Thương Ngô
+26177	1	1	Thôn Hợp Phố
+26178	1	1	Thôn Lệ Phỗ
+26179	1	1	Thôn Quỳnh Sơn
+26180	1	1	Thôn Quỳnh Sơn
+26181	1	1	Thôn Quỳnh Sơn
+26201	1	1	Đường lớn Giao Chỉ
+26221	1	1	Phiên Ngu nhai đạo
+26241	1	1	Đường lớn Phiên Ngu
+26242	1	1	Đường lớn Giao Chỉ
+26261	1	1	Đường lớn Phiên Ngu
+26262	1	1	Đường lớn Giao Chỉ
+26281	1	1	Phiên Ngu nhai đạo
+26301	1	1	Đường lớn Phiên Ngu
+26302	1	1	Đường lớn Giao Chỉ
+26401	2	1,2	Thông Đạo Trấn Nam | Giao Châu
+26402	2	1,2	Trấn Nam Quan | Giao Châu
+26403	2	1,2	Thông Đạo Trấn Nam | Giao Châu
+26404	2	1,2	Trấn Nam Quan | Giao Châu
+26411	1	1	Giao Châu
+26421	1	1	Giao Châu
+26431	2	1,2	Phòng nhỏ Vô Danh | Giao Châu
+26501	2	1,2	Rừng Lệ Phổ | Sơn động Lệ Phổ
+26502	2	1,2	Sơn động Lệ Phổ
+26503	2	1,2	Sơn động Lệ Phổ | Giao Châu
+26511	3	1,2,3	Sơn động Tăng Thành | Giao Châu
+26512	2	1,2	Sơn động Tăng Thành
+26513	1	1	Sơn động Tăng Thành
+26514	3	1,2,3	Sơn động Tăng Thành
+26515	3	1,2,3	Sơn động Tăng Thành | Giao Châu
+26516	2	1,2	Sơn động Tăng Thành
+26517	1	1	Sơn động Tăng Thành
+26518	2	1,2	Sơn động Tăng Thành | Giao Châu
+26521	2	1,2	Thuỷ động Đam Nhĩ | Giao Châu
+26522	3	1,2,3	Thuỷ động Đam Nhĩ
+26523	2	1,2	Thuỷ động Đam Nhĩ
+26524	2	1,2	Thuỷ động Đam Nhĩ
+26525	1	1	Thuỷ động Đam Nhĩ
+26526	2	1,2	Thuỷ động Đam Nhĩ
+26527	3	1,2,3	Thuỷ động Đam Nhĩ
+26528	1	1	Thuỷ động Đam Nhĩ
+26529	1	1	Thuỷ động Đam Nhĩ
+26531	2	1,2	Sơn động Quỳnh Sơn | Giao Châu
+26532	3	1,2,3	Sơn động Quỳnh Sơn
+26533	1	1	Sơn động Quỳnh Sơn
+26534	2	1,2	Sơn động Quỳnh Sơn | Rừng Quỳnh Sơn
+26541	2	1,2	Mỏ khoáng Quế Sơn | Giao Châu
+26542	2	1,2	Mỏ khoáng Quế Sơn
+26543	1	1	Mỏ khoáng Quế Sơn
+26551	2	1,2	Mỏ khoáng Tượng Sơn | Giao Châu
+26552	3	1,2,3	Mỏ khoáng Tượng Sơn
+26553	1	1	Mỏ khoáng Tượng Sơn
+26554	1	1	Mỏ khoáng Tượng Sơn
+26801	2	1,2	Rừng Trung Túc | Giao Châu
+26802	1	1	Rừng Trung Túc
+26806	2	1,2	Sơn động Lệ Phổ | Thôn Lệ Phỗ
+26811	2	1,2	Đầm lầy Long Xuyên | Giao Châu
+26812	1	1	Đầm lầy Long Xuyên
+26816	2	1,2	Sơn động Quỳnh Sơn | Thôn Quỳnh Sơn
+26821	2	1,2	Trướng Nam Hải | Giao Châu
+26822	1	1	Trướng Nam Hải
+26831	1	1	Giao Châu
+26841	2	1,2	Rừng Hoài An | Giao Châu
+26842	1	1	Rừng Hoài An
+26851	2	1,2	Rừng Chu Nhai | Giao Châu
+26852	1	1	Rừng Chu Nhai
+26861	2	1,2	Rừng Long Biên | Giao Châu
+26862	1	1	Rừng Long Biên
+26871	2	1,2	Giao Châu | Trại Cửu Chân
+26872	2	1,2	Cửa Trại Cửu Chân | Trướng Cửu Chân
+26873	1	1	Trại Cửu Chân
+26881	2	1,2	Giao Châu
+26891	2	1,2	Giao Châu | Rừng Quảng Tín
+26901	2	1,1	Thông độ Giao Châu
+26902	2	1,1	Thông độ Giao Châu
+26903	2	1,1	Thông độ Giao Châu
+26904	2	1,1	Thông độ Giao Châu
+26905	1	1	Dị Giới
+27000	26	1,1,1,1,1,1,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20	Rừng Quảng Tín | Đất tuyết Thượng Cốc | Thảo nguyên VânTrung | Đại Thảo Nguyen | Thảo nguyên Quảng Vũ | Thảo nguyên PhóngMục | Thảo nguyên Du Mục | Mỏ khoáng Quản Sầm | Bộ lạc Tây Tiên Ti | Thôn Tang Càn | Bộ lạc Đông Tiên Ti | Thôn Hà Sáo | Thảo nguyên Cố Bình | Hẻm núi Bạch Đăng | Thảo nguyên LâuPhiền | Thảo nguyên Mã Ấp | Hẻm núi Âm Quán | Nhạn Môn Quan | Sào huyệt Sơn Thú
+27001	7	1,2,3,4,5,6,7	Tắc Ngoại | Bần hộ | Phổ hộ
+27011	5	1,2,3,4,5	Tắc Ngoại | Trướng Tiên Ti | Đại trướng
+27021	5	1,2,3,4,5	Trướng Tiên Ti | Đại trướng | Tắc Ngoại
+27031	3	1,2,3	Bần hộ | Tắc Ngoại
+27101	1	1	Bộ lạc Tây Tiên Ti
+27102	1	1	Bộ lạc Đông Tiên Ti
+27131	1	1	Thôn Tang Càn
+27132	1	1	Thôn Tang Càn
+27133	1	1	Thôn Tang Càn
+27134	1	1	Bộ lạc Tây Tiên Ti
+27135	1	1	Bộ lạc Đông Tiên Ti
+27136	1	1	Thôn Hà Sáo
+27171	1	1	Thôn Tang Càn
+27172	1	1	Thôn Tang Càn
+27173	1	1	Thôn Tang Càn
+27174	1	1	Bộ lạc Tây Tiên Ti
+27175	1	1	Bộ lạc Tây Tiên Ti
+27176	1	1	Bộ lạc Đông Tiên Ti
+27177	1	1	Bộ lạc Đông Tiên Ti
+27178	1	1	Thôn Hà Sáo
+27401	1	1	Tắc Ngoại
+27411	1	1	Tắc Ngoại
+27421	1	1	Tắc Ngoại
+27431	2	1,2	Tắc Bắc | Ẩn thân Sơn Thú
+27501	2	1,2	Hẻm núi Âm Quán | Sơn động Âm Quán
+27502	3	1,2,3	Sơn động Âm Quán
+27503	1	1	Sơn động Âm Quán
+27504	1	1	Sơn động Âm Quán
+27511	2	1,2	Đất tuyết Thượng Cốc | Tuyết động ThượngCốc
+27512	3	1,2,3	Đất tuyết Thượng Cốc
+27513	1	1	Tuyết động ThượngCốc
+27514	1	1	Tuyết động ThượngCốc
+27521	2	1,2	Mỏ khoáng Quản Sầm | Tắc Ngoại
+27522	2	1,2	Mỏ khoáng Quản Sầm
+27523	1	1	Mỏ khoáng Quản Sầm
+27531	1	1	Sào huyệt Sơn Thú
+27801	2	1,2	Thảo nguyên LâuPhiền | Tắc Ngoại
+27802	1	1	Thảo nguyên LâuPhiền
+27811	1	1	Tắc Ngoại
+27821	3	1,2,3	Thảo nguyên Cố Bình | Tắc Ngoại
+27822	1	1	Thảo nguyên Cố Bình
+27831	1	1	Tắc Ngoại
+27841	2	1,2	Sơn động Âm Quán | Tắc Ngoại
+27851	3	1,2,3	Thảo nguyên Mã Ấp | Tắc Ngoại
+27852	1	1	Thảo nguyên Mã Ấp
+27861	2	1,2	Hẻm núi Bạch Đăng | Tắc Ngoại
+27862	1	1	Hẻm núi Bạch Đăng
+27871	3	1,2,3	Tắc Ngoại | Tuyết địa Thượng Cốc | Tuyết động ThượngCốc
+27872	2	1,2	Tuyết địa Thượng Cốc | Trướng Thượng Cốc
+27873	1	1	Tuyết địa Thượng Cốc
+28000	10	1,2,3,4,5,6,7,8,9,10	Ngọc Môn Quan | Sa mạc Y Ngô Lư | Hẻm núi Y Hoa | Hẻm núi Liễu Trung | Cửa thành Xa Sư | Sa mạc Xa Sư | Xa mạc Yên Kỳ | Sa mạc Thiện Thiện | Sơn động Lâu Lan | Y Ngô Lư lục châu
+28001	2	1,2	Sa mạc Y Ngô Lư | Đường lớn Y Ngô Lư
+28002	7	1,2,3,4,5,6,7	Y Ngô Lư lục châu | Cửa thành Y Ngô Lư | Phổ hộ | Bần hộ | Khách sạn | QuảngTrường Y Ngô Lư | Tiền trang
+28003	4	1,2,3,4	Đường lớn Y Ngô Lư | Phổ hộ | Bần hộ | Phú hộ
+28004	2	1,2	Đường lớn Y Ngô Lư | Phổ hộ
+28011	2	1,2	Đường lớn Xa Sư | Tây Vực
+28012	6	1,2,3,4,5,6	Cửa thành Xa Sư | Phổ hộ | Bần hộ | Cung điện Xa Sư | Phú hộ | Sa mạc Xa Sư
+28021	4	1,2,3,4	Sa mạc Yên Kỳ | Tiệm thuốc | Phổ hộ | Bần hộ
+28031	4	1,2,3,4	Sa mạc Thiện Thiện | Phú hộ | Lò rèn
+28101	1	1	Y Ngô Lư lục châu
+28102	1	1	Đường lớn Xa Sư
+28103	1	1	Thôn Thiện Thiện
+28104	1	1	Thôn Thiện Thiện
+28131	1	1	Đường lớn Y Ngô Lư
+28132	1	1	Y Ngô Lư lục châu
+28133	1	1	Đường lớn Xa Sư
+28134	1	1	Yên Kỳ lục châu
+28135	1	1	QuảngTrường Y Ngô Lư
+28171	1	1	Đường lớn Y Ngô Lư
+28172	1	1	Y Ngô Lư lục châu
+28173	1	1	Đường lớn Xa Sư
+28174	1	1	Yên Kỳ lục châu
+28201	1	1	Thôn Thiện Thiện
+28221	1	1	Yên Kỳ lục châu
+28241	1	1	Đường lớn Y Ngô Lư
+28261	1	1	Đường lớn Y Ngô Lư
+28301	1	1	Đường lớn Xa Sư
+28401	1	1	Sa mạc Yên Kỳ
+28501	2	1,2	Sơn động Lâu Lan | Tây Vực
+28502	3	1,2,3	Sơn động Lâu Lan
+28503	2	1,2	Sơn động Lâu Lan
+28504	3	1,2,3	Sơn động Lâu Lan
+28505	1	1	Sơn động Lâu Lan
+28506	1	1	Sơn động Lâu Lan
+28507	2	1,2	Ti Lộ | Sơn động Lâu Lan
+28511	2	1,2	Sa mạc Xa Sư
+28801	2	1,2	Cửa thành Y Ngô Lư | Tây Vực
+28811	1	1	Tây Vực
+28821	2	1,2	Hẻm núi Liễu Trung | Tây Vực
+28822	1	1	Hẻm núi Liễu Trung
+28831	2	1,2	Đường lớn Xa Sư | Xa Sư nhai đạo
+28832	2	1,2	Xa Sư nhai đạo | Tây Vực
+28841	4	1,2,3,4	Sa mạc Yên Kỳ | Yên Kỳ lục châu | Hồ Bắc | Tây Vực
+28842	2	1,2	Sa mạc Yên Kỳ | Ti Lộ
+28851	2	1,2	Thôn Thiện Thiện | Tây Vực
+28861	2	1,2	Y Ngô Lư lục châu | Tây Vực
+28862	1	1	Y Ngô Lư lục châu
+29000	16	1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16	Sơn động Lâu Lan | Sa mạc Thả Mạt | Sơn động Cô Mặc | Thôn Quy Tư | Sa mạc Quy Tư | Sa mạc Yên Kỳ | Hẻm núi Câu Di | Sa mạc Vu Điền | Kiều Qua Lí sơn cước | Sa mạc Toa Xa | Sa mạc Sơ Lặc | Thông đạo Thống Lĩnh | Sa mạc Ô Luỹ | Mỏ khoáng Vu Điền
+29001	2	1,2	Sa mạc Sơ Lặc | Đường lớn Sơ Lặc
+29002	6	1,2,3,4,5,6	Cửa thành Sơ Lặc | Bần hộ | Phú hộ | Cung điện Sơ Lặc | Khách sạn | Sơ Lạc nhai đạo
+29003	4	1,2,3,4	Đường lớn Sơ Lặc | Bần hộ | Tiệm trà | Phổ hộ
+29011	2	1,2	Sa mạc Vu Điền | Đường lớn Vu Điền
+29012	6	1,2,3,4,5,6	Cửa thành Vu Điền | Phú hộ | Phổ hộ | Cung điện Vu Điền | Tiền trang | Quảng Trường Vu Điền
+29013	3	1,2,3	Đường lớn Vu Điền | Phổ hộ | Phú hộ
+29021	5	1,2,3,4,5	Ti Lộ | Sa mạc Quy Tư | Quan phủ | Phổ hộ | Bần hộ
+29031	4	1,2,3,4	Sa mạc Toa Xa | Phú hộ | Phổ hộ
+29101	1	1	Đường lớn Sơ Lặc
+29102	1	1	Đường lớn Vu Điền
+29103	1	1	Quảng Trường Vu Điền
+29104	1	1	Toa Xa lục châu
+29131	1	1	Sơ Lạc nhai đạo
+29132	1	1	Đường lớn Vu Điền
+29133	1	1	Thôn Quy Tư
+29134	1	1	Toa Xa lục châu
+29135	1	1	Căn cứ địa Bạch Chí
+29171	1	1	Đường lớn Sơ Lặc
+29172	1	1	Sơ Lạc nhai đạo
+29173	1	1	Quảng Trường Vu Điền
+29174	1	1	Thôn Quy Tư
+29175	1	1	Toa Xa lục châu
+29241	1	1	Đường lớn Sơ Lặc
+29261	1	1	Đường lớn Vu Điền
+29281	1	1	Sơ Lạc nhai đạo
+29301	1	1	Đường lớn Sơ Lặc
+29302	1	1	Đường lớn Vu Điền
+29303	1	1	Thôn Quy Tư
+29401	2	1,2	Ti Lộ | Sườn núi Kiều Qua Lí
+29402	2	1,2	Chân núi Kiều Qua Lí | Đỉnh núi Kiều Qua Lí
+29403	1	1	Sườn núi Kiều Qua Lí
+29501	2	1,2	Ti Lộ | Sơn động Cô Mặc
+29502	3	1,2,3	Sơn động Cô Mặc
+29503	2	1,2	Sơn động Cô Mặc | Ti Lộ
+29504	3	1,2,3	Sơn động Cô Mặc
+29505	2	1,2	Sơn động Cô Mặc
+29506	1	1	Sơn động Cô Mặc
+29507	2	1,2	Sơn động Cô Mặc
+29508	1	1	Sơn động Cô Mặc
+29511	2	1,2	Mỏ khoáng Vu Điền | Ti Lộ
+29512	2	1,2	Mỏ khoáng Vu Điền
+29513	1	1	Mỏ khoáng Vu Điền
+29801	2	1,2	Ti Lộ | Cửa thành Sơ Lặc
+29811	3	1,2,3	Ti Lộ | Thôn Quy Tư | Sa mạc Quy Tư
+29812	3	1,2,3	Căn cứ địa Bạch Chí | Quy Tư lục châu | Sa mạc Quy Tư
+29813	2	1,2	Sa mạc Quy Tư | Nhà Bạch Chi
+29814	1	1	Sa mạc Quy Tư
+29821	2	1,2	Ti Lộ | Sa mạc Ô Luỹ
+29822	1	1	Sa mạc Ô Luỹ
+29831	2	1,2	Ti Lộ | Toa Xa lục châu
+29841	2	1,2	Ti Lộ | Hẻm núi Câu Di
+29842	1	1	Hẻm núi Câu Di
+29851	2	1,2	Ti Lộ | Cửa thành Vu Điền
+29861	2	1,2	Ti Lộ | Sa mạc Thông Lĩnh
+29862	1	1	Thông đạo Thống Lĩnh
+29871	1	1	Ti Lộ
+30000	42	1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42	Rừng Bản Gia | Cửa thành Kiến Ninh | Bờ Sông Lô | Thạch Lâm | Điền trì | Trại Bát Phiên | Đào Hoa Độ | Nước Ô Qua | Đằng Lâm | Đường mòn Bàn Xà Cốc | ĐườngMòn GiápSơnDục | Trúc Sơn | Ngân Khánh Sơn | Tông Lư vũ lâm | Rừng đá Bát Nạp | Thành Tam Giang | Rừng 93 Điện | Trại Mã Gia | Rừng Đá Ngốc Long | Động Ngốc Long | Ao Độc | Đường mòn Rừng Mưa | Nhị Hải | Thành Vũ Xương | Cẩm Đái Sơn | Trại Việt Tuyển | Lô Tân Quan | Cửa Trại Tang Ca | Ích Châu | Rừng Mã Gia | Rừng Chu Đề | Thông đạo Chu Đề | Âm Sầm chiểu lâm | Trại Vĩnh Xương | Lô Thuỷ
+30001	2	1,2	Đường lớn Kiến Ninh | Nam Trung
+30002	4	1,2,3,4	Cửa thành Kiến Ninh | Phổ hộ | Kiến Ninh thứ nhai
+30003	5	1,2,3,4,5	Đường lớn Kiến Ninh | QuảngTrườngKiếnNinh | Khách sạn | Lò rèn | Bờ Lô Thuỷ
+30004	3	1,2,3	Kiến Ninh thứ nhai | Phú hộ | Phổ hộ
+30005	2	1,2	Kiến Ninh thứ nhai | Bờ Lô Thuỷ
+30006	2	1,2	Bờ Lô Thuỷ | Nam Trung
+30011	6	1,2,3,4,5,6	Tiền trang | Quan phủ | Phú hộ | Phổ hộ | Nam Trung
+30012	4	1,2,3,4	Phú hộ | Phổ hộ | Nam Trung
+30021	2	1,2	QuảngTrường TamGiang | Nam Trung
+30022	5	1,2,3,4,5	Đường lớn Tam Giang | Phú hộ | Tiền trang | Đường nhỏ Tam Giang | Thành Tam Giang
+30023	4	1,2,3,4	Phổ hộ | Khách sạn | Phú hộ | QuảngTrường TamGiang
+30024	4	1,2,3,4	Khu thuần thú | Phổ hộ | QuảngTrường TamGiang
+30025	1	1	Đường lớn Tam Giang
+30031	9	1,2,3,4,5,6,7,8,9	Thạch đạo Ô Qua | Nam Trung
+30041	9	1,2,3,4,5,6,7,8,9	MêCung NgânKhánhSơn | Th.Thất NgânKhánhSơn | CungĐiệnNgânKhánhSơn | Phòng Ngân Khánh Sơn | Nam Trung
+30101	1	1	QuảngTrườngKiếnNinh
+30102	2	1,2	Thành Vĩnh Xương
+30103	1	1	QuảngTrường TamGiang
+30104	1	1	Đường nhỏ Tam Giang
+30105	1	1	Nước Ô Qua
+30106	1	1	Ngân Khánh Sơn
+30107	1	1	Trại Mã Gia
+30108	1	1	Ẩn cư Trữ Lư
+30131	1	1	Đường lớn Kiến Ninh
+30132	1	1	Đường lớn Kiến Ninh
+30133	1	1	QuảngTrườngKiếnNinh
+30134	2	1,2	Thành Vĩnh Xương
+30135	2	1,2	Thành Vĩnh Xương
+30136	1	1	Đường nhỏ Kiến Ninh
+30137	1	1	Đường nhỏ Kiến Ninh
+30138	1	1	Đường nhỏ Kiến Ninh
+30139	1	1	Nước Ô Qua
+30171	1	1	Ngân Khánh Sơn
+30172	1	1	Ngân Khánh Sơn
+30173	1	1	Trại Mã Gia
+30174	1	1	Động đá Tây Ngân
+30201	1	1	Đường nhỏ Kiến Ninh
+30241	1	1	Đường nhỏ Kiến Ninh
+30242	1	1	Đường nhỏ Tam Giang
+30261	1	1	Thành Vĩnh Xương
+30262	1	1	QuảngTrường TamGiang
+30301	1	1	Thành Vĩnh Xương
+30302	1	1	Thạch đạo Ô Qua
+30303	1	1	Ngân Khánh Sơn
+30401	2	1,2	Nam Trung | Lô Tân Quan
+30402	2	1,2	Lô Tân Quan
+30403	2	1,2	Lô Tân Quan | Nam Trung
+30411	2	1,2	Rừng Chu Đề | Thông đạo ChuĐề Quan
+30412	2	1,2	Chu Đề Quan | Nam Trung
+30413	2	1,2	Nam Trung | Chu Đề Quan
+30421	2	1,2	Hoa đào độ | Nam Trung
+30422	2	1,2	Hoa đào độ | Nam Trung
+30431	1	1	Nam Trung
+30432	1	1	Nam Trung
+30441	1	1	Nam Trung
+30451	1	1	Nam Trung
+30461	2	1,2	Chiến trường chính | Nam Trung
+30462	2	1,2	Đường mòn GiápSơnDục | Chiến trường chính
+30463	3	1,2,3	Chiến trường chính
+30464	1	1	Chiến trường chính
+30465	3	1,2,3	Chiến trường chính | Đường mòn GiápSơnDục
+30466	1	1	Chiến trường chính
+30467	2	1,2	Chiến trường chính | Nam Trung
+30471	2	1,2	Nam Trung | Đường núi CẩmĐái Sơn
+30472	2	1,2	Cẩm Đái Sơn | Ven hồ Cẩm Đái Sơn
+30473	2	1,2	Đường núi CẩmĐái Sơn | Đỉnh Cẩm Đái Sơn
+30474	1	1	Ven hồ Cẩm Đái Sơn
+30481	2	1,2	Điện Tháp Lang | Nam Trung
+30482	2	1,2	Đường mòn Bàn Xà Cốc
+30483	2	1,2	Điện Tháp Lang | Nam Trung
+30511	2	1,2	Động Ngốc Long | Nam Trung
+30512	3	1,2,3	Động Ngốc Long
+30513	2	1,2	Động Ngốc Long
+30514	2	1,2	Động Ngốc Long
+30515	1	1	Động Ngốc Long
+30516	3	1,2,3	Động Ngốc Long
+30517	2	1,2	Động Ngốc Long | Rừng Đá Ngốc Long
+30518	2	1,2	Động Ngốc Long
+30519	1	1	Động Ngốc Long
+30521	3	1,2,3	Rừng đá Bát Nạp | Động Bát Nạp
+30522	3	1,2,3	Động Bát Nạp
+30523	3	1,2,3	Động Bát Nạp
+30524	1	1	Động Bát Nạp
+30525	1	1	Động Bát Nạp
+30526	1	1	Động Bát Nạp
+30527	2	1,2	Động Bát Nạp
+30528	1	1	Động Bát Nạp
+30531	2	1,2	Địa đạo Trúc Sơn | Trúc Sơn
+30532	3	1,2,3	Địa đạo Trúc Sơn
+30533	2	1,2	Địa đạo Trúc Sơn | Đỉnh Trúc Sơn
+30534	2	1,2	Địa đạo Trúc Sơn
+30535	4	1,2,3,4	Địa đạo Trúc Sơn
+30536	1	1	Địa đạo Trúc Sơn
+30537	1	1	Địa đạo Trúc Sơn
+30538	2	1,2	Địa đạo Trúc Sơn
+30539	3	1,2,3	Địa đạo Trúc Sơn
+30540	1	1	Địa đạo Trúc Sơn
+30541	2	1,2	Thạch Lâm | Động Thạch Nhũ
+30542	4	1,2,3,4	Động Thạch Nhũ
+30543	2	1,2	Động Thạch Nhũ
+30544	1	1	Động Thạch Nhũ
+30545	2	1,2	Động Thạch Nhũ
+30546	3	1,2,3	Động Thạch Nhũ
+30547	1	1	Động Thạch Nhũ
+30548	1	1	Động Thạch Nhũ
+30549	2	1,2	Động Thạch Nhũ | Thạch Lâm
+30551	2	1,2	Nước Ô Qua | Thạch đạo Ô Qua
+30552	2	1,2	Thạch đạo Ô Qua
+30553	2	1,2	Thạch đạo Ô Qua
+30554	2	1,2	Thạch đạo Ô Qua
+30555	3	1,2,3	Thạch đạo Ô Qua
+30556	2	1,2	Nước Ô Qua | Thạch đạo Ô Qua
+30557	2	1,2	Thạch đạo Ô Qua
+30558	2	1,2	Thạch đạo Ô Qua
+30559	2	1,2	Nước Ô Qua | Thạch đạo Ô Qua
+30561	4	1,2,3,4	Nước Ô Qua | Thạch đạo Ô Qua
+30562	3	1,2,3	Thạch đạo Ô Qua
+30563	1	1	Thạch đạo Ô Qua
+30564	2	1,2	Nước Ô Qua | Cung điện Ô Qua
+30571	2	1,2	Mỏ Ngân Khánh Sơn | Ngân Khánh Sơn
+30572	2	1,2	Mỏ Ngân Khánh Sơn
+30573	3	1,2,3	Mỏ Ngân Khánh Sơn
+30574	2	1,2	Mỏ Ngân Khánh Sơn
+30575	2	1,2	Mỏ Ngân Khánh Sơn | Ngân Khánh Sơn
+30576	1	1	Mỏ Ngân Khánh Sơn
+30581	2	1,2	Mỏ Ngân Khánh Sơn | Ngân Khánh Sơn
+30582	2	1,2	Mỏ Ngân Khánh Sơn
+30583	3	1,2,3	Mỏ Ngân Khánh Sơn
+30584	1	1	Mỏ Ngân Khánh Sơn
+30585	2	1,2	Mỏ Ngân Khánh Sơn
+30586	2	1,2	Mỏ Ngân Khánh Sơn
+30587	2	1,2	Mỏ Ngân Khánh Sơn | Ngân Khánh Sơn
+30591	2	1,2	Địa đạo Trúc Sơn
+30592	2	1,2	Trúc Sơn | Địa đạo Trúc Sơn
+30601	2	1,2	Rừng Mưa Tây Ngân Dã | Động Tây Ngân Dã
+30602	4	1,2,3,4	Động Tây Ngân Dã
+30603	1	1	Động Tây Ngân Dã
+30604	2	1,2	Động Tây Ngân Dã
+30605	3	1,2,3	Động Tây Ngân Dã
+30606	1	1	Động Tây Ngân Dã
+30607	2	1,2	Động Tây Ngân Dã
+30608	2	1,2	Động Tây Ngân Dã
+30609	2	1,2	Động Tây Ngân Dã
+30610	2	1,2	Động Tây Ngân Dã
+30611	2	1,2	Động Tây Ngân Dã
+30612	3	1,2,3	Động Tây Ngân Dã
+30613	2	1,2	Động Tây Ngân Dã | Thạch thất Tây Ngân
+30801	2	1,2	Rừng Kính Tang Ca | Nam Trung
+30802	2	1,2	Rừng Kính Tang Ca | Cửa Trại Tang Ca
+30803	2	1,2	Rừng Kính Tang Ca | Trại Tang Ca
+30804	4	1,2,3,4	Rừng Kính Tang Ca | Binh trướng | Đại trướng
+30805	1	1	Trại Tang Ca
+30806	1	1	Trại Tang Ca
+30807	1	1	Trại Tang Ca
+30811	2	1,2	Rừng Việt Tuyển | Nam Trung
+30812	2	1,2	Đường nhỏ Việt Tuyển | Trại Việt Tuyển
+30813	2	1,2	Trại Việt Tuyển | Rừng Việt Tuyển
+30814	4	1,2,3,4	Đại trướng | Binh trướng | Đường nhỏ Việt Tuyển
+30815	1	1	Trại Việt Tuyển
+30816	1	1	Trại Việt Tuyển
+30817	1	1	Trại Việt Tuyển
+30821	2	1,2	Rừng Bát Phiên | Nam Trung
+30822	3	1,2,3	Khu luyện binh | Trại Bát Phiên
+30823	1	1	Rừng Bát Phiên
+30824	3	1,2,3	Binh trướng | Đại trướng | Rừng Bát Phiên
+30825	1	1	Trại Bát Phiên
+30826	1	1	Trại Bát Phiên
+30831	2	1,2	Rừng Bản Gia | Nam Trung
+30832	1	1	Rừng Bản Gia
+30841	3	1,2,3	Rừng 93 Điện | Nam Trung
+30842	1	1	Rừng 93 Điện
+30843	2	1,2	Rừng 93 Điện
+30844	1	1	Rừng 93 Điện
+30851	3	1,2,3	Rừng cọ | Nam Trung
+30852	1	1	Rừng cọ
+30853	1	1	Rừng cọ
+30861	3	1,2,3	Đằng Lâm | Nam Trung
+30862	1	1	Đằng Lâm
+30863	1	1	Đằng Lâm
+30871	2	1,2	Đường mòn Rừng Mưa | Nam Trung
+30872	2	1,2	Rừng Tây Ngân Dã | Đường mòn Rừng Mưa
+30873	3	1,2,3	Quân trướng | Đường mòn Rừng Mưa | Động Tây Ngân Dã
+30874	1	1	Rừng Tây Ngân Dã
+30881	2	1,2	Động Thạch Nhũ | Nam Trung
+30882	2	1,2	Động Thạch Nhũ | Nam Trung
+30891	3	1,2,3	Rừng Mã Gia | Vạn An Khê | Nam Trung
+30892	4	1,2,3,4	Vạn An Khê | Quan miếu Mã Tướng | Rừng Mã Gia | Nam Trung
+30893	3	1,2,3	Đại trướng | Binh trướng | Rừng Mã Gia
+30894	1	1	Rừng Mã Gia
+30895	2	1,2	Vạn An Khê
+30896	2	1,2	Nhà tranh | Vạn An Khê
+30897	2	1,2	Vạn An Khê | Nhà tranh
+30901	2	1,2	Địa đạo Trúc Sơn | Nam Trung
+30902	2	1,2	Địa đạo Trúc Sơn | Nam Trung
+30903	1	1	Địa đạo Trúc Sơn
+30911	3	1,2,3	Động Ngốc Long | Trại Ngốc Long | Nam Trung
+30912	1	1	Rừng Đá Ngốc Long
+30921	3	1,2,3	Nam Trung | Trại Bát Nạp | Động Bát Nạp
+30922	1	1	Rừng đá Bát Nạp
+30931	2	1,2	Nam Trung | Đường mòn Âm Sầm
+30932	1	1	Đường mòn Âm Sầm
+30933	3	1,2,3	Rừng Âm Sầm
+30934	1	1	Đường mòn Âm Sầm
+30941	1	1	Đường núi Vĩnh Xương
+30942	3	1,2,3	Đường mòn Âm Sầm | Trại Vĩnh Xương | Lô Thuỷ sa khẩu
+30943	4	1,2,3,4	Nam trại A Khoái | T.Lớn KimHoàngTamKết | Trại Đổng Trà Ná | Trại Vĩnh Xương
+30944	3	1,2,3	Nam Trung | Rừng Vĩnh Xương | Đường núi Vĩnh Xương
+30945	1	1	Rừng Vĩnh Xương
+30946	1	1	Rừng Vĩnh Xương
+30947	1	1	Rừng Vĩnh Xương
+30948	2	1,2	Đường núi Vĩnh Xương | Lô Thuỷ
+30949	2	1,2	Nam Trung | Lô Thuỷ sa khẩu
+31000	14	1,2,3,4,5,6,7,8,9,10,11,12,13,14	Tây Ninh Quan | Cửathành BắcĐiểnNông | Rừng Hàng Cẩm | Tháp Trấn Hà | Sơn động Thạch Chuỳ | Tầng 1 mỏ Định Biên | Vân Vu sơn đạo | Thôn Cố Nguyên | Chân núi Tu Di | Rừng Phi Vân | An Định Quan | Hoang mạc Song Hợp | Sơn động Đồ Lan
+31001	4	1,2,3,4	Phổ hộ | Khách sạn | Tây Ninh
+31011	6	1,2,3,4,5,6	Rừng Hàng Cẩm | Bần hộ | Phổ hộ
+31021	1	1	Hoang mạc Song Hợp
+31061	3	1,2,3	ĐườngLớn BắcĐiểnNông | Tây Ninh | Trại Lưu Gia
+31062	3	1,2,3	Cửathành BắcĐiểnNông | Khách sạn | ĐườngTắt BắcĐiểnNông
+31063	4	1,2,3,4	ĐườngLớn BắcĐiểnNông | ĐườngSau BắcĐiểnNông | Bần hộ | QuảngTrườngTâyBĐNông
+31064	4	1,2,3,4	ĐườngTắt BắcĐiểnNông | ĐườngNhỏ BắcĐiểnNông | Phổ hộ | Quảng Trường Đông
+31065	2	1,2	ĐườngNhỏ BắcĐiểnNông | Phú hộ
+31066	2	1,2	ĐườngNhỏ BắcĐiểnNông | Phổ hộ
+31067	2	1,2	ĐườngTắt BắcĐiểnNông | Bần hộ
+31071	4	1,2,3,4	Tây Ninh | Phổ hộ | Lầu 1 Tháp Trấn Hà
+31072	2	1,2	Tháp Trấn Hà | Lầu 2 Tháp Trấn Hà
+31073	2	1,2	Lầu 1 Tháp Trấn Hà | Đỉnh Tháp Trấn Hà
+31074	2	1,2	Lầu 2 Tháp Trấn Hà | Địa Phủ
+31101	1	1	ĐườngNhỏ BắcĐiểnNông
+31130	1	1	Thôn Cố Nguyên
+31131	1	1	Thôn Cố Nguyên
+31132	1	1	Thôn Hàng Cẩm
+31133	1	1	Thôn Hàng Cẩm
+31134	1	1	Thôn Hàng Cẩm
+31137	1	1	Trại Phi Vân
+31138	1	1	ĐườngSau BắcĐiểnNông
+31139	1	1	Quảng trường Đông
+31140	1	1	Tháp Trấn Hà
+31141	1	1	Tháp Trấn Hà
+31171	1	1	Thôn Hàng Cẩm
+31172	1	1	Thôn Hàng Cẩm
+31173	1	1	Đường mòn Tu Di
+31174	1	1	Đường mòn Tu Di
+31175	1	1	Eo núi Tu Di
+31176	1	1	Eo núi Tu Di
+31177	1	1	Đỉnh núi Tu Di
+31178	1	1	ĐườngTắt BắcĐiểnNông
+31179	1	1	QuảngTrườngTâyBĐNông
+31241	1	1	Thôn Cố Nguyên
+31242	1	1	ĐườngLớn BắcĐiểnNông
+31401	2	1,2	Tây Ninh | Rừng Vân Vụ
+31402	1	1	Rừng Vân Vụ
+31403	3	1,2,3	Vân Vu sơn đạo | Tây phong núi Vân Vụ | Núi Vân Vụ
+31404	2	1,2	Rừng Vân Vụ | ĐôngPhong núi Vân Vụ
+31405	1	1	Núi Vân Vụ
+31411	2	1,2	Đường mòn Tu Di | Tây Ninh
+31412	4	1,2,3,4	Chân núi Tu Di | Thạch thất núi Tu Di | Eo núi Tu Di
+31413	4	1,2,3,4	Đường mòn Tu Di | Thạch thất núi Tu Di | Tu Di sơn đạo
+31414	2	1,2	Eo núi Tu Di | Đỉnh núi Tu Di
+31415	2	1,2	Tu Di sơn đạo | Thạch thất núi Tu Di
+31416	2	1,2	Tây Ninh Quan | Yến Nhiên
+31417	2	1,2	Tây Ninh Quan | Tây Ninh
+31421	3	1,2,3	Sơn động Phi Vân | Suối Phi Vân | Tây Ninh
+31422	1	1	Rừng Phi Vân
+31423	2	1,2	Rừng Phi Vân
+31424	2	1,2	Sơn động Phi Vân | Trại Phi Vân
+31425	2	1,2	Phòng nhỏ Phi Vân | Rừng Phi Vân
+31501	2	1,2	Sơn động Thạch Chuỳ | Tây Ninh
+31502	2	1,2	Sơn động Thạch Chuỳ
+31503	2	1,2	Sơn động Thạch Chuỳ
+31504	1	1	Sơn động Thạch Chuỳ
+31505	3	1,2,3	Sơn động Thạch Chuỳ
+31506	2	1,2	Sơn động Thạch Chuỳ | Tây Ninh
+31511	2	1,2	Tầng 1 mỏ Định Biên | Tây Ninh
+31512	2	1,2	Tầng 1 mỏ Định Biên
+31513	2	1,2	Tầng 1 mỏ Định Biên
+31514	3	1,2,3	Tầng 1 mỏ Định Biên
+31515	1	1	Tầng 1 mỏ Định Biên
+31516	2	1,2	Tầng 1 mỏ Định Biên | Tầng 2 mỏ Định Biên
+31517	2	1,2	Tầng 2 mỏ Định Biên | Tầng 1 mỏ Định Biên
+31518	3	1,2,3	Tầng 2 mỏ Định Biên
+31519	2	1,2	Tầng 2 mỏ Định Biên
+31520	1	1	Tầng 2 mỏ Định Biên
+31521	3	1,2,3	Tầng 2 mỏ Định Biên
+31522	2	1,2	Tầng 2 mỏ Định Biên
+31523	1	1	Tầng 2 mỏ Định Biên
+31524	2	1,2	Tầng 2 mỏ Định Biên
+31525	1	1	Tầng 2 mỏ Định Biên
+31531	2	1,2	Tây Ninh | Sơn động Đồ Lan
+31532	2	1,2	Sơn động Đồ Lan
+31533	4	1,2,3,4	Sơn động Đồ Lan
+31534	2	1,2	Sơn động Đồ Lan
+31535	2	1,2	Sơn động Đồ Lan
+31536	2	1,2	Sơn động Đồ Lan
+31537	2	1,2	Sơn động Đồ Lan
+31538	2	1,2	Sơn động Đồ Lan
+31539	2	1,2	Sơn động Đồ Lan
+31540	4	1,2,3,4	Sơn động Đồ Lan
+31541	2	1,2	Sơn động Đồ Lan
+31542	2	1,2	Sơn động Đồ Lan
+31543	2	1,2	Sơn động Đồ Lan
+31544	2	1,2	Sơn động Đồ Lan
+31545	1	1	Sơn động Đồ Lan
+31801	2	1,2	Thôn Hàng Cẩm | Tây Ninh
+31806	2	1,2	Sa mạc Song Hợp | Tây Ninh
+31807	1	1	Sa mạc Song Hợp
+31808	3	1,2,3	Sa mạc Song Hợp | Tàn thôn Song Hợp
+31811	2	1,2	ThảoNguyênThôngThiên | Cửathành BắcĐiểnNông
+31812	2	1,2	Thông đạo Yến Nhiên | Trại Lưu Gia
+31813	2	1,2	Cửa trại Thông Thiên | Thông đạo Yến Nhiên
+31814	1	1	Thông đạo Yến Nhiên
+31815	4	1,2,3,4	QuanĐạoBắc Yến Nhiên | QuanĐạoNam Yến Nhiên | ThảoNguyênThôngThiên
+31816	1	1	Thông đạo Yến Nhiên
+31817	2	1,2	Sơn đạo Thông Thiên | ThảoNguyênThôngThiên
+31818	2	1,2	Cửa trại Thông Thiên | Trại lớn Thông Thiên
+31819	1	1	Trại lớn Thông Thiên
+31820	4	1,2,3,4	Trại Bắc Thông Thiên | Trại chủ Thông Thiên | Trại Nam Thông Thiên | Sơn đạo Thông Thiên
+31821	1	1	Trại lớn Thông Thiên
+31822	2	1,2	Trại lớn Thông Thiên | Trướng Thông Thiên
+31823	1	1	Trại chủ Thông Thiên
+31901	2	1,2	Địa Phủ | Đỉnh Tháp Chấn Hà
+31902	2	1,2	Địa Phủ
+31903	2	1,2	Cổng Địa Phủ | Địa Phủ
+31904	2	1,2	Bạt Thiên Địa Ngục | Địa Phủ
+31905	2	1,2	Tiễn Đao Địa Ngục | Cổng Địa Phủ
+31906	2	1,2	Thiết Thụ Địa Ngục | Bạt Thiên Địa Ngục
+31907	2	1,2	Nghiệt Kính Địa Ngục | Tiễn Đao Địa Ngục
+31908	2	1,2	Chung Lưng Địa Ngục | Thiết Thụ Địa Ngục
+31909	2	1,2	Đồng Trụ Địa Ngục | Nghiệt Kính Địa Ngục
+31910	2	1,2	Đao Sơn Địa Ngục | Chung Lưng Địa Ngục
+31911	2	1,2	Băng Sơn Địa Ngục | Đồng Trụ Địa Ngục
+31912	2	1,2	Dầu Oa Địa Ngục | Đao Sơn Địa Ngục
+31913	2	1,2	Ngưu Khanh Địa Ngục | Băng Sơn Địa Ngục
+31914	2	1,2	Thạch Áp Địa Ngục | Dầu Oa Địa Ngục
+31915	2	1,2	Thung Cữu Địa Ngục | Ngưu Khanh Địa Ngục
+31916	2	1,2	Huyết Trì Địa Ngục | Thạch Áp Địa Ngục
+31917	2	1,2	Uổng Tử Địa Ngục | Thung Cữu Địa Ngục
+31918	2	1,2	Trách Hình Địa Ngục | Huyết Trì Địa Ngục
+31919	2	1,2	Hỏa Sơn Địa Ngục | Uổng Tử Địa Ngục
+31920	2	1,2	Thạch Ma Địa Ngục | Trách Hình Địa Ngục
+31921	2	1,2	Đao Cư Địa Ngục | Hỏa Sơn Địa Ngục
+31922	1	1	Thạch Ma Địa Ngục
+32000	11	1,2,3,4,5,6,7,8,9,10,11	Cửa thành NgạchTếNạp | Hoang mạc Ba Đan | Rừng Bắc Ngân Cân | Thái hồ Cát Lan | Rừng Trừng Khẩu | Núi cát Thông Thiên | Đông A Lạp Thiện | Tây A Lạp Thiện | Thông đạo Tây Ninh | Chân núi Long Thủ | Rừng Bắc Tịch 1
+32001	2	1,2	QTrường Ngạch Tế Nạp | Yến Nhiên
+32002	4	1,2,3,4	Cửa thành NgạchTếNạp | Nhà bạt lớn N.Tế Nạp | Lò rèn | Nhà bạt Ngạch Tế Nạp
+32011	4	1,2,3,4	Nhà bạt lớn | Nhà bạt | Tiền trang | Yến Nhiên
+32021	4	1,2,3,4	Nhà bạt lớn | Khách sạn | Nhà bạt | Yến Nhiên
+32101	1	1	Tây A Lạp Thiện
+32102	1	1	Đông A Lạp Thiện
+32103	1	1	QTrường Ngạch Tế Nạp
+32131	1	1	Tây A Lạp Thiện
+32132	1	1	Đông A Lạp Thiện
+32133	1	1	QTrường Ngạch Tế Nạp
+32134	2	1,2	Chân núi Long Thủ | Đường mòn Long Thủ
+32201	1	1	QTrường Ngạch Tế Nạp
+32241	1	1	Đông A Lạp Thiện
+32261	1	1	Tây A Lạp Thiện
+32401	1	1	Yến Nhiên
+32411	2	1,2	Núi cát Thông Thiên | Yến Nhiên
+32412	2	1,2	Núi cát Thông Thiên
+32413	3	1,2,3	Núi cát Thông Thiên | Trại cát Thông Thiên
+32414	1	1	Núi cát Thông Thiên
+32415	2	1,2	Núi cát Thông Thiên | Nhà bạt Thông Thiên
+32416	1	1	Trại cát Thông Thiên
+32501	3	1,2,3	Tầng 1 Bắc Ngân Căn | Rừng Bắc Ngân Cân
+32502	2	1,2	Tầng 1 Bắc Ngân Căn | Tầng 2 Bắc Ngân Căn
+32503	4	1,2,3,4	Tầng 1 Bắc Ngân Căn
+32504	1	1	Tầng 1 Bắc Ngân Căn
+32505	1	1	Tầng 1 Bắc Ngân Căn
+32506	2	1,2	Tầng 1 Bắc Ngân Căn
+32507	4	1,2,3,4	Tầng 1 Bắc Ngân Căn
+32508	1	1	Tầng 1 Bắc Ngân Căn
+32509	1	1	Tầng 1 Bắc Ngân Căn
+32510	2	1,2	Tầng 1 Bắc Ngân Căn | Tầng 2 Bắc Ngân Căn
+32511	2	1,2	Tầng 1 Bắc Ngân Căn | Tầng 2 Bắc Ngân Căn
+32512	2	1,2	Tầng 2 Bắc Ngân Căn | Tầng 1 Bắc Ngân Căn
+32513	3	1,2,3	Tầng 2 Bắc Ngân Căn
+32514	2	1,2	Tầng 2 Bắc Ngân Căn
+32515	2	1,2	Tầng 2 Bắc Ngân Căn
+32516	3	1,2,3	Tầng 2 Bắc Ngân Căn
+32517	1	1	Tầng 2 Bắc Ngân Căn
+32518	1	1	Tầng 2 Bắc Ngân Căn
+32519	3	1,2,3	Tầng 2 Bắc Ngân Căn
+32520	1	1	Tầng 2 Bắc Ngân Căn
+32531	2	1,2	Sơn động Trừng Khẩu | Rừng Trừng Khẩu
+32532	4	1,2,3,4	Sơn động Trừng Khẩu
+32533	1	1	Sơn động Trừng Khẩu
+32534	1	1	Sơn động Trừng Khẩu
+32535	1	1	Sơn động Trừng Khẩu
+32541	3	1,2,3	Sườn núi Long Thủ | Mỏ khoáng Long Thủ
+32542	3	1,2,3	Mỏ khoáng Long Thủ
+32543	3	1,2,3	Mỏ khoáng Long Thủ
+32544	2	1,2	Mỏ khoáng Long Thủ
+32545	2	1,2	Mỏ khoáng Long Thủ
+32546	2	1,2	Mỏ khoáng Long Thủ
+32547	2	1,2	Mỏ khoáng Long Thủ
+32548	2	1,2	Mỏ khoáng Long Thủ
+32549	2	1,2	Mỏ khoáng Long Thủ | Sườn núi Long Thủ
+32550	3	1,2,3	Mỏ khoáng Long Thủ
+32551	3	1,2,3	Trác phong Long Thủ | Mỏ khoáng Long Thủ
+32552	3	1,2,3	Mỏ khoáng Long Thủ
+32553	2	1,2	Mỏ khoáng Long Thủ
+32554	2	1,2	Mỏ khoáng Long Thủ
+32555	2	1,2	Mỏ khoáng Long Thủ
+32556	2	1,2	Mỏ khoáng Long Thủ
+32557	3	1,2,3	Mỏ khoáng Long Thủ | Đỉnh núi Long Thủ
+32558	3	1,2,3	Mỏ khoáng Long Thủ
+32559	2	1,2	Mỏ khoáng Long Thủ
+32560	1	1	Mỏ khoáng Long Thủ
+32561	1	1	Mỏ khoáng Long Thủ
+32801	2	1,2	Tầng 1 Bắc Ngân Căn | Yến Nhiên
+32811	2	1,2	Rừng Trừng Khẩu | Yến Nhiên
+32812	1	1	Rừng Trừng Khẩu
+32813	3	1,2,3	Rừng Trừng Khẩu | Sơn động Trừng Khẩu
+32821	3	1,2,3	Hoang mạc Ba Đan | Yến Nhiên
+32822	1	1	Hoang mạc Ba Đan
+32823	1	1	Hoang mạc Ba Đan
+32831	3	1,2,3	Yến Nhiên | Núi Long Thủ
+32832	2	1,2	Chân núi Long Thủ
+32833	2	1,2	Chân núi Long Thủ
+32834	3	1,2,3	Núi Long Thủ | Phòng nhỏ Long Thủ
+32835	2	1,2	Phòng nhỏ Long Thủ | Chân núi Long Thủ
+32836	2	1,2	Mỏ khoáng Long Thủ | Chân núi Long Thủ
+32837	4	1,2,3,4	Thiên Kỳ Phong | Sườn núi Long Thủ | Đường mòn Long Thủ
+32838	2	1,2	Mỏ khoáng Long Thủ | Chân núi Long Thủ
+32839	1	1	Chân núi Long Thủ
+32840	1	1	Đỉnh núi Long Thủ
+32841	3	1,2,3	Bắc kính | Nam Kính | Mỏ khoáng Long Thủ
+32842	1	1	Đỉnh núi Long Thủ
+32843	2	1,2	Mỏ khoáng Long Thủ | Trấn Long Bàn
+32844	1	1	Trác phong Long Thủ
+32851	4	1,2,3,4	Yến Nhiên | Rừng Đông Bắc Tịch 1 | Rừng Bắc Tịch 2 | Rừng Tây Bắc Tịch 1
+32852	1	1	Rừng Đông Bắc Tịch 1
+32853	1	1	Rung Bac Tich
+32854	2	1,2	Rừng Bắc Tịch 1 | Rừng Đông Bắc Tịch 2
+32855	1	1	Rừng Tây Bắc Tịch 1
+32856	4	1,2,3,4	Rừng Bắc Tịch 1 | Rừng Đông Bắc Tịch 3 | Rừng Bắc Bắc Tịch 1 | Rừng Bắc Tịch 3
+32857	2	1,2	Rừng Bắc Tịch 2 | Rừng Đông Bắc Tịch 4
+32858	1	1	Rừng Đông Bắc Tịch 3
+32859	2	1,2	Rừng Bắc Tịch 2 | Rừng Bắc Bắc Tịch 2
+32860	1	1	Rừng Bắc Bắc Tịch 1
+32861	4	1,2,3,4	Rừng Bắc Tịch 2 | Đường mòn Bắc Tịch | Đường núi Bắc Tịch 1 | Rừng Bắc Tịch 4
+32863	2	1,2	Rừng Bắc Tịch 3 | Đường núi Bắc Tịch 2
+32864	1	1	Đường núi Bắc Tịch 1
+32865	4	1,2,3,4	Rừng Bắc Tịch 3 | Rừng Nam Bắc Tịch 1 | Rừng Nam Bắc Tịch 3 | Rừng Nam Bắc Tịch 2
+32866	1	1	Rừng Bắc Tịch 4
+32867	1	1	Rừng Bắc Tịch 4
+32868	1	1	Rừng Bắc Tịch 4
+33000	10	1,2,3,4,5,6,7,8,9,10	Hoa Quả Sơn tầng 1 | Khu vực Vô Danh 3 | Khu vực Vô Danh 2 | Lối mòn QuangMộc Thụ | Khu vực Vô Danh 1 | Chân núi Kim Long | Sơn Trà Mộc Thụ | Tiểu Đào Viên | Khu vực Vô Danh
+33001	2	1,2	Tân Kinh Nam | Hoa Quả Sơn tầng 2
+33002	3	1,2,3	Hoa Quả Sơn tầng 1 | Cầu treo
+33003	2	1,2	Hoa Quả Sơn tầng 2 | Tân Kinh Nam
+33004	2	1,2	Hoa Quả Sơn tầng 2 | Đường mòn
+33005	2	1,2	Cầu treo | Đỉnh Hoa Quả Sơn
+33006	2	1,2	Đường mòn | Thuỷ Liêm Động
+33011	1	1	Tân Kinh Nam
+33021	2	1,2	Tân Kinh Nam | Rừng Quang Mộc Thụ
+33022	2	1,2	Lối mòn QuangMộc Thụ | Lưng núi Quang Mộc
+33023	2	1,2	Rừng Quang Mộc Thụ | Đỉnh núi Quang Mộc
+33024	1	1	Lưng núi Quang Mộc
+33031	2	1,2	Tân Kinh Nam | Eo núi Kim Long
+33032	2	1,2	Chân núi Kim Long | Đỉnh núi Kim Long
+33033	2	1,2	Eo núi Kim Long | Cửu Thiên
+33041	2	1,2	Tân Kinh Nam | Khu vực Vô Danh 1
+33042	2	1,2	Khu vực Vô Danh 1 | Ích Châu
+33051	2	1,2	Tân Kinh Nam | Khu vực Vô Danh 2
+33052	1	1	Khu vực Vô Danh 2
+33061	2	1,2	Tân Kinh Nam | Khu vực Vô Danh 3
+33062	1	1	Khu vực Vô Danh 3
+33071	1	1	Tân Kinh Nam
+33501	2	1,2	Đỉnh Hoa Quả Sơn | Thuỷ Liêm Động
+33502	2	1,2	Thuỷ Liêm Động
+33503	2	1,2	Thuỷ Liêm Động
+33504	2	1,2	Thuỷ Liêm Động
+33505	2	1,2	Thuỷ Liêm Động
+33506	2	1,2	Thuỷ Liêm Động
+33507	2	1,2	Thuỷ Liêm Động
+33508	2	1,2	Thuỷ Liêm Động
+33509	2	1,2	Thuỷ Liêm Động
+33510	2	1,2	Thuỷ Liêm Động | Tận cùng Thuỷ Liêm
+33511	1	1	Thuỷ Liêm Động
+33911	1	1	Tầng 1 Cửu Thiên
+33912	2	1,2	Tầng 2 Cửu Thiên | Tầng 1 Cửu Thiên
+33913	2	1,2	Tầng 1 Cửu Thiên | Tầng 3 Cửu Thiên
+33914	2	1,2	Tầng 2 Cửu Thiên | Tầng 4 Cửu Thiên
+33915	2	1,2	Tầng 3 Cửu Thiên | Tầng 5 Cửu Thiên
+33916	2	1,2	Tầng 4 Cửu Thiên | Tầng 6 Cửu Thiên
+33917	2	1,2	Tầng 5 Cửu Thiên | Tầng 7 Cửu Thiên
+33918	2	1,2	Tầng 6 Cửu Thiên | Tầng 8 Cửu Thiên
+33919	1	1	Tầng 7 Cửu Thiên
+33920	1	1	Tầng 8 Cửu Thiên
+34000	13	1,2,3,4,5,6,7,8,9,10,11,12,13	Giao Châu | Cốc Thôn Dã | Chân Nhật Dạ | Tuyệt Hành Tiên | Hải Dã Thôn | Thổ Phủ | Chân Chấn Phủ | Tử Lâm Mộc | Chân Viêm Phủ | Sơn động Vô Danh | Rừng Ngũ Hành | Sơn động Hoả Phủ
+34001	1	1	Dị Giới
+34010	1	1	Dị Giới
+34021	1	1	Dị Giới
+34031	2	1,2	Dị Giới | Đường mòn Viêm Phủ
+34032	2	1,2	Chân Viêm Phủ | Đỉnh Viêm Phủ
+34033	2	1,2	Đường mòn Viêm Phủ | Viêm Phủ tầng 1
+34034	2	1,2	Đỉnh Viêm Phủ | Viêm Phủ tầng 2
+34035	1	1	Viêm Phủ tầng 1
+34051	1	1	Tuyệt Hành Tiên
+34201	2	1,2	Dị Giới | Đường mòn Nhật Dạ
+34202	2	1,2	Chân Nhật Dạ | Đỉnh Nhật Dạ
+34203	2	1,2	Đường mòn Nhật Dạ | Nhật Dạ Cốc
+34204	1	1	Đỉnh Nhật Dạ
+34301	2	1,2	Dị Giới | Đỉnh Chấn Phủ
+34302	2	1,2	Chân Chấn Phủ | Chấn Phủ
+34303	1	1	Đỉnh Chấn Phủ
+34401	2	1,2	Dị Giới | Rừng Ngũ Hành
+34402	2	1,2	Rừng Ngũ Hành | Chân núi Ngũ Hành
+34403	2	1,2	Rừng Ngũ Hành | Sườn núi Ngũ Hành
+34404	2	1,2	Chân núi Ngũ Hành | Sườn núi Ngũ Hành
+34405	2	1,2	Chân núi Ngũ Hành | Đỉnh núi Ngũ Hành
+34406	1	1	Sườn núi Ngũ Hành
+34501	2	1,2	Dị Giới | Sơn động Vô Danh
+34502	2	1,2	Sơn động Vô Danh
+34503	2	1,2	Sơn động Vô Danh
+34504	2	1,2	Dị Giới | Chân núi Ngũ Hành
+34510	2	1,2	Dị Giới | Sơn động Hoả Phủ
+34511	2	1,2	Sơn động Hoả Phủ
+34512	2	1,2	Sơn động Hoả Phủ
+34513	2	1,2	Sơn động Hoả Phủ
+34514	2	1,2	Sơn động Hoả Phủ
+34515	2	1,2	Sơn động Hoả Phủ
+34516	2	1,2	Sơn động Hoả Phủ
+34517	2	1,2	Sơn động Hoả Phủ
+34518	2	1,2	Sơn động Hoả Phủ
+34519	2	1,2	Sơn động Hoả Phủ | Hoả Phủ
+34520	1	1	Sơn động Hoả Phủ
+34801	2	1,2	Dị Giới | Thôn Dị Nhân
+39919	1	2	Tầng 9 Cửu Thiên
+48001	7	1,2,3,4,5,6,7	Ngũ Phúc Phố | Quỳ Quan | Thuy Kính Trang | Thanh Thành sơn đạo | Binh trướng | Quân trướng
+48002	5	1,2,3,4,5	Rừng Bạch Đế | Rừng Nghi Đô | Rừng Ngũ Khê | Binh trướng
+48003	2	1,2	Nhà tranh | Quỳ Quan
+48004	3	1,2,3	Rừng Hao Đình | Thục doanh 700 dậm | Quỳ Quan
+48005	2	1,2	Thục doanh 700 dậm | Ngũ Phúc Phố
+48006	3	1,2,3	Rừng Nghi Đô | Rừng Di Lăng | Thục doanh 700 dậm
+48007	3	1,2,3	Thục doanh 700 dậm | Núi Mã An | Binh trướng
+48008	5	1,2,3,4,5	Rừng Nghi Đô | Đường núi Hao Đình | Trại Bắc Di Lăng | Quân trướng | Đường thuỷ Di Lăng
+48009	2	1,2	Rừng Hao Đình | Phòng nhỏ Hao Đình
+48010	3	1,2,3	Rừng Di Lăng | Phú Trì Khẩu | Rừng Hao Đình
+48011	2	1,2	Rừng Hao Đình | Quân trướng
+48012	4	1,2,3,4	Rừng Di Lăng | Đường thuỷ Di Lăng | Binh trướng | Thục doanh 700 dậm
+48013	4	1,2,3,4	Tế đàn Xuất Sư | Trại Di Lăng | Rừng Di Lăng | Binh trướng
+48014	2	1,2	Rừng Di Lăng | Quân trướng
+48015	5	1,2,3,4,5	Rừng Di Lăng | Thuy Kính Trang | Quân trướng | Binh trướng
+48016	2	1,2	Rừng Bạch Đế | Núi Thanh Thành
+48017	2	1,2	Thanh Thành sơn đạo | Phòng nhỏ ThanhThành
+48018	1	1	Núi Thanh Thành
+48019	11	1,2,3,4,5,6,7,8,9,10,11	Núi Mã An | Rừng Bạch Đế | Bát Trận Đồ
+48020	1	1	Rừng Hao Đình
+48021	1	1	Đường thuỷ Di Lăng
+48022	1	1	Rừng Bạch Đế
+48023	1	1	Rừng Bạch Đế
+48024	1	1	Rừng Bạch Đế
+48025	1	1	Quỳ Quan
+48026	1	1	Quỳ Quan
+48027	1	1	Rừng Hao Đình
+48028	1	1	Trại Bắc Di Lăng
+48029	1	1	Rừng Di Lăng
+48030	1	1	Rừng Di Lăng
+48031	1	1	Trại Di Lăng
+48032	1	1	Tế đàn Xuất Sư
+48033	1	1	Tế đàn Xuất Sư
+48034	1	1	Tế đàn Xuất Sư
+48035	1	1	Rừng Ngũ Khê
+48036	1	1	Thục doanh 700 dậm
+49001	9	1,2,3,4,5,6,7,8,9	Ao Vũ Xương | Cửa vào Vũ Xương | Trấn Vũ Xương | Binh trướng | Quân trướng | Đại trướng
+49002	1	1	Trấn Vũ Xương
+49003	1	1	Trấn Vũ Xương
+49004	3	1,2,3	Trấn Vũ Xương | Thuỷ động Vũ Xương | Rừng Vũ Xương
+49005	1	1	Ao Vũ Xương
+49009	4	1,2,3,4	Xưởng đóng tàu | U tàu Vũ Xương | Trấn Vũ Xương | QuảngTrườngTrácQuận
+49011	9	1,2,3,4,5,6,7,8,9	Cửa vào Nhu Tu | Trấn Nhu Tu | Ao Nhu Tu | Binh trướng | Quân trướng | Đại trướng
+49012	1	1	Trấn Nhu Tu
+49013	1	1	Trấn Nhu Tu
+49014	3	1,2,3	Trấn Nhu Tu | Thuỷ động Nhu Tu | Rừng Nhu Tu
+49015	1	1	Ao Nhu Tu
+49019	4	1,2,3,4	Trấn Nhu Tu | Xưởng đóng tàu | U tàu Nhu Tu | QuảngTrườngTrácQuận
+49021	8	1,2,3,4,5,6,7,8	Cửa vào Sài Tang | Binh trướng | Quân trướng | Trấn Sài Tang | Ao Sài Tang
+49022	1	1	Trấn Sài Tang
+49023	1	1	Trấn Sài Tang
+49024	3	1,2,3	Trấn Sài Tang | Thuỷ động Sài Tang | Rừng Sài Tang
+49025	1	1	Ao Sài Tang
+49029	4	1,2,3,4	Thuyền Trấn Sài Tang | U tàu Sài Tang | Trấn Sài Tang | QuảngTrườngTrácQuận
+49031	8	1,2,3,4,5,6,7,8	Cửa vào Giang Lăng | Binh trướng | Quân trướng | Trấn Giang Lăng | Ao Giang Lăng
+49032	1	1	Trấn Giang Lăng
+49033	1	1	Trấn Giang Lăng
+49034	3	1,2,3	Trấn Giang Lăng | Thuỷ động Giang Lăng | Rừng Giang Lăng
+49035	1	1	Ao Giang Lăng
+49039	4	1,2,3,4	ThuyềnTrấn GiangLăng | Trấn Giang Lăng | U tàu Giang Lăng | QuảngTrườngTrácQuận
+49041	7	1,2,3,4,5,6,7	Trấn Công An | Ao Công An | Cửa vào Công An | Quân trướng | Binh trướng
+49042	1	1	Trấn Công An
+49043	1	1	Trấn Công An
+49044	3	1,2,3	Trấn Công An | Thuỷ động Công An | Rừng Công An
+49045	1	1	Ao Công An
+49049	4	1,2,3,4	Xưởng đóng tàu | Trấn Công An | U tàu Công An | QuảngTrườngTrácQuận
+49051	7	1,2,3,4,5,6,7	Trấn Ngưu Chữ | Ao Ngưu Chữ | Cửa vào Ngưu Chữ | Quân trướng | Binh trướng
+49052	1	1	Trấn Ngưu Chữ
+49053	1	1	Trấn Ngưu Chữ
+49054	3	1,2,3	Ao Ngưu Chữ | Thuỷ động Ngưu Chữ | Rừng Ngưu Chữ
+49055	1	1	Ao Ngưu Chữ
+49059	4	1,2,3,4	QuảngTrườngTrácQuận | Trấn Ngưu Chữ | Xưởng đóng tàu | U tàu Ngưu Chữ
+49101	1	1	Trấn Vũ Xương
+49102	1	1	Trấn Nhu Tu
+49131	1	2	Trấn Vũ Xương
+49132	1	1	Trấn Nhu Tu
+49133	1	1	Trấn Sài Tang
+49134	1	1	Trấn Giang Lăng
+49135	1	1	Trấn Công An
+49136	1	1	Trấn Ngưu Chữ
+49171	1	1	Trấn Vũ Xương
+49172	1	1	Trấn Vũ Xương
+49173	1	1	Trấn Vũ Xương
+49174	1	1	Trấn Nhu Tu
+49175	1	1	Trấn Nhu Tu
+49176	1	1	Trấn Nhu Tu
+49177	1	1	Trấn Sài Tang
+49178	1	1	Trấn Sài Tang
+49179	1	1	Trấn Sài Tang
+49180	1	1	Trấn Giang Lăng
+49181	1	1	Trấn Giang Lăng
+49182	1	1	Trấn Giang Lăng
+49183	1	1	Trấn Công An
+49184	1	1	Trấn Công An
+49185	1	1	Trấn Ngưu Chữ
+49186	1	1	Trấn Ngưu Chữ
+49211	1	1	Cửa vào Vũ Xương
+49212	1	2	Cửa vào Nhu Tu
+49213	1	1	Cửa vào Sài Tang
+49214	1	2	Cửa vào Giang Lăng
+49215	1	1	Cửa vào Công An
+49216	1	2	Cửa vào Ngưu Chữ
+49221	1	1	Cửa vào Vũ Xương
+49222	1	1	Cửa vào Nhu Tu
+49223	1	1	Cửa vào Sài Tang
+49224	1	1	Cửa vào Giang Lăng
+49225	1	1	Cửa vào Công An
+49226	1	1	Cửa vào Ngưu Chữ
+49909	1	2	Thiên Kỳ Các
+49910	1	1	Tiên Đấu
+49916	1	1	U Châu
+49917	1	1	QuảngTrườngTrácQuận
+49918	1	1	QuảngTrườngTrácQuận
+49919	2	1,2	Phong Ma Trận | Rừng Trác Quận
+49920	3	1,2,3	Phong Ma Trận | Rừng Trác Quận
+49921	2	1,2	Phong Ma Trận
+49922	2	1,2	Phong Ma Trận | Rừng Trác Quận
+49923	2	1,2	Phong Ma Trận | Rừng Trác Quận
+49924	3	1,2,3	Phong Ma Trận | Rừng Trác Quận
+49925	2	1,2	Phong Ma Trận | Rừng Trác Quận
+49926	2	1,2	Phong Ma Trận | Rừng Trác Quận
+49927	3	1,2,3	Phong Ma Trận | Rừng Trác Quận
+49928	3	1,2,3	Phong Ma Trận | Rừng Trác Quận
+49929	3	1,2,3	Phong Ma Trận | Rừng Trác Quận
+49930	3	1,2,3	Phong Ma Trận | Rừng Trác Quận
+49931	2	1,2	Phong Ma Trận | Rừng Trác Quận
+49932	2	1,2	Phong Ma Trận | Rừng Trác Quận
+49933	3	1,2,3	Phong Ma Trận | Rừng Trác Quận
+49934	2	1,2	Phong Ma Trận | Rừng Trác Quận
+49935	3	1,2,3	Phong Ma Trận | Rừng Trác Quận
+49936	2	1,2	Phong Ma Trận | Rừng Trác Quận
+49937	3	1,2,3	Phong Ma Trận | Rừng Trác Quận
+49938	4	1,2,3,5	Phong Ma Trận | Rừng Trác Quận
+49939	2	1,2	Phong Ma Trận | Rừng Trác Quận
+49940	1	1	Rừng Trác Quận
+49941	1	1	U Châu
+49960	1	1	Tầng 1 Cửu Thiên
+49961	1	1	Tầng 2 Cửu Thiên
+49962	2	1,2	Tầng 1 Cửu Thiên | Tầng 3 Cửu Thiên
+49963	2	1,2	Tầng 2 Cửu Thiên | Tầng 4 Cửu Thiên
+49964	2	1,2	Tầng 3 Cửu Thiên | Tầng 5 Cửu Thiên
+49965	2	1,2	Tầng 4 Cửu Thiên | Tầng 6 Cửu Thiên
+49966	2	1,2	Tầng 5 Cửu Thiên | Tầng 7 Cửu Thiên
+49967	2	1,2	Tầng 6 Cửu Thiên | Tầng 8 Cửu Thiên
+49968	2	1,2	Tầng 7 Cửu Thiên | Tầng 9 Cửu Thiên
+49969	2	1,2	Tầng 8 Cửu Thiên | Tân Kinh Nam
+54811	2	1,3	Cửa thành Trác Quận | Nhạc viên NguyênTiêu
+54812	1	2	Nhạc viên NguyênTiêu
+54821	5	1,2,3,4,5	Hội trường hôn lễ | Thất Tịch đào lâm 2 | Thất Tịch đào lâm 3 | Thất Tịch Kiều | Cửa thành Trác Quận
+54822	1	1	Thất Tịch đào lâm
+54823	1	1	Thất Tịch đào lâm
+54824	1	1	Hội trường hôn lễ
+54825	1	1	Thất Tịch đào lâm
+54826	3	1,2,3	Vườn Đào | QuảngTrườngHoanNhạc
+54827	1	1	Thôn tuyết Bắc Quốc
+54828	1	1	Thôn tuyết Bắc Quốc
+54829	1	1	Thôn Giáng Sinh
+54830	3	1,2,3	Rừng Tuyết Địa | Nhà lao Công Cộng | Lô Long Khẩu
+54831	1	1	Thôn Giáng Sinh
+54901	1	1	Khu chuẩn bị lôi đài
+54902	1	1	Khu chuẩn bị lôi đài
+54903	1	1	Khu chuẩn bị lôi đài
+54904	1	1	Khu chuẩn bị lôi đài
+54911	1	1	QuảngTrườngTrácQuận
+54912	1	1	QuảngTrườngTrácQuận
+54913	1	1	QuảngTrườngTrácQuận
+54921	1	1	QuảngTrườngTrácQuận
+55000	4	1,2,3,4	Thanh Châu | Cao Cự Lệ | Bồng Lai Tiên đảo | Long Cung
+55001	3	1,2,3	Bột Hải | Nhà Nam Tinh Quân | Nhà Bắc Tinh Quân
+55002	1	1	Bồng Lai Tiên đảo
+55003	1	1	Bồng Lai Tiên đảo
+55100	1	1	Long Cung
+55101	3	1,2,3	Long Cung | Đại điện
+55102	1	1	Long Cung
+55200	1	1	Long Cung
+56000	8	1,2,3,4,5,6,7,8	Bột Hải | Oa Quốc | Sơn động Trường Bạch | Thôn Quế Lâu | Sơn động Thần Hàn | Rừng Mã Hàn | Rừng Mang Phương | Tuyết địa Cái Mã
+56001	5	1,2,3,4,5	Cao Cự Lệ | Nhà tranh
+56101	1	1	Thôn Quế Lâu
+56102	1	1	Thôn Quế Lâu
+56103	1	1	Thôn Quế Lâu
+56104	1	1	Thôn Quế Lâu
+56501	3	1,2,3	Sơn động Trường Bạch | Cao Cự Lệ
+56502	3	1,2,3	Sơn động Trường Bạch
+56503	3	1,2,3	Sơn động Trường Bạch
+56504	1	1	Sơn động Trường Bạch
+56505	2	1,2	Sơn động Trường Bạch
+56506	4	1,2,3,4	Sơn động Trường Bạch
+56507	1	1	Sơn động Trường Bạch
+56508	1	1	Sơn động Trường Bạch
+56509	3	1,2,3	Sơn động Trường Bạch
+56510	3	1,2,3	Sơn động Trường Bạch
+56511	1	1	Sơn động Trường Bạch
+56512	3	1,2,3	Sơn động Trường Bạch
+56513	1	1	Sơn động Trường Bạch
+56514	2	1,2	Sơn động Trường Bạch
+56515	1	1	Sơn động Trường Bạch
+56516	2	1,2	Sơn động Trường Bạch
+56517	1	1	Sơn động Trường Bạch
+56521	5	1,2,3,4,5	Cao Cự Lệ | Sơn động Thần Hàn
+56522	1	1	Sơn động Thần Hàn
+56523	1	1	Sơn động Thần Hàn
+56524	5	1,2,3,4,5	Sơn động Thần Hàn
+56525	1	1	Sơn động Thần Hàn
+56526	1	1	Sơn động Thần Hàn
+56527	1	1	Sơn động Thần Hàn
+56528	2	1,2	Sơn động Thần Hàn
+56529	1	1	Sơn động Thần Hàn
+56530	4	1,2,3,4	Sơn động Thần Hàn
+56531	1	1	Sơn động Thần Hàn
+56532	1	1	Sơn động Thần Hàn
+56533	1	1	Sơn động Thần Hàn
+56541	4	1,2,3,4	Tuyết địa Cái Mã
+56542	2	1,2	Tuyết địa Cái Mã
+56543	2	1,2	Tuyết địa Cái Mã
+56544	2	1,2	Tuyết địa Cái Mã
+56545	1	1	Tuyết địa Cái Mã
+56546	1	1	Tuyết địa Cái Mã
+56547	1	1	Tuyết địa Cái Mã
+56801	2	1,2	Rừng Mã Hàn | Cao Cự Lệ
+56802	2	1,2	Rừng Mã Hàn
+56803	1	1	Rừng Mã Hàn
+56811	2	1,2	Cao Cự Lệ | Rừng Mang Phương
+56812	1	1	Rừng Mang Phương
+56821	2	1,2	Cao Cự Lệ | Mỏ khoáng Cái Mã
+57000	10	1,2,3,4,5,6,7,8,9,10	Cao Cự Lệ | Hải động Oa Quốc | Ôn Tuyền Oa Quốc | Tà Mã Đài | Hoả Sơn Anh Đảo | Rừng Mạt Lư | Rừng Y Tà
+57001	5	1,2,3,4,5	Oa Quốc | Nhà tranh
+57101	1	1	Tà Mã Đài
+57102	1	1	Tà Mã Đài
+57103	1	1	Tà Mã Đài
+57104	1	1	Tà Mã Đài
+57105	1	1	Hoả Sơn Anh Đảo
+57106	1	1	Rừng Mạt Lư
+57401	1	1	Oa Quốc
+57501	5	1,2,3,4,5	Oa Quốc | Hải động Oa Quốc
+57502	1	1	Hải động Oa Quốc
+57503	3	1,2,3	Hải động Oa Quốc
+57504	2	1,2	Hải động Oa Quốc
+57505	1	1	Hải động Oa Quốc
+57506	4	1,2,3,4	Hải động Oa Quốc
+57507	1	1	Hải động Oa Quốc
+57508	1	1	Hải động Oa Quốc
+57509	2	1,2	Hải động Oa Quốc
+57510	3	1,2,3	Oa Quốc | Hải động Oa Quốc
+57511	1	1	Hải động Oa Quốc
+57512	2	1,2	Hải động Oa Quốc
+57513	1	1	Hải động Oa Quốc
+57514	4	1,2,3,4	Hải động Oa Quốc
+57515	1	1	Hải động Oa Quốc
+57516	1	1	Hải động Oa Quốc
+57517	2	1,2	Hải động Oa Quốc
+57518	3	1,2,3	Oa Quốc | Hải động Oa Quốc | Động Quỷ Vương
+57521	4	1,2,3,4	Hải động Oa Quốc | Oa Quốc
+57522	2	1,2	Hải động Oa Quốc
+57523	1	1	Hải động Oa Quốc
+57524	2	1,2	Hải động Oa Quốc
+57525	1	1	Hải động Oa Quốc
+57526	3	1,2,3	Hải động Oa Quốc
+57527	1	1	Hải động Oa Quốc
+57528	1	1	Hải động Oa Quốc
+57531	2	1,2	Hải động Oa Quốc | Động Quỷ Vương
+57532	2	1,2	Động Quỷ Vương
+57533	2	1,2	Động Quỷ Vương
+57534	2	1,2	Động Quỷ Vương
+57535	2	1,2	Động Quỷ Vương
+57536	2	1,2	Động Quỷ Vương | Thôn Quỷ Vương
+57541	2	1,2	Rừng Y Tà | Mỏ khoáng Y Tà
+57542	2	1,2	Mỏ khoáng Y Tà
+57543	1	1	Mỏ khoáng Y Tà
+57801	2	1,2	Oa Quốc | Phòng nhỏ Hoa Sơn
+57811	3	1,2,3	Oa Quốc | Nhà cỏ Mạt Lư | Rừng Mạt Lư
+57812	1	1	Rừng Mạt Lư
+57821	2	1,2	Mỏ khoáng Y Tà | Oa Quốc
+58000	1	1	Thanh Châu
+59000	16	1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16	Thông đạo Dao Trì | Tế đàn Tiên Giới | Khu vực Thuần Tinh | Thông đạo Thiên Đình | Khu vực Thái Bạch | Thôn Tiên Giới | Nam Thiên Môn | Khu vực Mê Hoặc | Thông đạo Bàn Đào | Khu vực Tuế Tinh | Núi Linh Hư | Đảo Thiên Ngoại | Địa Thiên Nghi | Chân núi Tiên Ẩn | Long Tuyền | Phật Giới
+59001	3	1,2,3	Phổ hộ | Phú hộ | Tiên Giới
+59011	2	1,2	Phòng nhỏ Nữ Oa | Tiên Giới
+59101	1	1	Thôn Tiên Giới
+59102	1	1	Đảo Thiên Ngoại
+59131	1	1	Thôn Tiên Giới
+59301	1	1	Thông đạo Thiên Đình
+59401	2	1,2	Tiên Giới | Đỉnh núi Thuấn Hoàng
+59411	1	1	Tiên Giới
+59421	2	1,2	Dao Trì | Tiên Giới
+59422	1	1	Thông đạo Dao Trì
+59431	3	1,2,3	Thần đàn Bàn Đào | Đường mòn Bàn Đào | Tiên Giới
+59432	1	1	Thông đạo Bàn Đào
+59433	2	1,2	Thông đạo Bàn Đào | Bàn Đào Viên
+59434	1	1	Đường mòn Bàn Đào
+59441	2	1,2	Thiên Đình | Tiên Giới
+59451	2	1,2	Tiên Giới | Đỉnh núi Hư Ninh
+59452	2	1,2	Núi Linh Hư | Phòng nhỏ Linh Hư
+59453	2	1,2	Đỉnh núi Hư Ninh | Phòng chứa đồ
+59454	1	1	Phòng nhỏ Linh Hư
+59461	1	1	Tiên Giới
+59471	2	1,2	Eo núi Tiên Ẩn | Tiên Giới
+59472	2	1,2	Đỉnh núi Tiên Ẩn | Chân núi Tiên Ẩn
+59473	1	1	Eo núi Tiên Ẩn
+59801	2	1,2	Khu vực Thuần Tinh | Tiên Giới
+59802	1	1	Khu vực Thuần Tinh
+59811	2	1,2	Khu vực Thái Bạch | Tiên Giới
+59812	1	1	Khu vực Thái Bạch
+59821	2	1,2	Khu vực Mê Hoặc | Tiên Giới
+59822	1	1	Khu vực Mê Hoặc
+59831	2	1,2	Khu vực Tuế Tinh | Tiên Giới
+59832	1	1	Khu vực Tuế Tinh
+59841	1	1	Địa Thiên Nghi
+59842	2	1,2	Tiên Giới | Ngày đêm điên đảo
+60000	13	1,2,3,4,5,6,7,8,9,10,11,12,13	Chảo Dầu | Rừng Mưa Chết | Rừng Diêm La | Cầu Nại Hà | Nguyệt Kính Đài | Cửa thành Uông Tử | Vọng Hương Lộ | Địa Ngục sơn đạo | Tu La địa huyệt | Núi đao Tàn Kiếm | Bến cảng Chuộc Ác
+60001	4	1,2,3,4	Quỷ Môn Quan | Hoàng Tuyền Lộ | Động Diêm La | Hẻm núi U Hồn
+60011	2	1,2	Cầu Nại Hà | Thông Đạo Uông Tử
+60012	2	1,2	Thông Đạo Uông Tử | Địa Ngục
+60013	2	1,2	Cửa thành Uông Tử
+60014	2	1,2	Cửa thành Uông Tử
+60021	4	1,2,3,4	Núi đao Tàn Kiếm | Quỷ Ốc
+60031	2	1,2	Cửa thành Địa Phủ | Địa Ngục
+60032	2	1,2	Địa Ngục sơn đạo | Bình Nguyên Địa Phủ
+60041	4	1,2,3,4	Bình Nguyên Địa Phủ | Nhà ma Địa Phủ
+60101	1	1	Thôn Âm Phong
+60102	1	1	Thôn Âm Phong
+60103	1	1	Quỷ Thành U Ám
+60104	1	1	Quỷ Thành U Ám
+60105	1	1	Quỷ Thành U Ám
+60301	1	1	Động Diêm La
+60302	2	1,2	Địa huyệt Tu La | Địa Ngục
+60303	1	1	Động Hoả Sơn
+60304	1	1	Động Hoả Sơn
+60401	2	1,2	Cửa thành Phong Đồ | Thôn U Linh
+60411	2	1,2	Thôn U Linh | Bình Nguyên Tử Linh
+60421	4	1,2,3,4	Hẻm núi U Hồn | Cửa thành Uông Tử
+60422	2	1,2	Địa Ngục
+60431	1	1	Địa Ngục
+60441	1	1	Địa Ngục
+60451	2	1,2	Địa Ngục | Vọng Hương Đài
+60452	1	1	Vọng Hương Lộ
+60461	2	1,2	Đỉnh núi Đao | Núi đao Tàn Kiếm
+60462	1	1	Núi Đao sơn đạo
+60471	3	1,2,3	Địa huyệt Tu La | Địa Ngục
+60481	1	1	Rừng Mưa Chết
+60491	2	1,2	Chuộc Ác sơn đạo | Địa Ngục
+60492	2	1,2	Bến cảng Chuộc Ác | Chuộc Ác sơn đạo
+60493	2	1,2	Chuộc Ác sơn đạo | Cửa Chuộc Ác
+60494	9	1,2,3,4,5,7,8,9,10	Chuộc Ác sơn đạo | Luyện ngục Khổ Hình
+60501	2	1,2	Thôn U Linh | Động Diêm La
+60502	2	1,2	Động Diêm La
+60503	4	1,2,3,4	Động Diêm La
+60504	4	1,2,3,4	Động Diêm La
+60505	14	1,2,3,4,5,6,7,8,9,10,11,12,13,14	Động Diêm La
+60506	14	1,2,3,4,5,6,7,8,9,10,11,12,13,14	Động Diêm La
+60507	14	1,2,3,4,5,6,7,8,9,10,11,12,13,14	Động Diêm La
+60508	4	1,2,3,4	Động Diêm La
+60509	2	1,2	Điện Diêm La
+60510	5	1,2,3,4,5	Động Diêm La
+60511	5	1,2,3,4,5	Động Diêm La
+60512	2	1,2	Động Diêm La
+60521	4	1,2,3,4	Địa Ngục | Địa huyệt Tu La | Hắc ngục Tu La
+60522	2	1,2	Địa huyệt Tu La
+60523	3	1,2,3	Địa huyệt Tu La | Huyết Trì | Hắc ngục Tu La
+60524	2	1,2	Huyết Trì | Hắc ngục Tu La
+60525	2	1,2	Địa huyệt Tu La
+60526	1	1	Địa huyệt Tu La
+60531	2	1,2	Bình Nguyên Địa Phủ | Động núi lửa Địa Phủ
+60532	2	1,2	Động núi lửa Địa Phủ
+60533	3	1,2,3	Động núi lửa Địa Phủ | Đại lao Địa Phủ | Địa Ngục
+60801	4	1,2,3,4	Thôn U Linh | Hẻm núi U Hồn
+60802	3	1,2,3	Hẻm núi U Hồn
+60803	3	1,2,3	Hẻm núi U Hồn
+60804	3	1,2,3	Hẻm núi U Hồn
+60805	7	1,2,3,4,5,6,7	Hẻm núi U Hồn | Cầu Nại Hà
+60806	8	1,2,3,4,5,6,7,8	Hẻm núi U Hồn | Cầu Nại Hà | Thôn Du Linh
+60807	4	1,2,3,4	Hoàng Tuyền Lộ | Bình Nguyên Tử Linh
+60808	1	1	Bình Nguyên Tử Linh
+60809	1	1	Bình Nguyên Tử Linh
+60810	1	1	Bình Nguyên Tử Linh
+60811	2	1,2	Bãi Tha Ma | Địa Ngục
+60821	2	1,2	Thôn Âm Phong | Địa Ngục
+60822	3	1,2,3	Thôn Âm Phong | Núi Đao sơn đạo | Núi đao Tàn Kiếm
+60823	2	1,2	Địa Ngục | Núi đao Tàn Kiếm
+60831	1	1	Địa Ngục
+60841	3	1,2,3	Cửa thành Địa Phủ | Quỷ Thành U Ám | Động Hoả Sơn
+61000	20	1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20	Đảo Phổ Cát | Bãi biển Ba Đạt Nhã | Miếu Voi Thần | Bến tàu Bất Lao Sơn | Giao Châu | Đường núi Tây Đồ Di | Mỏ khoáng ĐồngTrụSơn | Sơn động Nhật Nam | Sơn động Phù Nam | Cửa động Thạch Quất | Rừng Việt Thường | Chân núi Áo Lạp | Chân núi Tỉ Lao Khắc | Rừng Phất Thống | Đầm lầy Động Lý Tát | Cửa thành Lâm Ấp | Cửa thành Phù Nam | Rừng Bản Gia | Thông đạo Lĩnh Nam
+61001	2	1,2	Thành Lâm Ấp | Lĩnh Nam
+61002	6	1,2,3,4,5,6	Cửa thành Lâm Ấp | Bần hộ | Phổ hộ | Phú hộ
+61011	2	1,2	Thành Phù Nam | Lĩnh Nam
+61012	8	1,2,3,4,5,6,7,8	Cửa thành Phù Nam | Phổ hộ | Bần hộ | Phú hộ
+61021	5	1,2,3,4,5	Đường núi Tây Đồ Di | Phổ hộ | Bần hộ | Phú hộ
+61031	4	1,2,3,4	Phổ hộ | Bần hộ | Phú hộ | Rừng Bản Gia
+61041	3	1,2,3	Rừng Tà Mã | Nhà cỏ Tà Mã | Đảo Phổ Cát
+61051	1	1	Nhà cỏ Quỷ Vương
+61101	1	1	Thành Lâm Ấp
+61102	1	1	Thành Phù Nam
+61103	1	1	Thành Phù Nam
+61104	1	1	Thôn Tây Đồ Di
+61105	1	1	Thôn Bản Gia
+61131	1	1	Thành Lâm Ấp
+61132	1	1	Thành Lâm Ấp
+61133	1	1	Thành Phù Nam
+61134	1	1	Thành Phù Nam
+61135	1	1	Thành Phù Nam
+61136	1	1	Thôn Tây Đồ Di
+61137	1	1	Thôn Bản Gia
+61138	2	1,2	Bộ lạc Tà Mã | Đảo Phổ Cát
+61171	1	1	Thành Lâm Ấp
+61172	1	1	Thành Lâm Ấp
+61173	1	1	Thành Phù Nam
+61174	1	1	Thành Phù Nam
+61175	1	1	Thôn Tây Đồ Di
+61176	1	1	Thôn Tây Đồ Di
+61177	1	1	Thôn Bản Gia
+61178	2	1,2	Mê cung Quỷ Vương | Thôn Quỷ Vương
+61301	1	1	Động Bất Lao Sơn
+61401	2	1,2	Thôn Tây Đồ Di | Lĩnh Nam
+61411	2	1,2	Động huyệt ThạchQuất | Lĩnh Nam
+61421	1	1	Lĩnh Nam
+61431	1	1	Lĩnh Nam
+61441	2	1,2	Lĩnh Nam | Rừng Tà Mã
+61501	2	1,2	Đỉnh Bất Lao Sơn | Đại lao Bất Lao Sơn
+61511	2	1,2	Sơn động Phù Nam | Lĩnh Nam
+61512	3	1,2,3	Sơn động Phù Nam
+61513	1	1	Sơn động Phù Nam
+61514	3	1,2,3	Sơn động Phù Nam | Lĩnh Nam
+61515	2	1,2	Sơn động Phù Nam
+61516	1	1	Sơn động Phù Nam
+61521	2	1,2	Sơn động Phù Nam | Lĩnh Nam
+61522	3	1,2,3	Sơn động Phù Nam
+61523	2	1,2	Sơn động Phù Nam
+61524	2	1,2	Sơn động Phù Nam
+61525	1	1	Sơn động Phù Nam
+61526	2	1,2	Sơn động Phù Nam
+61527	2	1,2	Sơn động Phù Nam
+61528	1	1	Sơn động Phù Nam
+61531	4	1,2,3,4	Cửa vào Thạch Quất | Hang động Thạch Quất
+61532	3	1,2,3	Hang động Thạch Quất | Cửa vào Thạch Quất
+61533	3	1,2,3	Hang động Thạch Quất | Cửa vào Thạch Quất
+61534	3	1,2,3	Hang động Thạch Quất | Cửa vào Thạch Quất
+61535	2	1,2	Hang động Thạch Quất | Cửa vào Thạch Quất
+61536	1	1	Hang động Thạch Quất
+61537	2	1,2	Hang động Thạch Quất | Cửa vào Thạch Quất
+61541	3	1,2,3	Mỏ Đồng Trụ Sơn | Lĩnh Nam
+61542	2	1,2	Mỏ Đồng Trụ Sơn
+61543	2	1,2	Mỏ Đồng Trụ Sơn
+61544	2	1,2	Mỏ Đồng Trụ Sơn
+61545	1	1	Mỏ Đồng Trụ Sơn
+61546	2	1,2	Mỏ Đồng Trụ Sơn
+61547	2	1,2	Mỏ Đồng Trụ Sơn
+61548	2	1,2	Mỏ Đồng Trụ Sơn
+61549	1	1	Mỏ Đồng Trụ Sơn
+61551	4	1,1,3,4	Nhà cỏ Quỷ Vương | Mê cung Quỷ Vương
+61552	1	1	Mê cung Quỷ Vương
+61553	4	1,2,3,4	Mê cung Quỷ Vương
+61554	1	1	Mê cung Quỷ Vương
+61555	1	1	Mê cung Quỷ Vương
+61556	4	1,2,3,4	Mê cung Quỷ Vương
+61557	1	1	Mê cung Quỷ Vương
+61558	1	1	Mê cung Quỷ Vương
+61559	5	1,2,3,4,5	Mê cung Quỷ Vương
+61560	1	1	Mê cung Quỷ Vương
+61561	3	1,2,3	Mê cung Quỷ Vương
+61562	1	1	Mê cung Quỷ Vương
+61563	6	1,2,3,4,5,6	Mê cung Quỷ Vương
+61564	1	1	Mê cung Quỷ Vương
+61565	2	1,2	Mê cung Quỷ Vương | Động Quỷ Vương
+61566	1	1	Mê cung Quỷ Vương
+61567	1	1	Mê cung Quỷ Vương
+61801	2	1,2	Lĩnh Nam | Đường núi BấtLao Sơn
+61802	2	1,2	Bến tàu Bất Lao Sơn | Đỉnh Bất Lao Sơn
+61803	2	1,2	Đường núi BấtLao Sơn | Động Bất Lao Sơn
+61811	2	1,2	Rừng Việt Thường | Lĩnh Nam
+61812	1	1	Rừng Việt Thường
+61821	2	1,2	Đỉnh Áo Lạp Sơn | Lĩnh Nam
+61822	1	1	Chân núi Áo Lạp
+61831	2	1,2	Đầm lầy Động Lý Tát | Lĩnh Nam
+61832	1	1	Đầm lầy Động Lý Tát
+61841	2	1,2	Rừng Phất Thống | Lĩnh Nam
+61842	1	1	Rừng Phất Thống
+61851	2	1,2	Đỉnh núi Tỉ Lao Khắc | Lĩnh Nam
+61852	1	1	Chân núi Tỉ Lao Khắc
+61861	2	1,2	Thôn Bản Gia | Lĩnh Nam
+61871	2	1,2	Bộ lạc Tà Mã | Phổ Cát đảo
+61872	1	1	Vô Danh
+61873	1	1	Vô Danh
+61901	2	1,1	Thông đạo Lĩnh Nam
+61902	2	1,1	Thông đạo Lĩnh Nam
+61903	2	1,1	Thông đạo Lĩnh Nam
+61904	2	1,1	Thông đạo Lĩnh Nam
+61905	2	1,1	Thông đạo Lĩnh Nam
+61906	2	1,1	Thông đạo Lĩnh Nam
+61907	2	1,1	Thông đạo Lĩnh Nam
+61908	1	1	Dị Giới
+62000	1	1	Tiên Giới

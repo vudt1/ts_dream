@@ -1,0 +1,385 @@
+client_id	client_id_hex	server_id	server_id_hex	offset_server_minus_client	match	name	client_name	client_type	server_type	client_elem	server_elem	server_requireSk	client_require_sk	max_lvl	sk_point
+10000	0x2710	10000	0x2710	0	EXACT	Đấu vật	Đấu vật	0	0	0	0	0	0	1	0
+10001	0x2711	10001	0x2711	0	EXACT	Thuật mưa đá	Thuật mưa đá	1	1	1	1	0	0	10	1
+10002	0x2712	10002	0x2712	0	EXACT	Lôi mộc	Lôi mộc	1	1	1	1	10001	10001	10	3
+10003	0x2713	10003	0x2713	0	EXACT	Cạm bẫy	Cạm bẫy	1	1	1	1	10001	10001	10	3
+10004	0x2714	10004	0x2714	0	EXACT	Cây tinh	Cây tinh	1	1	1	1	10002	10002	10	6
+10005	0x2715	10005	0x2715	0	EXACT	Ném đá	Ném đá	1	1	1	1	10003	10003	10	7
+10006	0x2716	10006	0x2716	0	EXACT	Địa nha	Địa nha	1	1	1	1	10004	10004	10	9
+10007	0x2717	10007	0x2717	0	EXACT	Đá lăn	Đá lăn	1	1	1	1	10005	10005	10	10
+10008	0x2718	10008	0x2718	0	EXACT	Phi sa tẩu thạch	Phi sa tẩu thạch	1	1	1	1	10005	10005	10	10
+10009	0x2719	10009	0x2719	0	EXACT	Giải kết giới	Giải kết giới	1	1	1	1	10006	10006	1	1
+10010	0x271A	10010	0x271A	0	EXACT	Kết giới	Kết giới	1	1	1	1	10006	10006	10	12
+10011	0x271B	10011	0x271B	0	EXACT	Thái Sơn áp đỉnh	Thái Sơn áp đỉnh	1	1	1	1	10007	10007	10	14
+10012	0x271C	10012	0x271C	0	EXACT	Thiên Băng Địa Liệt	Thiên Băng Địa Liệt	1	1	1	1	10008	10008	10	18
+10013	0x271D	10013	0x271D	0	EXACT	Vạn mã phi đằng	Vạn mã phi đằng	1	1	1	1	10008	10008	10	14
+10014	0x271E	10014	0x271E	0	EXACT	Giải trừ kính	Giải trừ kính	1	1	1	1	10010	10010	1	1
+10015	0x271F	10015	0x271F	0	EXACT	Kính	Kính	1	1	1	1	10010	10010	5	18
+10016	0x2720	10016	0x2720	0	EXACT	Nham quái	Nham quái	1	1	1	1	0	0	10	0
+10017	0x2721	10017	0x2721	0	EXACT	Gọi tiểu trung nham	Gọi tiểu trung nham	1	1	1	1	0	0	1	0
+10018	0x2722	10018	0x2722	0	EXACT	Gọi trung nham	Gọi trung nham	1	1	1	1	0	0	1	0
+10019	0x2723	10019	0x2723	0	EXACT	Gọi đại nham	Gọi đại nham	1	1	1	1	0	0	1	0
+10020	0x2724	10020	0x2724	0	EXACT	Địa Động Quyết	Địa Động Quyết	1	1	1	1	0	0	10	1
+10021	0x2725	10021	0x2725	0	EXACT	ĐịaLiệt Vô Song Kiếm	ĐịaLiệt Vô Song Kiếm	1	1	1	1	10020	10020	10	8
+10022	0x2726	10022	0x2726	0	EXACT	Địa Động Phá	Địa Động Phá	1	1	1	1	10020	10020	10	7
+10023	0x2727	10023	0x2727	0	EXACT	Khu Tượng Đột	Khu Tượng Đột	1	1	1	1	10024	10024	10	13
+10024	0x2728	10024	0x2728	0	EXACT	Hoành Tảo Thiên Quân	Hoành Tảo Thiên Quân	1	1	1	1	10022	10022	10	9
+10025	0x2729	10025	0x2729	0	EXACT	Thổ Băng Trận	Thổ Băng Trận	1	1	1	1	10021	10021	5	11
+10026	0x272A	10026	0x272A	0	EXACT	Linh Kính	Linh Kính	1	1	1	1	10025	10025	5	15
+10027	0x272B	10027	0x272B	0	EXACT	Vô Gian Chấn Ba	Vô Gian Chấn Ba	1	1	1	1	10011	10011	10	8
+10028	0x272C	10028	0x272C	0	EXACT	Cát Thiên Hồn Phủ	Cát Thiên Hồn Phủ	1	1	1	1	10021	10021	10	8
+10029	0x272D	10029	0x272D	0	EXACT	Lưu Tinh Thiết Pháo	Lưu Tinh Thiết Pháo	1	1	1	1	10005	10005	10	7
+10030	0x272E	10030	0x272E	0	EXACT	Lang Tinh Pháo	Lang Tinh Pháo	1	1	1	1	10008	10008	10	10
+10031	0x272F	10031	0x272F	0	EXACT	Kim Chung Tráo	Kim Chung Tráo	1	1	1	1	10015	10015	10	12
+10032	0x2730	10032	0x2730	0	EXACT	ChiếnTượngTrùngPhong	ChiếnTượngTrùngPhong	1	1	1	1	10013	10013	10	8
+10033	0x2731	10033	0x2731	0	EXACT	Sa Bộc Cầm	Sa Bộc Cầm	1	1	1	1	10025	10025	5	8
+10034	0x2732	10034	0x2732	0	EXACT	Đồ Nham Vương Sát	Đồ Nham Vương Sát	1	1	1	1	10024	10024	10	15
+10035	0x2733	10035	0x2733	0	EXACT	Sa bạo chi loạn	Sa bạo chi loạn	1	1	1	1	0	0	5	0
+10036	0x2734	10036	0x2734	0	EXACT	Sa khau chi vũ	Sa khau chi vũ	1	1	1	1	0	0	5	0
+10037	0x2735	10037	0x2735	0	EXACT	Kết giới 3	Kết giới 3	1	1	1	1	0	0	10	0
+10038	0x2736	10038	0x2736	0	EXACT	Kính 3	Kính 3	1	1	1	1	0	0	5	0
+10039	0x2737	10039	0x2737	0	EXACT	Linh Kính 3	Linh Kính 3	1	1	1	1	0	0	5	0
+10040	0x2738	10040	0x2738	0	EXACT	Kim Chung Tráo 3	Kim Chung Tráo 3	1	1	1	1	0	0	10	0
+10041	0x2739	10041	0x2739	0	EXACT	Sa Bộc Cầm 3	Sa Bộc Cầm 3	1	1	1	1	0	0	5	0
+10042	0x273A	10042	0x273A	0	EXACT	Vô Gian Chấn Ba 2	Vô Gian Chấn Ba 2	1	1	1	1	10027	10027	10	8
+10043	0x273B	10043	0x273B	0	EXACT	Cát Thiên Hồn Phủ 2	Cát Thiên Hồn Phủ 2	1	1	1	1	10028	10028	10	8
+11001	0x2AF9	11001	0x2AF9	0	EXACT	Thuật nước ngập	Thuật nước ngập	2	2	2	2	0	0	10	1
+11002	0x2AFA	11002	0x2AFA	0	EXACT	Băng tường	Băng tường	2	2	2	2	11001	11001	5	4
+11003	0x2AFB	11003	0x2AFB	0	EXACT	Băng kiếm	Băng kiếm	2	2	2	2	11001	11001	10	3
+11004	0x2AFC	11004	0x2AFC	0	EXACT	Thanh lưu	Thanh lưu	2	2	2	2	11002	11002	10	6
+11005	0x2AFD	11005	0x2AFD	0	EXACT	Dũng tuyền	Dũng tuyền	2	2	2	2	11003	11003	10	5
+11006	0x2AFE	11006	0x2AFE	0	EXACT	Thuật hồi ma	Thuật hồi ma	2	2	2	2	11004	11004	10	8
+11007	0x2AFF	11007	0x2AFF	0	EXACT	Thuật trị liệu	Thuật trị liệu	2	2	2	2	11004	11004	10	8
+11008	0x2B00	11008	0x2B00	0	EXACT	Hồng thủy	Hồng thủy	2	2	2	2	11005	11005	10	8
+11009	0x2B01	11009	0x2B01	0	EXACT	Toàn hồi ma thuật	Toàn hồi ma thuật	2	2	2	2	11006	11006	10	9
+11010	0x2B02	11010	0x2B02	0	EXACT	Toàn trị liệu thuật	Toàn trị liệu thuật	2	2	2	2	11007	11007	10	9
+11011	0x2B03	11011	0x2B03	0	EXACT	Băng đá	Băng đá	2	2	2	2	11008	11008	10	9
+11012	0x2B04	11012	0x2B04	0	EXACT	Trạng thái giải trừ	Trạng thái giải trừ	2	2	2	2	11009	11009	1	12
+11013	0x2B05	11013	0x2B05	0	EXACT	Thuật hồi sinh	Thuật hồi sinh	2	2	2	2	11010	11010	10	12
+11014	0x2B06	11014	0x2B06	0	EXACT	Băng phong	Băng phong	2	2	2	2	11011	11011	10	16
+11014	0x2B06	20026	0x4E3A	9012	EXACT	Băng Phong 	Băng phong	2	15	2	2	0	11011	10	0
+11015	0x2B07	11015	0x2B07	0	EXACT	Băng tan	Băng tan	2	2	2	2	11011	11011	1	1
+11016	0x2B08	11016	0x2B08	0	EXACT	Thủy thần	Thủy thần	2	2	2	2	0	0	10	0
+11017	0x2B09	11017	0x2B09	0	EXACT	Gọi tiểu trung thủy	Gọi tiểu trung thủy	2	2	2	2	0	0	1	0
+11018	0x2B0A	11018	0x2B0A	0	EXACT	Gọi trung thủy	Gọi trung thủy	2	2	2	2	0	0	1	0
+11019	0x2B0B	11019	0x2B0B	0	EXACT	Gọi đại thủy	Gọi đại thủy	2	2	2	2	0	0	1	0
+11020	0x2B0C	11020	0x2B0C	0	EXACT	Băng Tâm Quyết	Băng Tâm Quyết	2	2	2	2	0	0	10	1
+11021	0x2B0D	11021	0x2B0D	0	EXACT	Băng Tuyền Trảm	Băng Tuyền Trảm	2	2	2	2	11020	11020	10	7
+11022	0x2B0E	11022	0x2B0E	0	EXACT	Băng Phách Chùy	Băng Phách Chùy	2	2	2	2	11021	11021	10	9
+11023	0x2B0F	11023	0x2B0F	0	EXACT	Sương Hàn Đống Liệt	Sương Hàn Đống Liệt	2	2	2	2	11022	11022	10	12
+11024	0x2B10	11024	0x2B10	0	EXACT	Minh Kính Chỉ Thủy	Minh Kính Chỉ Thủy	2	2	2	2	11020	11020	5	10
+11025	0x2B11	11025	0x2B11	0	EXACT	Tiến Giai Trạng Giải	Tiến Giai Trạng Giải	2	2	2	2	11024	11024	1	15
+11026	0x2B12	11026	0x2B12	0	EXACT	Diệu Thủ Hồi Xuân	Diệu Thủ Hồi Xuân	2	2	2	2	11025	11025	10	15
+11027	0x2B13	11027	0x2B13	0	EXACT	Thiên Hồi Băng Vũ	Thiên Hồi Băng Vũ	2	2	2	2	11014	11014	5	5
+11028	0x2B14	11028	0x2B14	0	EXACT	Sương Lôi Quyền	Sương Lôi Quyền	2	2	2	2	11014	11014	5	5
+11029	0x2B15	11029	0x2B15	0	EXACT	Siêu Hồi Ma Thuật	Siêu Hồi Ma Thuật	2	2	2	2	11009	11009	10	7
+11030	0x2B16	11030	0x2B16	0	EXACT	Thiên Giáng Cam Lâm	Thiên Giáng Cam Lâm	2	2	2	2	11010	11010	10	7
+11031	0x2B17	11031	0x2B17	0	EXACT	SiêuTrạng Giải Thuật	SiêuTrạng Giải Thuật	2	2	2	2	11025	11025	1	15
+11032	0x2B18	11032	0x2B18	0	EXACT	Minh Hà Vô Tưởng	Minh Hà Vô Tưởng	2	2	2	2	11024	11024	5	10
+11033	0x2B19	11033	0x2B19	0	EXACT	Trảm Kỵ Nhất Thiểm	Trảm Kỵ Nhất Thiểm	2	2	2	2	11022	11022	10	9
+11034	0x2B1A	11034	0x2B1A	0	EXACT	Lục Hồi Thiên BăngVũ	Lục Hồi Thiên BăngVũ	2	2	2	2	11023	11023	10	14
+11035	0x2B1B	11035	0x2B1B	0	EXACT	Hải đào chi loạn	Hải đào chi loạn	2	2	2	2	0	0	5	0
+11036	0x2B1C	11036	0x2B1C	0	EXACT	Thuỷ triều chi vũ	Thuỷ triều chi vũ	2	2	2	2	0	0	5	0
+11037	0x2B1D	11037	0x2B1D	0	EXACT	Băng tường 3	Băng tường 3	2	2	2	2	11002	11002	5	0
+11038	0x2B1E	11038	0x2B1E	0	EXACT	Thiên Hồi Băng Vũ 3	Thiên Hồi Băng Vũ 3	2	2	2	2	11027	11027	5	0
+11039	0x2B1F	11039	0x2B1F	0	EXACT	Sương Lôi Quyền 3	Sương Lôi Quyền 3	2	2	2	2	11028	11028	5	0
+11040	0x2B20	11040	0x2B20	0	EXACT	Minh Hà Vô Tưởng 3	Minh Hà Vô Tưởng 3	2	2	2	2	11032	11032	5	0
+11041	0x2B21	11041	0x2B21	0	EXACT	Trảm Kỵ Nhất Thiểm 2	Trảm Kỵ Nhất Thiểm 2	2	2	2	2	11033	11033	10	9
+12001	0x2EE1	12001	0x2EE1	0	EXACT	Thuật phóng hỏa	Thuật phóng hỏa	3	3	3	3	0	0	10	1
+12002	0x2EE2	12002	0x2EE2	0	EXACT	Liệt hỏa	Liệt hỏa	3	3	3	3	12001	12001	10	3
+12003	0x2EE3	12003	0x2EE3	0	EXACT	Hỏa tiễn	Hỏa tiễn	3	3	3	3	12001	12001	10	4
+12004	0x2EE4	12004	0x2EE4	0	EXACT	Hỏa cầu	Hỏa cầu	3	3	3	3	12002	12002	10	7
+12005	0x2EE5	12005	0x2EE5	0	EXACT	Hỏa luân	Hỏa luân	3	3	3	3	12002	12002	10	6
+12006	0x2EE6	12006	0x2EE6	0	EXACT	Hội tâm nhất kích	Hội tâm nhất kích	3	3	3	3	12003	12003	10	7
+12007	0x2EE7	12007	0x2EE7	0	EXACT	Diễm Chi Vũ	Diễm Chi Vũ	3	3	3	3	12004	12004	10	10
+12008	0x2EE8	12008	0x2EE8	0	EXACT	Phong hỏa luân	Phong hỏa luân	3	3	3	3	12005	12005	10	10
+12009	0x2EE9	12009	0x2EE9	0	EXACT	Hỏa kiếm	Hỏa kiếm	3	3	3	3	12006	12006	10	9
+12010	0x2EEA	12010	0x2EEA	0	EXACT	Hỏa Long	Hỏa Long	3	3	3	3	12007	12007	10	12
+12011	0x2EEB	12011	0x2EEB	0	EXACT	Bát diện hỏa luân	Bát diện hỏa luân	3	3	3	3	12008	12008	10	13
+12012	0x2EEC	12012	0x2EEC	0	EXACT	Cuồng diêm trảm	Cuồng diêm trảm	3	3	3	3	12009	12009	10	12
+12013	0x2EED	12013	0x2EED	0	EXACT	Tam vị chân hỏa	Tam vị chân hỏa	3	3	3	3	12010	12010	10	16
+12014	0x2EEE	12014	0x2EEE	0	EXACT	Phong Hỏa LiêuNguyên	Phong Hỏa LiêuNguyên	3	3	3	3	12011	12011	10	16
+12015	0x2EEF	12015	0x2EEF	0	EXACT	Bạch hồng quán nhật	Bạch hồng quán nhật	3	3	3	3	12012	12012	10	16
+12016	0x2EF0	12016	0x2EF0	0	EXACT	Phụng hoàng	Phụng hoàng	3	3	3	3	0	0	10	0
+12017	0x2EF1	12017	0x2EF1	0	EXACT	Gọi tiểu trung phụng	Gọi tiểu trung phụng	3	3	3	3	0	0	1	0
+12017	0x2EF1	12018	0x2EF2	1	EXACT	Gọi tiểu trung phụng	Gọi tiểu trung phụng	3	3	3	3	0	0	1	0
+12018	0x2EF2	12017	0x2EF1	-1	EXACT	Gọi tiểu trung phụng	Gọi tiểu trung phụng	3	3	3	3	0	0	1	0
+12018	0x2EF2	12018	0x2EF2	0	EXACT	Gọi tiểu trung phụng	Gọi tiểu trung phụng	3	3	3	3	0	0	1	0
+12019	0x2EF3	12019	0x2EF3	0	EXACT	Gọi đại phụng	Gọi đại phụng	3	3	3	3	0	0	1	0
+12020	0x2EF4	12020	0x2EF4	0	EXACT	Hỏa Dương Quyết	Hỏa Dương Quyết	3	3	3	3	0	0	10	1
+12021	0x2EF5	12021	0x2EF5	0	EXACT	Cực Dương Kiếm	Cực Dương Kiếm	3	3	3	3	12020	12020	10	8
+12022	0x2EF6	12022	0x2EF6	0	EXACT	Cuồng Long Phệ Nhật	Cuồng Long Phệ Nhật	3	3	3	3	12024	12024	10	18
+12023	0x2EF7	12023	0x2EF7	0	EXACT	Sí Diễm Vô Nhị	Sí Diễm Vô Nhị	3	3	3	3	12020	12020	10	11
+12024	0x2EF8	12024	0x2EF8	0	EXACT	Đan Dương Hộ Thể	Đan Dương Hộ Thể	3	3	3	3	12021	12021	5	10
+12025	0x2EF9	12025	0x2EF9	0	EXACT	CuồngNhiệt Chiến Hồn	CuồngNhiệt Chiến Hồn	3	3	3	3	12026	12026	5	15
+12026	0x2EFA	12026	0x2EFA	0	EXACT	Ngũ Lôi Oanh Đỉnh	Ngũ Lôi Oanh Đỉnh	3	3	3	3	12023	12023	10	13
+12027	0x2EFB	12027	0x2EFB	0	EXACT	Hỏa Bạo Nhất Kích	Hỏa Bạo Nhất Kích	3	3	3	3	12006	12006	10	7
+12028	0x2EFC	12028	0x2EFC	0	EXACT	Liệt Thuật Hào Hỏa	Liệt Thuật Hào Hỏa	3	3	3	3	12011	12011	10	9
+12029	0x2EFD	12029	0x2EFD	0	EXACT	Xích Long Cự	Xích Long Cự	3	3	3	3	12004	12004	10	5
+12030	0x2EFE	12030	0x2EFE	0	EXACT	Lôi Hỏa Thiệu Lâm	Lôi Hỏa Thiệu Lâm	3	3	3	3	12010	12010	10	9
+12031	0x2EFF	12031	0x2EFF	0	EXACT	Dương Viêm	Dương Viêm	3	3	3	3	12015	12015	10	10
+12032	0x2F00	12032	0x2F00	0	EXACT	Chúc Dung Phần Dã	Chúc Dung Phần Dã	3	3	3	3	12014	12014	10	9
+12033	0x2F01	12033	0x2F01	0	EXACT	Long Bá Liệt Trảm	Long Bá Liệt Trảm	3	3	3	3	12022	12022	10	16
+12034	0x2F02	12034	0x2F02	0	EXACT	Long Vương Chấn Hề	Long Vương Chấn Hề	3	3	3	3	12026	12026	10	16
+12035	0x2F03	12035	0x2F03	0	EXACT	Hoả thiệt chi loạn	Hoả thiệt chi loạn	3	3	3	3	0	0	5	0
+12036	0x2F04	12036	0x2F04	0	EXACT	Liệt diễm chi vũ	Liệt diễm chi vũ	3	3	3	3	0	0	5	0
+12037	0x2F05	12037	0x2F05	0	EXACT	Chân.TLong Bá L Trảm	Chân.TLong Bá L Trảm	3	3	3	3	0	0	10	16
+12038	0x2F06	12038	0x2F06	0	EXACT	Đại Thánh trảm yêu	Đại Thánh trảm yêu	3	3	3	3	0	0	10	16
+12039	0x2F07	12039	0x2F07	0	EXACT	ĐT trảm yêu áo nghĩa	ĐT trảm yêu áo nghĩa	3	3	3	3	0	0	10	16
+12040	0x2F08	12040	0x2F08	0	EXACT	Kim tinh hoả nhãn	Kim tinh hoả nhãn	3	3	3	3	0	0	10	4
+12041	0x2F09	12041	0x2F09	0	EXACT	Xà mâu hồn phệ kích	Xà mâu hồn phệ kích	3	3	3	3	0	0	5	1
+12042	0x2F0A	12042	0x2F0A	0	EXACT	XM Hồn phệ kích A.N	XM Hồn phệ kích A.N	3	3	3	3	0	0	5	1
+12043	0x2F0B	12043	0x2F0B	0	EXACT	Bạch Hổ tàng địa phệ	Bạch Hổ tàng địa phệ	1	1	1	1	0	0	10	5
+12044	0x2F0C	12044	0x2F0C	0	EXACT	BH tàng địa phệ A.N	BH tàng địa phệ A.N	1	1	1	1	0	0	10	5
+12045	0x2F0D	12045	0x2F0D	0	EXACT	Đan Dương Hộ Thể 3	Đan Dương Hộ Thể 3	3	3	3	3	0	0	5	0
+12046	0x2F0E	12046	0x2F0E	0	EXACT	Liệt Thuật Hào Hỏa 2	Liệt Thuật Hào Hỏa 2	3	3	3	3	12028	12028	10	9
+12047	0x2F0F	12047	0x2F0F	0	EXACT	Dương Viêm 4	Dương Viêm 4	3	3	3	3	12031	12031	10	10
+12048	0x2F10	12048	0x2F10	0	EXACT	Long Bá Liệt Trảm 2	Long Bá Liệt Trảm 2	3	3	3	3	12033	12033	10	16
+13001	0x32C9	13001	0x32C9	0	EXACT	Thuật ngự phong	Thuật ngự phong	4	4	4	4	0	0	10	1
+13002	0x32CA	13002	0x32CA	0	EXACT	Tuyền Phong	Tuyền Phong	4	4	4	4	13001	13001	5	3
+13003	0x32CB	13003	0x32CB	0	EXACT	Lẫn tránh	Lẫn tránh	4	4	4	4	13001	13001	5	4
+13004	0x32CC	13004	0x32CC	0	EXACT	Cuồng phong	Cuồng phong	4	4	4	4	13002	13002	10	6
+13005	0x32CD	13005	0x32CD	0	EXACT	Thuật ẩn mình	Thuật ẩn mình	4	4	4	4	13003	13003	5	7
+13006	0x32CE	13006	0x32CE	0	EXACT	Bão Phong	Bão Phong	4	4	4	4	13004	13004	10	11
+13006	0x32CE	20028	0x4E3C	7022	EXACT	Bạo Phong 	Bão Phong	4	15	4	4	0	13004	10	0
+13007	0x32CF	13007	0x32CF	0	EXACT	Huyền Kích	Huyền Kích	4	4	4	4	13004	13004	10	10
+13008	0x32D0	13008	0x32D0	0	EXACT	Thuật phân thân	Thuật phân thân	4	4	4	4	13005	13005	1	13
+13009	0x32D1	13009	0x32D1	0	EXACT	Phong quyển tàn vân	Phong quyển tàn vân	4	4	4	4	13006	13006	10	16
+13010	0x32D2	13010	0x32D2	0	EXACT	Liên kích	Liên kích	4	4	4	4	13007	13007	10	13
+13011	0x32D3	13011	0x32D3	0	EXACT	Thuật thu nhỏ	Thuật thu nhỏ	4	4	4	4	13008	13008	5	12
+13012	0x32D4	13012	0x32D4	0	EXACT	Thuật phóng đại	Thuật phóng đại	4	4	4	4	13008	13008	5	12
+13013	0x32D5	13013	0x32D5	0	EXACT	Loạn kích	Loạn kích	4	4	4	4	13010	13010	10	16
+13014	0x32D6	13014	0x32D6	0	EXACT	Nguyên khí	Nguyên khí	4	4	4	4	13011	13011	10	15
+13015	0x32D7	13015	0x32D7	0	EXACT	Thanh long	Thanh long	4	4	4	4	0	0	10	0
+13016	0x32D8	13016	0x32D8	0	EXACT	Gọi tiểu trung long	Gọi tiểu trung long	4	4	4	4	0	0	1	0
+13017	0x32D9	13017	0x32D9	0	EXACT	Gọi trung long	Gọi trung long	4	4	4	4	0	0	1	0
+13018	0x32DA	13018	0x32DA	0	EXACT	Gọi đại long	Gọi đại long	4	4	4	4	0	0	1	0
+13019	0x32DB	13019	0x32DB	0	EXACT	Phong Ngạo Quyết	Phong Ngạo Quyết	4	4	4	4	0	0	10	1
+13020	0x32DC	13020	0x32DC	0	EXACT	Phong Chi Chiến Ý	Phong Chi Chiến Ý	4	4	4	4	13021	13021	5	10
+13021	0x32DD	13021	0x32DD	0	EXACT	Đẩu Chuyển Tinh Di	Đẩu Chuyển Tinh Di	4	4	4	4	13019	13019	5	9
+13022	0x32DE	13022	0x32DE	0	EXACT	Liệt Phong Đạn	Liệt Phong Đạn	4	4	4	4	13019	13019	10	8
+13023	0x32DF	13023	0x32DF	0	EXACT	Long Quyển Cụ Phong	Long Quyển Cụ Phong	4	4	4	4	13024	13024	10	12
+13024	0x32E0	13024	0x32E0	0	EXACT	Ảo Ảnh Liên Kích	Ảo Ảnh Liên Kích	4	4	4	4	13022	13022	10	11
+13025	0x32E1	13025	0x32E1	0	EXACT	Vô Ảnh Vô Tướng	Vô Ảnh Vô Tướng	4	4	4	4	13020	13020	5	15
+13026	0x32E2	13026	0x32E2	0	EXACT	Băng Lôi	Băng Lôi	4	4	4	4	13009	13009	10	11
+13027	0x32E3	13027	0x32E3	0	EXACT	Phong Huyễn Thần Ly	Phong Huyễn Thần Ly	4	4	4	4	13006	13006	10	9
+13028	0x32E4	13028	0x32E4	0	EXACT	Trảm Kỵ Phi Kiếm	Trảm Kỵ Phi Kiếm	4	4	4	4	13004	13004	10	4
+13029	0x32E5	13029	0x32E5	0	EXACT	Sơn Lam	Sơn Lam	4	4	4	4	13024	13024	10	9
+13030	0x32E6	13030	0x32E6	0	EXACT	Thức Qủy Hấp Hồn	Thức Qủy Hấp Hồn	4	4	4	4	13014	13014	5	9
+13031	0x32E7	13031	0x32E7	0	EXACT	Phong Kình Lôi Minh	Phong Kình Lôi Minh	4	4	4	4	13023	13023	10	11
+13032	0x32E8	13032	0x32E8	0	EXACT	Ẩn Phân Thân Thuật	Ẩn Phân Thân Thuật	4	4	4	4	13005	13005	5	9
+13033	0x32E9	13033	0x32E9	0	EXACT	Chấn Điện	Chấn Điện	4	4	4	4	13013	13013	10	8
+13034	0x32EA	13034	0x32EA	0	EXACT	Cuồng phong chi loạn	Cuồng phong chi loạn	4	4	4	4	0	0	5	0
+13035	0x32EB	13035	0x32EB	0	EXACT	Xuy phất chi vũ	Xuy phất chi vũ	4	4	4	4	0	0	5	0
+13036	0x32EC	13036	0x32EC	0	EXACT	TLong Y nguyệt trảm	TLong Y nguyệt trảm	4	4	4	4	0	0	10	8
+13037	0x32ED	13037	0x32ED	0	EXACT	TL YN trảm áo nghĩa	TL YN trảm áo nghĩa	4	4	4	4	0	0	10	8
+13038	0x32EE	13038	0x32EE	0	EXACT	Lẫn tránh 3	Lẫn tránh 3	4	4	4	4	0	0	5	0
+13039	0x32EF	13039	0x32EF	0	EXACT	Huyền Kích 3	Huyền Kích 3	4	4	4	4	0	0	10	0
+13040	0x32F0	13040	0x32F0	0	EXACT	Đẩu Chuyển Tinh Di 3	Đẩu Chuyển Tinh Di 3	4	4	4	4	0	0	5	0
+13041	0x32F1	13041	0x32F1	0	EXACT	Vô Ảnh Vô Tướng 3	Vô Ảnh Vô Tướng 3	4	4	4	4	0	0	5	0
+13042	0x32F2	13042	0x32F2	0	EXACT	Sơn Lam 3	Sơn Lam 3	4	4	4	4	0	0	10	0
+13043	0x32F3	13043	0x32F3	0	EXACT	Băng Lôi 2	Băng Lôi 2	4	4	4	4	13026	13026	10	11
+13044	0x32F4	13044	0x32F4	0	EXACT	PhongHuyễn Thần Ly 2	PhongHuyễn Thần Ly 2	4	4	4	4	13027	13027	10	9
+14001	0x36B1	14001	0x36B1	0	EXACT	Thuật trinh thám	Thuật trinh thám	5	5	5	5	0	0	1	0
+14002	0x36B2	14002	0x36B2	0	EXACT	Thuật đào tẩu	Thuật đào tẩu	5	5	5	5	14001	14001	1	0
+14003	0x36B3	14003	0x36B3	0	EXACT	Thuật mua bán	Thuật mua bán	5	5	5	5	14001	14001	8	0
+14004	0x36B4	14004	0x36B4	0	EXACT	Thuật dò xét	Thuật dò xét	5	5	5	5	14001	14001	10	0
+14005	0x36B5	14005	0x36B5	0	EXACT	Thuật luyện đơn	Thuật luyện đơn	5	5	5	5	14001	14001	10	0
+14006	0x36B6	14006	0x36B6	0	EXACT	Đại hô	Đại hô	5	5	5	5	14001	14001	10	0
+14007	0x36B7	14007	0x36B7	0	EXACT	Giải hôn	Giải hôn	5	5	5	5	14002	14002	1	0
+14008	0x36B8	14008	0x36B8	0	EXACT	Hôn mê	Hôn mê	5	5	5	5	14002	14002	5	0
+14009	0x36B9	14009	0x36B9	0	EXACT	Người làm	Người làm	5	5	5	5	14003	14003	10	0
+14010	0x36BA	14010	0x36BA	0	EXACT	Thuật đào khoáng	Thuật đào khoáng	5	5	5	5	14004	14004	10	0
+14011	0x36BB	14011	0x36BB	0	EXACT	Thuật đúc luyện 	Thuật đúc luyện	5	5	5	5	14005	14005	10	0
+14012	0x36BC	14012	0x36BC	0	EXACT	Đồng tâm	Đồng tâm	5	5	5	5	14006	14006	10	0
+14013	0x36BD	14013	0x36BD	0	EXACT	Cổ Vũ	Cổ Vũ	5	5	5	5	14006	14006	10	0
+14014	0x36BE	14014	0x36BE	0	EXACT	Giải độc	Giải độc	5	5	5	5	0	0	1	0
+14015	0x36BF	14015	0x36BF	0	EXACT	Bỏ độc	Bỏ độc	5	5	5	5	0	0	10	0
+14016	0x36C0	14016	0x36C0	0	EXACT	Thuật giao dịch	Thuật giao dịch	5	5	5	5	14009	14009	10	0
+14017	0x36C1	14017	0x36C1	0	EXACT	Tịnh toạ	Tịnh toạ	5	5	5	5	14009	14009	10	0
+14018	0x36C2	14018	0x36C2	0	EXACT	Thuật đào sâu	Thuật đào sâu	5	5	5	5	14010	14010	10	0
+14019	0x36C3	14019	0x36C3	0	EXACT	Thuật chế tạo	Thuật chế tạo	5	5	5	5	14011	14011	5	0
+14020	0x36C4	14020	0x36C4	0	EXACT	Hoạch lí phản	Hoạch lí phản	5	5	5	5	14012	14012	5	0
+14021	0x36C5	14021	0x36C5	0	EXACT	Hỗn loạn	Hỗn loạn	5	5	5	5	0	0	5	0
+14022	0x36C6	14022	0x36C6	0	EXACT	Giải hỗn loạn	Giải hỗn loạn	5	5	5	5	0	0	1	0
+14023	0x36C7	14023	0x36C7	0	EXACT	Cưỡi ngựa	Cưỡi ngựa	5	5	5	5	0	0	1	0
+14024	0x36C8	14024	0x36C8	0	EXACT	Linh quang ẩn hiện	Linh quang ẩn hiện	5	5	5	5	0	0	1	0
+14025	0x36C9	14025	0x36C9	0	EXACT	Chiếm đọat	Chiếm đọat	5	5	5	5	0	0	1	0
+14026	0x36CA	14026	0x36CA	0	EXACT	Triệu gọi	Triệu gọi	5	5	5	5	0	0	1	0
+14027	0x36CB	14027	0x36CB	0	EXACT	Đạo sư	Đạo sư	5	5	5	5	0	0	1	0
+14028	0x36CC	14028	0x36CC	0	EXACT	Đoàn kết	Đoàn kết	5	5	5	5	0	0	1	0
+14029	0x36CD	14029	0x36CD	0	EXACT	Cát Phổ Trại bắn đạn	Cát Phổ Trại bắn đạn	5	5	5	5	0	0	10	0
+14030	0x36CE	14030	0x36CE	0	EXACT	Cát Phổ Trại áp đỉnh	Cát Phổ Trại áp đỉnh	5	5	5	5	0	0	10	0
+14031	0x36CF	14031	0x36CF	0	EXACT	Tiếp chiêu	Tiếp chiêu	5	5	5	5	0	0	1	0
+14032	0x36D0	14032	0x36D0	0	EXACT	Tinh luyện	Tinh luyện	5	5	5	5	14019	14019	10	0
+14033	0x36D1	14033	0x36D1	0	EXACT	Xạ Tiễn	Xạ Tiễn	5	5	5	5	14037	14037	5	0
+14034	0x36D2	14034	0x36D2	0	EXACT	Kỵ Binh	Kỵ Binh	5	5	5	5	0	0	1	0
+14035	0x36D3	14035	0x36D3	0	EXACT	Chuyển Thể	Chuyển Thể	5	5	5	5	0	0	1	0
+14036	0x36D4	14036	0x36D4	0	EXACT	Bách Xuyên	Bách Xuyên	5	5	5	5	0	0	5	0
+14037	0x36D5	14037	0x36D5	0	EXACT	Tiễn Vũ 	Tiễn Vũ	5	5	5	5	14036	14036	5	0
+14038	0x36D6	14038	0x36D6	0	EXACT	Đại chu thiên	Đại chu thiên	5	5	5	5	0	0	10	1
+14039	0x36D7	14039	0x36D7	0	EXACT	Bá khí	Bá khí	5	5	5	5	14038	14038	10	1
+14040	0x36D8	14040	0x36D8	0	EXACT	Bá ý	Bá ý	5	5	5	5	14038	14038	5	1
+14041	0x36D9	14041	0x36D9	0	EXACT	Lực bạt sơn hề	Lực bạt sơn hề	5	5	5	5	14038	14038	10	1
+14042	0x36DA	14042	0x36DA	0	EXACT	Sóng cuồng	Sóng cuồng	5	5	5	5	14038	14038	5	1
+14043	0x36DB	14043	0x36DB	0	EXACT	Anh khí hộ thân	Anh khí hộ thân	5	5	5	5	14038	14038	10	1
+14044	0x36DC	14044	0x36DC	0	EXACT	ThiênThần thuẫn	ThiênThần thuẫn	5	5	5	5	14038	14038	5	1
+14045	0x36DD	14045	0x36DD	0	EXACT	Tâm nhãn	Tâm nhãn	5	5	5	5	14038	14038	10	1
+14046	0x36DE	14046	0x36DE	0	EXACT	NgưngKhí HộThân	NgưngKhí HộThân	5	5	5	5	14038	14038	5	1
+14047	0x36DF	14047	0x36DF	0	EXACT	Dùng kế	Dùng kế	5	5	5	5	14038	14038	10	1
+14048	0x36E0	14048	0x36E0	0	EXACT	Trí thủ	Trí thủ	5	5	5	5	14038	14038	10	1
+14049	0x36E1	14049	0x36E1	0	EXACT	Chống địch	Chống địch	5	5	5	5	14038	14038	10	1
+14050	0x36E2	14050	0x36E2	0	EXACT	Sách động	Sách động	5	5	5	5	14038	14038	10	1
+14051	0x36E3	14051	0x36E3	0	EXACT	Tiên khiếu	Tiên khiếu	5	5	5	5	14038	14038	10	1
+14052	0x36E4	14052	0x36E4	0	EXACT	HóaHuyếtHòanHồn	HóaHuyếtHòanHồn	5	5	5	5	14038	14038	5	1
+14053	0x36E5	14053	0x36E5	0	EXACT	ThánhLinh thuật	ThánhLinh thuật	5	5	5	5	14038	14038	5	1
+14054	0x36E6	14054	0x36E6	0	EXACT	CànKhônThiênLôi	CànKhônThiênLôi	5	5	5	5	14038	14038	5	1
+14055	0x36E7	14055	0x36E7	0	EXACT	Tổn huyết	Tổn huyết	5	5	0	0	0	0	0	0
+14056	0x36E8	14056	0x36E8	0	EXACT	Tiên khí hộ thân	Tiên khí hộ thân	5	5	0	0	0	0	0	0
+14057	0x36E9	14057	0x36E9	0	EXACT	Vật lý giảm nữa	Vật lý giảm nữa	5	5	5	5	0	0	10	1
+14058	0x36EA	14058	0x36EA	0	EXACT	Thiết bố sam	Thiết bố sam	5	5	5	5	0	0	10	1
+14059	0x36EB	14059	0x36EB	0	EXACT	Đằng thuật giáp	Đằng thuật giáp	5	5	5	5	0	0	10	1
+14060	0x36EC	14060	0x36EC	0	EXACT	Toàn thể Thiên Lôi	Toàn thể Thiên Lôi	5	5	5	5	0	0	5	1
+14061	0x36ED	14061	0x36ED	0	EXACT	Thiên Lôi Thần Thuẫn	Thiên Lôi Thần Thuẫn	5	5	5	5	0	0	10	1
+15001	0x3A99	15001	0x3A99	0	EXACT	Bắt cóc	Bắt cóc	6	6	0	0	0	0	10	0
+15002	0x3A9A	15002	0x3A9A	0	EXACT	Thả lưới	Thả lưới	6	6	0	0	0	0	10	0
+15003	0x3A9B	15003	0x3A9B	0	EXACT	Thả lưới thành công	Thả lưới thành công	6	6	0	0	0	0	10	0
+15004	0x3A9C	15004	0x3A9C	0	EXACT	Phãn đoàn bộ võng	Phãn đoàn bộ võng	7	7	0	0	0	0	10	0
+15005	0x3A9D	15005	0x3A9D	0	EXACT	Thành công phãn đoàn	Thành công phãn đoàn	7	7	0	0	0	0	10	0
+16001	0x3E81	16001	0x3E81	0	EXACT	Lầu tên	Lầu tên	7	7	0	0	0	0	10	0
+16002	0x3E82	16002	0x3E82	0	EXACT	Thành Môn 	Thành Môn	7	7	0	0	0	0	10	0
+17001	0x4269	17001	0x4269	0	EXACT	Phòng ngự	Phòng ngự	8	8	0	0	0	0	10	0
+18001	0x4651	18001	0x4651	0	EXACT	Chạy trốn	Chạy trốn	9	9	0	0	0	0	10	0
+18002	0x4652	18002	0x4652	0	EXACT	Chạy trốn thất bại	Chạy trốn thất bại	9	9	0	0	0	0	10	0
+19001	0x4A39	19001	0x4A39	0	EXACT	Vật phẩm	Vật phẩm	10	10	0	0	0	0	0	0
+20001	0x4E21	20001	0x4E21	0	EXACT	Cây tinh hút máu	Cây tinh hút máu	11	11	0	0	0	0	0	0
+20002	0x4E22	20002	0x4E22	0	EXACT	Trúng độc mất máu	Trúng độc mất máu	11	11	0	0	0	0	0	0
+20003	0x4E23	20003	0x4E23	0	EXACT	Thương hại phản đàn	Thương hại phản đàn	11	11	0	0	0	0	0	0
+20004	0x4E24	20004	0x4E24	0	EXACT	Thần xui xẻo	Thần xui xẻo	12	12	0	0	0	0	0	0
+20005	0x4E25	20005	0x4E25	0	EXACT	Phúc thần	Phúc thần	12	12	0	0	0	0	0	0
+20006	0x4E26	20006	0x4E26	0	EXACT	Hộ chủ	Hộ chủ	5	5	5	5	0	0	1	0
+20007	0x4E27	20007	0x4E27	0	EXACT	Giải hộ chủ	Giải hộ chủ	13	13	0	0	0	0	0	0
+20008	0x4E28	20008	0x4E28	0	EXACT	Bùa chú	Bùa chú	14	14	0	0	0	0	0	0
+20009	0x4E29	20009	0x4E29	0	EXACT	Xe xung phong	Xe xung phong	7	7	0	0	0	0	10	0
+20010	0x4E2A	20010	0x4E2A	0	EXACT	Xe dao	Xe dao	7	7	0	0	0	0	10	0
+20011	0x4E2B	20011	0x4E2B	0	EXACT	Xe nỏ	Xe nỏ	7	7	0	0	0	0	10	0
+20012	0x4E2C	20012	0x4E2C	0	EXACT	Xe ném đá	Xe ném đá	7	7	0	0	0	0	10	0
+20013	0x4E2D	20013	0x4E2D	0	EXACT	Giếng/tháp tên	Giếng/tháp tên	7	7	0	0	0	0	10	0
+20014	0x4E2E	20014	0x4E2E	0	EXACT	Tứ nhân hỗn loạn	Tứ nhân hỗn loạn	15	15	3	3	0	0	10	0
+20015	0x4E2F	20015	0x4E2F	0	EXACT	Tứ nhân trạng giải	Tứ nhân trạng giải	15	15	0	0	0	0	10	0
+20016	0x4E30	20016	0x4E30	0	EXACT	Long đầu	Long đầu	15	15	0	0	0	0	10	0
+20017	0x4E31	20017	0x4E31	0	EXACT	Hữu long trảo	Hữu long trảo	15	15	0	0	0	0	10	0
+20018	0x4E32	20018	0x4E32	0	EXACT	Tả long trảo	Tả long trảo	15	15	0	0	0	0	10	0
+20019	0x4E33	20019	0x4E33	0	EXACT	Giải thoát	Giải thoát	15	15	0	0	0	0	10	0
+20020	0x4E34	20020	0x4E34	0	EXACT	Tam sát	Tam sát	15	15	0	0	0	0	10	0
+20021	0x4E35	20021	0x4E35	0	EXACT	Loạn Nha	Loạn Nha	15	15	0	0	0	0	10	0
+20022	0x4E36	20022	0x4E36	0	EXACT	Quy Thúc	Quy Thúc	15	15	0	0	0	0	10	0
+20023	0x4E37	20023	0x4E37	0	EXACT	Tứ độc thủ	Tứ độc thủ	15	15	0	0	0	0	10	0
+20024	0x4E38	20024	0x4E38	0	EXACT	Thập Khí	Thập Khí	15	15	0	0	0	0	10	0
+20025	0x4E39	20025	0x4E39	0	EXACT	Cây tinh 3	Cây tinh 3	15	15	1	1	0	0	10	0
+20026	0x4E3A	11014	0x2B06	-9012	EXACT	Băng phong	Băng Phong	15	2	2	2	11011	0	10	16
+20026	0x4E3A	20026	0x4E3A	0	EXACT	Băng Phong 	Băng Phong	15	15	2	2	0	0	10	0
+20027	0x4E3B	20027	0x4E3B	0	EXACT	Hoàn Phong 	Hoàn Phong	15	15	4	4	0	0	10	0
+20028	0x4E3C	13006	0x32CE	-7022	EXACT	Bão Phong	Bạo Phong	15	4	4	4	13004	0	10	11
+20028	0x4E3C	20028	0x4E3C	0	EXACT	Bạo Phong 	Bạo Phong	15	15	4	4	0	0	10	0
+20029	0x4E3D	20029	0x4E3D	0	EXACT	Bạch Hổ Pháo	Bạch Hổ Pháo	15	15	2	2	0	0	10	0
+20030	0x4E3E	20030	0x4E3E	0	EXACT	Bạch Hổ đầu	Bạch Hổ đầu	15	15	0	0	0	0	10	0
+20031	0x4E3F	20031	0x4E3F	0	EXACT	Tả Bạch Hổ trảo	Tả Bạch Hổ trảo	15	15	0	0	0	0	10	0
+20032	0x4E40	20032	0x4E40	0	EXACT	HữuBạch Hổ trảo	HữuBạch Hổ trảo	15	15	0	0	0	0	10	0
+20033	0x4E41	20033	0x4E41	0	EXACT	Kiếm tuyệt vọng	Kiếm tuyệt vọng	15	15	5	5	0	0	10	0
+20034	0x4E42	20034	0x4E42	0	EXACT	Xe đầu trâu	Xe đầu trâu	7	7	0	0	0	0	10	0
+20035	0x4E43	20035	0x4E43	0	EXACT	Xeđao tinhluyện gang	Xeđao tinhluyện gang	7	7	0	0	0	0	10	0
+20036	0x4E44	20036	0x4E44	0	EXACT	Xe Vận Cung	Xe Vận Cung	7	7	0	0	0	0	10	0
+20037	0x4E45	20037	0x4E45	0	EXACT	Xe lớn chở đá	Xe lớn chở đá	7	7	0	0	0	0	10	0
+20038	0x4E46	20038	0x4E46	0	EXACT	Giếng Cường Cung	Giếng Cường Cung	7	7	0	0	0	0	10	0
+20039	0x4E47	20039	0x4E47	0	EXACT	Tháp Thần Tiễn	Tháp Thần Tiễn	7	7	0	0	0	0	10	0
+20040	0x4E48	20040	0x4E48	0	EXACT	Tường Đinh	Tường Đinh	7	7	0	0	0	0	10	0
+20041	0x4E49	20041	0x4E49	0	EXACT	Cung tên trúc	Cung tên trúc	7	7	0	0	0	0	10	0
+20042	0x4E4A	20042	0x4E4A	0	EXACT	Thuốc nổ	Thuốc nổ	7	7	0	0	0	0	10	0
+20043	0x4E4B	20043	0x4E4B	0	EXACT	Đá lớn	Đá lớn	7	7	0	0	0	0	10	0
+20044	0x4E4C	20044	0x4E4C	0	EXACT	Phá hủy 	Phá hủy	7	7	0	0	0	0	10	0
+20045	0x4E4D	20045	0x4E4D	0	EXACT	Thần nộ thiên tru	Thần nộ thiên tru	7	7	0	0	0	0	10	0
+20046	0x4E4E	20046	0x4E4E	0	EXACT	Đuổi địch	Đuổi địch	7	7	0	0	0	0	10	0
+20047	0x4E4F	20047	0x4E4F	0	EXACT	Cường hiệu thi độc	Cường hiệu thi độc	17	17	5	5	0	0	5	0
+20048	0x4E50	20048	0x4E50	0	EXACT	Siêu cấp toàn phong	Siêu cấp toàn phong	17	17	4	4	0	0	5	0
+20049	0x4E51	20049	0x4E51	0	EXACT	Siêu cấp thụ tinh	Siêu cấp thụ tinh	17	17	1	1	0	0	5	0
+20050	0x4E52	20050	0x4E52	0	EXACT	Cường hiệu giải trừ	Cường hiệu giải trừ	17	17	2	2	0	0	5	0
+20051	0x4E53	20051	0x4E53	0	EXACT	Cửu vỉ hồ mi hoặc	Cửu vỉ hồ mi hoặc	17	17	5	5	0	0	10	0
+20052	0x4E54	20052	0x4E54	0	EXACT	Kiếm tuyệt vọng 4	Kiếm tuyệt vọng 4	15	15	5	5	0	0	10	0
+21001	0x5209	21001	0x5209	0	EXACT	Chấn địa chùy	Chấn địa chùy	16	16	1	1	0	0	1	0
+21002	0x520A	21002	0x520A	0	EXACT	Hàn băng quán	Hàn băng quán	16	16	2	2	0	0	1	0
+21003	0x520B	21003	0x520B	0	EXACT	Hồng liên hỏa	Hồng liên hỏa	16	16	3	3	0	0	1	0
+21004	0x520C	21004	0x520C	0	EXACT	Phá không thiểm	Phá không thiểm	16	16	4	4	0	0	1	0
+21005	0x520D	21005	0x520D	0	EXACT	Mãnh ngưu kích	Mãnh ngưu kích	16	16	1	1	0	0	1	0
+21006	0x520E	21006	0x520E	0	EXACT	Băng nha nhẫn	Băng nha nhẫn	16	16	2	2	0	0	1	0
+21007	0x520F	21007	0x520F	0	EXACT	Chính diệm nộ	Chính diệm nộ	16	16	3	3	0	0	1	0
+21008	0x5210	21008	0x5210	0	EXACT	Gió độc	Gió độc	16	16	4	4	0	0	1	0
+21009	0x5211	21009	0x5211	0	EXACT	Vẫn tinh lạc	Vẫn tinh lạc	16	16	1	1	0	0	1	0
+21010	0x5212	21010	0x5212	0	EXACT	Trùng quyền	Trùng quyền	16	16	2	2	0	0	1	0
+21011	0x5213	21011	0x5213	0	EXACT	Hỏa phụng thiên	Hỏa phụng thiên	16	16	3	3	0	0	1	0
+21012	0x5214	21012	0x5214	0	EXACT	Hồi mã thương	Hồi mã thương	16	16	4	4	0	0	1	0
+21013	0x5215	21013	0x5215	0	EXACT	Sư Phệ	Sư Phệ	16	16	1	1	0	0	1	0
+21014	0x5216	21014	0x5216	0	EXACT	Liềm Trảm	Liềm Trảm	16	16	3	3	0	0	1	0
+21015	0x5217	21015	0x5217	0	EXACT	Nhị Đoạn Thức	Nhị Đoạn Thức	16	16	2	2	0	0	1	0
+21016	0x5218	21016	0x5218	0	EXACT	Động Ngân 	Động Ngân	16	16	4	4	0	0	1	0
+21017	0x5219	21017	0x5219	0	EXACT	Thâm Uyên	Thâm Uyên	16	16	1	1	0	0	1	0
+21018	0x521A	21018	0x521A	0	EXACT	Nhẫn Trảm	Nhẫn Trảm	16	16	3	3	0	0	1	0
+21019	0x521B	21019	0x521B	0	EXACT	Tiễn thần Định quân	Tiễn thần Định quân	16	16	4	4	0	0	1	0
+21020	0x521C	21020	0x521C	0	EXACT	Thiên tru thái bình 	Thiên tru thái bình	16	16	1	1	0	0	1	0
+21021	0x521D	21021	0x521D	0	EXACT	Địadiệtkinhđàotrận	Địadiệtkinhđàotrận	16	16	2	2	0	0	1	0
+21022	0x521E	21022	0x521E	0	EXACT	Nhân vong tống táng 	Nhân vong tống táng	16	16	3	3	0	0	1	0
+21023	0x521F	21023	0x521F	0	EXACT	Thương thiên đã chết	Thương thiên đã chết	16	16	0	0	0	0	1	0
+21024	0x5220	21024	0x5220	0	EXACT	Thácđaophápáonghĩa	Thácđaophápáonghĩa	16	16	4	4	0	0	1	0
+21025	0x5221	21025	0x5221	0	EXACT	Cuồng xà đoạt thủ	Cuồng xà đoạt thủ	16	16	3	3	0	0	1	0
+21026	0x5222	21026	0x5222	0	EXACT	Nhân giả vô địch	Nhân giả vô địch	16	16	1	1	0	0	1	0
+21026	0x5222	21028	0x5224	2	EXACT	Nhân giả vô địch	Nhân giả vô địch	16	16	1	1	0	0	1	0
+21027	0x5223	21027	0x5223	0	EXACT	Kết nghĩa vườn đào	Kết nghĩa vườn đào	16	16	0	0	0	0	1	0
+21028	0x5224	21026	0x5222	-2	EXACT	Nhân giả vô địch	Nhân giả vô địch	16	16	1	1	0	0	1	0
+21028	0x5224	21028	0x5224	0	EXACT	Nhân giả vô địch	Nhân giả vô địch	16	16	1	1	0	0	1	0
+21029	0x5225	21029	0x5225	0	EXACT	Lạc Thuỷ kết tụ	Lạc Thuỷ kết tụ	16	16	2	2	0	0	1	0
+21030	0x5226	21030	0x5226	0	EXACT	Nham diệp phiêu kiếm	Nham diệp phiêu kiếm	16	16	1	1	0	0	1	0
+22001	0x55F1	22001	0x55F1	0	EXACT	Quang mâu thuật	Quang mâu thuật	18	18	0	0	0	0	10	4
+22002	0x55F2	22002	0x55F2	0	EXACT	Phật quang chưởng	Phật quang chưởng	18	18	0	0	0	0	5	5
+22003	0x55F3	22003	0x55F3	0	EXACT	Huyễn quang	Huyễn quang	18	18	0	0	0	0	10	8
+22004	0x55F4	22004	0x55F4	0	EXACT	Liệt diệm chi quang	Liệt diệm chi quang	18	18	0	0	0	0	5	0
+22005	0x55F5	22005	0x55F5	0	EXACT	Quang du thuật	Quang du thuật	18	18	0	0	0	0	1	12
+22006	0x55F6	22006	0x55F6	0	EXACT	Quang chi kính	Quang chi kính	18	18	0	0	0	0	5	1
+22007	0x55F7	22007	0x55F7	0	EXACT	Quang tuyền quán chú	Quang tuyền quán chú	18	18	0	0	0	0	10	15
+22008	0x55F8	22008	0x55F8	0	EXACT	Hồi quang phản chiếu	Hồi quang phản chiếu	18	18	0	0	0	0	1	1
+22009	0x55F9	22009	0x55F9	0	EXACT	Quang tốc đầu trịch	Quang tốc đầu trịch	18	18	0	0	0	0	5	7
+22010	0x55FA	22010	0x55FA	0	EXACT	Kim tê công kích	Kim tê công kích	18	18	0	0	0	0	10	7
+22011	0x55FB	22011	0x55FB	0	EXACT	Bạch Hổ	Bạch Hổ	18	18	0	0	0	0	10	0
+22012	0x55FC	22012	0x55FC	0	EXACT	Gọi tiểu Bạch Hổ	Gọi tiểu Bạch Hổ	18	18	0	0	0	0	1	0
+22013	0x55FD	22013	0x55FD	0	EXACT	Gọi trung Bạch Hổ	Gọi trung Bạch Hổ	18	18	0	0	0	0	1	0
+22014	0x55FE	22014	0x55FE	0	EXACT	Gọi đại Bạch Hổ	Gọi đại Bạch Hổ	18	18	0	0	0	0	1	0
+22015	0x55FF	22015	0x55FF	0	EXACT	Tập thức quang đạn	Tập thức quang đạn	18	18	0	0	0	0	10	14
+22016	0x5600	22016	0x5600	0	EXACT	Đồng quang chi ban	Đồng quang chi ban	18	18	0	0	0	0	5	5
+22017	0x5601	22017	0x5601	0	EXACT	C.Đ quang chi ban	C.Đ quang chi ban	18	18	0	0	0	0	5	5
+22018	0x5602	22018	0x5602	0	EXACT	C.L diệm chi quang	C.L diệm chi quang	18	18	0	0	0	0	5	0
+22019	0x5603	22019	0x5603	0	EXACT	Chân huyễn quang	Chân huyễn quang	18	18	0	0	0	0	10	8
+22020	0x5604	22020	0x5604	0	EXACT	C.Phật quang chưởng	C.Phật quang chưởng	18	18	0	0	0	0	5	5
+22021	0x5605	22021	0x5605	0	EXACT	Siêu quang ba	Siêu quang ba	18	18	0	0	0	0	10	10
+22022	0x5606	22022	0x5606	0	EXACT	Quyền khuynh vạn lý	Quyền khuynh vạn lý	18	18	0	0	0	0	5	0
+23001	0x59D9	23001	0x59D9	0	EXACT	Ám độc tiễn	Ám độc tiễn	19	19	0	0	0	0	10	4
+23002	0x59DA	23002	0x59DA	0	EXACT	Ám đao trảm	Ám đao trảm	19	19	0	0	0	0	10	18
+23003	0x59DB	23003	0x59DB	0	EXACT	Hắc toàn trảm	Hắc toàn trảm	19	19	0	0	0	0	10	16
+23004	0x59DC	23004	0x59DC	0	EXACT	Vu độc	Vu độc	19	19	0	0	0	0	5	0
+23005	0x59DD	23005	0x59DD	0	EXACT	Tụ ẩn kiếm	Tụ ẩn kiếm	19	19	0	0	0	0	1	0
+23006	0x59DE	23006	0x59DE	0	EXACT	Khô lâu đầu trịch	Khô lâu đầu trịch	19	19	0	0	0	0	5	7
+23007	0x59DF	23007	0x59DF	0	EXACT	Vu độc oa oa	Vu độc oa oa	19	19	0	0	0	0	1	0
+23008	0x59E0	23008	0x59E0	0	EXACT	Yêu thuật kích hoả	Yêu thuật kích hoả	19	19	0	0	0	0	5	1
+23009	0x59E1	23009	0x59E1	0	EXACT	Mê hoặc độc trâm	Mê hoặc độc trâm	19	19	0	0	0	0	5	0
+23010	0x59E2	23010	0x59E2	0	EXACT	Độc phi luân	Độc phi luân	19	19	0	0	0	0	10	9
+23011	0x59E3	23011	0x59E3	0	EXACT	Huyền Vũ	Huyền Vũ	19	19	0	0	0	0	10	0
+23012	0x59E4	23012	0x59E4	0	EXACT	Gọi tiểu Huyền Vũ	Gọi tiểu Huyền Vũ	19	19	0	0	0	0	1	0
+23013	0x59E5	23013	0x59E5	0	EXACT	Gọi trung Huyền Vũ	Gọi trung Huyền Vũ	19	19	0	0	0	0	1	0
+23014	0x59E6	23014	0x59E6	0	EXACT	Gọi đại Huyền Vũ	Gọi đại Huyền Vũ	19	19	0	0	0	0	1	0
+23015	0x59E7	23015	0x59E7	0	EXACT	Vựng trảm	Vựng trảm	19	19	0	0	0	0	10	9
+23016	0x59E8	23016	0x59E8	0	EXACT	Hắc ám liên trảm	Hắc ám liên trảm	19	19	0	0	0	0	10	16
+23017	0x59E9	23017	0x59E9	0	EXACT	C.Ám độc tiễn	C.Ám độc tiễn	19	19	0	0	0	0	10	4
+23018	0x59EA	23018	0x59EA	0	EXACT	Chân Vu độc	Chân Vu độc	19	19	0	0	0	0	5	0
+23019	0x59EB	23019	0x59EB	0	EXACT	Vạn độc xuyên tâm	Vạn độc xuyên tâm	19	19	0	0	0	0	10	9
+23020	0x59EC	23020	0x59EC	0	EXACT	C.Độc phi luân	C.Độc phi luân	19	19	0	0	0	0	10	9
+23021	0x59ED	23021	0x59ED	0	EXACT	C.Ám nhẫn trẩm	C.Ám nhẫn trẩm	19	19	0	0	0	0	10	18
+23022	0x59EE	23022	0x59EE	0	EXACT	C.Mê hoặc độc trâm	C.Mê hoặc độc trâm	19	19	0	0	0	0	5	0
+23023	0x59EF	23023	0x59EF	0	EXACT	Phiêu diêu lưu phong	Phiêu diêu lưu phong	19	19	0	0	0	0	5	0

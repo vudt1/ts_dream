@@ -1,0 +1,18 @@
+id	id_hex	name	type	element	sp_cost	sk_point	max_lvl	require_sk	skill_type	job	branch	branch_index	branch_skill_name	display_order
+14043	0x36DB	Anh khí hộ thân	5	Tâm	0	1	10	14038	Passive	1	Hiệp	0	Anh khí hộ thân	2
+14044	0x36DC	ThiênThần thuẫn	5	Tâm	46	1	5	14038	19	1	Hiệp	1	ThiênThần thuẫn	2
+14045	0x36DD	Tâm nhãn	5	Tâm	0	1	10	14038	Passive	1	Hiệp	2	Tâm nhãn	2
+14046	0x36DE	NgưngKhí HộThân	5	Tâm	46	1	5	14038	19	1	Hiệp	3	NgưngKhí HộThân	2
+14039	0x36D7	Bá khí	5	Tâm	0	1	10	14038	Passive	2	Bá	0	Bá khí	1
+14040	0x36D8	Bá ý	5	Tâm	46	1	5	14038	19	2	Bá	1	Bá ý	1
+14041	0x36D9	Lực bạt sơn hề	5	Tâm	0	1	10	14038	Passive	2	Bá	2	Lực bạt sơn hề	1
+14042	0x36DA	Sóng cuồng	5	Tâm	54	1	5	14038	Active	2	Bá	3	Sóng cuồng	1
+14047	0x36DF	Dùng kế	5	Tâm	0	1	10	14038	Passive	3	Hiền	0	Dùng kế	3
+14048	0x36E0	Trí thủ	5	Tâm	0	1	10	14038	Passive	3	Hiền	1	Trí thủ	3
+14049	0x36E1	Chống địch	5	Tâm	0	1	10	14038	Passive	3	Hiền	2	Chống địch	3
+14050	0x36E2	Sách động	5	Tâm	0	1	10	14038	Passive	3	Hiền	3	Sách động	3
+14051	0x36E3	Tiên khiếu	5	Tâm	0	1	10	14038	Passive	4	Tiên	0	Tiên khiếu	4
+14052	0x36E4	HóaHuyếtHòanHồn	5	Tâm	0	1	5	14038	Passive	4	Tiên	1	HóaHuyếtHòanHồn	4
+14053	0x36E5	ThánhLinh thuật	5	Tâm	52	1	5	14038	19	4	Tiên	2	ThánhLinh thuật	4
+14054	0x36E6	CànKhônThiênLôi	5	Tâm	84	1	5	14038	Buff	4	Tiên	3	CànKhônThiênLôi	4
+14038	0x36D6	Đại chu thiên	5	Tâm	0	1	10	0	Passive	0	(gốc chung)	0	Đại chu thiên	0

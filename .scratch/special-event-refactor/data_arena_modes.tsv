@@ -1,0 +1,6 @@
+#modeId	hex	labelLiteral	labelText	flag1Suffix	flag2Suffix	note
+96	0x60	0x0053BDA0	[Lôi đài tranh đấu 4]	Tỉ thí + Đòan P + "  "	—
+97	0x61	0x0053BD80	[Lôi đài tranh đấu 3]	Tỉ thí + Đòan P + "  "	Đấu trận cấp 100 + "  "
+98	0x62	0x0053BD60	[Lôi đài tranh đấu 2]	Tỉ thí + Đòan P + "  "	Lọan đấu + Đòan P + Tỉ thí
+99	0x63	0x0053BD40	[Lôi đài tranh đấu 1]	Tỉ thí + Đòan P + "  "	—
+#	—	0x0053BDCC	(dựng động: literal + IntToStr(mode) + literal)	—	—	literal 0x53BDCC = A6 F8 AA 41 BE B9, 0x53BDC0 = B2 C4 — cần xác minh

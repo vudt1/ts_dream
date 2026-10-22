@@ -1,0 +1,377 @@
+id	id_hex	name	type	type_label	elem	sp_cost	skill_type	delay	state	sk_point	max_lvl	require_sk	des
+10000	0x2710	Đấu vật	0	Đấu vật (basic attack)	0	0	1	12	0	0	1	0	Tấn công bình thường
+10001	0x2711	Thuật mưa đá	1	Hệ Địa	1	9	2	19	0	1	10	0	Phép mưa thiên thạch
+10002	0x2712	Lôi mộc	1	Hệ Địa	1	13	2	20	0	3	10	10001	Gọi đại thụ để tấn công
+10003	0x2713	Cạm bẫy	1	Hệ Địa	1	14	2	20	0	3	10	10001	Tạo cạm bẩy để tấn công
+10004	0x2714	Cây tinh	1	Hệ Địa	1	18	3	26	3	6	10	10002	Gọi cây tinh để trói kẻ thù
+10005	0x2715	Ném đá	1	Hệ Địa	1	22	1	27	0	7	10	10003	Dùng xe bắn đá để tấn công
+10006	0x2716	Địa nha	1	Hệ Địa	1	28	1	9	0	9	10	10004	Dùng răng thú thần để tấn công
+10007	0x2717	Đá lăn	1	Hệ Địa	1	34	1	17	0	10	10	10005	Dùng đá thần để tấn công
+10008	0x2718	Phi sa tẩu thạch	1	Hệ Địa	1	38	2	24	0	10	10	10005	Gọi bão cát để tấn công
+10009	0x2719	Giải kết giới	1	Hệ Địa	1	10	16	22	0	1	1	10006	Phép phá giải kết giới
+10010	0x271A	Kết giới	1	Hệ Địa	1	33	4	8	101	12	10	10006	Mở cổng trời tránh tấn công
+10011	0x271B	Thái Sơn áp đỉnh	1	Hệ Địa	1	40	2	33	0	14	10	10007	Gọi thần núi giúp tấn công
+10012	0x271C	Thiên Băng Địa Liệt	1	Hệ Địa	1	50	2	37	0	18	10	10008	Tuyệt kỹ kinh thiên động địa
+10013	0x271D	Vạn mã phi đằng	1	Hệ Địa	1	45	2	26	0	14	10	10008	Gọi thiên quân vạn mã tấn công
+10014	0x271E	Giải trừ kính	1	Hệ Địa	1	10	16	22	0	1	1	10010	Phép phá giải kính
+10015	0x271F	Kính	1	Hệ Địa	1	40	4	15	103	18	5	10010	Tạo tấm kính giúp phản đòn
+10016	0x2720	Nham quái	1	Hệ Địa	1	120	15	52	175	0	10	0	Gọi nham quái hiện thân
+10017	0x2721	Gọi tiểu trung nham	1	Hệ Địa	1	120	2	51	0	0	1	0	N/A
+10018	0x2722	Gọi trung nham	1	Hệ Địa	1	120	2	51	0	0	1	0	N/A
+10019	0x2723	Gọi đại nham	1	Hệ Địa	1	120	2	50	0	0	1	0	N/A
+10020	0x2724	Địa Động Quyết	1	Hệ Địa	1	0	19	0	0	1	10	0	Tâm pháp thu khí Địa linh.
+10021	0x2725	ĐịaLiệt Vô Song Kiếm	1	Hệ Địa	1	36	1	18	0	8	10	10020	Bảo kiếm thiên địa BÀN CỔ.
+10022	0x2726	Địa Động Phá	1	Hệ Địa	1	44	2	33	0	7	10	10020	Tụ khí địa linh đánh địch.
+10023	0x2727	Khu Tượng Đột	1	Hệ Địa	1	54	2	27	0	13	10	10024	Dùng voi lớn để tấn công.
+10024	0x2728	Hoành Tảo Thiên Quân	1	Hệ Địa	1	48	2	27	0	9	10	10022	Tấn công địch bằng đá gỗ.
+10025	0x2729	Thổ Băng Trận	1	Hệ Địa	1	46	15	17	177	11	5	10021	Làm sạt lở đất để ngăn địch.
+10026	0x272A	Linh Kính	1	Hệ Địa	1	50	4	17	110	15	5	10025	Phản xạ khí địa linh.
+10027	0x272B	Vô Gian Chấn Ba	1	Hệ Địa	1	56	2	34	0	8	10	10011	Dùng lực ép dẹp đich thủ
+10028	0x272C	Cát Thiên Hồn Phủ	1	Hệ Địa	1	52	1	30	0	8	10	10021	Lấy rìu thần Bàn Cổ tấn công
+10029	0x272D	Lưu Tinh Thiết Pháo	1	Hệ Địa	1	56	1	27	0	7	10	10005	Phóng Thiết Pháo về địch
+10030	0x272E	Lang Tinh Pháo	1	Hệ Địa	1	44	2	30	0	10	10	10008	Bắn đạn nổ vào địch
+10031	0x272F	Kim Chung Tráo	1	Hệ Địa	1	56	4	35	115	12	10	10015	Phòng thủ nghiêm ngặt
+10032	0x2730	ChiếnTượngTrùngPhong	1	Hệ Địa	1	72	2	35	0	8	10	10013	Dùng chiến tượng đột kích địch
+10033	0x2731	Sa Bộc Cầm	1	Hệ Địa	1	44	3	30	3	8	5	10025	Biến thành Bộc Cầm bắt địch
+10034	0x2732	Đồ Nham Vương Sát	1	Hệ Địa	1	84	2	34	181	15	10	10024	Quỷ Vương thôn tính
+10035	0x2733	Sa bạo chi loạn	1	Hệ Địa	1	67	20	19	0	0	5	0	Dùng skill Int ngẫu nhiên
+10036	0x2734	Sa khau chi vũ	1	Hệ Địa	1	65	20	19	0	0	5	0	Dùng skill Atk ngẫu nhiên
+10037	0x2735	Kết giới 3	1	Hệ Địa	1	83	4	8	101	0	10	0	Mở cổng trời tránh tấn công
+10038	0x2736	Kính 3	1	Hệ Địa	1	100	4	15	103	0	5	0	Tạo tấm kính giúp phản đòn
+10039	0x2737	Linh Kính 3	1	Hệ Địa	1	125	4	17	110	0	5	0	Phản xạ khí địa linh.
+10040	0x2738	Kim Chung Tráo 3	1	Hệ Địa	1	140	4	35	115	0	10	0	Phòng thủ nghiêm ngặt
+10041	0x2739	Sa Bộc Cầm 3	1	Hệ Địa	1	110	3	30	3	0	5	0	Biến thành Bộc Cầm bắt địch
+10042	0x273A	Vô Gian Chấn Ba 2	1	Hệ Địa	1	130	2	34	0	8	10	10027	Dùng lực ép dẹp 2 đich thủ
+10043	0x273B	Cát Thiên Hồn Phủ 2	1	Hệ Địa	1	130	1	30	0	8	10	10028	Lấy rìu thần Bàn Cổ tấn công
+11001	0x2AF9	Thuật nước ngập	2	Hệ Thủy	2	8	2	19	0	1	10	0	Gọi nước lũ làm ngập quân địch
+11002	0x2AFA	Băng tường	2	Hệ Thủy	2	11	4	20	104	4	5	11001	Tạo bức tường băng để bảo vệ
+11003	0x2AFB	Băng kiếm	2	Hệ Thủy	2	12	1	19	0	3	10	11001	Tạo băng kiếm để tấn công
+11004	0x2AFC	Thanh lưu	2	Hệ Thủy	2	22	14	35	0	6	10	11002	Nước thần hồi phục HP và SP
+11005	0x2AFD	Dũng tuyền	2	Hệ Thủy	2	18	1	20	0	5	10	11003	Gọi nước để tấn công
+11006	0x2AFE	Thuật hồi ma	2	Hệ Thủy	2	35	6	30	0	8	10	11004	Phép hồi phục SP
+11007	0x2AFF	Thuật trị liệu	2	Hệ Thủy	2	35	7	27	0	8	10	11004	Phép hồi phục HP
+11008	0x2B00	Hồng thủy	2	Hệ Thủy	2	26	2	29	0	8	10	11005	Gọi đại hồng thủy để tấn công
+11009	0x2B01	Toàn hồi ma thuật	2	Hệ Thủy	2	40	6	19	0	9	10	11006	Phép hồi phục tòan bộ SP
+11010	0x2B02	Toàn trị liệu thuật	2	Hệ Thủy	2	42	7	20	0	9	10	11007	Phép hồi phục tòan bộ HP
+11011	0x2B03	Băng đá	2	Hệ Thủy	2	32	2	37	0	9	10	11008	Phép mưa sao băng
+11012	0x2B04	Trạng thái giải trừ	2	Hệ Thủy	2	15	5	29	0	12	1	11009	Phép tự giải trừ
+11013	0x2B05	Thuật hồi sinh	2	Hệ Thủy	2	40	8	30	0	12	10	11010	Phép cứu sống
+11014	0x2B06	Băng phong	2	Hệ Thủy	2	40	3	27	1	16	10	11011	Đóng băng để trói kẻ thù
+11015	0x2B07	Băng tan	2	Hệ Thủy	2	10	5	35	0	1	1	11011	Phép phá giải băng phong
+11016	0x2B08	Thủy thần	2	Hệ Thủy	2	120	18	78	0	0	10	0	Gọi thủy thần hiện thân
+11017	0x2B09	Gọi tiểu trung thủy	2	Hệ Thủy	2	120	2	78	0	0	1	0	N/A
+11018	0x2B0A	Gọi trung thủy	2	Hệ Thủy	2	120	2	78	0	0	1	0	N/A
+11019	0x2B0B	Gọi đại thủy	2	Hệ Thủy	2	120	2	78	0	0	1	0	N/A
+11020	0x2B0C	Băng Tâm Quyết	2	Hệ Thủy	2	0	19	0	0	1	10	0	Tâm pháp thu khí Thủy linh.
+11021	0x2B0D	Băng Tuyền Trảm	2	Hệ Thủy	2	24	1	25	0	7	10	11020	Băng xoắn ốc xoáy nát địch
+11022	0x2B0E	Băng Phách Chùy	2	Hệ Thủy	2	30	1	25	0	9	10	11021	Đóng băng chớp nhoáng.
+11023	0x2B0F	Sương Hàn Đống Liệt	2	Hệ Thủy	2	50	2	33	0	12	10	11022	Hơi đóng băng chớp nhoáng.
+11024	0x2B10	Minh Kính Chỉ Thủy	2	Hệ Thủy	2	45	19	31	53	10	5	11020	Nước suối tiên giúp tĩnh tâm.
+11025	0x2B11	Tiến Giai Trạng Giải	2	Hệ Thủy	2	48	5	30	0	15	1	11024	Tĩnh tâm hoàn toàn.
+11026	0x2B12	Diệu Thủ Hồi Xuân	2	Hệ Thủy	2	72	14	33	0	15	10	11025	Hút nước Thiên để trị thương.
+11027	0x2B13	Thiên Hồi Băng Vũ	2	Hệ Thủy	2	52	1	30	1	5	5	11014	Băng đao hồi thiên bay lượng
+11028	0x2B14	Sương Lôi Quyền	2	Hệ Thủy	2	52	1	33	1	5	5	11014	Xuyên huyệt đạo địch phá hoại
+11029	0x2B15	Siêu Hồi Ma Thuật	2	Hệ Thủy	2	60	6	34	0	7	10	11009	Ma lực Thuỷ Thần hồi phục mạnh
+11030	0x2B16	Thiên Giáng Cam Lâm	2	Hệ Thủy	2	72	14	18	0	7	10	11010	Tiên Lộ Cam Lâm trị bách bệnh
+11031	0x2B17	SiêuTrạng Giải Thuật	2	Hệ Thủy	2	60	5	23	0	15	1	11025	Thay cảnh trần tục trước mắt
+11032	0x2B18	Minh Hà Vô Tưởng	2	Hệ Thủy	2	52	19	30	53	10	5	11024	Hướng đến cảnh giới vô tưởng
+11033	0x2B19	Trảm Kỵ Nhất Thiểm	2	Hệ Thủy	2	60	1	30	0	9	10	11022	Buốt thấu xương
+11034	0x2B1A	Lục Hồi Thiên BăngVũ	2	Hệ Thủy	2	84	2	27	0	14	10	11023	Cự băng bay lượn đầy trời
+11035	0x2B1B	Hải đào chi loạn	2	Hệ Thủy	2	67	20	19	0	0	5	0	Dùng skill Atk ngẫu nhiên
+11036	0x2B1C	Thuỷ triều chi vũ	2	Hệ Thủy	2	65	20	19	0	0	5	0	Dùng skill Int ngẫu nhiên
+11037	0x2B1D	Băng tường 3	2	Hệ Thủy	2	100	3	20	104	0	5	11002	Tạo bức tường băng để bảo vệ
+11038	0x2B1E	Thiên Hồi Băng Vũ 3	2	Hệ Thủy	2	130	1	30	1	0	5	11027	Băng đao hồi thiên bay lượng
+11039	0x2B1F	Sương Lôi Quyền 3	2	Hệ Thủy	2	130	1	33	1	0	5	11028	Xuyên huyệt đạo địch phá hoại
+11040	0x2B20	Minh Hà Vô Tưởng 3	2	Hệ Thủy	2	130	19	30	53	0	5	11032	Hướng đến cảnh giới vô tưởng
+11041	0x2B21	Trảm Kỵ Nhất Thiểm 2	2	Hệ Thủy	2	130	1	30	0	9	10	11033	Buốt thấu xương 2 đối tượng
+12001	0x2EE1	Thuật phóng hỏa	3	Hệ Hỏa	3	9	2	20	0	1	10	0	Phóng hỏa để tấn công kẻ thù
+12002	0x2EE2	Liệt hỏa	3	Hệ Hỏa	3	12	2	15	0	3	10	12001	Tăng hỏa lực để tấn công
+12003	0x2EE3	Hỏa tiễn	3	Hệ Hỏa	3	15	1	15	0	4	10	12001	Dùng tên lửa để tấn công
+12004	0x2EE4	Hỏa cầu	3	Hệ Hỏa	3	22	2	22	0	7	10	12002	Tạo quả cầu lửa để tấn công
+12005	0x2EE5	Hỏa luân	3	Hệ Hỏa	3	22	2	10	0	6	10	12002	Biến lửa thành đao để tấn công
+12006	0x2EE6	Hội tâm nhất kích	3	Hệ Hỏa	3	24	1	14	0	7	10	12003	Tăng cường uy lực cho tuyệt kỹ
+12007	0x2EE7	Diễm Chi Vũ	3	Hệ Hỏa	3	30	2	23	0	10	10	12004	Mượn mây lửa để tấn công
+12008	0x2EE8	Phong hỏa luân	3	Hệ Hỏa	3	30	2	23	0	10	10	12005	Sử dụng hỏa luân để tấn công
+12009	0x2EE9	Hỏa kiếm	3	Hệ Hỏa	3	30	1	18	0	9	10	12006	Tạo kiếm lửa để tấn công
+12010	0x2EEA	Hỏa Long	3	Hệ Hỏa	3	37	2	22	0	12	10	12007	Gọi rồng lửa để tấn công
+12011	0x2EEB	Bát diện hỏa luân	3	Hệ Hỏa	3	37	2	22	0	13	10	12008	Tạo nhiều hỏa luân để tấn công
+12012	0x2EEC	Cuồng diêm trảm	3	Hệ Hỏa	3	46	2	26	0	12	10	12009	Tạo đại đao lửa để tấn công
+12013	0x2EED	Tam vị chân hỏa	3	Hệ Hỏa	3	50	2	23	0	16	10	12010	Phép tạo lửa thiêu đốt kẻ thù
+12014	0x2EEE	Phong Hỏa LiêuNguyên	3	Hệ Hỏa	3	60	2	25	0	16	10	12011	Tuyệt kỹ cửu thiên liệt diệm
+12015	0x2EEF	Bạch hồng quán nhật	3	Hệ Hỏa	3	50	1	15	0	16	10	12012	Tuyệt kỹ xuyên thiên phá nhật
+12016	0x2EF0	Phụng hoàng	3	Hệ Hỏa	3	120	2	53	0	0	10	0	Gọi phụng hoàng lửa hiện thân
+12017	0x2EF1	Gọi tiểu trung phụng	3	Hệ Hỏa	3	120	2	54	0	0	1	0	N/A
+12018	0x2EF2	Gọi tiểu trung phụng	3	Hệ Hỏa	3	120	2	54	0	0	1	0	N/A
+12019	0x2EF3	Gọi đại phụng	3	Hệ Hỏa	3	120	2	54	0	0	1	0	N/A
+12020	0x2EF4	Hỏa Dương Quyết	3	Hệ Hỏa	3	0	19	0	0	1	10	0	Tâm pháp thu khí Hỏa linh
+12021	0x2EF5	Cực Dương Kiếm	3	Hệ Hỏa	3	36	1	35	0	8	10	12020	Gọi kiếm thần Dương giết địch.
+12022	0x2EF6	Cuồng Long Phệ Nhật	3	Hệ Hỏa	3	66	1	20	0	18	10	12024	Gọi Thiên Long Phá Địa.
+12023	0x2EF7	Sí Diễm Vô Nhị	3	Hệ Hỏa	3	48	2	26	0	11	10	12020	Dung nham phun trào.
+12024	0x2EF8	Đan Dương Hộ Thể	3	Hệ Hỏa	3	30	4	27	111	10	5	12021	Khí Đan Dương hộ thân.
+12025	0x2EF9	CuồngNhiệt Chiến Hồn	3	Hệ Hỏa	3	60	19	17	52	15	5	12026	Tăng ý chí chiến đấu.
+12026	0x2EFA	Ngũ Lôi Oanh Đỉnh	3	Hệ Hỏa	3	54	2	29	0	13	10	12023	Gọi Thiên Cự Lôi để phá địch
+12027	0x2EFB	Hỏa Bạo Nhất Kích	3	Hệ Hỏa	3	52	1	27	0	7	10	12006	Giáng cú đấm nảy lửa xuống
+12028	0x2EFC	Liệt Thuật Hào Hỏa	3	Hệ Hỏa	3	56	2	30	0	9	10	12011	Phóng hoả châu xuống trại địch
+12029	0x2EFD	Xích Long Cự	3	Hệ Hỏa	3	56	2	38	0	5	10	12004	Bùng nổ như rồng phun lửa
+12030	0x2EFE	Lôi Hỏa Thiệu Lâm	3	Hệ Hỏa	3	64	2	35	179	9	10	12010	Sấm sét đốt cháy địch
+12031	0x2EFF	Dương Viêm	3	Hệ Hỏa	3	52	1	30	179	10	10	12015	Cú đấm hào hùng đập tan tất cả
+12032	0x2F00	Chúc Dung Phần Dã	3	Hệ Hỏa	3	72	2	45	179	9	10	12014	Lửa biến thành rồng uốn mình
+12033	0x2F01	Long Bá Liệt Trảm	3	Hệ Hỏa	3	84	1	35	0	16	10	12022	Khí thế chấn động đất trời
+12034	0x2F02	Long Vương Chấn Hề	3	Hệ Hỏa	3	84	2	60	0	16	10	12026	Khí thế chấn động đất trời
+12035	0x2F03	Hoả thiệt chi loạn	3	Hệ Hỏa	3	67	20	19	0	0	5	0	Dùng skill Atk ngẫu nhiên
+12036	0x2F04	Liệt diễm chi vũ	3	Hệ Hỏa	3	65	20	19	0	0	5	0	Dùng skill Int ngẫu nhiên
+12037	0x2F05	Chân.TLong Bá L Trảm	3	Hệ Hỏa	3	84	1	35	0	16	10	0	Tước Long xoay người
+12038	0x2F06	Đại Thánh trảm yêu	3	Hệ Hỏa	3	84	1	35	0	16	10	0	Tuyệt kỹ Tôn Ngộ Không
+12039	0x2F07	ĐT trảm yêu áo nghĩa	3	Hệ Hỏa	3	84	1	35	0	16	10	0	Tôn Ngộ Không tĩnh ngộ
+12040	0x2F08	Kim tinh hoả nhãn	3	Hệ Hỏa	3	15	1	15	0	4	10	0	Sức nóng của kim tinh hoả nhãn
+12041	0x2F09	Xà mâu hồn phệ kích	3	Hệ Hỏa	3	54	1	19	7	1	5	0	Bát Xà Mâu chấn nhiếp hồn phệ
+12042	0x2F0A	XM Hồn phệ kích A.N	3	Hệ Hỏa	3	54	1	19	7	1	5	0	Bát Xà Mâu tuyệt sát
+12043	0x2F0B	Bạch Hổ tàng địa phệ	1	Hệ Địa	1	56	2	38	0	5	10	0	Mã Siêu từ lòng đất bay ra
+12044	0x2F0C	BH tàng địa phệ A.N	1	Hệ Địa	1	60	2	38	0	5	10	0	Siêu Bạch Hổ tàng địa phệ
+12045	0x2F0D	Đan Dương Hộ Thể 3	3	Hệ Hỏa	3	75	4	27	111	0	5	0	Khí Đan Dương hộ thân.
+12046	0x2F0E	Liệt Thuật Hào Hỏa 2	3	Hệ Hỏa	3	130	2	30	0	9	10	12028	Phóng hoả châu xuống trại địch
+12047	0x2F0F	Dương Viêm 4	3	Hệ Hỏa	3	140	1	30	179	10	10	12031	Cú đấm hào hùng đập tan tất cả
+12048	0x2F10	Long Bá Liệt Trảm 2	3	Hệ Hỏa	3	130	1	35	0	16	10	12033	Khí thế chấn động đất trời
+13001	0x32C9	Thuật ngự phong	4	Hệ Phong	4	9	2	18	0	1	10	0	Tạo ảo giác cho đối phương
+13002	0x32CA	Tuyền Phong	4	Hệ Phong	4	15	3	17	2	3	5	13001	Tạo lốc xoáy khống chế kẻ thù
+13003	0x32CB	Lẫn tránh	4	Hệ Phong	4	13	4	19	102	4	5	13001	Lợi dụng gió để xóa dấu vết
+13004	0x32CC	Cuồng phong	4	Hệ Phong	4	23	2	27	0	6	10	13002	Gọi cuồng phong đánh liên tục
+13005	0x32CD	Thuật ẩn mình	4	Hệ Phong	4	22	4	20	105	7	5	13003	Lợi dụng gió để ẩn mình
+13006	0x32CE	Bão Phong	4	Hệ Phong	4	30	2	22	0	11	10	13004	Tạo bão phong càn quét địch
+13007	0x32CF	Huyền Kích	4	Hệ Phong	4	31	1	18	5	10	10	13004	Đánh nhanh làm ngất đối thủ
+13008	0x32D0	Thuật phân thân	4	Hệ Phong	4	38	9	18	0	13	1	13005	Phép phân thân tạo ảo ảnh
+13009	0x32D1	Phong quyển tàn vân	4	Hệ Phong	4	40	1	24	0	16	10	13006	Tạo lốc xoáy tấn công đối thủ
+13010	0x32D2	Liên kích	4	Hệ Phong	4	40	1	20	0	13	10	13007	Phép tấn công liên hòan
+13011	0x32D3	Thuật thu nhỏ	4	Hệ Phong	4	33	15	17	172	12	5	13008	Phép thu nhỏ thân hình
+13012	0x32D4	Thuật phóng đại	4	Hệ Phong	4	33	4	17	107	12	5	13008	Phép phóng to thân hình
+13013	0x32D5	Loạn kích	4	Hệ Phong	4	49	1	26	0	16	10	13010	Cuồng sát quân địch
+13014	0x32D6	Nguyên khí	4	Hệ Phong	4	45	4	17	106	15	10	13011	Vận công để hồi phục thể lực
+13015	0x32D7	Thanh long	4	Hệ Phong	4	120	3	61	2	0	10	0	Gọi thanh long hiện thân
+13016	0x32D8	Gọi tiểu trung long	4	Hệ Phong	4	120	2	49	0	0	1	0	N/A
+13017	0x32D9	Gọi trung long	4	Hệ Phong	4	120	2	49	0	0	1	0	N/A
+13018	0x32DA	Gọi đại long	4	Hệ Phong	4	120	2	82	0	0	1	0	N/A
+13019	0x32DB	Phong Ngạo Quyết	4	Hệ Phong	4	0	19	0	0	1	10	0	Tâm pháp thu khí Phong linh
+13020	0x32DC	Phong Chi Chiến Ý	4	Hệ Phong	4	60	19	19	51	10	5	13021	Lợi dụng gió để tăng tốc.
+13021	0x32DD	Đẩu Chuyển Tinh Di	4	Hệ Phong	4	48	4	16	112	9	5	13019	Phong vân khí phản công.
+13022	0x32DE	Liệt Phong Đạn	4	Hệ Phong	4	36	2	24	0	8	10	13019	Tụ gió thành bão diệt địch
+13023	0x32DF	Long Quyển Cụ Phong	4	Hệ Phong	4	54	2	27	0	12	10	13024	Phong thần phá trận địch.
+13024	0x32E0	Ảo Ảnh Liên Kích	4	Hệ Phong	4	44	1	25	0	11	10	13022	Dùng sức của gió hạ nhiều địch
+13025	0x32E1	Vô Ảnh Vô Tướng	4	Hệ Phong	4	52	4	13	113	15	5	13020	Phép tàng hình mất dạng.
+13026	0x32E2	Băng Lôi	4	Hệ Phong	4	44	1	30	0	11	10	13009	Sấm sét liên tục giáng xuống
+13027	0x32E3	Phong Huyễn Thần Ly	4	Hệ Phong	4	42	2	34	0	9	10	13006	Dùng Điện Cầu phóng điện
+13028	0x32E4	Trảm Kỵ Phi Kiếm	4	Hệ Phong	4	48	2	26	0	4	10	13004	Chém đứt cả người lẫn ngựa
+13029	0x32E5	Sơn Lam	4	Hệ Phong	4	56	1	30	5	9	10	13024	Nhanh tựa Vũ bão đột kích địch
+13030	0x32E6	Thức Qủy Hấp Hồn	4	Hệ Phong	4	50	15	28	180	9	5	13014	Hấp thụ linh hồn
+13031	0x32E7	Phong Kình Lôi Minh	4	Hệ Phong	4	84	2	30	0	11	10	13023	Kêu gọi sấm chớp đến công kích
+13032	0x32E8	Ẩn Phân Thân Thuật	4	Hệ Phong	4	68	9	26	105	9	5	13005	Biến thân trốn vào trong gió
+13033	0x32E9	Chấn Điện	4	Hệ Phong	4	72	1	28	0	8	10	13013	Điện cực đánh vào điểm yếu
+13034	0x32EA	Cuồng phong chi loạn	4	Hệ Phong	4	67	20	19	0	0	5	0	Dùng skill Atk ngẫu nhiên
+13035	0x32EB	Xuy phất chi vũ	4	Hệ Phong	4	65	20	19	0	0	5	0	Dùng skill Int ngẫu nhiên
+13036	0x32EC	TLong Y nguyệt trảm	4	Hệ Phong	4	72	1	28	0	8	10	0	Võ Thần xuất ra 1 kích
+13037	0x32ED	TL YN trảm áo nghĩa	4	Hệ Phong	4	72	1	28	0	8	10	0	Võ Thần xuất ra tuyệt kích
+13038	0x32EE	Lẫn tránh 3	4	Hệ Phong	4	33	4	19	102	0	5	0	Lợi dụng gió để xóa dấu vết
+13039	0x32EF	Huyền Kích 3	4	Hệ Phong	4	78	1	18	5	0	10	0	Đánh nhanh làm ngất đối thủ
+13040	0x32F0	Đẩu Chuyển Tinh Di 3	4	Hệ Phong	4	120	4	16	112	0	5	0	Phong vân khí phản công.
+13041	0x32F1	Vô Ảnh Vô Tướng 3	4	Hệ Phong	4	130	4	13	113	0	5	0	Phép tàng hình mất dạng.
+13042	0x32F2	Sơn Lam 3	4	Hệ Phong	4	140	1	30	5	0	10	0	Nhanh tựa Vũ bão đột kích địch
+13043	0x32F3	Băng Lôi 2	4	Hệ Phong	4	130	1	30	0	11	10	13026	Sấm sét liên tục giáng xuống
+13044	0x32F4	PhongHuyễn Thần Ly 2	4	Hệ Phong	4	130	2	34	0	9	10	13027	Dùng Điện Cầu phóng điện
+14001	0x36B1	Thuật trinh thám	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	20	0	0	1	0	Hiện HP và thuộc tính của địch
+14002	0x36B2	Thuật đào tẩu	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	10	12	5	0	0	1	14001	Chốn khỏi chiến trường dể dàng
+14003	0x36B3	Thuật mua bán	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	20	0	0	8	14001	Dùng để trưng bày hàng hoá
+14004	0x36B4	Thuật dò xét	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	20	0	0	10	14001	Kỹ năng mua khoáng sơ cấp
+14005	0x36B5	Thuật luyện đơn	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	20	0	0	10	14001	Kỹ năng hợp thành sơ cấp
+14006	0x36B6	Đại hô	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	20	2	22	0	0	10	14001	Hô to để đe dọa quân địch
+14007	0x36B7	Giải hôn	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	5	5	20	0	0	1	14002	Giải hôn mê bằng âm nhạc
+14008	0x36B8	Hôn mê	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	15	3	22	6	0	5	14002	Gây hôn mê bằng âm nhạc
+14009	0x36B9	Người làm	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	20	0	0	10	14003	N/A
+14010	0x36BA	Thuật đào khoáng	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	20	0	0	10	14004	Kỹ năng đào khoáng trung cấp
+14011	0x36BB	Thuật đúc luyện	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	20	0	0	10	14005	Kỹ năng hợp thành trung cấp
+14012	0x36BC	Đồng tâm	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	36	4	20	108	0	10	14006	Đoàn kết đề cao phòng thủ
+14013	0x36BD	Cổ Vũ	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	36	4	20	109	0	10	14006	Tăng sức đánh cho quân mình
+14014	0x36BE	Giải độc	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	8	5	20	0	0	1	0	Vận công giải độc
+14015	0x36BF	Bỏ độc	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	25	15	20	171	0	10	0	Khiến kẻ thù bị nhiễm độc
+14016	0x36C0	Thuật giao dịch	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	20	0	0	10	14009	N/A
+14017	0x36C1	Tịnh toạ	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	20	0	0	10	14009	N/A
+14018	0x36C2	Thuật đào sâu	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	20	0	0	10	14010	Kỹ năng đào khoáng cao cấp
+14019	0x36C3	Thuật chế tạo	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	20	0	0	5	14011	Kỹ năng hợp thành cao cấp
+14020	0x36C4	Hoạch lí phản	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	30	15	20	174	0	5	14012	Khiến quân địch mất ý trí
+14021	0x36C5	Hỗn loạn	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	25	15	20	173	0	5	0	Gây hổn lọan cho quân địch
+14022	0x36C6	Giải hỗn loạn	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	10	5	32	0	0	1	0	Phá bỏ tình trạng hổn loạn
+14023	0x36C7	Cưỡi ngựa	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	20	0	0	1	0	Kỹ năng cưỡi ngựa
+14024	0x36C8	Linh quang ẩn hiện	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	20	0	12	0	0	1	0	Có thể thực hiện các kỹ năng
+14025	0x36C9	Chiếm đọat	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	12	0	0	1	0	Có thể lấy itemx2 từ phía địch
+14026	0x36CA	Triệu gọi	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	20	0	0	1	0	Học được năng lực gọi thần thú
+14027	0x36CB	Đạo sư	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	12	0	0	1	0	Khi giúp người mới,exp sẽ tăng
+14028	0x36CC	Đoàn kết	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	12	0	0	1	0	Khi chung sức,exp sẽ tăng
+14029	0x36CD	Cát Phổ Trại bắn đạn	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	60	15	30	176	0	10	0	Giảm nhanh nhạy của kẻ địch
+14030	0x36CE	Cát Phổ Trại áp đỉnh	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	80	2	33	0	0	10	0	Lấy tuyệt kỹ Các Phổ sái
+14031	0x36CF	Tiếp chiêu	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	20	0	0	1	0	Hóa giải tất cả kỹ năng
+14032	0x36D0	Tinh luyện	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	20	0	0	10	14019	Kỹ năng tổng hợp cấp 4
+14033	0x36D1	Xạ Tiễn	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	30	2	29	7	0	5	14037	Dùng cung tên hạ địch
+14034	0x36D2	Kỵ Binh	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	20	0	0	1	0	Có thể cưỡi các loài động vật.
+14035	0x36D3	Chuyển Thể	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	0	0	0	1	0	Thừa kế thiên mệnh chuyển sinh
+14036	0x36D4	Bách Xuyên	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	24	1	29	7	0	5	0	Xạ trường cung công kích địch
+14037	0x36D5	Tiễn Vũ	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	30	2	39	7	0	5	14036	Xạ tiễn ngập trời khó mà thoát
+14038	0x36D6	Đại chu thiên	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	30	0	1	10	0	Luyện khí thúc đẩy tiên mạch
+14039	0x36D7	Bá khí	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	30	0	1	10	14038	Lấy khí bá đạo nâng cao uy lực
+14040	0x36D8	Bá ý	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	46	19	27	54	1	5	14038	Đòn chí mạng của Tiểu Bá Vương
+14041	0x36D9	Lực bạt sơn hề	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	30	0	1	10	14038	Khích lệ sức mạnh đồng đội
+14042	0x36DA	Sóng cuồng	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	54	1	19	7	1	5	14038	Thế cuồng nộ của sóng
+14043	0x36DB	Anh khí hộ thân	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	30	0	1	10	14038	Chống mọi sự tập kích
+14044	0x36DC	ThiênThần thuẫn	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	46	19	30	56	1	5	14038	Vứt bỏ tâm để bảo vệ đồng đội
+14045	0x36DD	Tâm nhãn	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	30	0	1	10	14038	Dùng tâm nhãn nhìn thấu tâm tư
+14046	0x36DE	NgưngKhí HộThân	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	46	19	12	57	1	5	14038	Chống lại công kích của địch
+14047	0x36DF	Dùng kế	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	30	0	1	10	14038	Xuất chiêu vào đúng thời điểm
+14048	0x36E0	Trí thủ	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	30	0	1	10	14038	Chỉ ra những điểm yếu của địch
+14049	0x36E1	Chống địch	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	30	0	1	10	14038	Giảm tổn thương cho đồng đội
+14050	0x36E2	Sách động	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	30	0	1	10	14038	Gia tăng uy lực của đồng đội
+14051	0x36E3	Tiên khiếu	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	30	0	1	10	14038	Đả thông kinh mạch
+14052	0x36E4	HóaHuyếtHòanHồn	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	30	0	1	5	14038	Hấp thụ công kích của địch
+14053	0x36E5	ThánhLinh thuật	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	52	19	30	55	1	5	14038	Dùng lực thánh linh công kích
+14054	0x36E6	CànKhônThiênLôi	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	84	2	45	0	1	5	14038	Sự trừng phạt của Thiên Lôi
+14055	0x36E7	Tổn huyết	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	0	0	0	30	0	0	0	0	Mất máu
+14056	0x36E8	Tiên khí hộ thân	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	0	0	5	0	242	0	0	0	N/A
+14057	0x36E9	Vật lý giảm nữa	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	30	0	1	10	0	Tổn thương vật lý giảm nữa
+14058	0x36EA	Thiết bố sam	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	30	0	1	10	0	HP thấp tăng né tránh
+14059	0x36EB	Đằng thuật giáp	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	30	0	1	10	0	HP thấp tăng dmg
+14060	0x36EC	Toàn thể Thiên Lôi	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	84	2	45	0	1	5	0	Thiên Lôi trách phạt
+14061	0x36ED	Thiên Lôi Thần Thuẫn	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	0	30	0	1	10	0	Tránh né kỹ năng Thiên Lôi
+15001	0x3A99	Bắt cóc	6	Bắt cóc / thả lưới	0	0	11	30	0	0	10	0	N/A
+15002	0x3A9A	Thả lưới	6	Bắt cóc / thả lưới	0	0	11	30	0	0	10	0	N/A
+15003	0x3A9B	Thả lưới thành công	6	Bắt cóc / thả lưới	0	0	11	30	0	0	10	0	N/A
+15004	0x3A9C	Phãn đoàn bộ võng	7	Phãn đoàn / phương tiện (xe, giếng, tháp)	0	0	11	30	0	0	10	0	N/A
+15005	0x3A9D	Thành công phãn đoàn	7	Phãn đoàn / phương tiện (xe, giếng, tháp)	0	0	11	30	0	0	10	0	N/A
+16001	0x3E81	Lầu tên	7	Phãn đoàn / phương tiện (xe, giếng, tháp)	0	0	1	15	0	0	10	0	N/A
+16002	0x3E82	Thành Môn	7	Phãn đoàn / phương tiện (xe, giếng, tháp)	0	0	1	15	7	0	10	0	N/A
+17001	0x4269	Phòng ngự	8	Phòng ngự	0	0	10	1	0	0	10	0	Giảm công kích của đối phương
+18001	0x4651	Chạy trốn	9	Chạy trốn	0	0	12	15	0	0	10	0	Thoát ra chiến trường
+18002	0x4652	Chạy trốn thất bại	9	Chạy trốn	0	0	12	15	0	0	10	0	Thoát ra chiến trường thất bại
+19001	0x4A39	Vật phẩm	10	Vật phẩm	0	0	13	24	0	0	0	0	Sử dụng vật thể
+20001	0x4E21	Cây tinh hút máu	11	Skill hệ thống (hút máu, trúng độc…)	0	0	1	26	0	0	0	0	Cây tinh hút máu
+20002	0x4E22	Trúng độc mất máu	11	Skill hệ thống (hút máu, trúng độc…)	0	0	1	20	0	0	0	0	Trúng độc hiến máu
+20003	0x4E23	Thương hại phản đàn	11	Skill hệ thống (hút máu, trúng độc…)	0	0	1	20	0	0	0	0	Thương hại phản đàn
+20004	0x4E24	Thần xui xẻo	12	Thần xui xẻo / phúc thần	0	0	1	30	240	0	0	0	Thần xui phò mình
+20005	0x4E25	Phúc thần	12	Thần xui xẻo / phúc thần	0	0	1	30	170	0	0	0	Phúc thần phò mình
+20006	0x4E26	Hộ chủ	5	Hệ Tâm (kỹ năng sống + kỹ năng nghề sau chuyển sinh)	5	0	17	10	241	0	1	0	Thay thế chủ nhân đỡ công kích
+20007	0x4E27	Giải hộ chủ	13	Giải hộ chủ	0	0	17	10	0	0	0	0	N/A
+20008	0x4E28	Bùa chú	14	Bùa chú	0	0	17	10	0	0	0	0	N/A
+20009	0x4E29	Xe xung phong	7	Phãn đoàn / phương tiện (xe, giếng, tháp)	0	0	1	20	0	0	10	0	N/A
+20010	0x4E2A	Xe dao	7	Phãn đoàn / phương tiện (xe, giếng, tháp)	0	0	1	12	0	0	10	0	N/A
+20011	0x4E2B	Xe nỏ	7	Phãn đoàn / phương tiện (xe, giếng, tháp)	0	0	1	10	0	0	10	0	N/A
+20012	0x4E2C	Xe ném đá	7	Phãn đoàn / phương tiện (xe, giếng, tháp)	0	0	1	10	0	0	10	0	N/A
+20013	0x4E2D	Giếng/tháp tên	7	Phãn đoàn / phương tiện (xe, giếng, tháp)	0	0	1	8	0	0	10	0	N/A
+20014	0x4E2E	Tứ nhân hỗn loạn	15	Nhóm trung cấp (Tứ nhân, Long đầu, Bạch Hổ…)	3	50	15	20	173	0	10	0	Hỗn loạn 4người của đối phương
+20015	0x4E2F	Tứ nhân trạng giải	15	Nhóm trung cấp (Tứ nhân, Long đầu, Bạch Hổ…)	0	60	18	20	0	0	10	0	Trạng giải 4người của mình
+20016	0x4E30	Long đầu	15	Nhóm trung cấp (Tứ nhân, Long đầu, Bạch Hổ…)	0	60	1	18	5	0	10	0	Kỹ thuật đấu vật
+20017	0x4E31	Hữu long trảo	15	Nhóm trung cấp (Tứ nhân, Long đầu, Bạch Hổ…)	0	60	1	24	0	0	10	0	Kỹ thuật đấu vật
+20018	0x4E32	Tả long trảo	15	Nhóm trung cấp (Tứ nhân, Long đầu, Bạch Hổ…)	0	60	2	22	0	0	10	0	Kỹ thuật đấu vật
+20019	0x4E33	Giải thoát	15	Nhóm trung cấp (Tứ nhân, Long đầu, Bạch Hổ…)	0	60	18	20	0	0	10	0	Giải thoát 6 người phe ta.
+20020	0x4E34	Tam sát	15	Nhóm trung cấp (Tứ nhân, Long đầu, Bạch Hổ…)	0	60	1	18	5	0	10	0	Đánh gục 3 người
+20021	0x4E35	Loạn Nha	15	Nhóm trung cấp (Tứ nhân, Long đầu, Bạch Hổ…)	0	60	2	27	0	0	10	0	Toàn thể địa nha
+20022	0x4E36	Quy Thúc	15	Nhóm trung cấp (Tứ nhân, Long đầu, Bạch Hổ…)	0	60	15	52	175	0	10	0	Nham Quái Kỹ sử dụng toàn thân
+20023	0x4E37	Tứ độc thủ	15	Nhóm trung cấp (Tứ nhân, Long đầu, Bạch Hổ…)	0	60	15	20	171	0	10	0	Hạ độc 4 người bên địch
+20024	0x4E38	Thập Khí	15	Nhóm trung cấp (Tứ nhân, Long đầu, Bạch Hổ…)	0	60	4	17	106	0	10	0	Nguyên khí của 10 người
+20025	0x4E39	Cây tinh 3	15	Nhóm trung cấp (Tứ nhân, Long đầu, Bạch Hổ…)	1	36	3	26	3	0	10	0	Tam nhân thụ tinh
+20026	0x4E3A	Băng Phong	15	Nhóm trung cấp (Tứ nhân, Long đầu, Bạch Hổ…)	2	80	3	27	1	0	10	0	Tam nhân băng phong
+20027	0x4E3B	Hoàn Phong	15	Nhóm trung cấp (Tứ nhân, Long đầu, Bạch Hổ…)	4	30	3	17	2	0	10	0	Tam nhân hoàn phong
+20028	0x4E3C	Bạo Phong	15	Nhóm trung cấp (Tứ nhân, Long đầu, Bạch Hổ…)	4	60	2	22	0	0	10	0	Tam nhân bạo phong
+20029	0x4E3D	Bạch Hổ Pháo	15	Nhóm trung cấp (Tứ nhân, Long đầu, Bạch Hổ…)	2	80	2	55	0	0	10	0	Chùm tia sáng của Bạch Hổ
+20030	0x4E3E	Bạch Hổ đầu	15	Nhóm trung cấp (Tứ nhân, Long đầu, Bạch Hổ…)	0	60	1	18	0	0	10	0	Đầu của Bạch hổ
+20031	0x4E3F	Tả Bạch Hổ trảo	15	Nhóm trung cấp (Tứ nhân, Long đầu, Bạch Hổ…)	0	60	1	24	0	0	10	0	Móng trái của Bạch Hổ
+20032	0x4E40	HữuBạch Hổ trảo	15	Nhóm trung cấp (Tứ nhân, Long đầu, Bạch Hổ…)	0	60	2	22	0	0	10	0	Móng phải của Bạch Hổ
+20033	0x4E41	Kiếm tuyệt vọng	15	Nhóm trung cấp (Tứ nhân, Long đầu, Bạch Hổ…)	5	80	1	13	7	0	10	0	Có sức mạnh hủy diệt
+20034	0x4E42	Xe đầu trâu	7	Phãn đoàn / phương tiện (xe, giếng, tháp)	0	0	1	18	0	0	10	0	Va chạm đơn thể
+20035	0x4E43	Xeđao tinhluyện gang	7	Phãn đoàn / phương tiện (xe, giếng, tháp)	0	0	1	9	0	0	10	0	Va chạm đơn thể
+20036	0x4E44	Xe Vận Cung	7	Phãn đoàn / phương tiện (xe, giếng, tháp)	0	0	1	24	0	0	10	0	Công kich 2 lần vào 6 người
+20037	0x4E45	Xe lớn chở đá	7	Phãn đoàn / phương tiện (xe, giếng, tháp)	0	0	1	24	0	0	10	0	Hoả cầu công kích 6 người
+20038	0x4E46	Giếng Cường Cung	7	Phãn đoàn / phương tiện (xe, giếng, tháp)	0	0	1	21	0	0	10	0	Hoả tiễn 5 người
+20039	0x4E47	Tháp Thần Tiễn	7	Phãn đoàn / phương tiện (xe, giếng, tháp)	0	0	1	23	0	0	10	0	Tên bắn 10 người
+20040	0x4E48	Tường Đinh	7	Phãn đoàn / phương tiện (xe, giếng, tháp)	0	0	1	54	0	0	10	0	Cạm bẫy 10 người
+20041	0x4E49	Cung tên trúc	7	Phãn đoàn / phương tiện (xe, giếng, tháp)	0	0	1	22	0	0	10	0	Cạm bẫy 10 người
+20042	0x4E4A	Thuốc nổ	7	Phãn đoàn / phương tiện (xe, giếng, tháp)	0	0	1	53	0	0	10	0	Cạm bẫy 10 người
+20043	0x4E4B	Đá lớn	7	Phãn đoàn / phương tiện (xe, giếng, tháp)	0	0	1	17	0	0	10	0	Cạm bẫy 10 người
+20044	0x4E4C	Phá hủy	7	Phãn đoàn / phương tiện (xe, giếng, tháp)	0	0	1	23	0	0	10	0	Kỹ năng đơn thể
+20045	0x4E4D	Thần nộ thiên tru	7	Phãn đoàn / phương tiện (xe, giếng, tháp)	0	0	1	44	0	0	10	0	Chủ guild sai thiên khuyển TC
+20046	0x4E4E	Đuổi địch	7	Phãn đoàn / phương tiện (xe, giếng, tháp)	0	0	12	0	0	0	10	0	Khiến tướng địch cất pet
+20047	0x4E4F	Cường hiệu thi độc	17	Skill bắt buộc phải học (client tự chặn nếu chưa học)	5	60	15	20	171	0	5	0	Bỏ độc 4 người
+20048	0x4E50	Siêu cấp toàn phong	17	Skill bắt buộc phải học (client tự chặn nếu chưa học)	4	30	3	17	2	0	5	0	Gió lốc 3 người
+20049	0x4E51	Siêu cấp thụ tinh	17	Skill bắt buộc phải học (client tự chặn nếu chưa học)	1	36	3	26	3	0	5	0	Thụ tinh 3 người
+20050	0x4E52	Cường hiệu giải trừ	17	Skill bắt buộc phải học (client tự chặn nếu chưa học)	2	60	18	20	0	0	5	0	Giải trừ 4 người
+20051	0x4E53	Cửu vỉ hồ mi hoặc	17	Skill bắt buộc phải học (client tự chặn nếu chưa học)	5	50	15	20	173	0	10	0	Tuyệt kỹ Điêu Thuyền
+20052	0x4E54	Kiếm tuyệt vọng 4	15	Nhóm trung cấp (Tứ nhân, Long đầu, Bạch Hổ…)	5	180	1	13	7	0	10	0	Có sức mạnh hủy diệt
+21001	0x5209	Chấn địa chùy	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	1	54	1	29	175	0	1	0	Vung Chấn địa chùy đánh địch
+21002	0x520A	Hàn băng quán	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	2	44	2	37	0	0	1	0	Hàn băng xuyên qua cơ thể địch
+21003	0x520B	Hồng liên hỏa	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	3	54	2	34	0	0	1	0	Hồng Liên Hỏa đốt sạch tội lỗi
+21004	0x520C	Phá không thiểm	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	4	48	1	21	0	0	1	0	Chớp lóe phá thiên
+21005	0x520D	Mãnh ngưu kích	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	1	48	1	22	0	0	1	0	Thế mãnh ngưu tập kích kẻ thù
+21006	0x520E	Băng nha nhẫn	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	2	36	1	25	0	0	1	0	Tạo thành 3 thanh kiếm băng
+21007	0x520F	Chính diệm nộ	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	3	48	1	46	0	0	1	0	Liên hoa loạn kích
+21008	0x5210	Gió độc	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	4	30	15	20	171	0	1	0	Chất độc của ma quỷ
+21009	0x5211	Vẫn tinh lạc	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	1	48	1	30	0	0	1	0	Kêu gọi vẫn tinh đánh địch
+21010	0x5212	Trùng quyền	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	2	48	1	25	0	0	1	0	Trùng quyền thấu cả thịt xương
+21011	0x5213	Hỏa phụng thiên	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	3	72	2	30	0	0	1	0	Đổi mạng gọi hỏa phụng đến
+21012	0x5214	Hồi mã thương	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	4	52	1	25	0	0	1	0	Tuyệt chiêu hồi mã thương
+21013	0x5215	Sư Phệ	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	1	64	1	35	0	0	1	0	Sư tử thánh linh kích địch thủ
+21014	0x5216	Liềm Trảm	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	3	72	1	35	179	0	1	0	Dùng lưỡi liềm sát hại địch
+21015	0x5217	Nhị Đoạn Thức	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	2	56	1	30	0	0	1	0	Sét đánh như vũ bão kích địch
+21016	0x5218	Động Ngân	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	4	72	2	30	0	0	1	0	Thuận gió càn trận địa địch
+21017	0x5219	Thâm Uyên	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	1	65	1	25	0	0	1	0	Rơi vào vực sâu đao kiếm
+21018	0x521A	Nhẫn Trảm	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	3	75	1	25	0	0	1	0	Dùng Nhẫn Trảm chém giết địch
+21019	0x521B	Tiễn thần Định quân	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	4	72	2	30	0	0	1	0	Những mũi tên bắn địch như lo
+21020	0x521C	Thiên tru thái bình	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	1	80	2	17	0	0	1	0	Niêm những câu thần chú khiến
+21021	0x521D	Địadiệtkinhđàotrận	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	2	80	2	19	0	0	1	0	Niệm thần chú thiên thuỷ khiến
+21022	0x521E	Nhân vong tống táng	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	3	80	2	37	0	0	1	0	Niệm thần chú gọi lửa trời thi
+21023	0x521F	Thương thiên đã chết	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	0	80	1	83	0	0	1	0	N/A
+21024	0x5220	Thácđaophápáonghĩa	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	4	77	1	45	0	0	1	0	Tiêu diệt địch bằng Thanh hồng
+21025	0x5221	Cuồng xà đoạt thủ	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	3	77	1	45	0	0	1	0	Trương bát vừa xuất, lấy thủ c
+21026	0x5222	Nhân giả vô địch	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	1	77	19	45	58	0	1	0	Nhân giả... chính khí quá mạnh
+21027	0x5223	Kết nghĩa vườn đào	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	0	77	1	90	0	0	1	0	N/A
+21028	0x5224	Nhân giả vô địch	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	1	77	15	45	175	0	1	0	N/A
+21029	0x5225	Lạc Thuỷ kết tụ	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	2	82	2	34	0	0	1	0	Nước hồ Lạc vì kiếm mà cô đọng
+21030	0x5226	Nham diệp phiêu kiếm	16	Nhóm Thiên Nhân (chia theo 4 hệ Kim/Thủy/Hỏa/Phong)	1	82	2	34	0	0	1	0	Thánh linh hóa nham trừ ma đạo
+22001	0x55F1	Quang mâu thuật	18	Hệ QUANG (Light)	0	15	1	15	0	4	10	0	ầHầúấậầÙờẺệ`3ẩìửẢấH
+22002	0x55F2	Phật quang chưởng	18	Hệ QUANG (Light)	0	52	1	33	0	5	5	0	ẩòầúừEờồẹóƠxấấ, ậ@ầXổjốPậđÀừ
+22003	0x55F3	Huyễn quang	18	Hệ QUANG (Light)	0	72	1	28	0	8	10	0	ộoầXẽẻỗƠốtầú, ậđÀừấTẩìửẢấH
+22004	0x55F4	Liệt diệm chi quang	18	Hệ QUANG (Light)	0	30	2	39	7	0	5	0	ẽẻửỏếứấõầúậđÀừửẢấHẽÃỠÂởôầLễÌ
+22005	0x55F5	Quang du thuật	18	Hệ QUANG (Light)	0	15	5	29	0	12	1	0	ịứồặấTẩìờấấÍẩUứửồIệzếểứA
+22006	0x55F6	Quang chi kính	18	Hệ QUANG (Light)	0	46	19	30	56	1	5	0	ểIẹựầúấậÃèắAểồ3ẩìờấấÍẹèớừờẺệ`
+22007	0x55F7	Quang tuyền quán chú	18	Hệ QUANG (Light)	0	72	14	33	0	15	10	0	ầúểuấậấOẢéế`ẽễĂé, ẩPệÉềìƠ_ẽễấư
+22008	0x55F8	Hồi quang phản chiếu	18	Hệ QUANG (Light)	0	40	0	30	0	1	1	0	ẽủễPẩứấ@Àừềá, ẩỹồÊƠ_ểắấ@ẩị
+22009	0x55F9	Quang tốc đầu trịch	18	Hệ QUANG (Light)	0	104	2	27	0	7	5	0	ầHầúỠtậẻÂYÀợờắểIệiậđÀừ
+22010	0x55FA	Kim tê công kích	18	Hệ QUANG (Light)	0	24	1	25	0	7	10	0	ậẻÂYếọựôậđÀừựỉấè
+22011	0x55FB	Bạch Hổ	18	Hệ QUANG (Light)	0	120	2	52	0	0	10	0	ầlỠêầạếêậđÀừ
+22012	0x55FC	Gọi tiểu Bạch Hổ	18	Hệ QUANG (Light)	0	120	2	51	0	0	1	0	N/A
+22013	0x55FD	Gọi trung Bạch Hổ	18	Hệ QUANG (Light)	0	120	2	51	0	0	1	0	N/A
+22014	0x55FE	Gọi đại Bạch Hổ	18	Hệ QUANG (Light)	0	120	2	50	0	0	1	0	N/A
+22015	0x55FF	Tập thức quang đạn	18	Hệ QUANG (Light)	0	84	2	27	0	14	10	0	ộoệgờồậôầúửuậđÀừửẢấè
+22016	0x5600	Đồng quang chi ban	18	Hệ QUANG (Light)	0	52	1	33	1	5	5	0	ểIẹựẢặầửấậầúờẺệ`ẩPệÉệựịjửẢấè
+22017	0x5601	C.Đ quang chi ban	18	Hệ QUANG (Light)	0	52	1	33	1	5	5	0	ểIẹựẢặầửấậầúờẺệ`ẩPệÉệựịjửẢấè
+22018	0x5602	C.L diệm chi quang	18	Hệ QUANG (Light)	0	30	2	39	7	0	5	0	ẽẻửỏếứấõầúậđÀừửẢấHẽÃỠÂởôầLễÌ
+22019	0x5603	Chân huyễn quang	18	Hệ QUANG (Light)	0	72	1	28	0	8	10	0	ộoầXẽẻỗƠốtầú, ậđÀừấTẩìửẢấH
+22020	0x5604	C.Phật quang chưởng	18	Hệ QUANG (Light)	0	52	1	33	0	5	5	0	ẩòầúừEờồẹóƠxấấ, ậ@ầXổjốPậđÀừ
+22021	0x5605	Siêu quang ba	18	Hệ QUANG (Light)	0	52	1	30	179	10	10	0	ếựờZÂọẽỳầXờWổjầúếi
+22022	0x5606	Quyền khuynh vạn lý	18	Hệ QUANG (Light)	0	30	2	39	7	0	5	0	ẽỳễpĂýửẢồÊửuấặổo
+23001	0x59D9	Ám độc tiễn	19	Hệ ÁM (Dark)	0	15	1	15	0	4	10	0	ếợởtốàẹóấ}ơbấậấWậđÀừầửửĐ
+23002	0x59DA	Ám đao trảm	19	Hệ ÁM (Dark)	0	66	1	20	0	18	10	0	ựỉửẢấèấ@ấHẽỳầXĩĩờÂấOờqếứổÙÀừ
+23003	0x59DB	Hắc toàn trảm	19	Hệ ÁM (Dark)	0	72	1	26	0	16	10	0	ẽỳầXờÂổỹổÙậđÀừấTẩìửẢấH
+23004	0x59DC	Vu độc	19	Hệ ÁM (Dark)	0	30	2	20	0	0	5	0	ẹựầXậĂểrĩĩỠNờẺệ`ửẢấHẽÃởlốÓSP
+23005	0x59DD	Tụ ẩn kiếm	19	Hệ ÁM (Dark)	0	30	2	29	7	0	1	0	ểớởâếứỠSịÌửCÀuầýầXấâờẺệ`ửẢấH
+23006	0x59DE	Khô lâu đầu trịch	19	Hệ ÁM (Dark)	0	52	2	27	171	7	5	0	ậẻÂYớuĂ\, ậđÀừầ|ẩìửẢấH
+23007	0x59DF	Vu độc oa oa	19	Hệ ÁM (Dark)	0	50	15	20	173	0	1	0	ầĨậĂểrềơềơổổẽĩửẢấèấ@ấHấểểỹƠÝổợ
+23008	0x59E0	Yêu thuật kích hoả	19	Hệ ÁM (Dark)	0	69	19	27	54	1	5	0	ậốỠNưEấẳờấấÍ, ầXấâẹỹẹỹễPẹR
+23009	0x59E1	Mê hoặc độc trâm	19	Hệ ÁM (Dark)	0	30	2	39	173	0	5	0	ầHồgƠbểrồwậđÀừửẢấHẽÃỗVờÃầLễÌ
+23010	0x59E2	Độc phi luân	19	Hệ ÁM (Dark)	0	56	1	30	0	9	10	0	ổNờĩấWử@ểrếứễịơủÂYẩVựỉấè
+23011	0x59E3	Huyền Vũ	19	Hệ ÁM (Dark)	0	120	15	53	171	0	10	0	ầlỠêầÈếZậđÀừ
+23012	0x59E4	Gọi tiểu Huyền Vũ	19	Hệ ÁM (Dark)	0	120	2	54	0	0	1	0	N/A
+23013	0x59E5	Gọi trung Huyền Vũ	19	Hệ ÁM (Dark)	0	120	2	54	0	0	1	0	N/A
+23014	0x59E6	Gọi đại Huyền Vũ	19	Hệ ÁM (Dark)	0	120	2	54	0	0	1	0	N/A
+23015	0x59E7	Vựng trảm	19	Hệ ÁM (Dark)	0	56	1	30	5	9	10	0	ểớờBếứậđÀừếổệaếợổaớọỗvầƠởw
+23016	0x59E8	Hắc ám liên trảm	19	Hệ ÁM (Dark)	0	84	1	35	0	16	10	0	ẩVửẢấHẽỳầXÀợờắĩĩờÂỠsổÙ
+23017	0x59E9	C.Ám độc tiễn	19	Hệ ÁM (Dark)	0	15	1	15	0	4	10	0	ếợởtốàẹóấ}ơbấậấWậđÀừầửửĐ
+23018	0x59EA	Chân Vu độc	19	Hệ ÁM (Dark)	0	30	2	20	0	0	5	0	ẹựầXậĂểrĩĩỠNờẺệ`ửẢấHẽÃởlốÓSP
+23019	0x59EB	Vạn độc xuyên tâm	19	Hệ ÁM (Dark)	0	72	2	45	179	9	10	0	ểIẹựịUƠcấậểrắAẽỳửẢấHểrệđậđấư
+23020	0x59EC	C.Độc phi luân	19	Hệ ÁM (Dark)	0	56	1	30	0	9	10	0	ổNờĩấWử@ểrếứễịơủÂYẩVựỉấè
+23021	0x59ED	C.Ám nhẫn trẩm	19	Hệ ÁM (Dark)	0	66	1	20	0	18	10	0	ựỉửẢấèấ@ấHẽỳầXĩĩờÂấOờqếứổÙÀừ
+23022	0x59EE	C.Mê hoặc độc trâm	19	Hệ ÁM (Dark)	0	30	2	39	173	0	5	0	ầHồgƠbểrồwậđÀừửẢấHẽÃỗVờÃầLễÌ
+23023	0x59EF	Phiêu diêu lưu phong	19	Hệ ÁM (Dark)	0	82	2	34	0	0	5	0	ểầốềốBồÊẢẳẹưẩủễởậjịẽỠởấậậỡ!

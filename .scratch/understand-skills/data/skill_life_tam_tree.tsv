@@ -1,0 +1,37 @@
+id	id_hex	name	type	element	sp_cost	sk_point	max_lvl	require_sk	skill_type	branch_note	setkillElement5_level	reborn_default_level
+14001	0x36B1	Thuật trinh thám	5	Tâm	0	0	1	0	Passive	gốc nhánh sống		1
+14002	0x36B2	Thuật đào tẩu	5	Tâm	10	0	1	14001	12	gốc nhánh sống	1	1
+14003	0x36B3	Thuật mua bán	5	Tâm	0	0	8	14001	Passive	gốc nhánh sống	10	1
+14004	0x36B4	Thuật dò xét	5	Tâm	0	0	10	14001	Passive	gốc nhánh sống (tiền đề đào khoáng)	10	10
+14005	0x36B5	Thuật luyện đơn	5	Tâm	0	0	10	14001	Passive	gốc nhánh sống (tiền đề đúc luyện)	10	10
+14006	0x36B6	Đại hô	5	Tâm	20	0	10	14001	Buff	gốc nhánh sống	10	
+14007	0x36B7	Giải hôn	5	Tâm	5	0	1	14002	5	nhánh đào tẩu	1	
+14008	0x36B8	Hôn mê	5	Tâm	15	0	5	14002	Debuff	nhánh đào tẩu	5	
+14009	0x36B9	Người làm	5	Tâm	0	0	10	14003	Passive	nhánh mua bán		
+14010	0x36BA	Thuật đào khoáng	5	Tâm	0	0	10	14004	Passive	nhánh dò xét		10
+14011	0x36BB	Thuật đúc luyện	5	Tâm	0	0	10	14005	Passive	nhánh luyện đơn		10
+14012	0x36BC	Đồng tâm	5	Tâm	36	0	10	14006	Heal	nhánh Đại hô		
+14013	0x36BD	Cổ Vũ	5	Tâm	36	0	10	14006	Heal	nhánh Đại hô		
+14016	0x36C0	Thuật giao dịch	5	Tâm	0	0	10	14009	Passive	nhánh người làm		
+14017	0x36C1	Tịnh toạ	5	Tâm	0	0	10	14009	Passive	nhánh người làm		
+14018	0x36C2	Thuật đào sâu	5	Tâm	0	0	10	14010	Passive	nhánh đào khoáng		10
+14019	0x36C3	Thuật chế tạo	5	Tâm	0	0	5	14011	Passive	nhánh đúc luyện		10
+14020	0x36C4	Hoạch lí phản	5	Tâm	30	0	5	14012	15	nhánh Đồng tâm		
+14021	0x36C5	Hỗn loạn	5	Tâm	25	0	5	0	15	gốc nhánh sống		5
+14022	0x36C6	Giải hỗn loạn	5	Tâm	10	0	1	0	5	gốc nhánh sống		
+14023	0x36C7	Cưỡi ngựa	5	Tâm	0	0	1	0	Passive	độc lập (max 1)		1
+14024	0x36C8	Linh quang ẩn hiện	5	Tâm	20	0	1	0	Passive	độc lập		
+14025	0x36C9	Chiếm đọat	5	Tâm	0	0	1	0	Passive	độc lập		
+14026	0x36CA	Triệu gọi	5	Tâm	0	0	1	0	Passive	độc lập (max 1)	10	
+14027	0x36CB	Đạo sư	5	Tâm	0	0	1	0	Passive	độc lập (max 1)		
+14028	0x36CC	Đoàn kết	5	Tâm	0	0	1	0	Passive	gốc nhánh sống		
+14029	0x36CD	Cát Phổ Trại bắn đạn	5	Tâm	60	0	10	0	15	gốc nhánh sống		
+14030	0x36CE	Cát Phổ Trại áp đỉnh	5	Tâm	80	0	10	0	Buff	gốc nhánh sống		
+14031	0x36CF	Tiếp chiêu	5	Tâm	0	0	1	0	Passive	gốc nhánh sống		
+14032	0x36D0	Tinh luyện	5	Tâm	0	0	10	14019	Passive	gốc nhánh sống (tiền đề chế tạo)	10	
+14033	0x36D1	Xạ Tiễn	5	Tâm	30	0	5	14037	Buff	nhánh Tiễn Vũ		
+14034	0x36D2	Kỵ Binh	5	Tâm	0	0	1	0	Passive	gốc nhánh sống		
+14035	0x36D3	Chuyển Thể	5	Tâm	0	0	1	0	Passive	gốc nhánh sống		1
+14036	0x36D4	Bách Xuyên	5	Tâm	24	0	5	0	Active	gốc nhánh sống		
+14037	0x36D5	Tiễn Vũ	5	Tâm	30	0	5	14036	Buff	gốc nhánh sống		
+14038	0x36D6	Đại chu thiên	5	Tâm	0	1	10	0	Passive	GỐC nhánh nghề sau chuyển sinh		
