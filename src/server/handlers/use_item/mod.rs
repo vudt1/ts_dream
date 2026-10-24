@@ -173,9 +173,14 @@ impl UseCtx<'_> {
         self.out.send("F4440200170F".to_string());
     }
 
-    /// VISCII-encoded system message frame via channel `020102`.
-    pub fn red(&mut self, msg: &str) {
+    /// Send a system message frame via channel `020102` using `spawn::sys_msg_frame`.
+    pub fn sys_msg(&mut self, msg: &str) {
         self.out.send(crate::server::spawn::sys_msg_frame(msg));
+    }
+
+    /// Legacy alias for `sys_msg`.
+    pub fn red(&mut self, msg: &str) {
+        self.sys_msg(msg);
     }
 
     /// Sleep-equivalent for items 46036 and 46167: send the sleep frames, full-heal

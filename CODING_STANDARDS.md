@@ -76,5 +76,7 @@ Khi thực hiện bất kỳ giao dịch nào tương tác giữa 2 người ch�
 
 - **Tránh Magic Number / Primitive Obsession**:
   Sử dụng các hằng số định danh miền (domain constants) đã được khai báo trong `src/protocol/mod.rs` (ví dụ: dùng `BANK_SUB_WITHDRAW` thay vì literal số `1`).
-- **Khử Duplicated Code**:
-  Các logic định dạng frame dùng chung (như format 11-byte item không slot `storage_entry_no_slot`, frame mở khóa nút bấm UI ngân hàng) phải được trích xuất thành helper dùng chung.
+- **Phân nhánh Sub-Opcode Tường Minh (Explicit Sub-Opcode Branching)**:
+  Khi xử lý dispatch hoặc sinh phản hồi theo sub-opcode nhị phân (`u8`), **cấm** sử dụng fallback `else` vô điều kiện. Luôn phân nhánh tường minh (`if sub == CONST_A ... else if sub == CONST_B ... else { /* drop / no-op */ }`) để các gói tin mang sub-opcode lạ hoặc rác không bao giờ kích hoạt nhầm trạng thái mở khóa UI hay đột biến dữ liệu.
+- **Khử Duplicated Code & Legacy Aliases**:
+  Các logic định dạng frame dùng chung (như format 11-byte item không slot `storage_entry_no_slot`, frame mở khóa nút bấm UI ngân hàng) phải được trích xuất thành helper dùng chung. Khi chuẩn hóa API mới, phải chuyển đổi dứt điểm toàn bộ call-site và loại bỏ alias cũ.

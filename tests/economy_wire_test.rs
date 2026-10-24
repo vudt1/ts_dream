@@ -30,7 +30,7 @@ use ts_dream::server::handlers::shops::{
 use ts_dream::server::handlers::talk::handle_talk;
 use ts_dream::server::handlers::trade_storage::{
     cancel_timed_out_trade, expire_trade_if_timed_out, handle_bank_gold, handle_storage_transfer,
-    handle_trade, is_trade_timed_out, TRADE_TIMEOUT_MS,
+    handle_trade, is_trade_timed_out, send_bank_ui_unlock, TRADE_TIMEOUT_MS,
 };
 use ts_dream::server::session::{
     lock_online_sessions, Conn, InventoryItem, PetState, Session, ShopItem,
@@ -565,7 +565,7 @@ async fn test_bank_deposit_withdraw_with_ui_unlock() {
             service: &service,
             out: &mut out_dep,
             opcode: 0x1D,
-            sub: 2, // Deposit
+            sub: ts_dream::protocol::BANK_SUB_DEPOSIT,
             payload: &deposit_payload,
             decoded: &[],
             env,
@@ -612,7 +612,7 @@ async fn test_bank_deposit_withdraw_with_ui_unlock() {
             service: &service,
             out: &mut out_wdr,
             opcode: 0x1D,
-            sub: 1, // Withdraw
+            sub: ts_dream::protocol::BANK_SUB_WITHDRAW,
             payload: &withdraw_payload,
             decoded: &[],
             env,
@@ -2510,4 +2510,187 @@ async fn test_p2p_trade_natural_flow_and_partner_offline_recovery() {
     );
     assert!(!conn_solo.session.trade.active, "Solo session trade must be deactivated");
 }
+
+#[tokio::test]
+async fn test_bank_withdraw_overflow_vs_insufficient_balance() {
+    let data = GameData::default();
+    let service = BattleService::default();
+    let env = ServerEnv::none();
+
+    let mut conn = create_test_conn(8881, 8881);
+
+    // Case 1: Insufficient bank balance.
+    // Even if player's gold is already at GOLD_CAP, when bank balance is 0 or less than amount requested,
+    // the failure is due to insufficient bank balance, NOT inventory overflow.
+    // Must receive 1D 03 and 1D 08, and MUST NOT receive 1A 06!
+    conn.session.gold = GOLD_CAP;
+    conn.session.bank_gold = 0;
+    let mut out_insufficient = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out_insufficient,
+            opcode: 0x1D,
+            sub: ts_dream::protocol::BANK_SUB_WITHDRAW,
+            payload: &50_000u32.to_le_bytes(),
+            decoded: &[],
+            env,
+        };
+        handle_bank_gold(&mut ctx).await;
+    }
+    let frames_insufficient: Vec<String> = out_insufficient.outgoing.into_iter().map(|f| f.frame).collect();
+    assert!(
+        frames_insufficient.iter().any(|f| f == "F44402001D03"),
+        "Insufficient bank balance must emit 1D 03: {:?}",
+        frames_insufficient
+    );
+    assert!(
+        frames_insufficient.iter().any(|f| f == "F44402001D08"),
+        "Insufficient bank balance must unlock withdraw UI via 1D 08: {:?}",
+        frames_insufficient
+    );
+    assert!(
+        !frames_insufficient.iter().any(|f| f == "F44402001A06"),
+        "Insufficient bank balance MUST NOT emit 1A 06 overflow error: {:?}",
+        frames_insufficient
+    );
+
+    // Case 2: Bank has sufficient gold, BUT withdrawing would cause player inventory gold to exceed GOLD_CAP.
+    // e.g. player has 9_900_000, bank has 200_000, withdraw 200_000 -> 9_900_000 + 200_000 = 10_100_000 > GOLD_CAP.
+    // Must receive 1D 03, 1D 08, AND 1A 06!
+    conn.session.gold = 9_900_000;
+    conn.session.bank_gold = 200_000;
+    let mut out_overflow = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out_overflow,
+            opcode: 0x1D,
+            sub: ts_dream::protocol::BANK_SUB_WITHDRAW,
+            payload: &200_000u32.to_le_bytes(),
+            decoded: &[],
+            env,
+        };
+        handle_bank_gold(&mut ctx).await;
+    }
+    let frames_overflow: Vec<String> = out_overflow.outgoing.into_iter().map(|f| f.frame).collect();
+    assert!(
+        frames_overflow.iter().any(|f| f == "F44402001D03"),
+        "Inventory overflow must emit 1D 03: {:?}",
+        frames_overflow
+    );
+    assert!(
+        frames_overflow.iter().any(|f| f == "F44402001D08"),
+        "Inventory overflow must unlock withdraw UI via 1D 08: {:?}",
+        frames_overflow
+    );
+    assert!(
+        frames_overflow.iter().any(|f| f == "F44402001A06"),
+        "Inventory overflow MUST emit 1A 06 overflow error when bank has enough gold: {:?}",
+        frames_overflow
+    );
+
+    // Also verify send_bank_ui_unlock helper directly
+    let mut out_unlock_wdr = HandleOutcome::default();
+    send_bank_ui_unlock(
+        ts_dream::protocol::BANK_SUB_WITHDRAW,
+        &mut out_unlock_wdr,
+    );
+    assert_eq!(out_unlock_wdr.outgoing.len(), 1);
+    assert_eq!(out_unlock_wdr.outgoing[0].frame, "F44402001D08");
+
+    let mut out_unlock_dep = HandleOutcome::default();
+    send_bank_ui_unlock(
+        ts_dream::protocol::BANK_SUB_DEPOSIT,
+        &mut out_unlock_dep,
+    );
+    assert_eq!(out_unlock_dep.outgoing.len(), 1);
+    assert_eq!(out_unlock_dep.outgoing[0].frame, "F44402001D07");
+
+    // Invalid subcode for send_bank_ui_unlock must emit nothing
+    let mut out_unlock_invalid = HandleOutcome::default();
+    send_bank_ui_unlock(99, &mut out_unlock_invalid);
+    assert_eq!(out_unlock_invalid.outgoing.len(), 0);
+
+    // Case 3: Bank deposit overflow (bank_gold + amount > GOLD_CAP).
+    // Player has 500_000, bank has 9_800_000, attempts to deposit 300_000.
+    // Must receive 1D 03 and 1D 07, but MUST NOT receive 1A 06 (pocket overflow).
+    conn.session.gold = 500_000;
+    conn.session.bank_gold = 9_800_000;
+    let mut out_dep_overflow = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out_dep_overflow,
+            opcode: 0x1D,
+            sub: ts_dream::protocol::BANK_SUB_DEPOSIT,
+            payload: &300_000u32.to_le_bytes(),
+            decoded: &[],
+            env,
+        };
+        handle_bank_gold(&mut ctx).await;
+    }
+    let frames_dep_overflow: Vec<String> = out_dep_overflow.outgoing.into_iter().map(|f| f.frame).collect();
+    assert!(
+        frames_dep_overflow.iter().any(|f| f == "F44402001D03"),
+        "Bank deposit overflow must emit 1D 03: {:?}",
+        frames_dep_overflow
+    );
+    assert!(
+        frames_dep_overflow.iter().any(|f| f == "F44402001D07"),
+        "Bank deposit overflow must unlock deposit UI via 1D 07: {:?}",
+        frames_dep_overflow
+    );
+    assert!(
+        !frames_dep_overflow.iter().any(|f| f == "F44402001A06"),
+        "Bank deposit overflow MUST NOT emit 1A 06 pocket error: {:?}",
+        frames_dep_overflow
+    );
+
+    // Case 4: Amount == 0
+    let mut out_zero = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out_zero,
+            opcode: 0x1D,
+            sub: ts_dream::protocol::BANK_SUB_WITHDRAW,
+            payload: &0u32.to_le_bytes(),
+            decoded: &[],
+            env,
+        };
+        handle_bank_gold(&mut ctx).await;
+    }
+    let frames_zero: Vec<String> = out_zero.outgoing.into_iter().map(|f| f.frame).collect();
+    assert!(frames_zero.iter().any(|f| f == "F44402001D03"));
+    assert!(frames_zero.iter().any(|f| f == "F44402001D08"));
+    assert!(!frames_zero.iter().any(|f| f == "F44402001A06"));
+
+    // Case 5: Invalid subcode to handle_bank_gold is dropped silently
+    let mut out_invalid = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out_invalid,
+            opcode: 0x1D,
+            sub: 99,
+            payload: &50_000u32.to_le_bytes(),
+            decoded: &[],
+            env,
+        };
+        handle_bank_gold(&mut ctx).await;
+    }
+    assert_eq!(out_invalid.outgoing.len(), 0);
+}
+
 

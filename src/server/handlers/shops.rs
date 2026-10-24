@@ -4,6 +4,7 @@ use crate::db::persist;
 use crate::protocol::{encoder, GOLD_CAP};
 use crate::server::dispatcher::OpcodeCtx;
 use crate::server::session::{Conn, InventoryItem};
+use crate::server::spawn::sys_msg_frame;
 
 /// `F44406001A04` + gold — the gold-update frame sent after
 /// every successful shop transaction (also used by the Eve gold action in
@@ -37,12 +38,6 @@ pub fn npc_shop_buy_result(code: u8) -> String {
 /// Helper building NPC shop Sell result packet S->C `1B 02 <code>`.
 pub fn npc_shop_sell_result(code: u8) -> String {
     format!("F44403001B02{:02X}", code)
-}
-
-/// VISCII-encoded system message frame via channel `020102`.
-/// Delegates to standard `crate::server::spawn::sys_msg_frame`.
-fn red_message(msg: &str) -> String {
-    crate::server::spawn::sys_msg_frame(msg)
 }
 
 /// Lookup NPC shop entry by (idtalking, map_id, menu) → (item_id, price).
@@ -700,8 +695,8 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
                         conn.session.open_shop_id = target;
                         out.send(player_shop_catalog_frame(&s));
                     }
-                    None => out.send(red_message("Người bán đang offline")),
-                    _ => out.send(red_message("Cửa hàng đã đóng cửa")),
+                    None => out.send(sys_msg_frame("Người bán đang offline")),
+                    _ => out.send(sys_msg_frame("Cửa hàng đã đóng cửa")),
                 }
             }
         }
@@ -717,7 +712,7 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
                 seller_id_wire
             };
             if seller_id == 0 || seller_id == id {
-                out.send(red_message("Không thể mua từ cửa hàng này"));
+                out.send(sys_msg_frame("Không thể mua từ cửa hàng này"));
                 return;
             }
             let shop_index = payload[4] as usize;
@@ -732,7 +727,7 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
                 .get(&seller_id)
                 .cloned();
             let Some(mut seller_session) = seller else {
-                out.send(red_message("Người bán đang offline"));
+                out.send(sys_msg_frame("Người bán đang offline"));
                 return;
             };
 
@@ -751,7 +746,7 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
                     .await
                     {
                         conn.session = buyer_before;
-                        out.send(red_message("Giao dịch không thành công"));
+                        out.send(sys_msg_frame("Giao dịch không thành công"));
                         return;
                     }
                     crate::server::session::online_sessions()
@@ -781,18 +776,18 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
                     }
                 }
                 Err(ShopBuyError::NotEnoughGold { total }) => {
-                    out.send(red_message(&format!("Không đủ vàng để mua, cần {}", total)));
+                    out.send(sys_msg_frame(&format!("Không đủ vàng để mua, cần {}", total)));
                 }
                 Err(ShopBuyError::SellerGoldFull) => {
-                    out.send(red_message("Vàng của người bán đã đầy"));
+                    out.send(sys_msg_frame("Vàng của người bán đã đầy"));
                 }
                 Err(ShopBuyError::NotEnoughStock) => {
-                    out.send(red_message("Người bán không đủ hàng"));
+                    out.send(sys_msg_frame("Người bán không đủ hàng"));
                 }
                 Err(ShopBuyError::ShopClosed) => {
-                    out.send(red_message("Cửa hàng đã đóng cửa"));
+                    out.send(sys_msg_frame("Cửa hàng đã đóng cửa"));
                 }
-                Err(_) => out.send(red_message("Không thể mua")),
+                Err(_) => out.send(sys_msg_frame("Không thể mua")),
             }
         }
         _ => {}

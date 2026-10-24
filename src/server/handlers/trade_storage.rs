@@ -6,7 +6,7 @@
 
 use crate::db::persist;
 use crate::protocol::{encoder, frame};
-use crate::server::dispatcher::OpcodeCtx;
+use crate::server::dispatcher::{HandleOutcome, OpcodeCtx};
 use crate::protocol::GOLD_CAP;
 use crate::server::inventory;
 use crate::server::session::{lock_online_sessions, InventoryItem, PetState, Session, TradeState};
@@ -994,7 +994,19 @@ pub async fn handle_storage_transfer(ctx: &mut OpcodeCtx<'_>) {
     }
 }
 
+/// Emit bank UI button unlock frame (1D 08 for withdraw, 1D 07 for deposit).
+pub fn send_bank_ui_unlock(sub: u8, out: &mut HandleOutcome) {
+    if sub == crate::protocol::BANK_SUB_WITHDRAW {
+        out.send("F44402001D08");
+    } else if sub == crate::protocol::BANK_SUB_DEPOSIT {
+        out.send("F44402001D07");
+    }
+}
+
 pub async fn handle_bank_gold(ctx: &mut OpcodeCtx<'_>) {
+    if ctx.sub != crate::protocol::BANK_SUB_WITHDRAW && ctx.sub != crate::protocol::BANK_SUB_DEPOSIT {
+        return;
+    }
     if ctx.payload.len() < 4 {
         return;
     }
@@ -1006,11 +1018,7 @@ pub async fn handle_bank_gold(ctx: &mut OpcodeCtx<'_>) {
     );
     if amount == 0 {
         ctx.out.send("F44402001D03");
-        if ctx.sub == crate::protocol::BANK_SUB_WITHDRAW {
-            ctx.out.send("F44402001D08");
-        } else {
-            ctx.out.send("F44402001D07");
-        }
+        send_bank_ui_unlock(ctx.sub, ctx.out);
         return;
     }
     let before = ctx.conn.session.clone();
@@ -1027,17 +1035,16 @@ pub async fn handle_bank_gold(ctx: &mut OpcodeCtx<'_>) {
     };
     if !valid {
         ctx.out.send("F44402001D03");
-        if ctx.sub == crate::protocol::BANK_SUB_WITHDRAW {
-            ctx.out.send("F44402001D08");
-            if ctx.conn.session.gold >= GOLD_CAP || ctx.conn.session.gold.saturating_add(amount) > GOLD_CAP {
-                ctx.out.send("F44402001A06");
-            }
-        } else {
-            ctx.out.send("F44402001D07");
+        send_bank_ui_unlock(ctx.sub, ctx.out);
+        if ctx.sub == crate::protocol::BANK_SUB_WITHDRAW
+            && ctx.conn.session.bank_gold >= amount
+            && ctx.conn.session.gold.saturating_add(amount) > GOLD_CAP
+        {
+            ctx.out.send("F44402001A06");
         }
         return;
     }
-    if ctx.sub == 1 {
+    if ctx.sub == crate::protocol::BANK_SUB_WITHDRAW {
         ctx.conn.session.bank_gold -= amount;
         ctx.conn.session.gold += amount;
     } else {
@@ -1047,22 +1054,14 @@ pub async fn handle_bank_gold(ctx: &mut OpcodeCtx<'_>) {
     if !persist::persist_sessions_transaction(ctx.env.pool, &[&ctx.conn.session], &[]).await {
         ctx.conn.session = before;
         ctx.out.send("F44402001D03");
-        if ctx.sub == 1 {
-            ctx.out.send("F44402001D08");
-        } else {
-            ctx.out.send("F44402001D07");
-        }
+        send_bank_ui_unlock(ctx.sub, ctx.out);
         return;
     }
-    let code = if ctx.sub == 1 { "02" } else { "01" };
-    let gold_code = if ctx.sub == 1 { "01" } else { "02" };
+    let code = if ctx.sub == crate::protocol::BANK_SUB_WITHDRAW { "02" } else { "01" };
+    let gold_code = if ctx.sub == crate::protocol::BANK_SUB_WITHDRAW { "01" } else { "02" };
     ctx.out
         .send(format!("F44406001D{}{}", code, encoder::le32(amount)));
     ctx.out
         .send(format!("F44406001A{}{}", gold_code, encoder::le32(amount)));
-    if ctx.sub == 1 {
-        ctx.out.send("F44402001D08");
-    } else {
-        ctx.out.send("F44402001D07");
-    }
+    send_bank_ui_unlock(ctx.sub, ctx.out);
 }

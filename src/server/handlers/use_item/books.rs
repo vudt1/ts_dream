@@ -94,7 +94,7 @@ pub async fn handle(ctx: &mut UseCtx<'_>) -> bool {
             );
             ctx.out.send(crate::protocol::frame("0801", &body));
         } else {
-            ctx.red("Ban da co ky nang nay roi");
+            ctx.sys_msg("Ban da co ky nang nay roi");
         }
         return true;
     }
@@ -192,10 +192,10 @@ pub async fn handle(ctx: &mut UseCtx<'_>) -> bool {
     if let Some(is_hp) = store {
         if is_hp {
             ctx.conn.session.hp_store += 10000;
-            ctx.red("Hp Luu Thanh Cong: 10000");
+            ctx.sys_msg("Hp Luu Thanh Cong: 10000");
         } else {
             ctx.conn.session.sp_store += 10000;
-            ctx.red("Sp Luu Thanh Cong: 10000");
+            ctx.sys_msg("Sp Luu Thanh Cong: 10000");
         }
         ctx.consume().await;
         return true;

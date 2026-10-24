@@ -15,12 +15,12 @@ Hoàn thiện logic báo lỗi rút tiền ngân hàng và dọn dẹp các đi�
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] Sửa `src/server/handlers/trade_storage.rs` (hàm `handle_bank_gold`): Tách biệt điều kiện kiểm tra hợp lệ; chỉ phát `F44402001A06` khi và chỉ khi ngân hàng đủ tiền (`bank_gold >= amount`) nhưng ví tiền vượt trần (`gold.saturating_add(amount) > GOLD_CAP`).
-- [ ] Tạo helper `send_bank_ui_unlock(sub, out)` trong `src/server/handlers/trade_storage.rs`, loại bỏ 4 khối `if ctx.sub == 1` lặp lại và sử dụng hằng số `crate::protocol::BANK_SUB_WITHDRAW`.
-- [ ] Thống nhất các hàm định dạng tin nhắn hệ thống VISCII qua kênh `02 01 02` sử dụng `crate::server::spawn::sys_msg_frame(msg)`, loại bỏ mã trùng lặp ở `shops.rs` và `use_item/mod.rs`.
-- [ ] Bổ sung bài test trong `tests/economy_wire_test.rs`:
+- [x] Sửa `src/server/handlers/trade_storage.rs` (hàm `handle_bank_gold`): Tách biệt điều kiện kiểm tra hợp lệ; chỉ phát `F44402001A06` khi và chỉ khi ngân hàng đủ tiền (`bank_gold >= amount`) nhưng ví tiền vượt trần (`gold.saturating_add(amount) > GOLD_CAP`).
+- [x] Tạo helper `send_bank_ui_unlock(sub, out)` trong `src/server/handlers/trade_storage.rs`, loại bỏ 4 khối `if ctx.sub == 1` lặp lại và sử dụng hằng số `crate::protocol::BANK_SUB_WITHDRAW`.
+- [x] Thống nhất các hàm định dạng tin nhắn hệ thống VISCII qua kênh `02 01 02` sử dụng `crate::server::spawn::sys_msg_frame(msg)`, loại bỏ mã trùng lặp ở `shops.rs` và `use_item/mod.rs`.
+- [x] Bổ sung bài test trong `tests/economy_wire_test.rs`:
   - Rút tiền khi ngân hàng không đủ: Kiểm tra chỉ nhận `1D 03` và `1D 08`, khẳng định KHÔNG xuất hiện frame `1A 06`.
   - Rút tiền khi ngân hàng đủ nhưng túi tràn: Kiểm tra nhận đủ `1D 03`, `1D 08`, và `1A 06`.
-- [ ] `cargo check --all-targets` và `cargo test --all-targets` đạt 100% PASS (0 error, 0 warning).
+- [x] `cargo check --all-targets` và `cargo test --all-targets` đạt 100% PASS (0 error, 0 warning).
