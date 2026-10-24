@@ -383,6 +383,15 @@ pub fn your_turn() -> String {
     "F44402003401".to_string()
 }
 
+/// Turn action finish frame: `F44402003202` (ticket 21).
+///
+/// Sent after all 0x32 01 action animations in a turn have finished (`FUN_0064dd74`).
+/// Tells the client to set `[TFightManage+0x1C] = 1`, release animation queues and
+/// prepare for the next turn.
+pub fn turn_action_finish() -> String {
+    "F44402003202".to_string()
+}
+
 /// Acting indicator: `F44404003505` + row + col.
 pub fn acting(row: u8, col: u8) -> String {
     format!("F44404003505{:02X}{:02X}", row, col)
@@ -425,6 +434,74 @@ pub fn drop_item(item_id: u16, npc_row: u8, npc_col: u8, row: u8, col: u8) -> St
         col
     )
 }
+
+/// In-battle NPC talk / dialogue banner: `F4440B003506` + k + LE32(actor_id) + LE32(tpl_id).
+///
+/// Handled in client by `FUN_0064e064` (`case 46 / sub 0x06` in `FUN_007952ab`):
+/// - `k`: mode / display flag (1 = dialogue toast banner 2000ms, etc.)
+/// - `actor_id`: character / actor ID speaking
+/// - `tpl_id`: NPC template ID or dialogue string ID
+///
+/// Triggers `THuman.Create`, sets template id, puts into battle HUD (`FUN_0063c1d0`)
+/// and displays speech banner toast (`FUN_0064e064:83-129`).
+pub fn battle_npc_talk(k: u8, actor_id: u32, tpl_id: u32) -> String {
+    format!(
+        "F4440B003506{:02X}{}{}",
+        k,
+        encoder::le32(actor_id),
+        encoder::le32(tpl_id)
+    )
+}
+
+/// Helper wrapper for in-battle NPC dialogue toast following Bear C# convention.
+///
+/// Equivalent to Bear `PacketCreator(53, 6)` (`k = 1`, `actor_id = 0`, `tpl_id = dialog_id as u32`).
+pub fn battle_npc_dialog(dialog_id: u16) -> String {
+    battle_npc_talk(1, 0, dialog_id as u32)
+}
+
+/// Battle notice prefix types supported natively by client `FUN_0075c518`.
+///
+/// - `SYSTEM` (1): Channel/Type 1 (client prepends "Hàng 1" / system style prefix `0x75C6A8`)
+/// - `NOTICE` (2): Channel/Type 2 (client prepends "Hàng 2" / notice style prefix `0x75C6B8`)
+/// - `COMBAT` (3): Channel/Type 3 (client prepends "Hàng 3" / combat log prefix `0x75C6C8`)
+pub mod battle_notice_type {
+    pub const SYSTEM: u8 = 1;
+    pub const NOTICE: u8 = 2;
+    pub const COMBAT: u8 = 3;
+}
+
+pub mod notice_type {
+    pub use super::battle_notice_type::*;
+}
+
+/// Battle chat / notice frame: `F444` + LE16(payload_len) + `350B` + `(type:1B + len:1B + text:len B)*n`.
+///
+/// Handled in client by `FUN_0075c518` (`case 46 / sub 0x0B` in `FUN_007952ab`).
+/// Pushes formatted combat log / announcement lines directly into `TTalkMsgForm`.
+/// Supports up to 21 records per frame (`local_20 < 0x15`). Text is VISCII 1.1 encoded.
+pub fn battle_chat_notice(entries: &[(u8, &str)]) -> String {
+    let mut payload = String::from("350B");
+    for &(msg_type, text) in entries.iter().take(21) {
+        let bytes = crate::encoding::to_viscii(text);
+        let len = bytes.len().min(255) as u8;
+        let slice = &bytes[..len as usize];
+        payload.push_str(&format!("{:02X}{:02X}{}", msg_type, len, encoder::hex(slice)));
+    }
+    let payload_len = payload.len() / 2;
+    format!("F444{}{}", encoder::le16(payload_len as u16), payload)
+}
+
+/// Helper wrapper to send a single system notice (`type = 1`) in battle.
+pub fn battle_system_message(text: &str) -> String {
+    battle_chat_notice(&[(battle_notice_type::SYSTEM, text)])
+}
+
+/// Helper wrapper to send a single notice with explicit type in battle.
+pub fn battle_notice(msg_type: u8, text: &str) -> String {
+    battle_chat_notice(&[(msg_type, text)])
+}
+
 
 /// Status update: `F4440C000801` + status_byte + sign + LE32(abs_value) + `00000000`.
 pub fn status_update(status_byte: u8, value: i32) -> String {

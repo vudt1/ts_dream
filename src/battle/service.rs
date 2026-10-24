@@ -1202,7 +1202,7 @@ impl BattleService {
         }
     }
 
-    /// Submit an op 0x0B battle command to the player's battle.
+    /// Submit a battle command (op 0x32) to the player's battle.
     pub fn submit_command(&self, session: &Session, cmd: BattleCommand) -> bool {
         if session.battle_id == 0 {
             return false;
@@ -1217,6 +1217,20 @@ impl BattleService {
                 cmd,
             }),
             None => false,
+        }
+    }
+
+    /// Acknowledge the battle scene from the client (0B FA ack - Ticket 20).
+    pub fn ack_scene(&self, battle_id: i32) {
+        if battle_id == 0 {
+            return;
+        }
+        let handle = match self.handles.lock() {
+            Ok(h) => h.get(&battle_id).cloned(),
+            Err(_) => None,
+        };
+        if let Some(h) = handle {
+            h.ack_scene();
         }
     }
 

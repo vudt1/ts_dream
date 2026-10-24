@@ -1,8 +1,6 @@
-//! Battle input handler (ticket 01): Opcode 0x0B is the **only** battle-command
-//! channel. aLogin.exe never sends Opcode 0x32 — a scan of all 125
-//! `FUN_0077f414` call-sites finds no `0x32` (`.scratch/client-pseudo-op-code/
-//! battle/03_skill_and_combo.md §0.1.2`). The legacy skill/item command bodies
-//! are therefore re-parented behind `0x0B` (subs 3/4) instead of being lost.
+//! Battle input handler:
+//! - Opcode 0x32 is the C→S battle-command channel (Ticket 19 / ADR 0006).
+//! - Opcode 0x0B handles battle initialization, leaving, and map clicks.
 //!
 //! Client C→S sub map for `0x0B` (ASM `0077f414`, `HANDOFF-client-reverse.md §1.2`):
 //!
@@ -11,22 +9,21 @@
 //! | `0`  | `[b]`                              | client byte (no-op)              |
 //! | `1`  | `[confirm]`                        | leave battle (`confirm == 3`)    |
 //! | `2`  | `[kind][u32 target][u16 index]`    | battle command (kinds 2/3/4/5)   |
-//! | `3`  | legacy skill-command layout        | skill command (ex-0x32 sub 1)    |
-//! | `4`  | legacy use-item layout             | use item     (ex-0x32 sub 2)     |
+//! | `3`  | `[kind][u32 target][u16 index]`    | map action                       |
+//! | `4`  | `[kind][u32 target][u16 index]`    | map action                       |
 //! | `5`  | `[b1][b2]`                         | raw pair — **no-op**, NOT flee   |
 //! | `6`  | (none)                             | body-less map ping               |
 //! | `7`  | `[mode][counter]`                  | auto-battle toggle + counter     |
 //! | `8`  | `[kind][u32 target][index]`        | map/PK click (no auto-open)      |
 //! | `9`  | (none)                             | banner                           |
 //! | `0A` | `[kind][u32 target][index]`        | map/PK click (no auto-open)      |
-//! | `FA` | (none)                             | open battle                      |
+//! | `FA` | (none)                             | scene loaded ack                 |
 //!
 //! The synchronous handlers validate + gate the request, then hand work to the
 //! [`BattleService`] which spawns async per-battle tasks and routes frames.
 
-use crate::battle::runner::BattleCommand;
+use crate::battle::runner::{BattleAction, BattleCommand};
 use crate::battle::service::BattleService;
-use crate::data::loader::GameData;
 use crate::protocol::encoder;
 use crate::server::dispatcher::{HandleOutcome, OpcodeCtx};
 use crate::server::session::{Conn, Session};
@@ -61,10 +58,10 @@ pub fn handle_battle(ctx: &mut OpcodeCtx) {
             );
             handle_pk_or_attack(conn, payload, service, out);
         }
-        // Sub 3 — skill command, re-parented from the dead 0x32 channel.
-        3 => handle_skill_command(conn, payload, data, service, out),
-        // Sub 4 — use-item command, re-parented from the dead 0x32 channel.
-        4 => handle_use_item(conn, payload, service),
+        // Sub 3 — map action (8 bytes: [kind:1B][target:4B LE][param:2B LE], Ticket 19).
+        3 => log_map_action(3, payload),
+        // Sub 4 — map action (8 bytes: [kind:1B][target:4B LE][param:2B LE], Ticket 19).
+        4 => log_map_action(4, payload),
         // Sub 5 — raw 2-byte body. The client builder for sub 5 is a no-op
         // (`JA 0x78a4f2`), so this is NOT a flee branch.
         5 => log_raw_pair(5, payload),
@@ -95,8 +92,11 @@ pub fn handle_battle(ctx: &mut OpcodeCtx) {
         9 => tracing::debug!(sub = 9, "0x0B sub 9 (empty, banner)"),
         // Sub 0A — map/PK click, same family as sub 8. Never auto-opens.
         0x0A => log_map_action(0x0A, payload),
-        // Sub FA — open-battle marker (the heavy S→C frame; C→S is bare).
-        0xFA => tracing::debug!(sub = 0xFA, "0x0B sub 0xFA (open battle)"),
+        // Sub FA — open-battle marker (the heavy S→C frame; C→S is bare ack - Ticket 20).
+        0xFA => {
+            tracing::debug!(sub = 0xFA, "0x0B sub 0xFA (client scene ack)");
+            service.ack_scene(conn.session.battle_id);
+        }
         _ => {
             tracing::debug!(sub, "0x0B unknown sub (ignored)");
             let _ = (data, out);
@@ -269,87 +269,94 @@ fn handle_attack_npc(conn: &mut Conn, payload: &[u8], service: &BattleService) {
     service.start_npc_battle(&mut conn.session, i64::from(npc_id), 0, ground);
 }
 
-/// Sub 3 (`0x0B`) — skill command, re-parented from the dead 0x32 channel.
-/// Row/col/rowAttack/colAttack + skill id (LE16). Range-checks; cell must exist
-/// with `_Id > 0`; level via player skill or pet skill match; broadcast
-/// `F44404003505`+row+col.
-fn handle_skill_command(
-    conn: &mut Conn,
-    payload: &[u8],
-    _data: &GameData,
-    service: &BattleService,
-    out: &mut HandleOutcome,
-) {
-    if payload.len() < 6 || conn.session.battle_id == 0 {
-        return;
-    }
-    let row = payload[0];
-    let col = payload[1];
-    let row_attack = payload[2];
-    let col_attack = payload[3];
-    let skill_id = encoder::u16_le(payload[4], payload[5]) as i64;
-    if row > 3 || col > 4 || row_attack > 3 || col_attack > 4 || skill_id == 0 {
-        return;
-    }
-
-    let skill_lv = skill_level_for(&conn.session, skill_id, row);
-    let cmd = BattleCommand {
-        row,
-        col,
-        skill_id,
-        skill_lv,
-        row_attack,
-        col_attack,
-        use_item: 0,
-    };
-    if service.submit_command(&conn.session, cmd) {
-        // Broadcast `F44404003505`+row+col (SendSKillingToParty).
-        service.broadcast(format!("F44404003505{:02X}{:02X}", row, col));
-        let _ = out;
-    }
-}
-
-/// Sub 4 (`0x0B`) — use item (`26001..=27165`), re-parented from the dead 0x32
-/// channel. Heals the target cell + owner's pet (in the battle task).
+/// Dispatch Opcode 0x32 — the battle-command channel (Ticket 19 / ADR 0006).
 ///
-/// The item is consumed from the inventory **only after** the engine accepts
-/// the command (`submit_command`); a rejected command leaves the bag intact.
-fn handle_use_item(conn: &mut Conn, payload: &[u8], service: &BattleService) {
+/// Binary frame layout (10 bytes C→S):
+/// [32] [sub:1B] [srcGrp:1B] [srcSlot:1B] [dstGrp:1B] [dstSlot:1B] [skillOrItemId:2B LE] [rand1:1B] [rand2:1B]
+///
+/// sub 0x01: Action/Skill/NormalAttack/Defend/Flee/Capture
+/// sub 0x02: Use Item on battle grid
+pub fn handle_battle_command(ctx: &mut OpcodeCtx) {
+    let conn = &mut ctx.conn;
+    let service = ctx.service;
+    let sub = ctx.sub;
+    let payload = ctx.payload;
+
     if payload.len() < 6 || conn.session.battle_id == 0 {
         return;
     }
-    let row = payload[0];
-    let col = payload[1];
-    let row_attack = payload[2];
-    let col_attack = payload[3];
-    let item_id = encoder::u16_le(payload[4], payload[5]) as i64;
-    if !(26001..=27165).contains(&item_id) {
+
+    let src_grp = payload[0];
+    let src_slot = payload[1];
+    let dst_grp = payload[2];
+    let dst_slot = payload[3];
+    let code = encoder::u16_le(payload[4], payload[5]) as i64;
+
+    if src_grp > 3 || src_slot > 4 || dst_grp > 3 || dst_slot > 4 {
         return;
     }
-    let cmd = BattleCommand {
-        row,
-        col,
-        skill_id: 0,
-        skill_lv: 0,
-        row_attack,
-        col_attack,
-        use_item: item_id,
-    };
-    if service.submit_command(&conn.session, cmd) {
-        // Accepted by the engine: consume exactly one from the bag.
-        conn.session.remove_homdo_item(item_id as u16, 1);
-    } else {
-        tracing::debug!(
-            item_id,
-            "0x0B sub 4 use-item rejected by engine; inventory untouched"
-        );
+
+    match sub {
+        // Sub 1: Normal attack, Skill, Defend, Flee, Capture
+        1 => {
+            if code == 0 {
+                return;
+            }
+            let action = match code {
+                10000 => BattleAction::NormalAttack,
+                17001 => BattleAction::Defend,
+                18001 => BattleAction::Flee,
+                15001 => BattleAction::Capture,
+                skill_id => {
+                    let skill_lv = skill_level_for(&conn.session, skill_id, src_grp);
+                    BattleAction::CastSkill { skill_id, skill_lv }
+                }
+            };
+            let cmd = BattleCommand {
+                row: src_grp,
+                col: src_slot,
+                target_row: dst_grp,
+                target_col: dst_slot,
+                action,
+            };
+            if service.submit_command(&conn.session, cmd) {
+                // Broadcast acting indicator `F44404003505`+row+col (SendSKillingToParty).
+                service.broadcast(format!("F44404003505{:02X}{:02X}", src_grp, src_slot));
+            }
+        }
+        // Sub 2: In-battle item use (26001..=27165)
+        2 => {
+            let item_id = code;
+            if !(26001..=27165).contains(&item_id) {
+                return;
+            }
+            let cmd = BattleCommand {
+                row: src_grp,
+                col: src_slot,
+                target_row: dst_grp,
+                target_col: dst_slot,
+                action: BattleAction::UseItem { item_id },
+            };
+            if service.submit_command(&conn.session, cmd) {
+                // Accepted by the engine: consume exactly one from the bag.
+                conn.session.remove_homdo_item(item_id as u16, 1);
+            } else {
+                tracing::debug!(
+                    item_id,
+                    "0x32 sub 2 use-item rejected by engine; inventory untouched"
+                );
+            }
+        }
+        other => {
+            tracing::debug!(sub = other, "0x32 unknown sub (ignored)");
+        }
     }
 }
 
 /// Resolve the skill level for a submitted command: player skill (`SkillGet`)
 /// for player cells, or the active pet's matching skill for pet cells.
 fn skill_level_for(session: &Session, skill_id: i64, row: u8) -> i64 {
-    if row == 2 {
+    if row == 1 || row == 2 {
         // Pet cells resolve against the session's active pet's skill list.
         if let Some(pet) = session
             .pets

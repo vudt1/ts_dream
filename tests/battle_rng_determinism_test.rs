@@ -16,7 +16,7 @@ use std::collections::HashMap;
 
 use ts_dream::battle::construction::Battle;
 use ts_dream::battle::rng::BattleRng;
-use ts_dream::battle::runner::{BattleCommand, BattleCommands, BattleData, Out};
+use ts_dream::battle::runner::{BattleAction, BattleCommand, BattleCommands, BattleData, Out};
 use ts_dream::data::tables::{Item, Npc, Skill, TexpRow};
 
 /// Magic skill id used to force the `apply_magic` path; its own id is unrelated
@@ -89,11 +89,12 @@ fn magic_command() -> BattleCommands {
         BattleCommand {
             row: 3,
             col: 2,
-            skill_id: MAGIC_SKILL,
-            skill_lv: 1,
-            row_attack: 0,
-            col_attack: 2,
-            use_item: 0,
+            target_row: 0,
+            target_col: 2,
+            action: BattleAction::CastSkill {
+                skill_id: MAGIC_SKILL,
+                skill_lv: 1,
+            },
         },
     );
     commands

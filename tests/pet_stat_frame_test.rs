@@ -7,7 +7,7 @@
 //! a growing delta. These tests pin the corrected offsets and the `apply_pet_exp`
 //! push (`Out::PetExp` → owner receives `0F 08`).
 
-use ts_dream::battle::runner::BattleCommand;
+use ts_dream::battle::runner::{BattleAction, BattleCommand};
 use ts_dream::battle::service::BattleService;
 use ts_dream::data::loader::GameData;
 use ts_dream::data::tables::{Npc, Skill};
@@ -241,11 +241,9 @@ async fn apply_pet_exp_sends_0f08_to_owner() {
     let cmd = BattleCommand {
         row: 3,
         col: 2,
-        skill_id: 10000,
-        skill_lv: 1,
-        row_attack: 0,
-        col_attack: 2,
-        use_item: 0,
+        target_row: 0,
+        target_col: 2,
+        action: BattleAction::NormalAttack,
     };
     let snapshot = sess.read().await.clone();
     assert!(service.submit_command(&snapshot, cmd));

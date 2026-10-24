@@ -4,8 +4,8 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] Builder `packets::battle_chat_notice(entries: &[(u8, &str)]) -> String` hỗ trợ gom từ 1 đến 21 bản ghi, mã hóa chuỗi theo VISCII 1.1 với độ dài động byte-exact.
-- [ ] Helper `packets::battle_system_message(text: &str) -> String` gửi một dòng thông báo hệ thống đơn lẻ trong trận (`type = 1`).
-- [ ] Bộ kiểm thử trong `tests/` kiểm tra round-trip chuỗi có dấu tiếng Việt (VISCII), giới hạn độ dài và định dạng byte header/payload.
+- [x] Builder `packets::battle_chat_notice(entries: &[(u8, &str)]) -> String` hỗ trợ gom từ 1 đến 21 bản ghi, mã hóa chuỗi theo VISCII 1.1 với độ dài động byte-exact.
+- [x] Helper `packets::battle_system_message(text: &str) -> String` gửi một dòng thông báo hệ thống đơn lẻ trong trận (`type = 1`).
+- [x] Bộ kiểm thử trong `tests/` (`tests/battle_talk_notice_test.rs`) kiểm tra round-trip chuỗi có dấu tiếng Việt (VISCII), giới hạn độ dài và định dạng byte header/payload.

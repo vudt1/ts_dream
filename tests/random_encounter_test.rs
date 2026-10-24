@@ -571,11 +571,12 @@ async fn test_player_flee_synchronization_and_cooldown() {
     let cmd_leader = ts_dream::battle::runner::BattleCommand {
         row: 3,
         col: 2,
-        skill_id: 14002, // Flee skill
-        skill_lv: 1,
-        row_attack: 0,
-        col_attack: 2,
-        use_item: 0,
+        target_row: 0,
+        target_col: 2,
+        action: ts_dream::battle::runner::BattleAction::CastSkill {
+            skill_id: 14002,
+            skill_lv: 1,
+        },
     };
     let leader_snap = leader_sess.read().await.clone();
     assert!(service.submit_command(&leader_snap, cmd_leader));
@@ -584,11 +585,9 @@ async fn test_player_flee_synchronization_and_cooldown() {
     let cmd_member = ts_dream::battle::runner::BattleCommand {
         row: 3,
         col: 1,
-        skill_id: 10000,
-        skill_lv: 1,
-        row_attack: 0,
-        col_attack: 2,
-        use_item: 0,
+        target_row: 0,
+        target_col: 2,
+        action: ts_dream::battle::runner::BattleAction::NormalAttack,
     };
     let member_snap = member_sess.read().await.clone();
     assert!(service.submit_command(&member_snap, cmd_member));
@@ -732,11 +731,12 @@ async fn test_party_member_individual_flee() {
     let cmd_member = ts_dream::battle::runner::BattleCommand {
         row: 3,
         col: 1,
-        skill_id: 14002,
-        skill_lv: 1,
-        row_attack: 0,
-        col_attack: 2,
-        use_item: 0,
+        target_row: 0,
+        target_col: 2,
+        action: ts_dream::battle::runner::BattleAction::CastSkill {
+            skill_id: 14002,
+            skill_lv: 1,
+        },
     };
     let member_snap = member_sess.read().await.clone();
     assert!(service.submit_command(&member_snap, cmd_member));
@@ -745,11 +745,9 @@ async fn test_party_member_individual_flee() {
     let cmd_leader = ts_dream::battle::runner::BattleCommand {
         row: 3,
         col: 2,
-        skill_id: 10000,
-        skill_lv: 1,
-        row_attack: 0,
-        col_attack: 2,
-        use_item: 0,
+        target_row: 0,
+        target_col: 2,
+        action: ts_dream::battle::runner::BattleAction::NormalAttack,
     };
     let leader_snap = leader_sess.read().await.clone();
     assert!(service.submit_command(&leader_snap, cmd_leader));
@@ -914,11 +912,9 @@ async fn test_battle_rewards_and_drops_synchronize_to_online_sessions() {
     let cmd_leader = ts_dream::battle::runner::BattleCommand {
         row: 3,
         col: 2,
-        skill_id: 10000,
-        skill_lv: 1,
-        row_attack: 0,
-        col_attack: 2,
-        use_item: 0,
+        target_row: 0,
+        target_col: 2,
+        action: ts_dream::battle::runner::BattleAction::NormalAttack,
     };
     let leader_snap = leader_sess.read().await.clone();
     assert!(service.submit_command(&leader_snap, cmd_leader));
@@ -927,11 +923,9 @@ async fn test_battle_rewards_and_drops_synchronize_to_online_sessions() {
     let cmd_member = ts_dream::battle::runner::BattleCommand {
         row: 3,
         col: 1,
-        skill_id: 10000,
-        skill_lv: 1,
-        row_attack: 0,
-        col_attack: 1,
-        use_item: 0,
+        target_row: 0,
+        target_col: 1,
+        action: ts_dream::battle::runner::BattleAction::NormalAttack,
     };
     let member_snap = member_sess.read().await.clone();
     assert!(service.submit_command(&member_snap, cmd_member));

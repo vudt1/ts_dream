@@ -210,3 +210,47 @@ fn leader_sp_regen_broadcasts_sp_frame() {
         "SP regen must broadcast 33 01 SP update, got {out:?}"
     );
 }
+
+#[test]
+fn turn_action_finish_frame_is_byte_exact() {
+    let frame = packets::turn_action_finish();
+    assert_eq!(frame, "F44402003202");
+    assert_eq!(frame_len(&frame), 2);
+    assert_eq!(frame_total_bytes(&frame), 6);
+}
+
+#[test]
+fn run_turn_emits_turn_action_finish() {
+    let (npcs, skills, items) = table();
+    let pet_slots = HashMap::new();
+    let players = HashMap::new();
+    let texps: Vec<TexpRow> = Vec::new();
+
+    let mut battle = Battle::new(1, 0);
+    {
+        let c = battle.cell_mut(3, 2).unwrap();
+        c.typ = 2;
+        c.id = 7;
+        c.hp = 100;
+        c.hp_max = 100;
+        c.team = 1;
+    }
+    {
+        let c = battle.cell_mut(0, 2).unwrap();
+        c.typ = 3;
+        c.id = 1001;
+        c.hp = 100;
+        c.hp_max = 100;
+        c.team = 2;
+    }
+
+    let data = entity_data(&npcs, &skills, &items, &pet_slots, &players, &texps);
+    let mut out = Vec::new();
+    battle.run_turn(&data, &BattleCommands::new(), &mut out);
+
+    assert_eq!(
+        out.last(),
+        Some(&Out::Broadcast(packets::turn_action_finish())),
+        "turn_action_finish (32 02) must be the last action broadcast in run_turn"
+    );
+}

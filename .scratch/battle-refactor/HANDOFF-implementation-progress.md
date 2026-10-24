@@ -33,14 +33,21 @@
 | 13 | [`issues/13-cleanup-dead-code.md`](issues/13-cleanup-dead-code.md) | ✅ completed | Xoá dead code + magic `F4441C` |
 | 14 | [`issues/14-capture-verification.md`](issues/14-capture-verification.md) | ⏸ ready-for-human | **BỎ QUA** — người dùng tự capture runtime thật sau |
 | 15 | [`issues/15-0b-fa-self-kind-04.md`](issues/15-0b-fa-self-kind-04.md) | ✅ completed | Marker self `0B FA` = `04` |
-| 16 | [`issues/16-35-06-battle-npc-talk-builder.md`](issues/16-35-06-battle-npc-talk-builder.md) | ⏳ ready-for-agent | Builder `35 06` thoại NPC / banner trận |
-| 17 | [`issues/17-35-0b-battle-chat-notice-builder.md`](issues/17-35-0b-battle-chat-notice-builder.md) | ⏳ ready-for-agent | Builder `35 0B` chat / thông báo trận đấu |
-| 18 | [`issues/18-battle-0x35-timing-wiring.md`](issues/18-battle-0x35-timing-wiring.md) | ⏳ ready-for-agent | Đấu nối timing `0x35` (`35 03`, `35 0F`) vào `runner.rs` |
+| 16 | [`issues/16-35-06-battle-npc-talk-builder.md`](issues/16-35-06-battle-npc-talk-builder.md) | ✅ completed | Builder `35 06` thoại NPC / banner trận |
+| 17 | [`issues/17-35-0b-battle-chat-notice-builder.md`](issues/17-35-0b-battle-chat-notice-builder.md) | ✅ completed | Builder `35 0B` chat / thông báo trận đấu |
+| 18 | [`issues/18-battle-0x35-timing-wiring.md`](issues/18-battle-0x35-timing-wiring.md) | ⏳ ready-for-agent | Đấu nối timing `0x35` + dynamic delay pacing |
+| 19 | [`issues/19-restore-0x32-command-channel.md`](issues/19-restore-0x32-command-channel.md) | ✅ completed | Phục hồi kênh 0x32 Sub 01/02 + enum BattleAction |
+| 20 | [`issues/20-turn-lifecycle-timing-and-34-01.md`](issues/20-turn-lifecycle-timing-and-34-01.md) | ✅ completed | Barrier ack 0B FA 1.5s + phát 34 01 đầu hiệp |
+| 21 | [`issues/21-turn-action-finish-32-02-frame.md`](issues/21-turn-action-finish-32-02-frame.md) | ✅ completed | Builder 32 02 turn_action_finish |
+| 22 | [`issues/22-isometric-grid-aoe-targeting.md`](issues/22-isometric-grid-aoe-targeting.md) | ⏳ ready-for-agent | Chuẩn hóa lưới Isometric AoE [2, 1, 3, 0, 4] |
+| 23 | [`issues/23-combo-rules-aoe-threshold.md`](issues/23-combo-rules-aoe-threshold.md) | ⏳ ready-for-agent | Chặn kỹ năng AoE >= 4 tham gia Combo |
+| 24 | [`issues/24-capture-validation-gates.md`](issues/24-capture-validation-gates.md) | ⏳ ready-for-agent | 8 rào chắn bắt võ tướng (Lệch LV <= 5) |
 
 **Tiến độ hiện tại**:
-- 14 ticket đợt đầu đã hoàn thành (01–13, 15).
-- 3 ticket đợt mới (16–18) đã xuất bản, sẵn sàng thực thi (`ready-for-agent`).
-- Ticket 14 giữ nguyên cho người dùng chạy capture runtime.
+- 19 ticket đã hoàn thành (02–13, 15, 16, 17, 19–21; Đợt 1 hoàn thành 100%, Đợt 2 hoàn thành 16 & 17; ticket 01 được thay thế bằng ticket 19).
+- 4 ticket sẵn sàng thực thi (`ready-for-agent`): 18 (Đợt 2 timing / wiring), 22 → 24 (Đợt 3).
+- Ticket 14 giữ nguyên cho người dùng chạy capture runtime (`ready-for-human`).
+- Đặc tả mới V2: [`spec_new.md`](spec_new.md). Quyết định kiến trúc: [`docs/adr/0006-battle-protocol-parity-and-turn-lifecycle.md`](../../docs/adr/0006-battle-protocol-parity-and-turn-lifecycle.md).
 
 ## 3. Thay đổi mã nguồn đã hoàn thành
 
@@ -53,8 +60,13 @@
   - `unit_action` (`35 0E`, 6 byte payload `[35][0E][grp][slot][val_u16]`).
   - `battle_unit_status` & `clear_unit_status` (`35 0F`, 8 byte payload `[35][0F][grp][slot][mode 'B'..'G'][flag/turns][val_u16]`).
   - `purge_status`, `buff_end`, `buff_start_caster` (`35 01`).
+  - `battle_npc_talk` & `battle_npc_dialog` (`35 06`, 11 byte payload `[35][06][k:1B][actor_id:4B LE][tpl_id:4B LE]`).
+  - `battle_chat_notice`, `battle_system_message`, `battle_notice` & `battle_notice_type` (`35 0B`, payload động gom tối đa 21 bản ghi, chuỗi VISCII 1.1).
   - `gold_gain` (`1A 01`), `level_up` (`05 0A`), `drop_reward` (`35 04`).
   - `battle_open_leader` marker self `03` → `04` (LEN vẫn `0x1C`).
+  - `your_turn` (`34 01`) và `turn_action_finish` (`32 02`).
+- `src/encoding.rs`:
+  - Bổ sung fallback ánh xạ ký tự tiếng Việt Unicode sang VISCII 1.1 trong `char_to_viscii` và chuẩn hóa NFC trong `to_viscii`.
 - `src/battle/construction.rs` — 3 call-site dùng `team_for_row`; `member_battle_frame` marker self `05` → `04`.
 - `src/battle/engine.rs` — helper `team_for_row(row) -> i64` (`row < 2 => 2`, ngược lại `1`); `get_hp_max`/`get_sp_max` re-derive khớp `FUN_0065a554`/`FUN_0065ad10`.
 - `src/battle/rng.rs` — stream tất định `BattleRng::random_skill` (seed `s0 + 12953`).
@@ -71,10 +83,10 @@
 
 ### Bộ test tập trung trong `tests/`
 Toàn bộ test mới:
-`battle_command_channel_test.rs`, `battle_frames_test.rs`, `battle_cell_frames_test.rs`, `battle_item_frame_test.rs`, `battle_gold_frame_test.rs`, `battle_levelup_frames_test.rs`, `pet_stat_frame_test.rs`, `pet_recall_13_02_test.rs`, `battle_team_row_test.rs`, `battle_finish_generalization_test.rs`, `battle_rng_determinism_test.rs`, `texps_formula_test.rs`, `max_hp_sp_formula_test.rs`, `battle_state7_frame_test.rs`, `battle_status_frames_test.rs` (6 test mới cho 35 0E/0F/01), `ehuman_public_test.rs`, `battle_open_leader_test.rs`, `battle_open_self_kind_test.rs`.
+`battle_command_channel_test.rs`, `battle_frames_test.rs`, `battle_cell_frames_test.rs`, `battle_item_frame_test.rs`, `battle_gold_frame_test.rs`, `battle_levelup_frames_test.rs`, `pet_stat_frame_test.rs`, `pet_recall_13_02_test.rs`, `battle_team_row_test.rs`, `battle_finish_generalization_test.rs`, `battle_rng_determinism_test.rs`, `texps_formula_test.rs`, `max_hp_sp_formula_test.rs`, `battle_state7_frame_test.rs`, `battle_status_frames_test.rs` (6 test mới cho 35 0E/0F/01), `ehuman_public_test.rs`, `battle_open_leader_test.rs`, `battle_open_self_kind_test.rs`, `battle_action_restore_test.rs` (3 test cho 32 01/02), `battle_turn_lifecycle_test.rs` (4 test cho 34 01/lifecycle), `battle_talk_notice_test.rs` (15 test cho 35 06/35 0B).
 
 ```bash
-cargo test --all-targets --no-fail-fast    # 311 passed / 0 failed (55 test binaries)
+cargo test --all-targets --no-fail-fast    # 335 passed / 0 failed (57 test binaries)
 ```
 
 ## 4. Tổng hợp phân tích làm rõ (Deep Research Findings)

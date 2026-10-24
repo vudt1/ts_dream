@@ -10,7 +10,7 @@
 use crate::battle::construction::Battle;
 use crate::battle::npc_world::NpcWorld;
 use crate::battle::runner::{
-    BattleCommand, BattleCommands, BattleData, DbUpdate, Out, Outcome, PlayerSnapshot,
+    BattleAction, BattleCommand, BattleCommands, BattleData, DbUpdate, Out, Outcome, PlayerSnapshot,
 };
 use crate::data::tables::{BinarySkillDef, Item, Npc, Skill, TexpRow};
 use std::collections::HashMap;
@@ -47,12 +47,18 @@ pub trait BattleSink: Send + Sync + 'static {
 pub struct BattleHandle {
     pub id: i32,
     tx: mpsc::UnboundedSender<PlayerInput>,
+    ack_notify: Arc<tokio::sync::Notify>,
 }
 
 impl BattleHandle {
     /// Submit a command for the current turn.
     pub fn command(&self, input: PlayerInput) -> bool {
         self.tx.send(input).is_ok()
+    }
+
+    /// Notify that the client has acknowledged the battle scene (0B FA).
+    pub fn ack_scene(&self) {
+        self.ack_notify.notify_one();
     }
 }
 
@@ -61,6 +67,7 @@ pub struct BattleManager {
     battles: RwLock<HashMap<i32, BattleHandle>>,
     next_id: AtomicI32,
     default_timeout: std::time::Duration,
+    handshake_timeout: std::time::Duration,
 }
 
 impl Default for BattleManager {
@@ -79,7 +86,12 @@ impl BattleManager {
             // timeout; custom timeouts remain available for deterministic
             // tests and special battle modes.
             default_timeout: std::time::Duration::from_secs(20),
+            handshake_timeout: std::time::Duration::from_millis(1500),
         }
+    }
+
+    pub fn set_handshake_timeout(&mut self, timeout: std::time::Duration) {
+        self.handshake_timeout = timeout;
     }
 
     /// The next battle id (assigns before increment).
@@ -158,7 +170,18 @@ impl BattleManager {
     ) -> BattleHandle {
         let id = battle.id_battle;
         let (tx, rx) = mpsc::unbounded_channel();
-        let handle = BattleHandle { id, tx };
+        let ack_notify = Arc::new(tokio::sync::Notify::new());
+        let handle = BattleHandle {
+            id,
+            tx,
+            ack_notify: ack_notify.clone(),
+        };
+
+        let handshake_dur = if timeout <= std::time::Duration::from_millis(500) {
+            timeout.min(std::time::Duration::from_millis(50))
+        } else {
+            self.handshake_timeout
+        };
 
         let manager = self.clone();
         tokio::spawn(async move {
@@ -178,9 +201,33 @@ impl BattleManager {
             )
             .with_binary_skills(&binary_skills);
             let mut out: Vec<Out> = Vec::new();
+
+            // Turn 1 Handshake Barrier: wait for 0B FA ack from client with 1.5s fallback (Ticket 20)
+            let _ = tokio::time::timeout(handshake_dur, ack_notify.notified()).await;
+
             loop {
                 out.clear();
-                // Collect commands with a timeout.
+
+                // Step 1: Turn Prompt (34 01) - send to all living player-controlled fighters (Ticket 20)
+                let player_ids: std::collections::HashSet<i64> = (0..4u8)
+                    .flat_map(|r| (0..5u8).map(move |c| (r, c)))
+                    .filter_map(|(r, c)| {
+                        let cell = battle.cell(r, c)?;
+                        if cell.hp > 0 {
+                            if cell.typ == 2 && cell.id > 0 {
+                                return Some(cell.id);
+                            } else if cell.typ == 4 && cell.id_char > 0 {
+                                return Some(cell.id_char);
+                            }
+                        }
+                        None
+                    })
+                    .collect();
+                for pid in player_ids {
+                    sink.send_to(pid, crate::battle::packets::your_turn());
+                }
+
+                // Step 2: Collect commands with a timeout.
                 let commands = collect_commands(&mut rx, timeout, &battle).await;
                 let outcome = battle.run_turn(&data, &commands, &mut out);
                 dispatch(&out, sink.as_ref());
@@ -270,11 +317,9 @@ fn fill_timeout_commands(
             BattleCommand {
                 row,
                 col,
-                skill_id: 10000,
-                skill_lv: 1,
-                row_attack: target.0,
-                col_attack: target.1,
-                use_item: 0,
+                target_row: target.0,
+                target_col: target.1,
+                action: BattleAction::NormalAttack,
             },
         );
     }

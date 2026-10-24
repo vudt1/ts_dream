@@ -9,7 +9,7 @@
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use ts_dream::battle::runner::BattleCommand;
+use ts_dream::battle::runner::{BattleAction, BattleCommand};
 use ts_dream::battle::service::BattleService;
 use ts_dream::data::loader::GameData;
 use ts_dream::data::tables::{Npc, Skill};
@@ -160,11 +160,9 @@ async fn killed_npc_drop_reaches_owner_as_17_06() {
     let cmd = BattleCommand {
         row: 3,
         col: 2,
-        skill_id: 10000,
-        skill_lv: 1,
-        row_attack: 0,
-        col_attack: 2,
-        use_item: 0,
+        target_row: 0,
+        target_col: 2,
+        action: BattleAction::NormalAttack,
     };
     let snapshot = sess.read().await.clone();
     assert!(service.submit_command(&snapshot, cmd));

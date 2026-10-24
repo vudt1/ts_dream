@@ -17,19 +17,45 @@ use crate::data::tables::{BinarySkillDef, Item, Npc, Skill};
 use crate::protocol::encoder;
 use std::collections::HashMap;
 
-/// One player-submitted battle command (op 0x0B sub 3 skill / sub 4 item).
+/// Hành động chiến đấu phân loại theo nghiệp vụ (Domain Enum - Quyết định Q5: B)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BattleAction {
+    /// Đánh thường (Skill 10000)
+    NormalAttack,
+    /// Thi triển kỹ năng với mã kỹ năng và cấp độ tra cứu từ Session
+    CastSkill { skill_id: i64, skill_lv: i64 },
+    /// Sử dụng vật phẩm chiến đấu trong trận
+    UseItem { item_id: i64 },
+    /// Phòng ngự (Skill 17001)
+    Defend,
+    /// Bỏ chạy / Đào tẩu (Skill 18001)
+    Flee,
+    /// Thu phục võ tướng / Bắt quái (Skill 15001)
+    Capture,
+}
+
+/// Lệnh chiến đấu hoàn chỉnh gửi từ client sau khi parse và xác thực quyền sở hữu (Ticket 19)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BattleCommand {
     /// The grid cell being commanded (player's own cell or their pet cell).
     pub row: u8,
     pub col: u8,
-    pub skill_id: i64,
-    pub skill_lv: i64,
-    pub row_attack: u8,
-    pub col_attack: u8,
-    /// Op 0x0B sub 4: use-an-item command. `0` = normal skill command; a
-    /// potion id in `26001..=27165` heals the target cell + the owner's pet.
-    pub use_item: i64,
+    pub target_row: u8,
+    pub target_col: u8,
+    pub action: BattleAction,
+}
+
+impl BattleCommand {
+    pub fn skill_id(&self) -> i64 {
+        match self.action {
+            BattleAction::NormalAttack => 10000,
+            BattleAction::CastSkill { skill_id, .. } => skill_id,
+            BattleAction::Defend => 17001,
+            BattleAction::Flee => 18001,
+            BattleAction::Capture => 15001,
+            BattleAction::UseItem { .. } => 0,
+        }
+    }
 }
 
 /// Commands collected for one round, keyed by the commanded source cell.
@@ -79,7 +105,9 @@ fn binary_skill_def<'a>(data: &'a BattleData<'_>, skill_id: i64) -> Option<&'a B
 }
 
 fn skill_exists(data: &BattleData<'_>, skill_id: i64) -> bool {
-    data.skills.contains_key(&skill_id) || binary_skill_def(data, skill_id).is_some()
+    ALWAYS_ALLOWED.contains(&skill_id)
+        || data.skills.contains_key(&skill_id)
+        || binary_skill_def(data, skill_id).is_some()
 }
 
 fn skill_sp(data: &BattleData<'_>, skill_id: i64) -> i64 {
@@ -303,6 +331,7 @@ impl Battle {
         self.turn_phase2(data, commands, out);
         let outcome = self.turn_phase4(data, &mut ts, out);
         if outcome != Outcome::Running {
+            out.push(Out::Broadcast(packets::turn_action_finish()));
             return outcome;
         }
 
@@ -312,6 +341,8 @@ impl Battle {
         // `Round((QS.Int + QS.Int2) / 15.0)` per turn, capped at SpMax, both
         // the player cells and their pet cells, with DB writes.
         self.leader_sp_regen(out);
+
+        out.push(Out::Broadcast(packets::turn_action_finish()));
 
         if self.count_enemies_alive() == 0 {
             return Outcome::PlayerWin;
@@ -477,10 +508,6 @@ impl Battle {
                 )));
             }
 
-            // Your turn prompt for player entities.
-            if c.typ == 2 {
-                out.push(Out::ToPlayer(c.id, packets::your_turn()));
-            }
             // Acting indicator on silenced entities.
             if c.type3_turn > 0 {
                 out.push(Out::Broadcast(packets::acting(row, col)));
@@ -529,16 +556,43 @@ impl Battle {
                     c.attacked = true;
                 }
 
-                // Apply a submitted player command (op 0x0B sub 3 / sub 4).
+                // Apply a submitted player command (op 0x32 sub 1 / sub 2).
                 if let Some(cmd) = commands.get(&(c.row, c.col)) {
                     if !c.attacked && c.row == cmd.row && c.col == cmd.col {
-                        if cmd.use_item > 0 {
-                            self.apply_use_item(data, &mut c, cmd.use_item, out);
-                        } else {
-                            c.id_skill = cmd.skill_id;
-                            c.lv_skill = cmd.skill_lv;
-                            c.row_attack = cmd.row_attack;
-                            c.col_attack = cmd.col_attack;
+                        match cmd.action {
+                            BattleAction::UseItem { item_id } => {
+                                self.apply_use_item(data, &mut c, item_id, out);
+                            }
+                            BattleAction::NormalAttack => {
+                                c.id_skill = 10000;
+                                c.lv_skill = 1;
+                                c.row_attack = cmd.target_row;
+                                c.col_attack = cmd.target_col;
+                            }
+                            BattleAction::Defend => {
+                                c.id_skill = 17001;
+                                c.lv_skill = 1;
+                                c.row_attack = cmd.target_row;
+                                c.col_attack = cmd.target_col;
+                            }
+                            BattleAction::Flee => {
+                                c.id_skill = 18001;
+                                c.lv_skill = 1;
+                                c.row_attack = cmd.target_row;
+                                c.col_attack = cmd.target_col;
+                            }
+                            BattleAction::Capture => {
+                                c.id_skill = 15001;
+                                c.lv_skill = 1;
+                                c.row_attack = cmd.target_row;
+                                c.col_attack = cmd.target_col;
+                            }
+                            BattleAction::CastSkill { skill_id, skill_lv } => {
+                                c.id_skill = skill_id;
+                                c.lv_skill = skill_lv;
+                                c.row_attack = cmd.target_row;
+                                c.col_attack = cmd.target_col;
+                            }
                         }
                         c.attacked = true;
                     }
@@ -750,7 +804,13 @@ impl Battle {
         let skill_type = skill_def
             .map(|s| i64::from(s.kind))
             .or_else(|| skill_row.map(|s| s.skill_type))
-            .unwrap_or(0);
+            .unwrap_or(match skill {
+                10000 => 1,
+                15001..=15003 => 11,
+                18001..=18002 => 12,
+                17001 => 17,
+                _ => 0,
+            });
         let do_manh = skill_row.map(|s| s.do_manh).unwrap_or(0);
         let num34 = skill_def
             .map(|s| i64::from(s.fight_area))

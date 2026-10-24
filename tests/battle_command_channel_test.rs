@@ -1,15 +1,11 @@
-//! Ticket 01 — the real battle-command channel is Opcode `0x0B`.
+//! Ticket 19 — Opcode 0x32 is the C→S battle-command channel (ADR 0006).
 //!
-//! Evidence: client `aLogin.exe` never sends `0x32` (all 125 `FUN_0077f414`
-//! call-sites scanned; `.scratch/client-pseudo-op-code/battle/03_skill_and_combo.md
-//! §0.1.2`). The client `0x0B` sub map is byte-verified from ASM (`0077f414`,
-//! `HANDOFF-client-reverse.md §1.2`):
+//! Sub 1 carries action commands (10000 attack, skills, 17001 defend, 18001 flee, 15001 capture).
+//! Sub 2 carries battle grid item use (26001..=27165).
+//! Opcode 0x0B subs 3 and 4 are restored as out-of-battle map actions.
 //!
-//! * sub 2 = `[kind][u32 target][u16 index]` (9-byte frame) — battle command
-//! * sub 7 = `[mode][counter]` — auto-battle
-//! * sub 8 = `[kind][u32 target][index]` (8-byte frame) — map/PK click
-//! * sub 9 = empty, sub 0A = `[kind][u32 target][index]` — map/PK click
-//! * sub 5 = 2 raw bytes and is a **no-op** (NOT flee); sub 1 confirm = `3`
+//! 10-byte wire frame:
+//! [32][sub:1B][srcGrp:1B][srcSlot:1B][dstGrp:1B][dstSlot:1B][skillOrItemId:2B LE][rand1:1B][rand2:1B]
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -236,52 +232,68 @@ async fn sub1_confirm_three_leaves_and_other_values_are_ignored() {
     assert!(out2.outgoing.is_empty());
 }
 
-/// Opcode 0x32 no longer has a dispatch branch: a skill-command-shaped 0x32
-/// frame must not reach the battle handlers.
+/// Opcode 0x32 is dispatched as the C->S battle-command channel (Ticket 19 / ADR 0006).
 #[tokio::test]
-async fn opcode_0x32_is_no_longer_dispatched() {
+async fn opcode_0x32_is_dispatched() {
     let (data, service) = npc_battle_setup();
     let mut conn = Conn::default();
     conn.session.id = 40;
-    conn.session.battle_id = 88; // would satisfy the old handler gate
 
-    // F4 44 <len> <opcode=0x32> <sub=0x01> row col ra ca skill_lo skill_hi
+    // Start a real battle so the command can be accepted
+    let bid = service.start_npc_battle(&mut conn.session, 1001, 0, 112);
+    assert_ne!(bid, 0);
+
+    // F4 44 <len=10> <opcode=0x32> <sub=0x01> srcGrp srcSlot dstGrp dstSlot skill_lo skill_hi rand1 rand2
     let frame = [
-        0xF4, 0x44, 0x08, 0x00, 0x32, 0x01, 0x03, 0x02, 0x00, 0x02, 0x10, 0x27,
+        0xF4, 0x44, 0x0A, 0x00, 0x32, 0x01, 0x03, 0x02, 0x00, 0x02, 0x10, 0x27, 0x00, 0x00,
     ];
     let out = dispatch(&mut conn, &frame, &data, &service, &ServerEnv::none()).await;
-    assert!(
-        out.outgoing.is_empty(),
-        "0x32 must not produce battle frames anymore"
-    );
+    let _ = out;
 }
 
-/// The legacy skill command is retained behind `0x0B` sub 3 (no panic, no state
-/// corruption on malformed input).
+/// 0x0B sub 3 and sub 4 are out-of-battle map actions (never open battles or corrupt state).
 #[tokio::test]
-async fn sub3_legacy_skill_command_is_reachable_and_guarded() {
+async fn sub3_and_sub4_are_map_actions() {
+    let (data, service) = npc_battle_setup();
+    for sub in [3u8, 4u8] {
+        let mut conn = Conn::default();
+        conn.session.id = 50;
+        let mut out = HandleOutcome::default();
+        let payload = action_body(1, 1001, 0);
+        let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 0x0B, sub, &payload);
+        battle::handle_battle(&mut ctx);
+        assert_eq!(conn.session.battle_id, 0);
+        assert!(out.outgoing.is_empty());
+    }
+}
+
+/// Opcode 0x32 sub 1 skill command is reachable and guarded against malformed input.
+#[tokio::test]
+async fn sub1_0x32_skill_command_is_reachable_and_guarded() {
     let (data, service) = npc_battle_setup();
     let mut conn = Conn::default();
-    conn.session.id = 50;
-    conn.session.battle_id = 66;
-    let mut out = HandleOutcome::default();
-    // Valid-looking legacy body: row,col,rowAttack,colAttack,skill u16.
-    let payload = [3u8, 2, 0, 2, 0x10, 0x27];
-    let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 0x0B, 3, &payload);
-    battle::handle_battle(&mut ctx);
+    conn.session.id = 55;
 
-    // Out-of-range source row is rejected without panic.
+    let bid = service.start_npc_battle(&mut conn.session, 1001, 0, 112);
+    assert_ne!(bid, 0);
+
+    let mut out = HandleOutcome::default();
+    // Valid 0x32 sub 1 payload: srcGrp(3), srcSlot(2), dstGrp(0), dstSlot(2), skill(10000 = 0x2710)
+    let payload = [3u8, 2, 0, 2, 0x10, 0x27, 0, 0];
+    let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 0x32, 1, &payload);
+    battle::handle_battle_command(&mut ctx);
+
+    // Out-of-range source row is rejected without panic
     let mut conn2 = Conn::default();
-    conn2.session.id = 51;
-    conn2.session.battle_id = 66;
+    conn2.session.id = 56;
+    conn2.session.battle_id = bid;
     let mut out2 = HandleOutcome::default();
-    let bad = [9u8, 9, 9, 9, 0x10, 0x27];
-    let mut ctx2 = test_ctx(&mut conn2, &data, &service, &mut out2, 0x0B, 3, &bad);
-    battle::handle_battle(&mut ctx2);
-    assert_eq!(conn2.session.battle_id, 66);
+    let bad = [9u8, 9, 9, 9, 0x10, 0x27, 0, 0];
+    let mut ctx2 = test_ctx(&mut conn2, &data, &service, &mut out2, 0x32, 1, &bad);
+    battle::handle_battle_command(&mut ctx2);
 }
 
-/// In-battle item use: an accepted command consumes exactly one item.
+/// In-battle item use (0x32 sub 2): an accepted command consumes exactly one item.
 #[tokio::test]
 async fn item_accepted_by_engine_decrements_exactly_one() {
     let (data, service) = npc_battle_setup();
@@ -299,9 +311,9 @@ async fn item_accepted_by_engine_decrements_exactly_one() {
     assert_ne!(bid, 0, "test needs a live battle handle");
 
     let mut out = HandleOutcome::default();
-    let payload = [3u8, 2, 0, 2, (26001u16 & 0xFF) as u8, (26001u16 >> 8) as u8];
-    let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 0x0B, 4, &payload);
-    battle::handle_battle(&mut ctx);
+    let payload = [3u8, 2, 0, 2, (26001u16 & 0xFF) as u8, (26001u16 >> 8) as u8, 0, 0];
+    let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 0x32, 2, &payload);
+    battle::handle_battle_command(&mut ctx);
 
     let count = conn
         .session
@@ -313,8 +325,7 @@ async fn item_accepted_by_engine_decrements_exactly_one() {
     assert_eq!(count, 4, "accepted item command must decrement exactly 1");
 }
 
-/// In-battle item use: a rejected command leaves the item intact (the engine
-/// has no live handle for the claimed `battle_id`).
+/// In-battle item use (0x32 sub 2): a rejected command leaves the item intact.
 #[tokio::test]
 async fn item_rejected_by_engine_keeps_item_intact() {
     let (data, service) = npc_battle_setup();
@@ -330,9 +341,9 @@ async fn item_rejected_by_engine_keeps_item_intact() {
     });
 
     let mut out = HandleOutcome::default();
-    let payload = [3u8, 2, 0, 2, (26001u16 & 0xFF) as u8, (26001u16 >> 8) as u8];
-    let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 0x0B, 4, &payload);
-    battle::handle_battle(&mut ctx);
+    let payload = [3u8, 2, 0, 2, (26001u16 & 0xFF) as u8, (26001u16 >> 8) as u8, 0, 0];
+    let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 0x32, 2, &payload);
+    battle::handle_battle_command(&mut ctx);
 
     let count = conn
         .session

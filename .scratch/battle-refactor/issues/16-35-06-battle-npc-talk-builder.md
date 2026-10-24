@@ -4,8 +4,8 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] Builder `packets::battle_npc_talk(k: u8, actor_id: u32, tpl_id: u32) -> String` byte-exact với payload 11 byte (`F4440B003506...`).
-- [ ] Hỗ trợ hàm bọc tiện ích `packets::battle_npc_dialog(dialog_id: u16) -> String` tương thích với quy ước `PacketCreator(53, 6)` của Bear C# (`k=1`, `actor_id=0`, `tpl_id=dialog_id`).
-- [ ] Bộ kiểm thử trong `tests/` (ví dụ `tests/battle_status_frames_test.rs`) xác nhận độ dài, cấu trúc byte Little-Endian và cờ hiển thị.
+- [x] Builder `packets::battle_npc_talk(k: u8, actor_id: u32, tpl_id: u32) -> String` byte-exact với payload 11 byte (`F4440B003506...`).
+- [x] Hỗ trợ hàm bọc tiện ích `packets::battle_npc_dialog(dialog_id: u16) -> String` tương thích với quy ước `PacketCreator(53, 6)` của Bear C# (`k=1`, `actor_id=0`, `tpl_id=dialog_id`).
+- [x] Bộ kiểm thử trong `tests/` (`tests/battle_talk_notice_test.rs`) xác nhận độ dài, cấu trúc byte Little-Endian và cờ hiển thị.

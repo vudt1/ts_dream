@@ -112,13 +112,22 @@ pub fn char_to_viscii(cp: u32, map: &HashMap<u32, u8>) -> u8 {
     if is_unmappable(cp) {
         return 0xE5;
     }
-    map.get(&cp).copied().unwrap_or(0x3F) // '?' fallback
+    if let Some(ch) = char::from_u32(cp) {
+        if let Some(b) = unicode_to_viscii(ch) {
+            return b;
+        }
+    }
+    if let Some(&b) = map.get(&cp) {
+        return b;
+    }
+    0x3F // '?' fallback
 }
 
-/// Translate a Unicode string (the in-memory mojibake text) into VISCII bytes.
+/// Translate a Unicode string (mojibake text or standard Vietnamese NFC/NFD) into VISCII bytes.
 pub fn to_viscii(s: &str) -> Vec<u8> {
     let map = reverse_mojibake_map();
-    s.chars().map(|c| char_to_viscii(c as u32, &map)).collect()
+    let norm = normalize_vietnamese_nfc(s);
+    norm.chars().map(|c| char_to_viscii(c as u32, &map)).collect()
 }
 
 /// The VISCII byte→Unicode table used for display: the 102-entry table

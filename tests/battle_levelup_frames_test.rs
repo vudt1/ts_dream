@@ -21,7 +21,9 @@ use tokio::sync::RwLock;
 
 use ts_dream::battle::construction::Battle;
 use ts_dream::battle::packets;
-use ts_dream::battle::runner::{BattleCommand, BattleData, DbTarget, Out, PlayerSnapshot, Stat};
+use ts_dream::battle::runner::{
+    BattleAction, BattleCommand, BattleData, DbTarget, Out, PlayerSnapshot, Stat,
+};
 use ts_dream::battle::service::BattleService;
 use ts_dream::data::loader::GameData;
 use ts_dream::data::tables::{Npc, Skill, TexpRow};
@@ -288,11 +290,9 @@ async fn run_leveling_battle() -> Vec<String> {
     let cmd = BattleCommand {
         row: 3,
         col: 2,
-        skill_id: 10000,
-        skill_lv: 1,
-        row_attack: 0,
-        col_attack: 2,
-        use_item: 0,
+        target_row: 0,
+        target_col: 2,
+        action: BattleAction::NormalAttack,
     };
     let snapshot = sess.read().await.clone();
     assert!(service.submit_command(&snapshot, cmd));
