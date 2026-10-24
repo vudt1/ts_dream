@@ -39,12 +39,12 @@ pub fn trade_toast_frame(code: u8) -> String {
     format!("F44403001902{:02X}", code)
 }
 
-/// Helper building S->C `17 3B` trade cancelled / close trade form frame.
+/// Helper building S->C `19 04` trade cancelled / close trade form frame.
 pub fn trade_cancelled_frame() -> &'static str {
-    "F4440200173B"
+    "F44402001904"
 }
 
-/// Cancel a timed-out trade asynchronously, sending `17 3B` to both participants.
+/// Cancel a timed-out trade asynchronously, sending `19 04` and `19 02 03` toast to both participants.
 pub async fn cancel_timed_out_trade(
     session: &mut Session,
     out: &mut crate::server::dispatcher::HandleOutcome,
@@ -58,14 +58,23 @@ pub async fn cancel_timed_out_trade(
         return false;
     }
     let partner_id = session.trade.partner_id;
+    let _locks = crate::server::session::lock_player_operations(if partner_id > 0 {
+        vec![session.id, partner_id]
+    } else {
+        vec![session.id]
+    })
+    .await;
     session.trade = TradeState::default();
     if let Some(mut partner) = registry_get(partner_id) {
         partner.trade = TradeState::default();
         registry_put(partner);
     }
+    registry_update_if_online(session);
     out.send(trade_cancelled_frame());
+    out.send(trade_toast_frame(0x03));
     if let Some(hub) = hub {
         hub.send_to(partner_id, trade_cancelled_frame()).await;
+        hub.send_to(partner_id, &trade_toast_frame(0x03)).await;
     }
     true
 }
@@ -86,6 +95,19 @@ fn storage_entry(item: &InventoryItem) -> String {
     format!(
         "{:02X}{}{:02X}{:02X}{:02X}{:02X}{:02X}{}",
         item.slot,
+        encoder::le16(item.id),
+        item.count,
+        item.doben,
+        item.long_val,
+        inventory::biased_giatri_long(item.giatri_long),
+        item.khang,
+        encoder::le32(item.texp)
+    )
+}
+
+fn storage_entry_no_slot(item: &InventoryItem) -> String {
+    format!(
+        "{}{:02X}{:02X}{:02X}{:02X}{:02X}{}",
         encoder::le16(item.id),
         item.count,
         item.doben,
@@ -200,11 +222,12 @@ fn pet_trade_settle(a: &mut Session, b: &mut Session) -> Result<(), &'static str
     crate::server::trade_system::pet_trade_settle(a, b)
 }
 
-fn add_storage_item(storage: &mut Vec<InventoryItem>, mut item: InventoryItem) -> bool {
-    let Some(slot) = crate::server::inventory::free_slot_in(
-        storage,
-        crate::db::modern::model::StorageType::Bank.capacity(),
-    ) else {
+fn add_storage_item(
+    storage: &mut Vec<InventoryItem>,
+    mut item: InventoryItem,
+    capacity: u16,
+) -> bool {
+    let Some(slot) = crate::server::inventory::free_slot_in(storage, capacity) else {
         return false;
     };
     item.slot = slot;
@@ -228,6 +251,12 @@ fn registry_get(id: u32) -> Option<Session> {
 fn registry_put(s: Session) {
     lock_online_sessions().insert(s.id, s);
 }
+fn registry_update_if_online(s: &Session) {
+    let mut sessions = lock_online_sessions();
+    if sessions.contains_key(&s.id) {
+        sessions.insert(s.id, s.clone());
+    }
+}
 
 /// Op 0x19.
 pub async fn handle_trade(ctx: &mut OpcodeCtx<'_>) {
@@ -248,6 +277,12 @@ pub async fn handle_trade(ctx: &mut OpcodeCtx<'_>) {
                 return;
             }
             let partner_id = encoder::u32_le(payload[0], payload[1], payload[2], payload[3]);
+            if partner_id == 0 || partner_id == id || ctx.conn.session.trade.active {
+                ctx.out.send(trade_toast_frame(0x02));
+                return;
+            }
+            // Two-Phase State Lock: Lock both accounts in stable ID order BEFORE reading partner session
+            let _locks = crate::server::session::lock_player_operations([id, partner_id]).await;
             let Some(mut partner) = registry_get(partner_id) else {
                 ctx.out.send(trade_toast_frame(0x01));
                 return;
@@ -260,7 +295,7 @@ pub async fn handle_trade(ctx: &mut OpcodeCtx<'_>) {
                 partner.trade = TradeState::default();
                 registry_put(partner.clone());
             }
-            if partner_id == id || partner.trade.active || ctx.conn.session.trade.active {
+            if partner.trade.active {
                 ctx.out.send(trade_toast_frame(0x02));
                 return;
             }
@@ -277,6 +312,7 @@ pub async fn handle_trade(ctx: &mut OpcodeCtx<'_>) {
                 ..Default::default()
             };
             registry_put(partner);
+            registry_update_if_online(&ctx.conn.session);
             ctx.out.send(frame("1901", &encoder::le32(partner_id)));
             if let Some(hub) = ctx.env.hub {
                 hub.send_to(partner_id, &frame("1901", &encoder::le32(id)))
@@ -288,6 +324,12 @@ pub async fn handle_trade(ctx: &mut OpcodeCtx<'_>) {
                 return;
             }
             let partner_id = encoder::u32_le(payload[0], payload[1], payload[2], payload[3]);
+            if partner_id == 0 || partner_id == id || ctx.conn.session.trade.active {
+                ctx.out.send(trade_toast_frame(0x02));
+                return;
+            }
+            // Two-Phase State Lock: Lock both accounts in stable ID order BEFORE reading partner session
+            let _locks = crate::server::session::lock_player_operations([id, partner_id]).await;
             let Some(mut partner) = registry_get(partner_id) else {
                 ctx.out.send(trade_toast_frame(0x01));
                 return;
@@ -300,7 +342,7 @@ pub async fn handle_trade(ctx: &mut OpcodeCtx<'_>) {
                 partner.trade = TradeState::default();
                 registry_put(partner.clone());
             }
-            if partner_id == id || partner.trade.active || ctx.conn.session.trade.active {
+            if partner.trade.active {
                 ctx.out.send(trade_toast_frame(0x02));
                 return;
             }
@@ -317,6 +359,7 @@ pub async fn handle_trade(ctx: &mut OpcodeCtx<'_>) {
                 ..Default::default()
             };
             registry_put(partner);
+            registry_update_if_online(&ctx.conn.session);
             ctx.out.send(frame("190A", &encoder::le32(partner_id)));
             if let Some(hub) = ctx.env.hub {
                 hub.send_to(partner_id, &frame("190A", &encoder::le32(id)))
@@ -332,24 +375,38 @@ pub async fn handle_trade(ctx: &mut OpcodeCtx<'_>) {
                 return;
             }
             let mut items = Vec::new();
-            for slot in &payload[4..] {
-                let Some(item) = ctx
+            let mut seen_slots = std::collections::HashSet::new();
+            let mut cursor = 4;
+            let end = payload.len().min(14);
+            while cursor + 2 <= end {
+                let slot = payload[cursor];
+                let qty = payload[cursor + 1];
+                cursor += 2;
+                if slot == 0 || qty == 0 {
+                    continue;
+                }
+                if !(1..=25).contains(&slot) || !seen_slots.insert(slot) {
+                    return;
+                }
+                let Some(mut item) = ctx
                     .conn
                     .session
                     .homdo
                     .iter()
-                    .find(|i| i.slot == *slot && i.id > 0)
+                    .find(|i| i.slot == slot && i.id > 0)
                     .cloned()
                 else {
                     return;
                 };
-                if items.iter().any(|i: &InventoryItem| i.slot == item.slot) {
+                if qty > item.count {
                     return;
                 }
+                item.count = qty;
                 items.push(item);
             }
             ctx.conn.session.trade.gold = gold;
             ctx.conn.session.trade.items = items;
+            registry_update_if_online(&ctx.conn.session);
             let partner_id = ctx.conn.session.trade.partner_id;
             if let Some(partner) = registry_get(partner_id) {
                 if partner.trade.active {
@@ -365,29 +422,45 @@ pub async fn handle_trade(ctx: &mut OpcodeCtx<'_>) {
                 return;
             };
             let partner_id = ctx.conn.session.trade.partner_id;
+            if partner_id == 0 {
+                return;
+            }
+            // Two-Phase State Lock: Lock both accounts in stable ID order BEFORE reading partner session
+            let _locks = crate::server::session::lock_player_operations([id, partner_id]).await;
             let Some(mut partner) = registry_get(partner_id) else {
+                ctx.conn.session.trade = TradeState::default();
+                registry_update_if_online(&ctx.conn.session);
+                ctx.out.send(trade_cancelled_frame());
+                if action == 1 {
+                    ctx.out.send(trade_toast_frame(0x01));
+                }
                 return;
             };
-            if action == 2 {
+            if action == 0 || action == 2 {
                 ctx.conn.session.trade = TradeState::default();
                 partner.trade = TradeState::default();
                 registry_put(partner);
-                ctx.out.send("F4440300190209");
+                registry_update_if_online(&ctx.conn.session);
                 ctx.out.send(trade_cancelled_frame());
                 if let Some(hub) = ctx.env.hub {
                     hub.send_to(partner_id, "F4440300190203").await;
                     hub.send_to(partner_id, trade_cancelled_frame()).await;
                 }
             } else if action == 1 && ctx.conn.session.trade.active {
-                let current_before = ctx.conn.session.clone();
                 ctx.conn.session.trade.accepted = true;
+                registry_update_if_online(&ctx.conn.session);
                 if !partner.trade.accepted {
                     registry_put(partner);
                     return;
                 }
+
+                let current_before = ctx.conn.session.clone();
                 let partner_before = partner.clone();
-                let incoming = partner.trade.items.clone();
-                let partner_incoming = ctx.conn.session.trade.items.clone();
+                let a_offers = ctx.conn.session.trade.items.clone();
+                let b_offers = partner.trade.items.clone();
+                let a_gold = ctx.conn.session.trade.gold;
+                let b_gold = partner.trade.gold;
+
                 if settle_trade(&mut ctx.conn.session, &mut partner) {
                     if !persist::persist_sessions_transaction(
                         ctx.env.pool,
@@ -397,25 +470,58 @@ pub async fn handle_trade(ctx: &mut OpcodeCtx<'_>) {
                     .await
                     {
                         ctx.conn.session = current_before;
-                        registry_put(partner_before);
+                        ctx.conn.session.trade = TradeState::default();
+                        let mut p = partner_before;
+                        p.trade = TradeState::default();
+                        registry_put(p);
+                        registry_update_if_online(&ctx.conn.session);
+                        ctx.out.send("F4440300190207");
+                        ctx.out.send(trade_cancelled_frame());
+                        if let Some(hub) = ctx.env.hub {
+                            hub.send_to(partner_id, "F4440300190207").await;
+                            hub.send_to(partner_id, trade_cancelled_frame()).await;
+                        }
                         return;
                     }
                     registry_put(partner.clone());
+                    registry_update_if_online(&ctx.conn.session);
+
+                    // Emit gold updates
+                    if a_gold < b_gold {
+                        ctx.out.send(format!("F44406001A01{}", encoder::le32(b_gold - a_gold)));
+                    } else if a_gold > b_gold {
+                        ctx.out.send(format!("F44406001A02{}", encoder::le32(a_gold - b_gold)));
+                    }
                     ctx.out.send(crate::server::handlers::shops::gold_frame(
                         ctx.conn.session.gold,
-                        ctx.conn.session.shop_point,
                     ));
-                    for item in &incoming {
+
+                    // Emit item changes (17 09 remove, 17 06 add)
+                    for item in &a_offers {
+                        ctx.out.send(format!("F44404001709{:02X}{:02X}", item.slot, item.count));
+                    }
+                    for item in &b_offers {
                         ctx.out.send(crate::server::inventory::item_added_frame(item));
                     }
                     ctx.out.send("F4440300190204");
+                    ctx.out.send(trade_cancelled_frame());
+
                     if let Some(hub) = ctx.env.hub {
+                        if b_gold < a_gold {
+                            hub.send_to(partner_id, &format!("F44406001A01{}", encoder::le32(a_gold - b_gold))).await;
+                        } else if b_gold > a_gold {
+                            hub.send_to(partner_id, &format!("F44406001A02{}", encoder::le32(b_gold - a_gold))).await;
+                        }
                         hub.send_to(
                             partner_id,
-                            &crate::server::handlers::shops::gold_frame(partner.gold, partner.shop_point),
+                            &crate::server::handlers::shops::gold_frame(partner.gold),
                         )
                         .await;
-                        for item in &partner_incoming {
+
+                        for item in &b_offers {
+                            hub.send_to(partner_id, &format!("F44404001709{:02X}{:02X}", item.slot, item.count)).await;
+                        }
+                        for item in &a_offers {
                             hub.send_to(
                                 partner_id,
                                 &crate::server::inventory::item_added_frame(item),
@@ -423,11 +529,13 @@ pub async fn handle_trade(ctx: &mut OpcodeCtx<'_>) {
                             .await;
                         }
                         hub.send_to(partner_id, "F4440300190204").await;
+                        hub.send_to(partner_id, trade_cancelled_frame()).await;
                     }
                 } else {
                     ctx.conn.session.trade = TradeState::default();
                     partner.trade = TradeState::default();
                     registry_put(partner);
+                    registry_update_if_online(&ctx.conn.session);
                     ctx.out.send("F4440300190207");
                     ctx.out.send(trade_cancelled_frame());
                     if let Some(hub) = ctx.env.hub {
@@ -451,6 +559,7 @@ pub async fn handle_trade(ctx: &mut OpcodeCtx<'_>) {
             }
             ctx.conn.session.trade.gold = gold;
             ctx.conn.session.trade.pets = if stt > 0 { vec![stt] } else { Vec::new() };
+            registry_update_if_online(&ctx.conn.session);
             let partner_id = ctx.conn.session.trade.partner_id;
             if let Some(hub) = ctx.env.hub {
                 let packet = pet_at(&ctx.conn.session, stt)
@@ -464,13 +573,25 @@ pub async fn handle_trade(ctx: &mut OpcodeCtx<'_>) {
                 return;
             };
             let partner_id = ctx.conn.session.trade.partner_id;
+            if partner_id == 0 {
+                return;
+            }
+            // Two-Phase State Lock: Lock both accounts in stable ID order BEFORE reading partner session
+            let _locks = crate::server::session::lock_player_operations([id, partner_id]).await;
             let Some(mut partner) = registry_get(partner_id) else {
+                ctx.conn.session.trade = TradeState::default();
+                registry_update_if_online(&ctx.conn.session);
+                ctx.out.send(trade_cancelled_frame());
+                if action == 1 {
+                    ctx.out.send(trade_toast_frame(0x01));
+                }
                 return;
             };
-            if action == 2 {
+            if action == 0 || action == 2 {
                 ctx.conn.session.trade = TradeState::default();
                 partner.trade = TradeState::default();
                 registry_put(partner);
+                registry_update_if_online(&ctx.conn.session);
                 ctx.out.send("F4440300190B0F");
                 ctx.out.send(trade_cancelled_frame());
                 if let Some(hub) = ctx.env.hub {
@@ -481,10 +602,12 @@ pub async fn handle_trade(ctx: &mut OpcodeCtx<'_>) {
             }
             let current_before = ctx.conn.session.clone();
             ctx.conn.session.trade.accepted = true;
+            registry_update_if_online(&ctx.conn.session);
             if !partner.trade.accepted {
                 registry_put(partner);
                 return;
             }
+
             let partner_before = partner.clone();
             let current_incoming_id = partner_before
                 .trade
@@ -511,9 +634,9 @@ pub async fn handle_trade(ctx: &mut OpcodeCtx<'_>) {
                 {
                     let partner_after = partner.clone();
                     registry_put(partner_after.clone());
+                    registry_update_if_online(&ctx.conn.session);
                     ctx.out.send(crate::server::handlers::shops::gold_frame(
                         ctx.conn.session.gold,
-                        ctx.conn.session.shop_point,
                     ));
                     if let Some(stt) = current_offered_stt {
                         ctx.out.send(removed_pet_frame(ctx.conn.session.id, stt));
@@ -528,7 +651,7 @@ pub async fn handle_trade(ctx: &mut OpcodeCtx<'_>) {
                     if let Some(hub) = ctx.env.hub {
                         hub.send_to(
                             partner_id,
-                            &crate::server::handlers::shops::gold_frame(partner_after.gold, partner_after.shop_point),
+                            &crate::server::handlers::shops::gold_frame(partner_after.gold),
                         )
                         .await;
                         if let Some(stt) = partner_offered_stt {
@@ -556,6 +679,7 @@ pub async fn handle_trade(ctx: &mut OpcodeCtx<'_>) {
                     ctx.conn.session.trade = TradeState::default();
                     partner.trade = TradeState::default();
                     registry_put(partner);
+                    registry_update_if_online(&ctx.conn.session);
                     ctx.out.send(packet);
                     ctx.out.send(trade_cancelled_frame());
                     if let Some(hub) = ctx.env.hub {
@@ -580,6 +704,10 @@ async fn transfer_item(ctx: &mut OpcodeCtx<'_>) {
         ctx.payload[6],
         ctx.payload[7],
     );
+    if recipient == 0 || recipient == ctx.conn.session.id {
+        return;
+    }
+    let _locks = crate::server::session::lock_player_operations([ctx.conn.session.id, recipient]).await;
     let Some(mut target) = registry_get(recipient) else {
         return;
     };
@@ -642,6 +770,7 @@ async fn transfer_item(ctx: &mut OpcodeCtx<'_>) {
         return;
     }
     registry_put(target.clone());
+    registry_update_if_online(&ctx.conn.session);
     if let Some(hub) = ctx.env.hub {
         for item in &moved_items {
             hub.send_to(recipient, &crate::server::inventory::item_added_frame(item))
@@ -657,10 +786,17 @@ pub async fn handle_storage_transfer(ctx: &mut OpcodeCtx<'_>) {
         ctx.conn.session.select_menu = 40;
         return;
     }
-    let slots: Vec<u8> = ctx.payload.to_vec();
-    if slots.is_empty() {
+    if ctx.payload.is_empty() {
         return;
     }
+    let (slots, requested_qty) = if (ctx.opcode == crate::protocol::OP_STORAGE
+        || ctx.opcode == crate::protocol::OP_ITEM)
+        && ctx.payload.len() == 2
+    {
+        (vec![ctx.payload[0]], Some(ctx.payload[1]))
+    } else {
+        (ctx.payload.to_vec(), None)
+    };
     let old = ctx.conn.session.clone();
     let mut moved: Vec<(u8, InventoryItem)> = Vec::new();
     match (ctx.opcode, ctx.sub) {
@@ -673,13 +809,22 @@ pub async fn handle_storage_transfer(ctx: &mut OpcodeCtx<'_>) {
                     .iter()
                     .position(|i| i.slot == slot && i.id > 0)
                 {
-                    let item = ctx.conn.session.tientrang[pos].clone();
+                    let count_to_move = match requested_qty {
+                        Some(qty) if qty > 0 && qty < ctx.conn.session.tientrang[pos].count => qty,
+                        _ => ctx.conn.session.tientrang[pos].count,
+                    };
+                    let mut item = ctx.conn.session.tientrang[pos].clone();
+                    item.count = count_to_move;
                     let mut probe = ctx.conn.session.homdo.clone();
                     let Some(added) = add_storage_to_homdo(&mut probe, item) else {
                         continue;
                     };
                     ctx.conn.session.homdo = probe;
-                    ctx.conn.session.tientrang.remove(pos);
+                    if count_to_move == ctx.conn.session.tientrang[pos].count {
+                        ctx.conn.session.tientrang.remove(pos);
+                    } else {
+                        ctx.conn.session.tientrang[pos].count -= count_to_move;
+                    }
                     moved.push((slot, added));
                 }
             }
@@ -693,14 +838,27 @@ pub async fn handle_storage_transfer(ctx: &mut OpcodeCtx<'_>) {
                     .iter()
                     .position(|i| i.slot == slot && i.id > 0)
                 {
-                    let item = ctx.conn.session.homdo[pos].clone();
+                    let count_to_move = match requested_qty {
+                        Some(qty) if qty > 0 && qty < ctx.conn.session.homdo[pos].count => qty,
+                        _ => ctx.conn.session.homdo[pos].count,
+                    };
+                    let mut item = ctx.conn.session.homdo[pos].clone();
+                    item.count = count_to_move;
                     let mut probe = ctx.conn.session.tientrang.clone();
-                    if !add_storage_item(&mut probe, item) {
+                    if !add_storage_item(
+                        &mut probe,
+                        item,
+                        crate::db::modern::model::StorageType::Bank.capacity(),
+                    ) {
                         continue;
                     }
                     let added = probe.last().cloned().unwrap();
                     ctx.conn.session.tientrang = probe;
-                    ctx.conn.session.homdo.remove(pos);
+                    if count_to_move == ctx.conn.session.homdo[pos].count {
+                        ctx.conn.session.homdo.remove(pos);
+                    } else {
+                        ctx.conn.session.homdo[pos].count -= count_to_move;
+                    }
                     moved.push((slot, added));
                 }
             }
@@ -723,14 +881,27 @@ pub async fn handle_storage_transfer(ctx: &mut OpcodeCtx<'_>) {
                     .iter()
                     .position(|i| i.slot == slot && i.id > 0)
                 {
-                    let item = ctx.conn.session.homdo[pos].clone();
+                    let count_to_move = match requested_qty {
+                        Some(qty) if qty > 0 && qty < ctx.conn.session.homdo[pos].count => qty,
+                        _ => ctx.conn.session.homdo[pos].count,
+                    };
+                    let mut item = ctx.conn.session.homdo[pos].clone();
+                    item.count = count_to_move;
                     let mut probe = ctx.conn.session.luulang.clone();
-                    if !add_storage_item(&mut probe, item) {
+                    if !add_storage_item(
+                        &mut probe,
+                        item,
+                        crate::db::modern::model::StorageType::Warehouse.capacity(),
+                    ) {
                         continue;
                     }
                     let added = probe.last().cloned().unwrap();
                     ctx.conn.session.luulang = probe;
-                    ctx.conn.session.homdo.remove(pos);
+                    if count_to_move == ctx.conn.session.homdo[pos].count {
+                        ctx.conn.session.homdo.remove(pos);
+                    } else {
+                        ctx.conn.session.homdo[pos].count -= count_to_move;
+                    }
                     moved.push((slot, added));
                 }
             }
@@ -753,13 +924,22 @@ pub async fn handle_storage_transfer(ctx: &mut OpcodeCtx<'_>) {
                     .iter()
                     .position(|i| i.slot == slot && i.id > 0)
                 {
-                    let item = ctx.conn.session.luulang[pos].clone();
+                    let count_to_move = match requested_qty {
+                        Some(qty) if qty > 0 && qty < ctx.conn.session.luulang[pos].count => qty,
+                        _ => ctx.conn.session.luulang[pos].count,
+                    };
+                    let mut item = ctx.conn.session.luulang[pos].clone();
+                    item.count = count_to_move;
                     let mut probe = ctx.conn.session.homdo.clone();
                     let Some(added) = add_storage_to_homdo(&mut probe, item) else {
                         continue;
                     };
                     ctx.conn.session.homdo = probe;
-                    ctx.conn.session.luulang.remove(pos);
+                    if count_to_move == ctx.conn.session.luulang[pos].count {
+                        ctx.conn.session.luulang.remove(pos);
+                    } else {
+                        ctx.conn.session.luulang[pos].count -= count_to_move;
+                    }
                     moved.push((slot, added));
                 }
             }
@@ -791,26 +971,22 @@ pub async fn handle_storage_transfer(ctx: &mut OpcodeCtx<'_>) {
             ctx.out.send("F44402001732");
         }
         (crate::protocol::OP_STORAGE, crate::protocol::STORAGE_SUB_DEPOSIT) => {
-            let mut entries = String::new();
             for (slot, item) in moved {
                 ctx.out.send(format!("F44404001709{:02X}{:02X}", slot, item.count));
-                entries.push_str(&storage_entry(&item));
+                ctx.out.send(frame("1E02", &storage_entry_no_slot(&item)));
             }
-            ctx.out.send(frame("1E04", &entries));
         }
         (crate::protocol::OP_ITEM, crate::protocol::ITEM_SUB_WAREHOUSE_DEPOSIT) => {
-            let mut entries = String::new();
             for (slot, item) in moved {
                 ctx.out.send(format!("F44404001709{:02X}{:02X}", slot, item.count));
-                entries.push_str(&storage_entry(&item));
+                ctx.out.send(frame("1767", &storage_entry(&item)));
             }
-            ctx.out.send(frame("1766", &entries));
         }
         (crate::protocol::OP_ITEM, crate::protocol::ITEM_SUB_WAREHOUSE_WITHDRAW) => {
             for (slot, item) in moved {
                 ctx.out
                     .send(format!("F4440E001708{}", storage_entry(&item)));
-                ctx.out.send(format!("F44404001768{:02X}{:02X}", slot, item.count));
+                ctx.out.send(format!("F44403001768{:02X}", slot));
             }
             ctx.out.send("F44402001732");
         }
@@ -830,6 +1006,11 @@ pub async fn handle_bank_gold(ctx: &mut OpcodeCtx<'_>) {
     );
     if amount == 0 {
         ctx.out.send("F44402001D03");
+        if ctx.sub == crate::protocol::BANK_SUB_WITHDRAW {
+            ctx.out.send("F44402001D08");
+        } else {
+            ctx.out.send("F44402001D07");
+        }
         return;
     }
     let before = ctx.conn.session.clone();
@@ -846,6 +1027,14 @@ pub async fn handle_bank_gold(ctx: &mut OpcodeCtx<'_>) {
     };
     if !valid {
         ctx.out.send("F44402001D03");
+        if ctx.sub == crate::protocol::BANK_SUB_WITHDRAW {
+            ctx.out.send("F44402001D08");
+            if ctx.conn.session.gold >= GOLD_CAP || ctx.conn.session.gold.saturating_add(amount) > GOLD_CAP {
+                ctx.out.send("F44402001A06");
+            }
+        } else {
+            ctx.out.send("F44402001D07");
+        }
         return;
     }
     if ctx.sub == 1 {
@@ -857,6 +1046,12 @@ pub async fn handle_bank_gold(ctx: &mut OpcodeCtx<'_>) {
     }
     if !persist::persist_sessions_transaction(ctx.env.pool, &[&ctx.conn.session], &[]).await {
         ctx.conn.session = before;
+        ctx.out.send("F44402001D03");
+        if ctx.sub == 1 {
+            ctx.out.send("F44402001D08");
+        } else {
+            ctx.out.send("F44402001D07");
+        }
         return;
     }
     let code = if ctx.sub == 1 { "02" } else { "01" };
@@ -865,4 +1060,9 @@ pub async fn handle_bank_gold(ctx: &mut OpcodeCtx<'_>) {
         .send(format!("F44406001D{}{}", code, encoder::le32(amount)));
     ctx.out
         .send(format!("F44406001A{}{}", gold_code, encoder::le32(amount)));
+    if ctx.sub == 1 {
+        ctx.out.send("F44402001D08");
+    } else {
+        ctx.out.send("F44402001D07");
+    }
 }

@@ -470,7 +470,7 @@ fn execute_action_result(
                         out.send(build_stat_update(0x26, i32::from(session.point)));
                     } else {
                         session.gold = session.gold.saturating_add(amount as u32);
-                        out.send(gold_frame(session.gold, session.shop_point));
+                        out.send(gold_frame(session.gold));
                     }
                 }
                 // Type 2 (Bear `GoldEffectHandler`): deduct gold from player
@@ -479,7 +479,7 @@ fn execute_action_result(
                     if amount > 0 {
                         session.gold = session.gold.saturating_sub(amount as u32);
                     }
-                    out.send(gold_frame(session.gold, session.shop_point));
+                    out.send(gold_frame(session.gold));
                 }
                 other => {
                     tracing::debug!(
@@ -735,7 +735,6 @@ async fn handle_talk_continue(
     if matches!(template, 15002 | 16001 | 16016 | 15118) {
         match conn.session.select_menu {
             30 => {
-                out.send(crate::server::handlers::shops::open_npc_shop_frame());
                 out.send("F44411001401000000010603010000000000000100");
             }
             31 => {
@@ -766,7 +765,6 @@ async fn handle_talk_continue(
     if template == 16015 {
         match conn.session.select_menu {
             30 => {
-                out.send(crate::server::handlers::shops::open_npc_shop_frame());
                 out.send("F44411001401000000010603010000000000000200");
             }
             31 => {

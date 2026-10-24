@@ -45,7 +45,7 @@ async fn test_sub2_map_chat_echo() {
     assert!(out.outgoing[0].frame.contains(&encoder::le32(5001)));
 }
 
-// --- slash "/where" replies 020B with "MapID" ---
+// --- slash "/where" replies via system chat 020102 with "MapID" ---
 
 #[tokio::test]
 async fn test_sub2_slash_where() {
@@ -60,7 +60,7 @@ async fn test_sub2_slash_where() {
     assert_eq!(out.outgoing.len(), 1);
     let expected = spawn::sys_msg_frame("MapID:10817 X:100 Y:200");
     assert_eq!(out.outgoing[0].frame, expected);
-    assert!(out.outgoing[0].frame.contains("020B"));
+    assert!(out.outgoing[0].frame.contains("020102"));
 }
 
 // --- slash "/offq" replies F44402001408 ---
@@ -91,7 +91,7 @@ async fn test_sub2_slash_unknown_silent() {
     assert!(out.outgoing.is_empty());
 }
 
-// --- sub 3 whisper carries sender id; offline target gets 020B notice ---
+// --- sub 3 whisper carries sender id; offline target gets 020102 notice ---
 
 #[tokio::test]
 async fn test_sub3_whisper_sender_id() {
@@ -133,7 +133,7 @@ async fn test_sub3_whisper_offline_notice() {
         out.outgoing[0].frame,
         spawn::sys_msg_frame("Nguoi choi khong online.")
     );
-    assert!(out.outgoing[0].frame.contains("020B"));
+    assert!(out.outgoing[0].frame.contains("020102"));
 }
 
 // --- sub 4 gate: non-GM silent drop, GM broadcasts 0204 ---
@@ -191,7 +191,7 @@ async fn test_sub5_solo_error() {
         out.outgoing[0].frame,
         spawn::sys_msg_frame("Ban chua tham gia doi.")
     );
-    assert!(out.outgoing[0].frame.contains("020B"));
+    assert!(out.outgoing[0].frame.contains("020102"));
 }
 
 // --- spawn builders ---
@@ -245,7 +245,7 @@ fn test_chat_sub_constants_match_client_tags() {
     // builders render the matching wire sub bytes
     assert!(spawn::system_broadcast_frame(1, b"x").contains("0200"));
     assert!(spawn::self_talk_frame(1, b"x").contains("0207"));
-    assert!(spawn::sys_msg_frame("hi").contains("020B"));
+    assert!(spawn::sys_msg_frame("hi").contains("020102"));
     assert!(spawn::announce_frame("hi").contains("020C"));
 }
 
@@ -265,7 +265,7 @@ async fn test_sub2_rate_limit_5s() {
     let mut out2 = HandleOutcome::default();
     run_chat(&mut conn, &data, &service, &mut out2, CHAT_SUB_NEAR, b"two").await;
     assert_eq!(out2.outgoing.len(), 1);
-    assert!(out2.outgoing[0].frame.contains("020B")); // wait notice, not chat
+    assert!(out2.outgoing[0].frame.contains("020102")); // wait notice, not chat
     assert!(!out2.outgoing[0].frame.contains("0202"));
 }
 

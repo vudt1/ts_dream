@@ -37,7 +37,7 @@ fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
-/// Enforce the 5s anti-spam cooldown. Returns false (after sending a `020B`
+/// Enforce the 5s anti-spam cooldown. Returns false (after sending a system
 /// wait notice) when the sender must wait; on success stamps `last_chat_ms`
 /// and returns true.
 fn chat_cooldown_ok(conn: &mut Conn, out: &mut HandleOutcome) -> bool {
@@ -154,7 +154,7 @@ pub async fn handle_chat(ctx: &mut OpcodeCtx<'_>) {
                 out.send(spawn::sys_msg_frame("Tin nhan qua dai."));
                 return;
             }
-            // T2.2: recipient offline -> 020B notice to sender, no chat frame.
+            // T2.2: recipient offline -> system notice to sender, no chat frame.
             let online = lock_online_sessions().contains_key(&target_id);
             if !online {
                 out.send(spawn::sys_msg_frame("Nguoi choi khong online."));
@@ -189,7 +189,7 @@ pub async fn handle_chat(ctx: &mut OpcodeCtx<'_>) {
             }
         }
         // Sub 5 (Đài): leader + all members receive the frame.
-        // T2.3 (partial): sender with no party -> 020B error instead of a
+        // T2.3 (partial): sender with no party -> system notice instead of a
         // silent self-echo. Live-registry resolution is a future ticket.
         CHAT_SUB_LOUDSPEAKER => {
             let in_party =
@@ -420,7 +420,7 @@ async fn handle_slash(
             out.send("F44402001D06".to_string());
             out.send("F44402001409".to_string());
         }
-        // Bot/auto group stubs (T3.2): reply 020B "not supported"
+        // Bot/auto group stubs (T3.2): reply system notice "not supported"
         // instead of a silent drop so players know the command is dead.
         "/bot" | "/autoboom" | "/autosell" | "/ai" | "/hpsp" | "/potion" | "/combo" => {
             out.send(spawn::sys_msg_frame("Lenh nay chua duoc ho tro."));

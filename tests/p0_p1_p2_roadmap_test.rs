@@ -251,20 +251,24 @@ async fn test_p1_shop_image_and_reborn_colors() {
     let service = ts_dream::battle::service::BattleService::default();
     let mut out = HandleOutcome::default();
 
-    // Payload: name_len(1), name("My Shop"), image(5), slot(1), price(100u32)
+    // Wire layout: 10 items * 10 bytes (100B) + name_len(1B) + name + image(1B)
+    let mut payload = vec![0u8; 100];
+    // Item 0: slot 1, count 1, price 100u32 LE, 0u32 padding
+    payload[0] = 1; // slot 1
+    payload[1] = 1; // count 1
+    payload[2..6].copy_from_slice(&100u32.to_le_bytes());
+    // Name + image
     let name = b"MyShop";
-    let mut payload = vec![name.len() as u8];
+    payload.push(name.len() as u8);
     payload.extend_from_slice(name);
     payload.push(5); // image = 5
-    payload.push(1); // slot 1
-    payload.extend_from_slice(&100u32.to_le_bytes());
 
     let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 0x17, 30, &payload);
     shops::handle_player_shop(&mut ctx).await;
 
     assert!(conn.session.shop.active);
     assert_eq!(conn.session.shop.image, 5, "Shop image should be parsed as 5");
-    assert!(out.outgoing.iter().any(|f| f.frame.contains("171E")));
+    assert!(out.outgoing.iter().any(|f| f.frame == "F4440300171E01"));
 
     // Test Reborn 2x u32 LE (0x17 sub 46)
     let mut conn_rb = Conn::default();

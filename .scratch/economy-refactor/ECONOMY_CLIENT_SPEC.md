@@ -481,19 +481,19 @@ Handler `FUN_007921a6` (`case_026_007921A6_007922E5.c` + `007921a6_FUN_007921a6.
 
 | Frame | Callee Handler | Tổng Payload | Container đích | Bố cục Byte (`P[0..]`) & Hành vi chi tiết | Ví dụ Hex (Chưa XOR) | Mức |
 |:--:|:--:|:--:|:--:|:--|:--|:--:|
-| `1E 01` | `FUN_0076fc4c` | `2 + 12×N` | Kho B (25 ô) | Nạp danh sách `N` record **12 byte** (`[slot:u8][itemId:u16][qty:u8][b4..b7:4B][exp:u32]`) vào `gvar_007DA58C + 0x04 + slot*4`. | `F4440E001E0101E971010000000000000000` | **A** |
-| `1E 02` | `FUN_0076fe88` | **13 byte** | Kho B (25 ô) | Thêm vật phẩm vào Kho B (`11B` data: `itemId:u16, qty:u8, b4..b7:4B, exp:u32`, tự tìm ô trống). | `F4440D001E02E971010000000000000000` | **A** |
-| `1E 03` | `FUN_0077007c` | **4 byte** | Kho B (25 ô) | `1E 03 <slot:u8> <qty:u8>` — Trừ/xoá `qty` vật phẩm tại ô `slot` (`1..25`) của Kho B. | `F44404001E030101` | **A** |
-| `1E 04` | `FUN_00770528` | **2 byte** | Kho B (25 ô) | `1E 04` — Xoá trắng toàn bộ 25 ô của Kho B (`slot = 1..25`, gọi `VMT+0x08` Clear). | `F44402001E04` | **A** |
-| `1E 05` | `FUN_007707a0` | `2 + 12×N` | **Kho A (50 ô)** | **Đồng bộ Tiền trang vật phẩm 50 ô (`007707a0_FUN_007707a0.c`)**: đọc `N = (len(RP)-1)/12` record **12 byte**:<br>`[slot:u8 (1..50)][itemId:u16 LE][qty:u8][b4:u8][b5:u8][b6:u8][b7:u8][exp:u32 LE]`, ghi vào `player + 0x0A48 + slot*4`. | `F4440E001E0501E971010000000000000000` | **A** |
-| `1E 06` | `FUN_007701d8` | **13 byte** | Kho A (50 ô) | Thêm vật phẩm vào Tiền trang 50 ô (`itemId:u16, qty:u8, b4..b7:4B, exp:u32`). | `F4440D001E06E971010000000000000000` | **A** |
-| `1E 07` | `FUN_007703c8` | **4 byte** | Kho A (50 ô) | `1E 07 <slot:u8> <qty:u8>` — Trừ/xoá `qty` vật phẩm tại ô `slot` (`1..50`) của Tiền trang. | `F44404001E070101` | **A** |
-| `1E 08` | `FUN_007706ac` | **2 byte** | Kho A (50 ô) | `1E 08` — Xoá trắng toàn bộ 50 ô Tiền trang vật phẩm (`slot = 1..50`). | `F44402001E08` | **A** |
-| `1E 09` | `FUN_007709e0` | `2 + 12×N` | Kho C (5 ô) | Nạp danh sách `N` record **12 byte** vào Kho phụ 5 ô (`gvar_007DA58C + 0x6C + slot*4`, `slot = 1..5`). | `F4440E001E0901E971010000000000000000` | **A** |
-| `1E 0A` | `FUN_00770c1c` | **13 byte** | Kho C (5 ô) | Thêm vật phẩm vào Kho phụ 5 ô. | `F4440D001E0AE971010000000000000000` | **A** |
-| `1E 0B` | `FUN_00770e0c` | **4 byte** | Kho C (5 ô) | `1E 0B <slot:u8> <qty:u8>` — Trừ/xoá `qty` vật phẩm tại ô `slot` (`1..5`) của Kho phụ. | `F44404001E0B0101` | **A** |
-| `1E 0C` | `FUN_00770f68` | **2 byte** | Kho C (5 ô) | `1E 0C` — Xoá trắng 5 ô của Kho phụ (`slot = 1..5`). | `F44402001E0C` | **A** |
-| `1E 0D` | Inline `0x007922B1` | **2 byte** | UI (`0x7DA63C`) | `1E 0D` — Gọi `(**(code **)(**gvar_007DA63C + 0x20))()` để mở Form Kho phụ 5 ô. | `F44402001E0D` | **A** |
+| `1E 01` | `FUN_007707a0` | `2 + 12×N` | **Kho A (50 ô)** | **Đồng bộ Tiền trang vật phẩm 50 ô (`007707a0_FUN_007707a0.c`)**: đọc `N = (len(RP)-1)/12` record **12 byte**:<br>`[slot:u8 (1..50)][itemId:u16 LE][qty:u8][doben:u8][long_val:u8][giatri_long:u8][khang:u8][exp:u32 LE]`, ghi vào `player + 0x0A48 + slot*4`. | `F4440E001E0101E971010000000000000000` | **A** |
+| `1E 02` | `FUN_00770454` | **13 byte** | **Kho A (50 ô)** | **Thêm vật phẩm vào Tiền trang 50 ô (`00770454_FUN_00770454.c`)**: `1E 02 <itemId:u16 LE><qty:u8><doben:u8><long_val:u8><giatri_long:u8><khang:u8><exp:u32 LE>` (11B data không kèm slot, client gọi `FUN_00770454` -> `FUN_0072be9c` tự tìm ô trống bằng `FUN_0076ff98()`). | `F4440D001E02E971010000000000000000` | **A** |
+| `1E 03` | `FUN_00770170` | **5 byte** | **Kho A (50 ô)** | `1E 03 <itemId:u16 LE> <qty:u8>` — Trừ/xoá `qty` vật phẩm theo itemId trong Tiền trang (`FUN_0072c038`). | `F44405001E03E97101` | **A** |
+| `1E 04` | `FUN_007705d8` | **14 byte** | **Kho A (50 ô)** | `1E 04 <slot:u8> <11B item>` — Cập nhật vật phẩm tại ô `slot` (`1..50`) của Tiền trang 50 ô (`player + 0x0A48 + slot*4`). | `F4440E001E0401E971010000000000000000` | **A** |
+| `1E 05` | `FUN_0077021c` | **4 byte** | **Kho A (50 ô)** | `1E 05 <slot:u8> <qty:u8>` — Trừ/xoá `qty` vật phẩm tại ô `slot` (`1..50`) của Tiền trang (`FUN_0077250c`, `player + 0x0A48 + slot*4`). | `F44404001E050101` | **A** |
+| `1E 06` | *(Dead / No-op)*| — | — | Nhánh không tồn tại trong switch table `0x007921D5` của `FUN_007921a6` (rơi vào default handler dọn dẹp chuỗi). | — | **A** |
+| `1E 07` | *(Dead / No-op)*| — | — | Nhánh không tồn tại trong switch table `0x007921D5` của `FUN_007921a6` (rơi vào default handler dọn dẹp chuỗi). | — | **A** |
+| `1E 08` | `FUN_0076fdb8` | **2 byte** | **Kho A (50 ô)** | `1E 08` — Xoá trắng toàn bộ 50 ô Tiền trang vật phẩm (`slot = 1..50`, `player + 0x0A48 + slot*4`). | `F44402001E08` | **A** |
+| `1E 09` | `FUN_007714a0` | `2 + 12×N` | Kho C (5 ô) | Nạp danh sách `N` record **12 byte** vào Kho phụ 5 ô (`gvar_007DA58C + 0x6C + slot*4`, `slot = 1..5`). | `F4440E001E0901E971010000000000000000` | **A** |
+| `1E 0A` | `FUN_007702d0` | **13 byte** | Kho C (5 ô) | Thêm vật phẩm vào Kho phụ 5 ô. | `F4440D001E0AE971010000000000000000` | **A** |
+| `1E 0B` | `FUN_007700bc` | **4 byte** | Kho C (5 ô) | `1E 0B <slot:u8> <qty:u8>` — Trừ/xoá `qty` vật phẩm tại ô `slot` (`1..5`) của Kho phụ. | `F44404001E0B0101` | **A** |
+| `1E 0C` | `FUN_0077b72c` | `2 + var` | Kho Thủy chiến | Xử lý dữ liệu Kho Thủy chiến (`*gvar_007DA7C0` = `TWaterWarBankManage`). | `F44402001E0C` | **A** |
+| `1E 0D` | `FUN_0077b938` | `2 + var` | Kho Thủy chiến | Xử lý dữ liệu Kho Thủy chiến (`*gvar_007DA7C0` = `TWaterWarBankManage`). | `F44402001E0D` | **A** |
 
 ### 6.5.6 Nhóm Tài nguyên (`0x08`), Hệ số Nhà trọ (`0x23`), Cờ bạc & Lotto (`0x35`–`0x3E`)
 
@@ -680,11 +680,11 @@ Người chơi / UI (TMoneyAccountForm)           Client (aLogin.exe)           
 Client (TThingAccountForm / TRE_BiDaXiao)                                                 Server
            |                                                                                 |
            |=== [A] KHO TIỀN TRANG VẬT PHẨM (50 Ô: player+0x0A48) ===========================|
-           |<-- (1) S->C 1E 05 <N x 12B> (Đồng bộ 50 ô kho) + S->C 1D 06 (Mở form) ----------|
+           |<-- (1) S->C 1E 08 (Xóa trắng) + 1E 01 <N x 12B> (Đồng bộ 50 ô) + 1D 06 (Mở form)-|
            |--- (2) Gửi đồ vào kho: C->S 1E 02 <bagSlot:u8><qty:u8> ------------------------>|
-           |<-- (3) S->C 17 09 <bagSlot><qty> (Trừ túi) + S->C 1E 06 <11B item> (Thêm kho) --|
+           |<-- (3) S->C 17 09 <bagSlot><qty> (Trừ túi) + S->C 1E 02 <11B item> (Thêm kho) --|
            |--- (4) Rút đồ về túi:  C->S 1E 01 <bankSlot:u8><qty:u8> ----------------------->|
-           |<-- (5) S->C 1E 07 <bankSlot><qty> (Trừ kho) + S->C 17 06 <12B item> (Thêm túi) -|
+           |<-- (5) S->C 1E 05 <bankSlot><qty> (Trừ kho) + S->C 17 08 <12B item> (Thêm túi) -|
            |--- (6) Đóng form (0x00749399): C->S 1E 08 ------------------------------------->|
            |                                                                                 |
            |=== [B] CÁ CƯỢC TÀI XỈU (0x3A) & KẾT QUẢ SÒNG BẠC (0x38) ========================|

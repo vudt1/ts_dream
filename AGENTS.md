@@ -12,7 +12,15 @@ Five default triage labels: `needs-triage`, `needs-info`, `ready-for-agent`, `re
 
 ### Domain docs
 
-Single-context layout — one [`CONTEXT.md`](CONTEXT.md) + `docs/adr/` at the repo root. See [`docs/agents/domain.md`](docs/agents/domain.md).
+Single-context layout — one [`GLOSSARY.md`](GLOSSARY.md) + `docs/adr/` at the repo root. See [`docs/agents/domain.md`](docs/agents/domain.md).
+
+### Coding standards
+
+Mọi quy chuẩn viết mã, đồng thời (Two-Phase State Lock), đồng bộ Registry, wire parity và kiểm thử toàn vẹn slot **bắt buộc** phải tuân thủ [`CODING_STANDARDS.md`](CODING_STANDARDS.md).
+
+### Concurrency & Architecture ADRs
+
+Quy chuẩn giao dịch nguyên tử, Two-Phase State Lock & 5 Containers: xem [`docs/adr/0005-economy-wire-parity-and-transactions.md`](docs/adr/0005-economy-wire-parity-and-transactions.md).
 
 ---
 
@@ -37,6 +45,9 @@ Single-context layout — one [`CONTEXT.md`](CONTEXT.md) + `docs/adr/` at the re
      TS_TEST_DB_URL=sqlite://DB/ts_dream_test.db cargo test --test <test_name>
      ```
      File `*test.db` luôn được `.gitignore` loại trừ, không commit vào kho mã nguồn.
+- **Quy chuẩn Test Nghiệp Vụ Đa Phiên & Trao Đổi Đồ**:
+  - *Kiểm thử số lượng lẻ và tính toàn vẹn slot*: Mọi test thao tác vật phẩm (chuyển kho, bán sạp, trade) phải truyền số lượng lẻ và kiểm tra các slot phụ cận không bị ảnh hưởng (chống collateral transfer bug).
+  - *Kiểm thử luồng tự nhiên qua Dispatcher*: Không can thiệp thủ công `sessions.insert` giữa các bước test của giao dịch đa bên (P2P Trade); phải để server tự xử lý đồng bộ qua `registry_update_if_online`.
 - **Khi chạy lại test suite** (sau khi scaffold lại):
   ```bash
   cargo test --all-targets --no-fail-fast
@@ -50,7 +61,8 @@ Single-context layout — one [`CONTEXT.md`](CONTEXT.md) + `docs/adr/` at the re
 ts_dream/
 ├── Cargo.toml                  # Khai báo crate & phụ thuộc
 ├── build.rs                    # Đóng gói Data/ và DB/ vào cạnh binary khi cargo build
-├── CONTEXT.md                  # Từ vựng miền (Domain Glossary & Ubiquitous Language)
+├── GLOSSARY.md                  # Từ vựng miền (Domain Glossary & Ubiquitous Language)
+├── CODING_STANDARDS.md          # Quy chuẩn viết mã, đồng thời, wire parity & test integrity
 ├── AGENTS.md                   # Hướng dẫn Agent, Tech Stack & Cấu trúc Codebase
 ├── LICENSE & README.md         # Giấy phép & hướng dẫn dựng dự án
 ├── TS_Server_OP_Code_basic.md  # Đặc tả opcode giao thức TS Online tham khảo
@@ -173,6 +185,14 @@ ts_dream/
         └── texps.rs            # Load công thức tăng điểm kinh nghiệm (TEXP)
 ```
 
+## Quy Chuẩn Đồng Thời & Trạng Thái Phiên (Concurrency Rules)
+
+- **Thứ tự khóa RAM (Lock Ordering)**: Mọi thao tác giữa 2 người chơi (Trade, Party, PK, Mua sạp) **bắt buộc** phải gọi `lock_player_operations([min(id1, id2), max(id1, id2)]).await` **trước khi** đọc dữ liệu từ `registry_get(partner_id)`.
+- **Đồng bộ Session Registry**: Mọi thay đổi trên `ctx.conn.session` trong luồng tương tác nhiều người chơi phải gọi `registry_update_if_online(&ctx.conn.session)` để các phiên khác đọc được trạng thái mới nhất.
+- **Kênh thông báo hệ thống**: Dùng duy nhất `crate::server::spawn::sys_msg_frame(msg)` cho thông báo kênh `020102`. Cấm dùng `020B`.
+- **Quy chuẩn chi tiết**: Xem toàn diện tại [`CODING_STANDARDS.md`](CODING_STANDARDS.md).
+
 ## Tool Execution Constraints
 - Không tự ý commit source, user sẽ tự commit source thủ công.
+- Tránh grep đệ quy toàn repo không giới hạn; loại trừ `Data/npc_drops.json` và `Data/Warps.txt` (tham chiếu `.ignore`) để tiết kiệm token và tránh treo tiến trình.
 ---

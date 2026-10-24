@@ -315,9 +315,11 @@ fn text_banner(sub: u8, msg: &str) -> String {
     crate::protocol::frame(&format!("02{:02X}", sub), &body)
 }
 
-/// Build system message banner packet (op 0x02 sub 0x0B).
+/// Build system message frame via channel `020102` (`F444 + len + 0201 + 02 + msg`).
 pub fn sys_msg_frame(msg: &str) -> String {
-    text_banner(CHAT_SUB_MEMO, msg)
+    let visc = crate::encoding::viscii_encode(msg);
+    let body = format!("02{}", encoder::strhex(&visc));
+    crate::protocol::frame("0201", &body)
 }
 
 /// Build announcement packet (op 0x02 sub 0x0C).
@@ -610,14 +612,15 @@ pub fn build_logined_sequence_session_ext(s: &Session) -> Vec<String> {
     // 11. Step 11: Equipped
     frames.push(s.dump_trangbi());
 
-    // 12. Step 12: Gold & Bank Gold
-    let mut gold_body = String::new();
-    gold_body.push_str(&encoder::le32(s.gold.min(GOLD_CAP)));
-    gold_body.push_str(&encoder::le32(s.shop_point));
-    frames.push(crate::protocol::frame(OPCODE_GOLD, &gold_body));
+    // 12. Step 12: Gold & Bank Gold & Shop Point
+    // Gold sync: 1A 04 <gold: u32 LE> (6 bytes wire)
+    frames.push(crate::server::handlers::shops::gold_frame(s.gold));
 
     // Bank gold sync: 1D 04 <bank_gold: u32 LE> (unconditionally sent on login)
     frames.push(format!("F44406001D04{}", encoder::le32(s.bank_gold.min(GOLD_CAP))));
+
+    // Shop point sync: 1A 03 <shop_point: u32 LE> (6 bytes wire)
+    frames.push(crate::server::handlers::shops::point_frame(s.shop_point));
 
     // 13. Step 13: Server name ("TSDREAM")
     frames.push(server_name_frame(s.id, "TSDREAM"));

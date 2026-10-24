@@ -1,230 +1,125 @@
-# Kế Hoạch Nghiên Cứu & Hoàn Thiện Hệ Thống Kinh Tế Game (Mua / Bán / Giao Dịch / Tiền Tệ)
+# Specification: Hoàn thiện & Chuẩn hóa Giao thức Kinh tế (Economy Wire Parity)
 
-> **Mục tiêu**: Làm rõ 100% các hạng mục còn mở (mục 1 đến 5 tại Mục 8 tài liệu `.scratch/client-pseudo-op-code/economy/README.md`) bằng chứng cứ dịch ngược nhị phân client `aLogin.exe` (Mức bằng chứng A), từ đó xây dựng kế hoạch chi tiết từng bước để hoàn thiện server Rust `ts_dream` mà không làm thay đổi source code trước khi được người dùng kiểm duyệt.
-
----
-
-## 1. Kết Quả Dịch Ngược 5 Hạng Mục Còn Mở (Evidence Level A)
-
-Qua việc kết hợp REA (Reverse Engineer Anything), đọc trực tiếp assembly jump table, decompiled C từ Ghidra và tháo mã các hàm sự kiện Delphi trong `client_delphi/aLogin.exe`, 5 hạng mục còn mở đã được làm sáng tỏ hoàn toàn với độ tin cậy tuyệt đối (Level A):
-
-### 1.1 Mục 1: C→S `0x17` Stall Builders (Subs `0x1E`, `0x1F`, `0x20`, `0x21`, `0x22`)
-- **Vị trí trong binary**: Jump table tại `0x00783405` điều hướng qua 61 DWORDs.
-- **Chi tiết từng SubOp Client gửi lên Server**:
-  1. **`17 1E`** (`0x007840A7`): Mở quầy bán hàng (Open Stall).
-     - Wire: `17 1E <name_len: u8> <name: VISCII> <stall_id: u8> <payload>` (truyền danh sách item bày bán).
-  2. **`17 1F`** (`0x0078418C`): Đóng quầy bán hàng (Close Stall).
-     - Wire: `17 1F` (2 bytes cố định).
-  3. **`17 20`** (`0x007841E1`): Xem quầy của người khác (Click vào nhân vật đang mở stall).
-     - Wire: `17 20 <vendor_uid: u32 LE>` (6 bytes tổng cộng).
-  4. **`17 21`** (`0x00784261`): Mua vật phẩm từ quầy người chơi khác.
-     - Wire: `17 21 <vendor_uid: u32 LE> <slot: u8> <count: u8>` (8 bytes tổng cộng).
-     - *Đặc tả*: Đọc `vendor_uid` (DWORD LE), slot trên quầy (Byte), số lượng cần mua (Byte).
-  5. **`17 22`** (`0x0078434F`): Làm mới quầy của chính mình (Refresh own stall).
-     - Wire: `17 22 <stall_id: u8>`.
-
-### 1.2 Mục 2: S→C `17 21` Catalogue Shop Người Chơi (`FUN_00610290` / `TCY_BuyVenderMenu`)
-- **Tập tin phân tích**: `test/ts_decompile/functions/00610290_FUN_00610290.c` (3,656 bytes).
-- **Kết quả**: Cấu trúc frame hoàn toàn byte-exact, nâng cấp từ Level B lên **Level A**:
-  - **Header (17 bytes - `0x11`)**:
-    - `0x00`: SubOp `0x21` (1B)
-    - `0x01..0x04`: `vendor_uid` (4B DWORD Little-Endian)
-    - `0x05..0x10`: 12 bytes đệm zero (`00 00 00 00 00 00 00 00 00 00 00 00`)
-  - **Entries (Tối đa 10 vật phẩm, mỗi entry đúng 16 bytes)**:
-    - Offset `+0x00`: `slot: u8` (Vị trí ô trong stall 1..10)
-    - Offset `+0x01..0x02`: `item_id: u16 LE` (Mã vật phẩm)
-    - Offset `+0x03`: `count: u8` (Số lượng bán)
-    - Offset `+0x04`: `long_val: u8` (Độ bền / Thuộc tính lông)
-    - Offset `+0x05..0x08`: `price: u32 LE` (Đơn giá vàng bán)
-    - Offset `+0x09`: `giatri_long: u8` (Chỉ số ép lông / ngọc)
-    - Offset `+0x0A`: `khang: u8` (Kháng tính tâm linh)
-    - Offset `+0x0B`: `pad: u8` (`0x00`)
-    - Offset `+0x0C..0x0F`: `texp: u32 LE` (Điểm kinh nghiệm trang bị)
-
-### 1.3 Mục 3: Phân Biệt C→S `1D 01` và `1D 02` Trong Tiền Trang (Bank)
-- **Tập tin phân tích**: `client_delphi/aLogin.exe` tháo mã tại offset `0x1d79c4` (VA `0x005D85C4`) và `0x1d7bb4` (VA `0x005D87B4`).
-- **Logic sự kiện Delphi**:
-  - `btn_Bank_Gold_R` (`0x005D85C4`): Nút mũi tên PHẢI (từ Bank sang Túi đồ). Kiểm tra `pocket_gold < 9,999,999` và `bank_gold >= amount`, sau đó gọi `SendCommand(main=0x1D, sub=0x01, amount: u32 LE)`.
-    => **C→S `1D 01` = RÚT TIỀN (Withdraw: Bank → Túi)**.
-  - `btn_Bank_Gold_L` (`0x005D87B4`): Nút mũi tên TRÁI (từ Túi đồ vào Bank). Kiểm tra `bank_gold < 9,999,999` và `pocket_gold >= amount`, sau đó gọi `SendCommand(main=0x1D, sub=0x02, amount: u32 LE)`.
-    => **C→S `1D 02` = NỘP TIỀN (Deposit: Túi → Bank)**.
-- **Phản hồi S→C tương ứng từ Server**:
-  - `1D 01 <amount: u32 LE>`: Server báo Bank tăng thêm `amount` (nạp thành công).
-  - `1D 02 <amount: u32 LE>`: Server báo Bank giảm đi `amount` (rút thành công).
-  - `1D 03`: Báo lỗi "Dung lượng tiền trang không đủ".
-  - `1D 04 <val: u32 LE>`: Cài đặt giá trị tuyệt đối cho Bank gold (`player+0x12FC`).
-  - `1D 05`: Mở giao diện `TMoneyAccountForm`.
-
-### 1.4 Mục 4: Hệ Thống Mini-Game & Cờ Bạc (`TFBlissBag`, `TFRollEgg`, `TFWheel`)
-- **`TFWheel`**: Không phải tính năng roulette cờ bạc, mà là lớp đồ họa animation sprite hiển thị chiêu thức lửa ("Bánh xe lửa") trong chiến đấu.
-- **`TFBlissBag`**: Bộ nạp dữ liệu cục bộ đọc `Data\BlissBag.Dat` để client hiển thị preview tỉ lệ túi may mắn (túi quà Phúc Lộc), dùng kèm khi dùng vật phẩm `17 15`.
-- **`TFRollEgg`**: Đọc `Data\RG.Dat` tại `0x00772788`, nạp vào mảng toàn cục `DAT_009d13d0` rồi tự hủy giải phóng bộ nhớ.
-- **Hệ thống cá cược mạng thực sự**: Được điều phối qua `TSportManage` với Opcode `0x39` (`case 50` trong `FUN_0078a89c`):
-  - Panel 1: **Tài Xỉu (Big/Small)** — Opcode `0x3A`
-  - Panel 2: **Domino (Pai Gow)** — Opcode `0x3B`
-  - Panel 3: **Cờ Tướng (Xiangqi)** — Opcode `0x3C`
-  - Panel 4: **Lotto (Vé số)** — Opcode `0x36` (gồm 20x5 ma trận số)
-  - Panel 6: **Slot Machine (Máy đánh xèng)** — Opcode `0x36`
-
-### 1.5 Mục 5: Hệ Thống Kho Chứa Đồ `1E 01..0D`
-- Client quản lý 3 mảng bộ nhớ kho riêng biệt cho nhân vật:
-  - `player + 0xA48`: Kho cá nhân 1 (51 ô)
-  - `player + 0xB14`: Kho cá nhân 2 (51 ô)
-  - `player + 0xDC0`: Kho Thủy binh (26 ô)
-- **Đặc tả wire packet**:
-  - `1E 01`: Gửi danh sách hàng loạt vật phẩm trong kho (batch entries, mỗi record 12B).
-  - `1E 04`: Thêm 1 vật phẩm vào kho (12B record).
-  - `1E 05 <slot: u8> <count: u8>`: Rút bớt số lượng `count` khỏi ô `slot` trong kho.
-  - `1E 08`: Xóa toàn bộ kho hiển thị trên client.
-  - `1E 0C`: Thêm vật phẩm vào kho Thủy binh (mỗi record 14B).
-  - `1E 0D <slot: u8> <count: u8>`: Rút vật phẩm khỏi kho Thủy binh.
-- **Bug đã phát hiện trong Rust hiện tại**: File `src/server/handlers/trade_storage.rs` (dòng 677, 684, 701) đang hardcode số lượng `0x32` (`"32"`) thay vì format số lượng thực tế `{:02X}` của vật phẩm (`item.count`).
+Status: ready-for-agent
 
 ---
 
-## 2. Thiết Kế Kiến Trúc Kinh Tế Tổng Thể
+## Problem Statement
 
-```mermaid
-flowchart TD
-    subgraph Client ["Client (aLogin.exe)"]
-        UI_NPC["TThingSaleForm (Shop NPC)"]
-        UI_PlayerShop["TCY_BuyVenderMenu (Shop Người Chơi)"]
-        UI_Trade["TTradeForm (Giao Dịch 1-1)"]
-        UI_Bank["TMoneyAccountForm (Tiền Trang)"]
-        UI_Storage["TThingAccountForm (Kho Đồ)"]
-        Mem_Pocket["Túi đồ: +0x12F8 (Gold <= 9.999.999)"]
-        Mem_Bank["Bank: +0x12FC (Bank Gold <= 9.999.999)"]
-        Mem_Points["Điểm mềm: +0x1300 (Shop Points <= 2.000.000.000)"]
-    end
-
-    subgraph Server ["Server (ts_dream)"]
-        subgraph Handlers ["Opcode Handlers"]
-            H_Shop["shops.rs (0x1B, 0x17 subs 30-33)"]
-            H_Talk["talk.rs (0x18 Eve Dialogue)"]
-            H_TradeStorage["trade_storage.rs (0x17 subs 51-52, 0x19, 0x1D, 0x1E)"]
-            H_Spawn["spawn.rs (Login Sync)"]
-        end
-
-        subgraph GameDataCatalog ["Dữ Liệu Tĩnh (GameData)"]
-            Eve["data.scene_eve_data (SurfaceData)"]
-            ItemTable["data.item_defs (ItemDef.price & sell_price)"]
-        end
-
-        subgraph StorageLayer ["Database (SQLite Dual-Pool)"]
-            DB_Char["characters (gold, bank_gold, shop_point)"]
-            DB_Items["items (homdo, tien_trang, luu_lang)"]
-        end
-    end
-
-    UI_NPC -- "1B 01 (Buy) / 1B 02 (Sell)" --> H_Shop
-    H_Shop -- "1B 03 (Open), 1B 01/02 xx, 1A 01/02, 17 06/09" --> UI_NPC
-    H_Shop -. Tra cứu .-> Eve
-    H_Shop -. Lấy giá .-> ItemTable
-
-    UI_Bank -- "1D 01 (Withdraw) / 1D 02 (Deposit)" --> H_TradeStorage
-    H_TradeStorage -- "1D 01/02, 1A 01/02, 1D 04" --> UI_Bank
-
-    UI_Storage -- "1E 01 / 1E 02 (Lưu / Rút đồ)" --> H_TradeStorage
-    H_TradeStorage -- "1E 04, 1E 05, 17 08, 17 09" --> UI_Storage
-
-    H_Spawn -- "1D 04 (Bank Sync), 1A 04 (Gold+Points)" --> Mem_Bank
-```
-
-### 2.1 Mô Hình Tiền Tệ 3 Thành Phần Chuẩn Hóa
-1. **Gold (`+0x12F8`)**: Vàng trên người (túi đồ).
-   - Trần giới hạn: **`9,999,999`**.
-   - Cập nhật tăng: `1A 01 <delta: u32 LE>`
-   - Cập nhật giảm: `1A 02 <delta: u32 LE>`
-   - Đồng bộ tuyệt đối: `1A 04 <gold: u32 LE> <shop_point: u32 LE>`
-2. **Bank Gold (`+0x12FC`)**: Vàng gửi trong Tiền Trang.
-   - Trần giới hạn: **`9,999,999`**.
-   - Cập nhật tăng: `1D 01 <delta: u32 LE>`
-   - Cập nhật giảm: `1D 02 <delta: u32 LE>`
-   - Đồng bộ tuyệt đối: `1D 04 <bank_gold: u32 LE>` (bắt buộc phải gửi khi vừa login).
-3. **Shop Points / Điểm Mềm (`+0x1300`)**: Điểm tích lũy / nạp game.
-   - Trần giới hạn: **`2,000,000,000`**.
-   - Truyền qua DWORD thứ 2 của frame `1A 04`. Tuyệt đối không truyền `00 00 00 00` làm đè mất điểm của người chơi.
-
-### 2.2 Luồng Mua / Bán Shop NPC Chuẩn Hóa
-- **Mở Shop**: Khi người chơi chọn menu cửa hàng từ NPC (thông qua `talk.rs`), server phát frame `F44402001B03` để client bật giao diện `TThingSaleForm`.
-- **Mua hàng (`1B 01`)**:
-  1. Client gửi `1B 01 <index: u8> <count: u16 LE>`.
-  2. Server tra cứu `index` trong `scene_eve_data[map_id].surface_datas` tương ứng với NPC. Lấy `data_id` làm `item_id`.
-  3. Tra cứu `data.item_defs[&item_id].price`.
-  4. Tính `total_cost = price * count`. Kiểm tra `gold >= total_cost`, kiểm tra túi đồ còn chỗ.
-  5. Trừ tiền, thêm item, persist atomic vào DB.
-  6. Phát chuỗi frame wire:
-     - `1A 02 <total_cost: u32 LE>` (Banner trừ vàng)
-     - `1A 04 <gold: u32 LE> <shop_point: u32 LE>` (Đồng bộ số dư)
-     - `17 06 <item_id: u16 LE> <count: u16 LE> ...` (Đưa item vào túi)
-     - `1B 01 00` (Báo mua thành công - client im lặng)
-- **Bán hàng (`1B 02`)**:
-  1. Client gửi `1B 02 <slot: u8> <qty: u8>`.
-  2. Server kiểm tra slot có tồn tại trong túi đồ và số lượng `>= qty`.
-  3. Tra cứu `data.item_defs[&item.id].sell_price`.
-  4. Tính `revenue = sell_price * qty`. Kiểm tra `gold + revenue <= 9,999,999`.
-  5. Cộng tiền, trừ/xóa item, persist atomic vào DB.
-  6. Phát chuỗi frame wire:
-     - `1A 01 <revenue: u32 LE>` (Banner cộng vàng)
-     - `1A 04 <gold: u32 LE> <shop_point: u32 LE>` (Đồng bộ số dư)
-     - `17 09 <slot: u8> <qty: u8>` (Gỡ item khỏi túi)
-     - `1B 02 00` (Báo bán thành công)
+Người chơi TS Online khi sử dụng client nguyên bản (`aLogin.exe` Borland Delphi) kết nối tới server Rust `ts_dream` gặp phải các lỗi gián đoạn nghiêm trọng và trải nghiệm không mượt mà trong hệ thống kinh tế:
+1. Khi mở quầy hàng cá nhân (Stall), client bị lỗi hoặc danh mục hiển thị sai lệch hoàn toàn do server giải mã sai thứ tự các trường dữ liệu; sau khi mở sạp, form thiết lập không thể đóng lại được.
+2. Khi giao dịch trực tiếp giữa 2 người chơi (P2P Trade), số lượng và vị trí vật phẩm bị xáo trộn do server đọc nhầm byte số lượng thành slot tiếp theo; khi hủy giao dịch, client nhận nhầm frame "Cắt hàng" (`17 3B`) thay vì đóng form giao dịch an toàn (`19 04`).
+3. Khi nhận thông báo lỗi từ server, client thường xuyên bị bật popup "Tạo Quân Đoàn" không mong muốn do server lạm dụng opcode `02 0B` làm thông báo chữ đỏ; đồng thời người chơi không nhận được Điểm tích lũy (Shop Point) vì frame tiền tệ bị ghép sai định dạng.
+4. Sau khi gửi hoặc rút tiền trong Tiền Trang, các nút bấm trên giao diện client bị tê liệt, không thể thao tác tiếp do thiếu frame mở khóa UI.
+5. Việc mua số lượng lớn tại Shop NPC bị giới hạn nhân tạo ở mức 255 món dù client cho phép mua tới 1.250 món.
 
 ---
 
-## 3. Kế Hoạch Triển Khai Kỹ Thuật Cho Server Rust (5 Giai Đoạn)
+## Solution
 
-*(Toàn bộ các bước dưới đây được phân rã chi tiết để chuẩn bị thực hiện trong các phiên kế tiếp sau khi được duyệt)*
-
-### Giai Đoạn 1: Hoàn Thiện Shop NPC & Dialogue Bridge
-- **Tập tin tác động**:
-  - `src/server/handlers/talk.rs`: Tại các nhánh menu mở cửa hàng (ID 30, 32), bổ sung gửi gói `F44402001B03` để kích hoạt `TThingSaleForm` của client. Đồng thời cập nhật các hàm gọi `gold_frame` truyền đủ 2 tham số `(session.gold, session.shop_point)`.
-  - `src/server/handlers/shops.rs`:
-    - Sửa `handle_npc_shop`: Phân tách rạch ròi `ctx.sub == 1` (Mua) và `ctx.sub == 2` (Bán).
-    - Mua: Parse đúng `index: u8` và `count: u16 LE` (thay vì cố định count=1). Tra cứu `data.scene_eve_data` kết hợp `data.item_defs[&item_id].price`.
-    - Bán: Parse đúng `slot: u8` và `qty: u8`. Lấy giá bán từ `data.item_defs[&item.id].sell_price` (thay vì `+count` tượng trưng).
-    - Áp dụng triệt để bảng 12 mã phản hồi VISCII nội bộ (`1B 01 xx` và `1B 02 xx`) thay vì gửi nhầm mã đỏ `red_message(02 0B)`.
-    - Phát đúng wire sequence: `1A 02` -> `1A 04` -> `17 06` -> `1B 01 00` khi mua, và `1A 01` -> `1A 04` -> `17 09` -> `1B 02 00` khi bán.
-  - `src/server/dispatcher.rs`: Đính chính comment tại opcode `0x1B` (xác nhận client C→S có gửi `0x1B 01` và `0x1B 02`).
-
-### Giai Đoạn 2: Đồng Bộ Tiền Tệ & Tiền Trang (Bank) Lúc Đăng Nhập
-- **Tập tin tác động**:
-  - `src/server/spawn.rs`:
-    - Tại hàm `spawn_player_self`: Bổ sung gửi gói đồng bộ Bank gold `1D 04 <bank_gold: u32 LE>` ngay khi nhân vật vừa hoàn tất spawn vào map (`F44406001D04...`).
-    - Tại Step 12 (frame tiền tệ `1A 04`): Gửi đúng `s.shop_point` ở DWORD thứ 2 thay vì `00000000`.
-  - `src/server/handlers/shops.rs`: Sửa `gold_frame(gold: u32, shop_point: u32)` để mọi nơi gọi frame này đều bảo toàn số điểm `shop_point` của nhân vật.
-  - `src/server/handlers/trade_storage.rs`: Cập nhật `gold_status_frame` truyền đủ cả `gold` và `shop_point`.
-
-### Giai Đoạn 3: Sửa Lỗi Kho Bãi & Nâng Cấp Shop Người Chơi (Stall)
-- **Tập tin tác động**:
-  - `src/server/handlers/trade_storage.rs`:
-    - Khắc phục triệt để lỗi hardcode `"32"` tại hàm `handle_storage_transfer`: Thay thế chuỗi cố định `32` bằng `{:02X}` ứng với số lượng thực tế của item chuyển kho (`1E 05 <slot> <count>`, `17 09 <slot> <count>`, `17 68 <slot> <count>`).
-  - `src/server/handlers/shops.rs`:
-    - Cập nhật `player_shop_catalog_frame`: Áp dụng chuẩn Header 17B (`0x11`) và Records 16B theo giải mã của `FUN_00610290` (Level A).
-    - Cập nhật `handle_player_shop` (Sub 33 Mua hàng): Cập nhật `gold_frame` truyền `shop_point`, phát gói `17 09` cho người bán để trừ đồ trên quầy, và gửi `17 06` chuẩn cho người mua.
-
-### Giai Đoạn 4: Chuẩn Hóa Giao Dịch Người Chơi (Trade 1-1)
-- **Tập tin tác động**:
-  - `src/server/handlers/trade_storage.rs`:
-    - Tách biệt rõ ràng luồng `19 01` (Giao dịch vật phẩm) và `19 0A` (Giao dịch thú nuôi / Pet Trade) thay vì gộp chung `1 | 10`.
-    - Bổ sung gói `17 3B` khi hủy giao dịch hoặc quá thời gian timeout để client đóng form giao dịch an toàn.
-
-### Giai Đoạn 5: Kiểm Thử & Xác Nhận (Testing & Verification)
-- **Quy tắc tuân thủ**:
-  - Tuyệt đối **không** đặt code test inline trong `src/` (không dùng `#[cfg(test)]`).
-  - Toàn bộ integration test kiểm thử các packet wire (`1B 01`, `1B 02`, `1D 01`, `1D 02`, `17 21`, `1E 01`) sẽ được đặt trong file test tập trung tại `tests/economy_wire_test.rs`.
-  - Sử dụng cơ sở dữ liệu in-memory SQLite (`sqlite::memory:?cache=shared`) cho test suite để tránh đụng chạm đến production DB `DB/ts_dream.db`.
-  - Chạy kiểm tra: `cargo check` và `cargo test --all-targets --no-fail-fast`.
+Cải tiến toàn diện tầng xử lý kinh tế phía server Rust để đạt chuẩn **100% Wire Parity** với Client Delphi:
+1. Viết lại bộ giải mã và đóng gói frame Mở sạp cá nhân (`17 1E`), đọc đúng 100 byte danh mục trước rồi mới đến tên bảng hiệu; phản hồi frame 3 byte chuẩn xác để client đóng form thiết lập và hiển thị sạp trên bản đồ.
+2. Tái cấu trúc parser Giao dịch P2P (`0x19`), giải mã đúng cấu trúc 5 cặp `(slot, qty)` và 4 byte kim; xử lý hủy giao dịch chuẩn xác bằng frame đóng form `19 04` và toast thông báo `19 02 03`. Áp dụng cơ chế Two-Phase State Lock để chống race condition và dupe đồ tuyệt đối.
+3. Chấm dứt hoàn toàn việc lạm dụng opcode `02 0B`. Mọi thông báo lỗi được trả về đúng mã kết quả của từng opcode hoặc kênh Chat Hệ thống.
+4. Tách biệt hoàn toàn frame Kim (`1A 04`, 6 byte) và Điểm (`1A 03`, 6 byte); bổ sung các frame mở khóa nút bấm UI Tiền Trang (`1D 07 / 08`).
+5. Nâng giới hạn mua Shop NPC lên 1.250 món theo nguyên tắc All-or-Nothing, tự động phân tách thành các stack 50 món trong túi đồ.
+6. Bảo toàn và chuẩn hóa kiến trúc 5 Container vật phẩm (`homdo` 25 ô, `tientrang` 50 ô, `tuideo` 25 ô, `luulang` 10 ô, `trangbi` 6 ô 10-byte).
 
 ---
 
-## 4. Các Quyết Định Thiết Kế Đã Thống Nhất (Design Decisions)
+## User Stories
 
-1. **Lưu trữ Điểm mềm (`shop_point`)**:
-   - **Xác nhận**: Bảng `character_money` đã có sẵn cột `shoppoint` (`migrations/0001_init.sql:88`), do đó **không cần** tạo migration thêm cột.
-   - **Xử lý**: Trong `Session::apply_to_session`, `create_and_seed`, và các hàm persist giao dịch `persist_shop_transaction`, `character_money.shoppoint` được đồng bộ trực tiếp cùng với `gold` và `bankgold`.
-2. **Xử lý NPC tân thủ / dev test (NPC ID 7 Map 9999)**:
-   - **Xác nhận**: **Giữ lại** nhánh fallback starter bundle này trong `handle_npc_shop`.
-   - **Yêu cầu**: Bổ sung chú thích và doc comment chi tiết, nêu rõ đây là cơ chế fallback hỗ trợ tân thủ / môi trường test local khi NPC không có dữ liệu surface trong `eve.emg`.
-3. **Phê duyệt kế hoạch triển khai**:
-   - Kế hoạch 5 giai đoạn đã được người dùng thông qua và sẵn sàng để tiến hành thực hiện khi bắt đầu giai đoạn code.
+### Nhóm Shop NPC (NpcShop - Opcode 0x14 & 0x1B)
+1. As a player, I want to talk to an NPC merchant and select the Buy menu, so that the purchase interface (`TInterForm`) opens cleanly without popping up the Sell interface on top of it.
+2. As a player, I want to buy up to 1.250 items in a single transaction from an NPC shop, so that I can quickly stock up on consumables without clicking repeatedly.
+3. As a player, I want the server to check whether my inventory has enough empty slots for all purchased stacks (each stack max 50 items) before deducting my gold, so that I never lose gold without receiving items.
+4. As a player, I want to receive an exact "Bag is Full" error response (`1B 01 02`) when I lack inventory slots, so that my client UI shows the correct native error banner.
+5. As a player, I want to receive an exact "Insufficient Gold" error response (`1B 01 01`) when I lack gold, so that I understand why my purchase failed.
+6. As a player, I want to sell items from my bag (slots 1 to 25) with up to 50 items per action via the Sell interface (`TThingSaleForm`), so that my inventory stays organized.
+7. As a player, I want to receive the sold value added to my gold and my bag slot updated immediately, so that my balance is always accurate.
+
+### Nhóm Tiền tệ & Ngân hàng (Currency & Bank - Opcode 0x1A & 0x1D)
+8. As a player logging into the game, I want my client to receive separate, dedicated balance updates for Bag Gold (`1A 04`, 6 bytes), Bank Gold (`1D 04`, 6 bytes), and Shop Points (`1A 03`, 6 bytes), so that all HUD counters reflect my real balance without data corruption.
+9. As a player, I want to deposit gold from my bag into my bank account (`1D 02`), so that my currency is stored securely.
+10. As a player, I want to withdraw gold from my bank account into my bag (`1D 01`), so that I have currency available for trading.
+11. As a player, I want the server to send an unlock frame (`1D 07` or `1D 08`) after every bank transaction, so that my Deposit and Withdraw buttons do not become unresponsive.
+12. As a player, I want the server to reject any deposit or withdrawal that would exceed the gold cap of 9.999.999, so that my currency counters never overflow or roll over to negative values.
+
+### Nhóm Sạp hàng Cá nhân (Player Stall - Opcode 0x17 Subs 1E..22)
+13. As a player, I want to set up a vendor stall with up to 10 items, their individual prices, and a shop signboard name, so that I can sell items to other players while remaining in the world.
+14. As a player, I want the server to parse my 10 stall items and signboard name accurately, so that my stall displays the exact items and prices I specified.
+15. As a player, I want to receive an immediate 3-byte confirmation frame (`17 1E 01`) upon setting up my stall, so that the setup dialog closes cleanly and my stall becomes active on the map.
+16. As a browsing player, I want to click on another player's stall to inspect their catalog (`17 21`), so that I see their full inventory with correct item IDs, stack counts, and prices.
+17. As a browsing player, I want to purchase an item from another player's stall by specifying its 1-based slot index, so that I receive the exact item and stack count I selected.
+18. As a vendor, I want the listing to be removed or stack count decremented atomically when an item is purchased, so that multiple buyers cannot purchase the same item concurrently.
+
+### Nhóm Giao dịch Trực tiếp (P2P Trade - Opcode 0x19)
+19. As a player, I want to invite another player to trade items and gold (`19 01`), so that the trade window opens simultaneously on both screens.
+20. As a trading player, I want to offer up to 5 bag items and a gold amount (`19 02`), so that the server accurately conveys my offer to my trade partner without shifting item slots.
+21. As a trading player, I want to lock and confirm the trade (`19 03`), so that the transaction completes atomically only when both parties have agreed.
+22. As a trading player, I want the server to acquire a deterministic two-phase lock on both accounts before executing the trade, so that no race condition or duplication can occur even under high load.
+23. As a trading player, I want the trade window to close immediately and safely with frame `19 04` if either party cancels (`19 03 00`) or if a timeout occurs, so that neither player's items are lost or locked.
+24. As a trading player, I want to receive a polite toast notification (`19 02 03`) if my partner cancels the trade, so that I know what happened without unexpected popup menus appearing.
+
+### Nhóm Quản lý 5 Container Vật phẩm
+25. As a player, I want to move items between my main bag (`homdo`, 25 slots) and my Ba Đậu Yêu Balo (`tuideo`, 25 slots), so that I can manage my extended inventory.
+26. As a player, I want to store items in my Ba Đậu Yêu Lưu Lãng (`luulang`, 10 slots) via `17 33` and retrieve them via `17 34`, so that my mobile storage functions correctly within its strict 10-slot capacity.
+27. As a player, I want to store and retrieve items from my 50-slot Tiền Trang container (`1E 01..07`), with obsolete items cleared via `1E 08` upon login, so that my bank storage never shows ghost items.
+28. As a player, I want my equipped gear (`trangbi`, 6 slots) to be sent as 10-byte records without slot bytes sorted by slot ascending, so that my character wears all equipment in the correct body positions.
+
+---
+
+## Implementation Decisions
+
+### Module Boundaries & Interfaces
+- **Shop Handler**: Sẽ tinh chỉnh lại logic giải mã và phản hồi của các handler trong module Shop. Nâng mức giới hạn mua tối đa lên 1.250 món; triển khai thuật toán tính toán ô trống All-or-Nothing trước khi trừ tiền; loại bỏ lệnh gửi nhầm `1B 03` khi chọn mở mua hàng từ hội thoại NPC.
+- **Trade & Storage Handler**: Sửa lại toàn diện bộ giải mã packet Giao dịch P2P. Đọc 16 byte payload của gói tin offer gồm 4 byte vàng và 5 cặp `(slot, qty)`. Bắt sự kiện xác nhận và hủy theo đúng mã quy ước (`action = 1` đồng ý, `action = 0` hủy). Thay thế hoàn toàn mã phản hồi hủy giao dịch bằng gói tin đóng form giao dịch chuẩn (`19 04`) và mã toast hủy (`19 02 03`).
+- **Vendor Stall Handler**: Viết lại bộ giải mã gói tin mở sạp. Đọc tuần tự mảng 10 ô vật phẩm cố định (mỗi ô 10 byte) trước, sau đó mới giải mã độ dài chuỗi tên bảng hiệu và các trường phụ trợ. Chuẩn hóa phản hồi mở sạp thành gói tin 3 byte.
+- **Currency & Bank Service**: Chuẩn hóa gói tin đồng bộ tiền tệ thành các frame đơn lẻ 6 byte riêng biệt cho Vàng mang theo (`1A 04`) và Điểm tích lũy (`1A 03`). Bổ sung gói tin mở khóa nút bấm giao diện sau mỗi lần thực hiện gửi hoặc rút tiền trang (`1D 07` và `1D 08`).
+- **Container Registry & Emitters**: Củng cố cơ chế xuất danh mục của 5 container:
+  - Hòm đồ: 25 ô, chuỗi 12 byte có chứa byte slot.
+  - Tiền trang: 50 ô, chuỗi 12 byte, luôn phát lệnh dọn sạch 50 ô (`1E 08`) trước khi phát dữ liệu.
+  - Ba Đậu Yêu Balo: 25 ô, chuỗi 12 byte (`17 2F`).
+  - Ba Đậu Yêu Lưu Lãng: 10 ô, chuỗi 12 byte (`17 66`), áp đặt giới hạn cứng tối đa 10 ô.
+  - Trang bị: 6 ô, chuỗi 10 byte không chứa byte slot, sắp xếp tuần tự theo vị trí trang bị tăng dần.
+
+### Architectural & Concurrency Decisions
+- **Two-Phase State Lock**: Mọi giao dịch hoán đổi tài sản giữa 2 đối tượng phải tuân thủ nghiêm ngặt quy trình khóa 2 pha. Khóa bộ nhớ RAM theo thứ tự định danh người chơi tăng dần để triệt tiêu nguy cơ bế tắc (deadlock), sau đó thực thi giao dịch nguyên tử duy nhất trên luồng ghi cơ sở dữ liệu SQLite.
+- **Loại bỏ Hoàn toàn Opcode `02 0B`**: Không sử dụng opcode `02 0B` cho bất kỳ mục đích hiển thị thông báo lỗi nào. Toàn bộ thông báo nghiệp vụ quy về mã lỗi chuẩn của giao thức, thông báo tự do chuyển sang kênh Chat Hệ thống.
+- **Bảo toàn Giới hạn Tiền tệ**: Toàn bộ thao tác cộng/trừ tiền tệ phải được chặn trần ở mức 9.999.999 cho Vàng và 2.000.000.000 cho Điểm, từ chối nguyên tử mọi thao tác làm số dư âm hoặc vượt trần.
+
+---
+
+## Testing Decisions
+
+### What Makes a Good Test
+- **Kiểm thử hành vi bên ngoài qua Wire Packet (Wire Parity Testing)**: Không kiểm thử các hàm nội bộ; mọi bài test phải giả lập đúng chuỗi byte wire mà client gửi lên (Little-Endian, opcode, subcode) và kiểm tra chính xác các frame byte wire server phát ra cùng với sự thay đổi trạng thái trong cơ sở dữ liệu.
+- **Tách biệt Môi trường Cơ sở dữ liệu**: Toàn bộ bài test phải chạy trên cơ sở dữ liệu SQLite In-Memory (`sqlite::memory:?cache=shared`), không chạm vào tệp cơ sở dữ liệu sản xuất.
+- **Không viết test inline trong mã nguồn**: Toàn bộ test phải đặt tập trung tại thư mục kiểm thử ngoài repo root theo quy chuẩn kiến trúc.
+
+### Modules to Test
+- `tests/economy_wire_test.rs`: Bộ kiểm thử tích hợp chính, bao phủ:
+  1. Đồng bộ 3 loại tiền tệ độc lập khi đăng nhập (`1A 04`, `1D 04`, `1A 03`).
+  2. Mua hàng NPC số lượng lớn (tới 1.250 món) và các kịch bản từ chối All-or-Nothing.
+  3. Bán hàng NPC từ túi đồ.
+  4. Mở sạp cá nhân với 10 ô đồ và tên bảng hiệu, xác nhận phản hồi 3 byte.
+  5. Mua hàng từ sạp cá nhân của người khác, trừ đồ và tiền nguyên tử.
+  6. Giao dịch P2P 2 người chơi với đầy đủ vàng và vật phẩm, xác nhận chốt deal và hủy deal an toàn (`19 04`).
+  7. Nộp và rút tiền trang kèm kiểm tra frame mở khóa nút bấm UI (`1D 07 / 08`).
+  8. Kiểm tra tính toàn vẹn của 5 container vật phẩm (đặc biệt là Lưu Lãng 10 ô và Trang bị 10-byte).
+
+### Prior Art
+- Tham chiếu cấu trúc test runner và mô phỏng kết nối phiên từ `tests/economy_wire_test.rs`, `tests/inventory_storage_type_test.rs`, và `tests/login_char_flow_test.rs`.
+
+---
+
+## Out of Scope
+1. Hệ thống cờ bạc, sòng bạc, máy slot và xổ số Lotto (`0x36` đến `0x3E`).
+2. Quản lý quân lương và quỹ chiến dịch của Ngân hàng Thủy binh (`0x18`).
+3. Đóng góp quỹ Quân Đoàn qua `0x1A 01..04`.
+4. Cơ chế chuyển phát nhanh bưu kiện (`0x20 Express`).
+
+---
+
+## Further Notes
+- Đặc tả này tuân thủ đầy đủ tài liệu phân tích mã máy client [`.scratch/economy-refactor/ECONOMY_CLIENT_SPEC.md`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/.scratch/economy-refactor/ECONOMY_CLIENT_SPEC.md), các phát hiện kiểm chứng tại [`.scratch/economy-refactor/GAP_ANALYSIS_MATRIX.md`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/.scratch/economy-refactor/GAP_ANALYSIS_MATRIX.md), Quyết định Kiến trúc [`docs/adr/0005-economy-wire-parity-and-transactions.md`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/docs/adr/0005-economy-wire-parity-and-transactions.md), và Từ vựng chung tại [`CONTEXT.md`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/CONTEXT.md).

@@ -62,8 +62,9 @@ impl<'a> ResponseSender<'a> {
         self.out.send(frame);
     }
 
-    /// TienTrang storage dump (`1E01`).
+    /// TienTrang storage dump (`1E01` preceded by `1E08`).
     pub fn send_storage_items(&mut self) {
+        self.out.send(crate::server::spawn::clear_tientrang_frame());
         let frame = self.conn.session.dump_tientrang();
         self.out.send(frame);
     }

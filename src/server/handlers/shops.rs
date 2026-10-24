@@ -5,15 +5,22 @@ use crate::protocol::{encoder, GOLD_CAP};
 use crate::server::dispatcher::OpcodeCtx;
 use crate::server::session::{Conn, InventoryItem};
 
-/// `F4440A001A04` + gold + shop_point — the gold-update frame sent after
+/// `F44406001A04` + gold — the gold-update frame sent after
 /// every successful shop transaction (also used by the Eve gold action in
 /// `handlers::talk`). Gold is clamped to GOLD_CAP (9,999,999) to prevent client desync.
-pub fn gold_frame(gold: u32, shop_point: u32) -> String {
+pub fn gold_frame(gold: u32) -> String {
     let clamped_gold = gold.min(GOLD_CAP);
     format!(
-        "F4440A001A04{}{}",
-        encoder::le32(clamped_gold),
-        encoder::le32(shop_point)
+        "F44406001A04{}",
+        encoder::le32(clamped_gold)
+    )
+}
+
+/// `F44406001A03` + point — shop point sync frame (6 bytes wire).
+pub fn point_frame(point: u32) -> String {
+    format!(
+        "F44406001A03{}",
+        encoder::le32(point)
     )
 }
 
@@ -32,12 +39,10 @@ pub fn npc_shop_sell_result(code: u8) -> String {
     format!("F44403001B02{:02X}", code)
 }
 
-/// VISCII-encoded red message frame (`F444 + len + 020B + 00000000 + msg`).
-/// Kept for backward compatibility with player shop toasts.
+/// VISCII-encoded system message frame via channel `020102`.
+/// Delegates to standard `crate::server::spawn::sys_msg_frame`.
 fn red_message(msg: &str) -> String {
-    let visc = crate::encoding::viscii_encode(msg);
-    let body = format!("00000000{}", encoder::strhex(&visc));
-    crate::protocol::frame("020B", &body)
+    crate::server::spawn::sys_msg_frame(msg)
 }
 
 /// Lookup NPC shop entry by (idtalking, map_id, menu) → (item_id, price).
@@ -232,7 +237,7 @@ pub async fn handle_npc_shop(ctx: &mut OpcodeCtx<'_>) {
                 return;
             }
 
-            if count > 255 {
+            if count > 1250 {
                 out.send(npc_shop_buy_result(crate::protocol::NPC_SHOP_BUY_QTY_FULL));
                 return;
             }
@@ -271,7 +276,7 @@ pub async fn handle_npc_shop(ctx: &mut OpcodeCtx<'_>) {
                 for item in &granted_items {
                     out.send(crate::server::inventory::item_added_frame(item));
                 }
-                out.send(gold_frame(conn.session.gold, conn.session.shop_point));
+                out.send(gold_frame(conn.session.gold));
                 out.send(npc_shop_buy_result(crate::protocol::NPC_SHOP_BUY_SUCCESS));
                 return;
             }
@@ -289,20 +294,40 @@ pub async fn handle_npc_shop(ctx: &mut OpcodeCtx<'_>) {
             }
             let total_cost = total_cost as u32;
 
-            let buy_count = count.min(255) as u8;
-            let item = crate::server::inventory::from_template(data, item_id, buy_count);
-            if !crate::server::inventory::can_add_item(&conn.session.homdo, &item) {
+            let slots_needed = ((count as usize) + 49) / 50;
+            let occupied_slots: std::collections::HashSet<u8> = conn
+                .session
+                .homdo
+                .iter()
+                .filter(|i| i.id > 0 && i.count > 0)
+                .map(|i| i.slot)
+                .collect();
+            let empty_slots = (1..=crate::server::inventory::HOMDO_SLOTS)
+                .filter(|s| !occupied_slots.contains(s))
+                .count();
+
+            if empty_slots < slots_needed {
                 out.send(npc_shop_buy_result(crate::protocol::NPC_SHOP_BUY_BAG_FULL));
                 return;
             }
 
             let before = conn.session.clone();
             conn.session.gold -= total_cost;
-            let added_slots = conn.session.add_homdo_item(item.clone());
-            if added_slots.is_empty() {
-                conn.session = before;
-                out.send(npc_shop_buy_result(crate::protocol::NPC_SHOP_BUY_BAG_FULL));
-                return;
+
+            let mut remaining = count;
+            let mut added_items = Vec::new();
+            while remaining > 0 {
+                let chunk_size = remaining.min(50) as u8;
+                remaining -= u16::from(chunk_size);
+                let Some(slot) = crate::server::inventory::free_slot(&conn.session.homdo) else {
+                    conn.session = before;
+                    out.send(npc_shop_buy_result(crate::protocol::NPC_SHOP_BUY_BAG_FULL));
+                    return;
+                };
+                let mut item = crate::server::inventory::from_template(data, item_id, chunk_size);
+                item.slot = slot;
+                conn.session.homdo.push(item.clone());
+                added_items.push(item);
             }
 
             if !persist::persist_shop_transaction(
@@ -321,10 +346,12 @@ pub async fn handle_npc_shop(ctx: &mut OpcodeCtx<'_>) {
                 return;
             }
 
-            // Wire sequence: 1A 02 -> 1A 04 -> 17 06 -> 1B 01 00
+            // Wire sequence: 1A 02 -> 1A 04 -> multiple 17 06 -> 1B 01 00
             out.send(format!("F44406001A02{}", encoder::le32(total_cost)));
-            out.send(gold_frame(conn.session.gold, conn.session.shop_point));
-            out.send(crate::server::inventory::item_added_frame(&item));
+            out.send(gold_frame(conn.session.gold));
+            for item in &added_items {
+                out.send(crate::server::inventory::item_added_frame(item));
+            }
             out.send(npc_shop_buy_result(crate::protocol::NPC_SHOP_BUY_SUCCESS));
         }
         crate::protocol::NPC_SHOP_SUB_SELL => {
@@ -388,7 +415,7 @@ pub async fn handle_npc_shop(ctx: &mut OpcodeCtx<'_>) {
 
             // Wire sequence: 1A 01 -> 1A 04 -> 17 09 -> 1B 02 00
             out.send(format!("F44406001A01{}", encoder::le32(revenue)));
-            out.send(gold_frame(conn.session.gold, conn.session.shop_point));
+            out.send(gold_frame(conn.session.gold));
             out.send(format!("F44404001709{:02X}{:02X}", slot, qty));
             out.send(npc_shop_sell_result(crate::protocol::NPC_SHOP_SELL_SUCCESS));
         }
@@ -568,67 +595,76 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
     let id = conn.session.id;
 
     match sub {
-        // Sub 30: Open player shop — parse name + (slot, price) listings.
+        // Sub 30: Open player shop — parse 100 bytes items first, then name + card.
         crate::protocol::ITEM_SUB_STALL_OPEN => {
-            let Some(name_len) = payload.first().copied().map(usize::from) else {
-                return;
-            };
-            let listings_start = name_len + 2;
-            if name_len == 0
-                || listings_start > payload.len()
-                || !(payload.len() - listings_start).is_multiple_of(5)
-            {
+            if payload.len() < 101 {
+                out.send("F4440300171E02");
                 return;
             }
-            let name_bytes = payload[1..1 + name_len].to_vec();
-            let image = payload[name_len + 1];
+            let name_len = payload[100] as usize;
+            if name_len == 0 || payload.len() < 101 + name_len {
+                out.send("F4440300171E02");
+                return;
+            }
+            let name_bytes = payload[101..101 + name_len].to_vec();
+            let image = if payload.len() > 101 + name_len {
+                payload[101 + name_len]
+            } else {
+                0
+            };
+
             let mut listings = Vec::new();
             let mut seen_slots = std::collections::HashSet::new();
-            let mut items_hex = String::new();
-            let mut cursor = listings_start;
-            while cursor + 5 <= payload.len() {
-                let slot = payload[cursor];
+            for i in 0..10 {
+                let offset = i * 10;
+                let slot = payload[offset];
+                let qty = payload[offset + 1];
                 let price = encoder::u32_le(
-                    payload[cursor + 1],
-                    payload[cursor + 2],
-                    payload[cursor + 3],
-                    payload[cursor + 4],
+                    payload[offset + 2],
+                    payload[offset + 3],
+                    payload[offset + 4],
+                    payload[offset + 5],
                 );
+                if slot == 0 || qty == 0 {
+                    continue;
+                }
+                if !(1..=25).contains(&slot) || price == 0 || price > GOLD_CAP || !seen_slots.insert(slot) {
+                    out.send("F4440300171E02");
+                    return;
+                }
                 let Some(item) = conn
                     .session
                     .homdo
                     .iter()
                     .find(|item| item.slot == slot && item.id > 0)
                 else {
+                    out.send("F4440300171E02");
                     return;
                 };
-                if price == 0 || !seen_slots.insert(slot) {
+                if qty > item.count {
+                    out.send("F4440300171E02");
                     return;
                 }
                 listings.push(crate::server::session::ShopItem {
                     slot,
                     item_id: item.id,
-                    count: item.count,
+                    count: qty,
                     price,
                 });
-                items_hex.push_str(&format!("{:02X}", slot));
-                items_hex.push_str(&encoder::le32(price));
-                cursor += 5;
             }
+
+            if listings.is_empty() {
+                out.send("F4440300171E02");
+                return;
+            }
+
             conn.session.shop.active = true;
             conn.session.shop.image = image;
             conn.session.shop.name = name_bytes.clone();
             conn.session.shop.items = listings;
 
-            // Self catalog (171E) + broadcast open (171F) to other map clients.
-            let body = format!(
-                "{:02X}{}{:02X}{}",
-                name_len,
-                encoder::strhex(&name_bytes),
-                image,
-                items_hex
-            );
-            out.send(crate::protocol::frame("171E", &body));
+            // Self confirmation: exact 3 bytes (F4 44 03 00 17 1E 01)
+            out.send("F4440300171E01");
             let bcast = crate::protocol::frame(
                 "171F",
                 &format!(
@@ -646,7 +682,7 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
             conn.session.shop.active = false;
             conn.session.shop.name.clear();
             conn.session.shop.items.clear();
-            let close = format!("F44406001720{}", encoder::le32(id));
+            let close = format!("F44407001720{}00", encoder::le32(id));
             out.send(&close);
             out.broadcast(id, close);
         }
@@ -687,6 +723,9 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
             let shop_index = payload[4] as usize;
             let count = payload[5];
 
+            // Two-Phase State Lock: lock buyer and seller in deterministic order
+            let _locks = crate::server::session::lock_player_operations([id, seller_id]).await;
+
             let seller = crate::server::session::online_sessions()
                 .lock()
                 .unwrap()
@@ -719,16 +758,26 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
                         .lock()
                         .unwrap()
                         .insert(seller_id, seller_session.clone());
-                    out.send(gold_frame(conn.session.gold, conn.session.shop_point));
+                    out.send(gold_frame(conn.session.gold));
                     // Refresh the buyer's view of the seller's catalog.
                     out.send(player_shop_catalog_frame(&seller_session));
                     out.send(crate::server::inventory::item_added_frame(&res.item));
                     if let Some(hub) = hub {
                         // Notify the seller of the gold received.
-                        let seller_gold = gold_frame(seller_session.gold, seller_session.shop_point);
+                        let seller_gold = gold_frame(seller_session.gold);
                         hub.send_to(seller_id, &seller_gold).await;
                         // Gói gỡ/trừ đồ trên quầy
                         hub.send_to(seller_id, &format!("F44404001709{:02X}{:02X}", res.item.slot, res.count)).await;
+                        if seller_session.shop.items.is_empty() {
+                            seller_session.shop.active = false;
+                            crate::server::session::online_sessions()
+                                .lock()
+                                .unwrap()
+                                .insert(seller_id, seller_session.clone());
+                            let close = format!("F44407001720{}00", encoder::le32(seller_id));
+                            hub.send_to(seller_id, &close).await;
+                            hub.broadcast_except(seller_id, &close).await;
+                        }
                     }
                 }
                 Err(ShopBuyError::NotEnoughGold { total }) => {

@@ -24,8 +24,10 @@ use ts_dream::protocol::{
 };
 use ts_dream::server::dispatcher::{HandleOutcome, OpcodeCtx, ServerEnv};
 use ts_dream::server::handlers::shops::{
-    complete_shop_buy, gold_frame, handle_npc_shop, player_shop_catalog_frame, ShopBuyError,
+    complete_shop_buy, gold_frame, handle_npc_shop, handle_player_shop, player_shop_catalog_frame,
+    point_frame, ShopBuyError,
 };
+use ts_dream::server::handlers::talk::handle_talk;
 use ts_dream::server::handlers::trade_storage::{
     cancel_timed_out_trade, expire_trade_if_timed_out, handle_bank_gold, handle_storage_transfer,
     handle_trade, is_trade_timed_out, TRADE_TIMEOUT_MS,
@@ -57,10 +59,10 @@ fn create_test_conn(player_id: u32, db_char_id: i64) -> Conn {
 }
 
 // =========================================================================
-// Test 1: Currency Model & Login Bank Sync (Ticket 02)
+// Test 1: Currency Wire Sync Login (Ticket 01, 07)
 // =========================================================================
 #[test]
-fn test_currency_model_and_login_bank_sync() {
+fn test_currency_wire_sync_login() {
     let mut session = Session::default();
     session.id = 1001;
     session.gold = 500_000;
@@ -69,16 +71,19 @@ fn test_currency_model_and_login_bank_sync() {
 
     let frames = build_logined_sequence_session(&session);
 
-    // 1. Verify 1A 04 frame contains gold and shop_point in 2nd DWORD
-    let expected_gold_frame = format!(
-        "F4440A001A04{}{}",
-        encoder::le32(500_000),
-        encoder::le32(88_888)
-    );
+    // 1. Verify 1A 04 frame contains gold (6 bytes) and 1A 03 frame contains shop_point (6 bytes)
+    let expected_gold_frame = format!("F44406001A04{}", encoder::le32(500_000));
     assert!(
         frames.iter().any(|f| f == &expected_gold_frame),
-        "spawn frames must contain 1A 04 with gold and shop_point: expected {}",
+        "spawn frames must contain 1A 04 with gold (6 bytes): expected {}",
         expected_gold_frame
+    );
+
+    let expected_point_frame = format!("F44406001A03{}", encoder::le32(88_888));
+    assert!(
+        frames.iter().any(|f| f == &expected_point_frame),
+        "spawn frames must contain 1A 03 with shop_point (6 bytes): expected {}",
+        expected_point_frame
     );
 
     // 2. Verify 1D 04 frame contains bank_gold
@@ -98,15 +103,18 @@ fn test_currency_model_and_login_bank_sync() {
 
     let capped_frames = build_logined_sequence_session(&capped_session);
 
-    let expected_capped_gold = format!(
-        "F4440A001A04{}{}",
-        encoder::le32(GOLD_CAP),
-        encoder::le32(1_500_000_000)
-    );
+    let expected_capped_gold = format!("F44406001A04{}", encoder::le32(GOLD_CAP));
     assert!(
         capped_frames.iter().any(|f| f == &expected_capped_gold),
         "gold must be clamped to GOLD_CAP: expected {}",
         expected_capped_gold
+    );
+
+    let expected_capped_point = format!("F44406001A03{}", encoder::le32(1_500_000_000));
+    assert!(
+        capped_frames.iter().any(|f| f == &expected_capped_point),
+        "shop point sync frame must contain 1_500_000_000: expected {}",
+        expected_capped_point
     );
 
     let expected_capped_bank = format!("F44406001D04{}", encoder::le32(GOLD_CAP));
@@ -117,8 +125,10 @@ fn test_currency_model_and_login_bank_sync() {
     );
 
     // 4. Test gold_frame helper
-    let gf = gold_frame(capped_session.gold, capped_session.shop_point);
+    let gf = gold_frame(capped_session.gold);
     assert_eq!(gf, expected_capped_gold);
+    let pf = point_frame(capped_session.shop_point);
+    assert_eq!(pf, expected_capped_point);
 
     // 5. Verify unconditional 1D 04 sync frame when bank_gold == 0 (Ticket 02 / B4 fix)
     let mut zero_bank_session = Session::default();
@@ -176,11 +186,7 @@ async fn test_npc_shop_buy_flow_and_errors() {
         "Must send 1A 02 to deduct gold"
     );
 
-    let expected_sync = format!(
-        "F4440A001A04{}{}",
-        encoder::le32(970),
-        encoder::le32(50)
-    );
+    let expected_sync = format!("F44406001A04{}", encoder::le32(970));
     assert!(
         frames.iter().any(|f| f == &expected_sync),
         "Must send 1A 04 to sync balance"
@@ -412,11 +418,7 @@ async fn test_npc_shop_sell_flow_and_errors() {
         "Must send 1A 01 to credit gold"
     );
 
-    let expected_sync = format!(
-        "F4440A001A04{}{}",
-        encoder::le32(150),
-        encoder::le32(10)
-    );
+    let expected_sync = format!("F44406001A04{}", encoder::le32(150));
     assert!(
         frames.iter().any(|f| f == &expected_sync),
         "Must send 1A 04 to sync balance"
@@ -508,10 +510,10 @@ async fn test_npc_shop_sell_flow_and_errors() {
 }
 
 // =========================================================================
-// Test 5: Bank Deposit & Withdrawal Atomic Operations (Ticket 03)
+// Test 2: Bank Deposit & Withdrawal With UI Unlock (Ticket 01, 07)
 // =========================================================================
 #[tokio::test]
-async fn test_bank_deposit_withdrawal_atomic() {
+async fn test_bank_deposit_withdraw_with_ui_unlock() {
     let pool = setup_test_db().await;
     let repos = SqliteRepositories::new(pool.clone());
     let data = GameData::default();
@@ -585,6 +587,10 @@ async fn test_bank_deposit_withdrawal_atomic() {
         dep_frames.iter().any(|f| f == &expected_dep_gold),
         "Deposit must reply 1A 02 to debit pocket gold"
     );
+    assert!(
+        dep_frames.iter().any(|f| f == "F44402001D07"),
+        "Deposit must reply 1D 07 to unlock UI deposit button"
+    );
 
     // Verify DB persistence
     let row: (i64, i64) = sqlx::query_as("SELECT gold, bankgold FROM character_money WHERE playerid = ?")
@@ -628,6 +634,10 @@ async fn test_bank_deposit_withdrawal_atomic() {
         wdr_frames.iter().any(|f| f == &expected_wdr_gold),
         "Withdrawal must reply 1A 01 to credit pocket gold"
     );
+    assert!(
+        wdr_frames.iter().any(|f| f == "F44402001D08"),
+        "Withdrawal must reply 1D 08 to unlock UI withdraw button"
+    );
 
     // 3. Over-withdrawal: try withdrawing 100_000 when bank only has 70_000
     let mut over_wdr_payload = Vec::new();
@@ -655,6 +665,10 @@ async fn test_bank_deposit_withdrawal_atomic() {
         over_frames.iter().any(|f| f == "F44402001D03"),
         "Must reply 1D 03 on insufficient bank balance"
     );
+    assert!(
+        over_frames.iter().any(|f| f == "F44402001D08"),
+        "Must reply 1D 08 to unlock UI withdraw button even on failure"
+    );
 
     // 4. Over-deposit exceeding GOLD_CAP
     let mut over_dep_payload = Vec::new();
@@ -678,6 +692,10 @@ async fn test_bank_deposit_withdrawal_atomic() {
     assert!(
         over_dep_frames.iter().any(|f| f == "F44402001D03"),
         "Must reply 1D 03 on deposit exceeding GOLD_CAP"
+    );
+    assert!(
+        over_dep_frames.iter().any(|f| f == "F44402001D07"),
+        "Must reply 1D 07 to unlock UI deposit button even on failure"
     );
 }
 
@@ -725,8 +743,9 @@ async fn test_storage_warehouse_item_transfers_count_fix() {
         dep_frames
     );
     assert!(
-        dep_frames.iter().any(|f| f.starts_with("F4440E001E04")),
-        "Must send 1E 04 to add item to bank storage"
+        dep_frames.iter().any(|f| f == "F4440D001E0291650F6400640000000000"),
+        "Must send 1E 02 (13B frame F4440D001E02...) to add item to bank storage: found {:?}",
+        dep_frames
     );
     assert!(conn.session.homdo.is_empty());
     assert_eq!(conn.session.tientrang.len(), 1);
@@ -752,10 +771,10 @@ async fn test_storage_warehouse_item_transfers_count_fix() {
     }
 
     let wdr_frames: Vec<String> = out_wdr.outgoing.into_iter().map(|f| f.frame).collect();
-    // Must be 1E 05 01 0F, NOT 1E 05 01 32!
+    // Must be 1E 05 01 0F (<slot 1> <qty 15>)
     assert!(
         wdr_frames.iter().any(|f| f == "F44404001E05010F"),
-        "1E 05 remove frame must carry exact item count 15 (0x0F), NOT hardcoded 32: found {:?}",
+        "1E 05 remove frame must carry exact slot 1 and item count 15 (0x0F): found {:?}",
         wdr_frames
     );
     assert!(
@@ -801,6 +820,11 @@ async fn test_storage_warehouse_item_transfers_count_fix() {
         ll_dep_frames.iter().any(|f| f == "F44404001709012A"),
         "17 09 frame for Luulang must carry exact item count 42 (0x2A), NOT hardcoded 32"
     );
+    assert!(
+        ll_dep_frames.iter().any(|f| f == "F4440E0017670191652A6400640000000000"),
+        "17 67 update frame for Luulang must be 14-byte frame F4440E001767...: found {:?}",
+        ll_dep_frames
+    );
     assert_eq!(conn.session.luulang.len(), 1);
     assert_eq!(conn.session.luulang[0].count, 42);
 
@@ -825,8 +849,9 @@ async fn test_storage_warehouse_item_transfers_count_fix() {
 
     let ll_wdr_frames: Vec<String> = out_ll_wdr.outgoing.into_iter().map(|f| f.frame).collect();
     assert!(
-        ll_wdr_frames.iter().any(|f| f == "F44404001768012A"),
-        "17 68 frame for Luulang must carry exact item count 42 (0x2A), NOT hardcoded 32"
+        ll_wdr_frames.iter().any(|f| f == "F4440300176801"),
+        "17 68 frame for Luulang must be 3-byte F44403001768<slot>: found {:?}",
+        ll_wdr_frames
     );
     assert_eq!(conn.session.homdo.len(), 1);
     assert!(conn.session.luulang.is_empty());
@@ -1009,7 +1034,7 @@ async fn test_p2p_trade_and_pet_trade_separation_and_cancel() {
             out: &mut out_cancel,
             opcode: 0x19,
             sub: 3,
-            payload: &[0x02], // action == 2 (Cancel)
+            payload: &[0x00], // action == 0 (Cancel)
             decoded: &[],
             env,
         };
@@ -1018,8 +1043,12 @@ async fn test_p2p_trade_and_pet_trade_separation_and_cancel() {
 
     let cancel_frames: Vec<String> = out_cancel.outgoing.into_iter().map(|f| f.frame).collect();
     assert!(
-        cancel_frames.iter().any(|f| f == "F4440200173B"),
-        "Trade cancel must emit 17 3B to close trade form"
+        cancel_frames.iter().any(|f| f == "F44402001904"),
+        "Trade cancel must emit 19 04 to close trade form"
+    );
+    assert!(
+        !cancel_frames.iter().any(|f| f == "F4440200173B"),
+        "Trade cancel must NOT emit 17 3B"
     );
     assert!(!conn1.session.trade.active);
 
@@ -1056,7 +1085,7 @@ async fn test_p2p_trade_and_pet_trade_separation_and_cancel() {
     );
     assert!(conn1.session.trade.active);
 
-    // 4. Test Pet Trade Cancellation (action == 2): Sub 12
+    // 4. Test Pet Trade Cancellation (action == 0): Sub 12
     let mut out_pet_cancel = HandleOutcome::default();
     {
         let mut ctx = OpcodeCtx {
@@ -1066,7 +1095,7 @@ async fn test_p2p_trade_and_pet_trade_separation_and_cancel() {
             out: &mut out_pet_cancel,
             opcode: 0x19,
             sub: 12,
-            payload: &[0x02], // action == 2 (Cancel)
+            payload: &[0x00], // action == 0 (Cancel)
             decoded: &[],
             env,
         };
@@ -1075,8 +1104,12 @@ async fn test_p2p_trade_and_pet_trade_separation_and_cancel() {
 
     let pet_cancel_frames: Vec<String> = out_pet_cancel.outgoing.into_iter().map(|f| f.frame).collect();
     assert!(
-        pet_cancel_frames.iter().any(|f| f == "F4440200173B"),
-        "Pet trade cancel must emit 17 3B to close trade form"
+        pet_cancel_frames.iter().any(|f| f == "F44402001904"),
+        "Pet trade cancel must emit 19 04 to close trade form"
+    );
+    assert!(
+        !pet_cancel_frames.iter().any(|f| f == "F4440200173B"),
+        "Pet trade cancel must NOT emit 17 3B"
     );
     assert!(!conn1.session.trade.active);
 
@@ -1170,8 +1203,16 @@ async fn test_p2p_trade_and_pet_trade_separation_and_cancel() {
     assert!(!conn_timeout.session.trade.active);
     let to_frames: Vec<String> = out_to.outgoing.into_iter().map(|f| f.frame).collect();
     assert!(
-        to_frames.iter().any(|f| f == "F4440200173B"),
-        "Timed-out trade must emit 17 3B to close trade form"
+        to_frames.iter().any(|f| f == "F44402001904"),
+        "Timed-out trade must emit 19 04 to close trade form"
+    );
+    assert!(
+        to_frames.iter().any(|f| f == "F4440300190203"),
+        "Timed-out trade must emit 19 02 03 toast"
+    );
+    assert!(
+        !to_frames.iter().any(|f| f == "F4440200173B"),
+        "Timed-out trade must NOT emit 17 3B"
     );
 }
 
@@ -1317,3 +1358,1156 @@ async fn test_storage_warehouse_database_persistence() {
     .expect("count tientrang rows");
     assert_eq!(tt_count, 0, "TienTrang should have 0 rows after withdrawal");
 }
+
+// =========================================================================
+// Test 3: Player Stall Open & Catalog Buy (Ticket 02, 07)
+// =========================================================================
+#[tokio::test]
+async fn test_player_stall_open_and_catalog_buy() {
+    let data = GameData::default();
+    let service = BattleService::default();
+    let env = ServerEnv::none();
+
+    let seller_id = 5501u32;
+    let buyer_id = 5502u32;
+    let mut seller_conn = create_test_conn(seller_id, seller_id as i64);
+    seller_conn.session.gold = 10_000;
+    seller_conn.session.homdo.push(InventoryItem {
+        slot: 1,
+        id: 10001,
+        count: 10,
+        ..Default::default()
+    });
+
+    // 10 slots * 10 bytes = 100 bytes item data
+    let mut payload = Vec::new();
+    payload.push(1u8); // bagSlot 1
+    payload.push(5u8); // qty 5
+    payload.extend_from_slice(&500u32.to_le_bytes()); // price 500
+    payload.extend_from_slice(&100u32.to_le_bytes()); // vitality 100
+    payload.extend_from_slice(&[0u8; 90]); // remaining 9 empty slots
+    let stall_name = b"My Stall";
+    payload.push(stall_name.len() as u8);
+    payload.extend_from_slice(stall_name);
+    payload.push(1u8); // image
+
+    let mut out_open = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut seller_conn,
+            data: &data,
+            service: &service,
+            out: &mut out_open,
+            opcode: 0x17,
+            sub: 30, // STALL_OPEN
+            payload: &payload,
+            decoded: &[],
+            env,
+        };
+        handle_player_shop(&mut ctx).await;
+    }
+    let open_frames: Vec<String> = out_open.outgoing.into_iter().map(|f| f.frame).collect();
+    assert!(open_frames.iter().any(|f| f == "F4440300171E01"), "S->C response must be 3-byte F4440300171E01");
+    assert!(seller_conn.session.shop.active);
+    assert_eq!(seller_conn.session.shop.items.len(), 1);
+
+    // Put seller into online registry
+    {
+        let mut sessions = lock_online_sessions();
+        sessions.insert(seller_id, seller_conn.session.clone());
+    }
+
+    // Buyer views catalog: 17 32 <seller_id: 4B LE>
+    let mut buyer_conn = create_test_conn(buyer_id, buyer_id as i64);
+    buyer_conn.session.gold = 50_000;
+    let mut out_view = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut buyer_conn,
+            data: &data,
+            service: &service,
+            out: &mut out_view,
+            opcode: 0x17,
+            sub: 32, // STALL_VIEW
+            payload: &seller_id.to_le_bytes(),
+            decoded: &[],
+            env,
+        };
+        handle_player_shop(&mut ctx).await;
+    }
+    let view_frames: Vec<String> = out_view.outgoing.into_iter().map(|f| f.frame).collect();
+    assert!(view_frames.iter().any(|f| f.contains("1721")), "Must send 17 21 catalog frame");
+
+    // Buyer buys from stall: 17 33 <seller_id: 4B LE> <shop_index: 1> <count: 5>
+    let mut buy_payload = Vec::new();
+    buy_payload.extend_from_slice(&seller_id.to_le_bytes());
+    buy_payload.push(1u8); // 1-based index
+    buy_payload.push(5u8); // count 5
+    let mut out_buy = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut buyer_conn,
+            data: &data,
+            service: &service,
+            out: &mut out_buy,
+            opcode: 0x17,
+            sub: 33, // STALL_BUY
+            payload: &buy_payload,
+            decoded: &[],
+            env,
+        };
+        handle_player_shop(&mut ctx).await;
+    }
+    assert_eq!(buyer_conn.session.gold, 50_000 - 2_500);
+}
+
+// =========================================================================
+// Test 4: P2P Trade Two-Phase Atomic Flow (Ticket 03, 07)
+// =========================================================================
+#[tokio::test]
+async fn test_p2p_trade_two_phase_atomic_flow() {
+    let data = GameData::default();
+    let service = BattleService::default();
+    let env = ServerEnv::none();
+
+    let p1_id = 7101u32;
+    let p2_id = 7102u32;
+
+    let mut conn1 = create_test_conn(p1_id, p1_id as i64);
+    conn1.session.gold = 10_000;
+    conn1.session.homdo.push(InventoryItem {
+        slot: 1,
+        id: 10001,
+        count: 5,
+        ..Default::default()
+    });
+
+    let mut conn2 = create_test_conn(p2_id, p2_id as i64);
+    conn2.session.gold = 20_000;
+    conn2.session.homdo.push(InventoryItem {
+        slot: 1,
+        id: 20001,
+        count: 2,
+        ..Default::default()
+    });
+
+    conn1.session.trade.active = true;
+    conn1.session.trade.partner_id = p2_id;
+    conn2.session.trade.active = true;
+    conn2.session.trade.partner_id = p1_id;
+
+    {
+        let mut sessions = lock_online_sessions();
+        sessions.insert(p2_id, conn2.session.clone());
+    }
+
+    let mut offer1_payload = Vec::new();
+    offer1_payload.extend_from_slice(&1_000u32.to_le_bytes());
+    offer1_payload.push(1); offer1_payload.push(5);
+    offer1_payload.extend_from_slice(&[0u8; 8]);
+    let mut out_offer1 = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn1,
+            data: &data,
+            service: &service,
+            out: &mut out_offer1,
+            opcode: 0x19,
+            sub: 2,
+            payload: &offer1_payload,
+            decoded: &[],
+            env,
+        };
+        handle_trade(&mut ctx).await;
+    }
+    assert_eq!(conn1.session.trade.gold, 1_000);
+    assert_eq!(conn1.session.trade.items.len(), 1);
+
+    {
+        let mut sessions = lock_online_sessions();
+        sessions.insert(p1_id, conn1.session.clone());
+    }
+
+    let mut offer2_payload = Vec::new();
+    offer2_payload.extend_from_slice(&2_000u32.to_le_bytes());
+    offer2_payload.push(1); offer2_payload.push(2);
+    offer2_payload.extend_from_slice(&[0u8; 8]);
+    let mut out_offer2 = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn2,
+            data: &data,
+            service: &service,
+            out: &mut out_offer2,
+            opcode: 0x19,
+            sub: 2,
+            payload: &offer2_payload,
+            decoded: &[],
+            env,
+        };
+        handle_trade(&mut ctx).await;
+    }
+    assert_eq!(conn2.session.trade.gold, 2_000);
+    assert_eq!(conn2.session.trade.items.len(), 1);
+
+    {
+        let mut sessions = lock_online_sessions();
+        sessions.insert(p2_id, conn2.session.clone());
+    }
+    let mut out_conf1 = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn1,
+            data: &data,
+            service: &service,
+            out: &mut out_conf1,
+            opcode: 0x19,
+            sub: 3,
+            payload: &[0x01],
+            decoded: &[],
+            env,
+        };
+        handle_trade(&mut ctx).await;
+    }
+    assert!(conn1.session.trade.accepted);
+
+    {
+        let mut sessions = lock_online_sessions();
+        sessions.insert(p1_id, conn1.session.clone());
+    }
+
+    let mut out_conf2 = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn2,
+            data: &data,
+            service: &service,
+            out: &mut out_conf2,
+            opcode: 0x19,
+            sub: 3,
+            payload: &[0x01],
+            decoded: &[],
+            env,
+        };
+        handle_trade(&mut ctx).await;
+    }
+    let conf2_frames: Vec<String> = out_conf2.outgoing.into_iter().map(|f| f.frame).collect();
+    assert!(conf2_frames.iter().any(|f| f == "F4440300190204"), "Must send 19 02 04 success toast");
+    assert!(conf2_frames.iter().any(|f| f == "F44402001904"), "Must send 19 04 close form");
+    assert!(!conn2.session.trade.active);
+    assert_eq!(conn2.session.gold, 20_000 - 2_000 + 1_000);
+    assert!(conn2.session.homdo.iter().any(|i| i.id == 10001 && i.count == 5));
+}
+
+// =========================================================================
+// Test 5: P2P Trade Cancel Wire Safety (Ticket 03, 07)
+// =========================================================================
+#[tokio::test]
+async fn test_p2p_trade_cancel_wire_safety() {
+    let data = GameData::default();
+    let service = BattleService::default();
+    let env = ServerEnv::none();
+
+    let p1_id = 7201u32;
+    let p2_id = 7202u32;
+
+    let mut conn1 = create_test_conn(p1_id, p1_id as i64);
+    conn1.session.trade.active = true;
+    conn1.session.trade.partner_id = p2_id;
+
+    let mut s2 = Session::default();
+    s2.id = p2_id;
+    s2.trade.active = true;
+    s2.trade.partner_id = p1_id;
+    {
+        let mut sessions = lock_online_sessions();
+        sessions.insert(p2_id, s2);
+    }
+
+    let mut out_cancel = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn1,
+            data: &data,
+            service: &service,
+            out: &mut out_cancel,
+            opcode: 0x19,
+            sub: 3,
+            payload: &[0x00], // cancel
+            decoded: &[],
+            env,
+        };
+        handle_trade(&mut ctx).await;
+    }
+    let frames: Vec<String> = out_cancel.outgoing.into_iter().map(|f| f.frame).collect();
+    assert!(frames.iter().any(|f| f == "F44402001904"), "Cancel must emit 19 04 to close trade form");
+    assert!(!frames.iter().any(|f| f.contains("173B")), "Cancel must NEVER emit 17 3B");
+    assert!(!conn1.session.trade.active);
+}
+
+// =========================================================================
+// Test 6: NPC Shop Bulk Buy All-Or-Nothing (Ticket 04, 07)
+// =========================================================================
+#[tokio::test]
+async fn test_npc_shop_bulk_buy_all_or_nothing() {
+    let data = GameData::default();
+    let service = BattleService::default();
+    let env = ServerEnv::none();
+
+    // 1. Buy 100 items with 2 empty slots -> success (2 frames 17 06)
+    let mut conn = create_test_conn(3001, 3001);
+    conn.session.gold = 500_000;
+    for slot in 1..=23 {
+        conn.session.homdo.push(InventoryItem {
+            slot,
+            id: 10001,
+            count: 50,
+            ..Default::default()
+        });
+    }
+    let payload = vec![0x00, 100, 0];
+    let mut out = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out,
+            opcode: 0x1B,
+            sub: 1,
+            payload: &payload,
+            decoded: &[],
+            env,
+        };
+        handle_npc_shop(&mut ctx).await;
+    }
+    let frames: Vec<String> = out.outgoing.into_iter().map(|f| f.frame).collect();
+    assert!(frames.iter().any(|f| f == "F44403001B0100"));
+    let added_frames: Vec<_> = frames.iter().filter(|f| f.contains("1706")).collect();
+    assert_eq!(added_frames.len(), 2, "Must send exactly 2 frames of 17 06 for 100 items (2x50)");
+
+    // 2. Buy 100 items with only 1 empty slot -> reject 1B 01 02, gold untouched
+    let mut conn_tight = create_test_conn(3002, 3002);
+    conn_tight.session.gold = 500_000;
+    for slot in 1..=24 {
+        conn_tight.session.homdo.push(InventoryItem {
+            slot,
+            id: 10001,
+            count: 50,
+            ..Default::default()
+        });
+    }
+    let mut out_tight = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn_tight,
+            data: &data,
+            service: &service,
+            out: &mut out_tight,
+            opcode: 0x1B,
+            sub: 1,
+            payload: &payload,
+            decoded: &[],
+            env,
+        };
+        handle_npc_shop(&mut ctx).await;
+    }
+    let tight_frames: Vec<String> = out_tight.outgoing.into_iter().map(|f| f.frame).collect();
+    assert!(tight_frames.iter().any(|f| f == "F44403001B0102"), "Must return 1B 01 02 (BAG_FULL)");
+    assert_eq!(conn_tight.session.gold, 500_000, "Gold must be untouched 100% on reject");
+
+    // 3. Buy 1250 items with 25 empty slots -> success (25 frames 17 06)
+    let mut conn_empty = create_test_conn(3003, 3003);
+    conn_empty.session.gold = 500_000;
+    let payload_1250 = vec![0x00, (1250u16 & 0xFF) as u8, (1250u16 >> 8) as u8];
+    let mut out_1250 = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn_empty,
+            data: &data,
+            service: &service,
+            out: &mut out_1250,
+            opcode: 0x1B,
+            sub: 1,
+            payload: &payload_1250,
+            decoded: &[],
+            env,
+        };
+        handle_npc_shop(&mut ctx).await;
+    }
+    let frames_1250: Vec<String> = out_1250.outgoing.into_iter().map(|f| f.frame).collect();
+    assert!(frames_1250.iter().any(|f| f == "F44403001B0100"));
+    let added_1250: Vec<_> = frames_1250.iter().filter(|f| f.contains("1706")).collect();
+    assert_eq!(added_1250.len(), 25, "Must send exactly 25 frames of 17 06 for 1250 items");
+}
+
+// =========================================================================
+// Test 7: NPC Dialogue Menu Shop Segregation (Ticket 04, 07)
+// =========================================================================
+#[tokio::test]
+async fn test_npc_dialogue_menu_shop_segregation() {
+    let data = GameData::default();
+    let service = BattleService::default();
+    let env = ServerEnv::none();
+
+    let mut conn = create_test_conn(4001, 4001);
+    conn.session.idtalking = 1;
+    conn.session.idnpctalking = 15002;
+    conn.session.select_menu = 30;
+
+    let mut out = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out,
+            opcode: 0x14,
+            sub: 6,
+            payload: &[],
+            decoded: &[],
+            env,
+        };
+        handle_talk(&mut ctx).await;
+    }
+    let frames: Vec<String> = out.outgoing.into_iter().map(|f| f.frame).collect();
+    assert!(frames.iter().any(|f| f.contains("1401")), "Menu 30 must send 14 01 buy frame");
+    assert!(!frames.iter().any(|f| f.contains("1B03")), "Menu 30 must NEVER send 1B 03 sell frame");
+}
+
+// =========================================================================
+// Test 8: Five Containers Wire and Capacity (Ticket 06, 07)
+// =========================================================================
+#[tokio::test]
+async fn test_five_containers_wire_and_capacity() {
+    let data = GameData::default();
+    let service = BattleService::default();
+    let env = ServerEnv::none();
+
+    // 1. Luulang capacity is exactly 10 slots
+    let mut conn = create_test_conn(5001, 5001);
+    conn.session.pets.push(PetState { id: 41187, ..Default::default() });
+    for slot in 1..=10 {
+        conn.session.luulang.push(InventoryItem {
+            slot,
+            id: 20000 + slot as u16,
+            count: 1,
+            ..Default::default()
+        });
+    }
+    conn.session.homdo.push(InventoryItem {
+        slot: 1,
+        id: 30001,
+        count: 1,
+        ..Default::default()
+    });
+    let mut out_ll = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out_ll,
+            opcode: 0x17,
+            sub: 51,
+            payload: &[0x01],
+            decoded: &[],
+            env,
+        };
+        handle_storage_transfer(&mut ctx).await;
+    }
+    assert_eq!(conn.session.luulang.len(), 10, "Luulang cannot exceed 10 slots");
+    assert_eq!(conn.session.homdo.len(), 1, "Homdo item remains when luulang is full");
+
+    let mut out_ll_wdr = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out_ll_wdr,
+            opcode: 0x17,
+            sub: 52,
+            payload: &[0x01],
+            decoded: &[],
+            env,
+        };
+        handle_storage_transfer(&mut ctx).await;
+    }
+    let ll_wdr_frames: Vec<String> = out_ll_wdr.outgoing.into_iter().map(|f| f.frame).collect();
+    assert!(ll_wdr_frames.iter().any(|f| f == "F4440300176801"), "Withdraw from luulang must send F4440300176801");
+
+    // 2. Tientrang dump preceded by 1E 08
+    let mut session = Session::default();
+    session.tientrang.push(InventoryItem {
+        slot: 1,
+        id: 10001,
+        count: 5,
+        ..Default::default()
+    });
+    let login_frames = build_logined_sequence_session(&session);
+    let clear_idx = login_frames.iter().position(|f| f == "F44402001E08").expect("1E 08 clear frame present");
+    let dump_idx = login_frames.iter().position(|f| f.contains("1E01")).expect("1E 01 dump frame present");
+    assert_eq!(clear_idx + 1, dump_idx, "1E 08 mass clear must immediately precede 1E 01 dump");
+
+    conn.session.tientrang.push(InventoryItem {
+        slot: 1,
+        id: 10001,
+        count: 5,
+        ..Default::default()
+    });
+    let mut out_tt_wdr = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out_tt_wdr,
+            opcode: 0x1E,
+            sub: 1,
+            payload: &[0x01],
+            decoded: &[],
+            env,
+        };
+        handle_storage_transfer(&mut ctx).await;
+    }
+    let tt_wdr_frames: Vec<String> = out_tt_wdr.outgoing.into_iter().map(|f| f.frame).collect();
+    assert!(tt_wdr_frames.iter().any(|f| f == "F44404001E050105"), "Withdraw from tientrang must emit 1E 05");
+
+    // 3. Trangbi: dump_trangbi produces 10 bytes/record without slot byte
+    session.trangbi.push(InventoryItem {
+        slot: 1,
+        id: 11001,
+        count: 1,
+        long_val: 2,
+        giatri_long: 3,
+        khang: 4,
+        texp: 50,
+        ..Default::default()
+    });
+    let trangbi_dump = session.dump_trangbi();
+    assert!(trangbi_dump.starts_with("F4440C00170B"));
+}
+
+// =========================================================================
+// Test 9: Zero 020B Red Message Toast (Ticket 05, 07)
+// =========================================================================
+#[tokio::test]
+async fn test_zero_020b_red_message_toast() {
+    let data = GameData::default();
+    let service = BattleService::default();
+    let env = ServerEnv::none();
+
+    let mut conn = create_test_conn(6001, 6001);
+    conn.session.gold = 0;
+
+    let mut out1 = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out1,
+            opcode: 0x1B,
+            sub: 1,
+            payload: &[0x00, 0x05, 0x00],
+            decoded: &[],
+            env,
+        };
+        handle_npc_shop(&mut ctx).await;
+    }
+    for f in &out1.outgoing {
+        assert!(!f.frame.contains("020B"), "NPC buy error must not contain 020B: {}", f.frame);
+    }
+
+    let mut out2 = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out2,
+            opcode: 0x17,
+            sub: 33,
+            payload: &[0x99, 0x99, 0x00, 0x00, 0x01, 0x01],
+            decoded: &[],
+            env,
+        };
+        handle_player_shop(&mut ctx).await;
+    }
+    for f in &out2.outgoing {
+        assert!(!f.frame.contains("020B"), "Stall buy error must not contain 020B: {}", f.frame);
+    }
+
+    conn.session.gold = GOLD_CAP;
+    let mut out3 = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out3,
+            opcode: 0x1D,
+            sub: 1,
+            payload: &1000u32.to_le_bytes(),
+            decoded: &[],
+            env,
+        };
+        handle_bank_gold(&mut ctx).await;
+    }
+    for f in &out3.outgoing {
+        assert!(!f.frame.contains("020B"), "Bank overflow must not contain 020B: {}", f.frame);
+    }
+
+    // 4. sys_msg_frame must emit channel 020102 and never 020B
+    let sys_msg = ts_dream::server::spawn::sys_msg_frame("Thong bao he thong");
+    assert!(!sys_msg.contains("020B"), "sys_msg_frame must not contain 020B: {}", sys_msg);
+    assert!(sys_msg.contains("020102"), "sys_msg_frame must use channel 020102: {}", sys_msg);
+}
+
+#[tokio::test]
+async fn test_player_stall_open_rejects_exceeding_gold_cap() {
+    let data = GameData::default();
+    let service = BattleService::default();
+    let env = ServerEnv::none();
+
+    let mut conn = create_test_conn(9901, 9901);
+    conn.session.homdo.push(InventoryItem {
+        slot: 1,
+        id: 10001,
+        count: 10,
+        ..Default::default()
+    });
+
+    let mut payload = vec![0u8; 100];
+    payload[0] = 1; // slot 1
+    payload[1] = 1; // qty 1
+    // Price exceeds GOLD_CAP (10_000_000 > 9_999_999)
+    payload[2..6].copy_from_slice(&10_000_000u32.to_le_bytes());
+    payload.push(6); // name_len
+    payload.extend_from_slice(b"MyShop");
+    payload.push(0); // image
+
+    let mut out = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out,
+            opcode: 0x17,
+            sub: 30,
+            payload: &payload,
+            decoded: &[],
+            env,
+        };
+        handle_player_shop(&mut ctx).await;
+    }
+
+    assert_eq!(out.outgoing.len(), 1);
+    assert_eq!(out.outgoing[0].frame, "F4440300171E02", "Must reject price exceeding GOLD_CAP with 17 1E 02");
+    assert!(!conn.session.shop.active);
+}
+
+#[tokio::test]
+async fn test_storage_partial_quantity_and_no_collateral_transfer() {
+    let data = GameData::default();
+    let service = BattleService::default();
+    let env = ServerEnv::none();
+
+    let mut conn = create_test_conn(8801, 8801);
+    // HomDo has item in slot 1 (count 15) AND item in slot 5 (count 1)
+    conn.session.homdo.push(InventoryItem {
+        slot: 1,
+        id: 26001,
+        count: 15,
+        doben: 100,
+        ..Default::default()
+    });
+    conn.session.homdo.push(InventoryItem {
+        slot: 5,
+        id: 55555, // Collateral item that must NOT be touched
+        count: 1,
+        doben: 100,
+        ..Default::default()
+    });
+
+    // 1. Deposit 5 units from slot 1: payload is [slot=1, qty=5]
+    let dep_payload = [0x01, 0x05];
+    let mut out_dep = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out_dep,
+            opcode: 0x1E,
+            sub: 2, // STORAGE_SUB_DEPOSIT
+            payload: &dep_payload,
+            decoded: &[],
+            env,
+        };
+        handle_storage_transfer(&mut ctx).await;
+    }
+
+    let dep_frames: Vec<String> = out_dep.outgoing.into_iter().map(|f| f.frame).collect();
+    // Verify: slot 1 had 5 deducted (F444040017090105)
+    assert!(
+        dep_frames.iter().any(|f| f == "F444040017090105"),
+        "Must send 17 09 01 05 for 5 units deposited: found {:?}",
+        dep_frames
+    );
+    // Verify: 1E 02 frame emitted for 5 units (count = 0x05)
+    assert!(
+        dep_frames.iter().any(|f| f == "F4440D001E029165056400640000000000"),
+        "Must send 1E 02 with count 5: found {:?}",
+        dep_frames
+    );
+    // Verify: slot 5 item was NOT touched at all!
+    assert!(
+        !dep_frames.iter().any(|f| f.contains("170905")),
+        "Collateral slot 5 must NOT have 17 09 emitted: found {:?}",
+        dep_frames
+    );
+    let homdo_slot1 = conn.session.homdo.iter().find(|i| i.slot == 1).expect("slot 1 exists");
+    assert_eq!(homdo_slot1.count, 10, "Homdo slot 1 should retain 10 units (15 - 5)");
+    let homdo_slot5 = conn.session.homdo.iter().find(|i| i.slot == 5).expect("slot 5 untouched");
+    assert_eq!(homdo_slot5.id, 55555, "Slot 5 collateral item must remain intact");
+
+    assert_eq!(conn.session.tientrang.len(), 1);
+    assert_eq!(conn.session.tientrang[0].count, 5, "TienTrang should have received 5 units");
+
+    // 2. Withdraw 2 units from TienTrang: payload is [tientrang_slot=1, qty=2]
+    let tt_slot = conn.session.tientrang[0].slot;
+    let wdr_payload = [tt_slot, 0x02];
+    let mut out_wdr = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out_wdr,
+            opcode: 0x1E,
+            sub: 1, // STORAGE_SUB_WITHDRAW
+            payload: &wdr_payload,
+            decoded: &[],
+            env,
+        };
+        handle_storage_transfer(&mut ctx).await;
+    }
+
+    let wdr_frames: Vec<String> = out_wdr.outgoing.into_iter().map(|f| f.frame).collect();
+    // Verify: 1E 05 emitted for slot 1 with qty 2: F44404001E050102
+    assert!(
+        wdr_frames.iter().any(|f| f == "F44404001E050102"),
+        "Must send 1E 05 01 02: found {:?}",
+        wdr_frames
+    );
+    // TienTrang should retain 3 units (5 - 2)
+    assert_eq!(conn.session.tientrang.len(), 1);
+    assert_eq!(conn.session.tientrang[0].count, 3);
+}
+
+// =========================================================================
+// Test 21: P2P Trade Invite Error Wire Parity (Ticket 09)
+// =========================================================================
+#[tokio::test]
+async fn test_p2p_trade_invite_error_wire_parity() {
+    let data = GameData::default();
+    let service = BattleService::default();
+    let env = ServerEnv::none();
+
+    let p1_id = 7301u32;
+    let offline_p2_id = 7302u32;
+    let busy_p3_id = 7303u32;
+
+    // Ensure neither is in online sessions initially
+    {
+        let mut sessions = lock_online_sessions();
+        sessions.remove(&offline_p2_id);
+        sessions.remove(&busy_p3_id);
+    }
+
+    let mut conn1 = create_test_conn(p1_id, p1_id as i64);
+
+    // 1. Invite offline player -> S->C 19 02 01
+    let mut out_offline = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn1,
+            data: &data,
+            service: &service,
+            out: &mut out_offline,
+            opcode: 0x19,
+            sub: ts_dream::protocol::TRADE_SUB_INVITE_CS, // 0x01
+            payload: &offline_p2_id.to_le_bytes(),
+            decoded: &[],
+            env,
+        };
+        handle_trade(&mut ctx).await;
+    }
+    let offline_frames: Vec<String> = out_offline.outgoing.into_iter().map(|f| f.frame).collect();
+    assert!(
+        offline_frames.iter().any(|f| f == "F4440300190201"),
+        "Inviting offline target must emit 19 02 01 toast, got: {:?}",
+        offline_frames
+    );
+    assert!(!conn1.session.trade.active);
+
+    // 2. Put busy_p3 online with active trade -> S->C 19 02 02
+    {
+        let mut sessions = lock_online_sessions();
+        let mut s3 = Session::default();
+        s3.id = busy_p3_id;
+        s3.trade.active = true;
+        s3.trade.partner_id = 9999;
+        sessions.insert(busy_p3_id, s3);
+    }
+
+    let mut out_busy = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn1,
+            data: &data,
+            service: &service,
+            out: &mut out_busy,
+            opcode: 0x19,
+            sub: ts_dream::protocol::TRADE_SUB_INVITE_CS,
+            payload: &busy_p3_id.to_le_bytes(),
+            decoded: &[],
+            env,
+        };
+        handle_trade(&mut ctx).await;
+    }
+    let busy_frames: Vec<String> = out_busy.outgoing.into_iter().map(|f| f.frame).collect();
+    assert!(
+        busy_frames.iter().any(|f| f == "F4440300190202"),
+        "Inviting busy target must emit 19 02 02 toast, got: {:?}",
+        busy_frames
+    );
+    assert!(!conn1.session.trade.active);
+
+    // 3. Inviting self without being in registry -> S->C 19 02 02
+    {
+        let mut sessions = lock_online_sessions();
+        sessions.remove(&p1_id);
+    }
+    let mut out_self = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn1,
+            data: &data,
+            service: &service,
+            out: &mut out_self,
+            opcode: 0x19,
+            sub: ts_dream::protocol::TRADE_SUB_INVITE_CS,
+            payload: &p1_id.to_le_bytes(),
+            decoded: &[],
+            env,
+        };
+        handle_trade(&mut ctx).await;
+    }
+    let self_frames: Vec<String> = out_self.outgoing.into_iter().map(|f| f.frame).collect();
+    assert!(
+        self_frames.iter().any(|f| f == "F4440300190202"),
+        "Inviting self must emit 19 02 02 toast even if not in registry, got: {:?}",
+        self_frames
+    );
+
+    // 4. Inviting someone while sender is already busy in trade -> S->C 19 02 02
+    conn1.session.trade.active = true;
+    let mut out_sender_busy = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn1,
+            data: &data,
+            service: &service,
+            out: &mut out_sender_busy,
+            opcode: 0x19,
+            sub: ts_dream::protocol::TRADE_SUB_INVITE_CS,
+            payload: &offline_p2_id.to_le_bytes(),
+            decoded: &[],
+            env,
+        };
+        handle_trade(&mut ctx).await;
+    }
+    let sender_busy_frames: Vec<String> = out_sender_busy.outgoing.into_iter().map(|f| f.frame).collect();
+    assert!(
+        sender_busy_frames.iter().any(|f| f == "F4440300190202"),
+        "Inviting while sender is already busy in trade must emit 19 02 02 toast, got: {:?}",
+        sender_busy_frames
+    );
+    conn1.session.trade.active = false;
+}
+
+// =========================================================================
+// Test 22: P2P Trade Timeout Emits 19 04 and 19 02 03 Toast to Both Players (Ticket 09)
+// =========================================================================
+#[tokio::test]
+async fn test_p2p_trade_timeout_emits_close_and_toast_both_players() {
+    let p1_id = 7401u32;
+    let p2_id = 7402u32;
+
+    let app = std::sync::Arc::new(tokio::sync::RwLock::new(ts_dream::state::AppState::new(100)));
+    let control = ts_dream::web::server_control::ServerControl::new(19250, app, None, None);
+
+    let (p2_tx, mut p2_rx) = tokio::sync::mpsc::channel(16);
+    let registered = control.login_register(p2_id, &p2_tx).await;
+    assert!(registered, "Must register p2 in control");
+
+    let mut conn1 = create_test_conn(p1_id, p1_id as i64);
+    conn1.session.trade = ts_dream::server::session::TradeState {
+        active: true,
+        partner_id: p2_id,
+        started_at_ms: 1_000, // Long expired
+        ..Default::default()
+    };
+
+    let mut s2 = Session::default();
+    s2.id = p2_id;
+    s2.trade = ts_dream::server::session::TradeState {
+        active: true,
+        partner_id: p1_id,
+        started_at_ms: 1_000,
+        ..Default::default()
+    };
+    {
+        let mut sessions = lock_online_sessions();
+        sessions.insert(p2_id, s2);
+    }
+
+    let mut out1 = HandleOutcome::default();
+    let cancelled = cancel_timed_out_trade(&mut conn1.session, &mut out1, Some(&control)).await;
+    assert!(cancelled, "Must cancel timed out trade");
+    assert!(!conn1.session.trade.active, "p1 trade must be inactive");
+
+    // Check frames emitted to p1 (local)
+    let p1_frames: Vec<String> = out1.outgoing.into_iter().map(|f| f.frame).collect();
+    assert!(
+        p1_frames.iter().any(|f| f == "F44402001904"),
+        "p1 must receive 19 04 close trade form, got: {:?}",
+        p1_frames
+    );
+    assert!(
+        p1_frames.iter().any(|f| f == "F4440300190203"),
+        "p1 must receive 19 02 03 cancel toast, got: {:?}",
+        p1_frames
+    );
+
+    // Check frames emitted to p2 via hub
+    let mut p2_frames = Vec::new();
+    while let Ok(frame) = p2_rx.try_recv() {
+        p2_frames.push(frame);
+    }
+    assert!(
+        p2_frames.iter().any(|f| f == "F44402001904"),
+        "p2 must receive 19 04 close trade form via hub, got: {:?}",
+        p2_frames
+    );
+    assert!(
+        p2_frames.iter().any(|f| f == "F4440300190203"),
+        "p2 must receive 19 02 03 cancel toast via hub, got: {:?}",
+        p2_frames
+    );
+
+    // Check registry state for p2
+    let s2_after = lock_online_sessions().get(&p2_id).cloned().expect("p2 in registry");
+    assert!(!s2_after.trade.active, "p2 trade must be reset in registry");
+}
+
+// =========================================================================
+// Test 23: Natural 2-Party P2P Trade Flow & Offline Partner Recovery
+// =========================================================================
+#[tokio::test]
+async fn test_p2p_trade_natural_flow_and_partner_offline_recovery() {
+    let data = GameData::default();
+    let service = BattleService::default();
+    let env = ServerEnv::none();
+
+    let p1_id = 7501u32;
+    let p2_id = 7502u32;
+
+    let mut conn1 = create_test_conn(p1_id, p1_id as i64);
+    conn1.session.gold = 5_000;
+    conn1.session.homdo.push(InventoryItem {
+        slot: 1,
+        id: 11111,
+        count: 3,
+        ..Default::default()
+    });
+
+    let mut conn2 = create_test_conn(p2_id, p2_id as i64);
+    conn2.session.gold = 10_000;
+    conn2.session.homdo.push(InventoryItem {
+        slot: 1,
+        id: 22222,
+        count: 1,
+        ..Default::default()
+    });
+
+    // Register both players as online initially
+    {
+        let mut sessions = lock_online_sessions();
+        sessions.insert(p1_id, conn1.session.clone());
+        sessions.insert(p2_id, conn2.session.clone());
+    }
+
+    // 1. P1 invites P2 via 19 01
+    let mut out1_invite = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn1,
+            data: &data,
+            service: &service,
+            out: &mut out1_invite,
+            opcode: 0x19,
+            sub: ts_dream::protocol::TRADE_SUB_INVITE_CS,
+            payload: &p2_id.to_le_bytes(),
+            decoded: &[],
+            env,
+        };
+        handle_trade(&mut ctx).await;
+    }
+    assert!(conn1.session.trade.active, "P1 trade should be active");
+    assert_eq!(conn1.session.trade.partner_id, p2_id);
+
+    // Sync conn2's session from registry where P1 set P2's trade state
+    conn2.session = lock_online_sessions().get(&p2_id).cloned().unwrap();
+    assert!(conn2.session.trade.active, "P2 trade should be active in registry");
+    assert_eq!(conn2.session.trade.partner_id, p1_id);
+
+    // 2. P1 offers 500 gold and item 11111 (slot 1, qty 2)
+    let mut offer1_payload = Vec::new();
+    offer1_payload.extend_from_slice(&500u32.to_le_bytes());
+    offer1_payload.push(1);
+    offer1_payload.push(2);
+    offer1_payload.extend_from_slice(&[0u8; 8]);
+    let mut out1_offer = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn1,
+            data: &data,
+            service: &service,
+            out: &mut out1_offer,
+            opcode: 0x19,
+            sub: 2,
+            payload: &offer1_payload,
+            decoded: &[],
+            env,
+        };
+        handle_trade(&mut ctx).await;
+    }
+
+    // 3. P2 offers 1,000 gold and item 22222 (slot 1, qty 1)
+    let mut offer2_payload = Vec::new();
+    offer2_payload.extend_from_slice(&1_000u32.to_le_bytes());
+    offer2_payload.push(1);
+    offer2_payload.push(1);
+    offer2_payload.extend_from_slice(&[0u8; 8]);
+    let mut out2_offer = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn2,
+            data: &data,
+            service: &service,
+            out: &mut out2_offer,
+            opcode: 0x19,
+            sub: 2,
+            payload: &offer2_payload,
+            decoded: &[],
+            env,
+        };
+        handle_trade(&mut ctx).await;
+    }
+
+    // 4. P1 confirms (action == 1) - Note: NO manual sessions.insert!
+    let mut out1_confirm = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn1,
+            data: &data,
+            service: &service,
+            out: &mut out1_confirm,
+            opcode: 0x19,
+            sub: 3,
+            payload: &[0x01],
+            decoded: &[],
+            env,
+        };
+        handle_trade(&mut ctx).await;
+    }
+    assert!(conn1.session.trade.accepted, "P1 should be accepted");
+
+    // 5. P2 confirms (action == 1) - Should settle automatically!
+    let mut out2_confirm = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn2,
+            data: &data,
+            service: &service,
+            out: &mut out2_confirm,
+            opcode: 0x19,
+            sub: 3,
+            payload: &[0x01],
+            decoded: &[],
+            env,
+        };
+        handle_trade(&mut ctx).await;
+    }
+    let conf2_frames: Vec<String> = out2_confirm.outgoing.into_iter().map(|f| f.frame).collect();
+    assert!(conf2_frames.iter().any(|f| f == "F4440300190204"), "Must send 19 02 04 success toast");
+    assert!(conf2_frames.iter().any(|f| f == "F44402001904"), "Must send 19 04 close form");
+    assert!(!conn2.session.trade.active, "P2 trade state must be reset");
+
+    // Check balances on P2: started with 10k, offered 1k, received 500 = 9,500
+    assert_eq!(conn2.session.gold, 9_500);
+    // P2 received item 11111 (count 2)
+    assert!(conn2.session.homdo.iter().any(|i| i.id == 11111 && i.count == 2));
+
+    // Verify P1 in registry settled as well
+    let s1_after = lock_online_sessions().get(&p1_id).cloned().expect("p1 in registry");
+    assert!(!s1_after.trade.active, "P1 trade state in registry must be reset");
+    assert_eq!(s1_after.gold, 5_000 - 500 + 1_000); // 5,500
+    assert!(s1_after.homdo.iter().any(|i| i.id == 22222 && i.count == 1));
+
+    // 6. Test Recovery when Partner vanishes midway through trade:
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+    let mut conn_solo = create_test_conn(7601, 7601);
+    conn_solo.session.trade = ts_dream::server::session::TradeState {
+        active: true,
+        partner_id: 9999, // offline
+        started_at_ms: now_ms, // current time (not timed out)
+        ..Default::default()
+    };
+    let mut out_vanished = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn_solo,
+            data: &data,
+            service: &service,
+            out: &mut out_vanished,
+            opcode: 0x19,
+            sub: 3,
+            payload: &[0x01], // Confirm attempt
+            decoded: &[],
+            env,
+        };
+        handle_trade(&mut ctx).await;
+    }
+    let vanished_frames: Vec<String> = out_vanished.outgoing.into_iter().map(|f| f.frame).collect();
+    assert!(
+        vanished_frames.iter().any(|f| f == "F44402001904"),
+        "Must emit 19 04 to close trade form when partner vanished, got: {:?}",
+        vanished_frames
+    );
+    assert!(
+        vanished_frames.iter().any(|f| f == "F4440300190201"),
+        "Must emit 19 02 01 toast (offline) when partner vanished, got: {:?}",
+        vanished_frames
+    );
+    assert!(!conn_solo.session.trade.active, "Solo session trade must be deactivated");
+}
+

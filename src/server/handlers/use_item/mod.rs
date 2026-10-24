@@ -173,11 +173,9 @@ impl UseCtx<'_> {
         self.out.send("F4440200170F".to_string());
     }
 
-    /// VISCII-encoded red message frame (`F444 + len + 020B + 00000000 + msg`).
+    /// VISCII-encoded system message frame via channel `020102`.
     pub fn red(&mut self, msg: &str) {
-        let visc = crate::encoding::viscii_encode(msg);
-        let body = format!("00000000{}", encoder::strhex(&visc));
-        self.out.send(crate::protocol::frame("020B", &body));
+        self.out.send(crate::server::spawn::sys_msg_frame(msg));
     }
 
     /// Sleep-equivalent for items 46036 and 46167: send the sleep frames, full-heal

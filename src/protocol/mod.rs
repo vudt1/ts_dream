@@ -149,6 +149,7 @@ pub const OP_SCENE_MANAGE: u8 = OP_TRADE;
 
 /// Trade sub-opcodes (opcode `0x19`).
 pub const TRADE_SUB_REQUEST: u8 = 0x01;
+pub const TRADE_SUB_INVITE_CS: u8 = 0x01;
 pub const TRADE_SUB_OFFER_CS: u8 = 0x02;
 pub const TRADE_SUB_CONFIRM_CS: u8 = 0x03;
 pub const TRADE_SUB_STATUS: u8 = 0x02;
@@ -168,10 +169,10 @@ pub const OP_TALK: u8 = OP_MONEY_SYNC;
 /// MoneySync sub-opcodes (opcode `0x1A`).
 pub const MONEY_SUB_ADD_GOLD: u8 = 0x01;
 pub const MONEY_SUB_SUB_GOLD: u8 = 0x02;
-pub const MONEY_SUB_CAPACITY_FULL: u8 = 0x03;
+pub const MONEY_SUB_SET_POINT: u8 = 0x03;
 pub const MONEY_SUB_SYNC_BALANCE: u8 = 0x04;
 pub const MONEY_SUB_ADD_POINTS: u8 = 0x05;
-pub const MONEY_SUB_SUB_POINTS: u8 = 0x06;
+pub const MONEY_SUB_CAPACITY_FULL: u8 = 0x06;
 pub const MONEY_SUB_BANNER: u8 = 0x07;
 
 /// [0x1B] NpcShop — mua/bán NPC (Shared)
