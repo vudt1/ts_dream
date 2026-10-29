@@ -24,6 +24,27 @@ pub struct CellInfo {
     pub type4_id: i64,
 }
 
+/// The isometric column adjacency sequence across the 5 slots on a row:
+/// `0 <-> 1 <-> 2 <-> 4 <-> 3` (where slot 2 is the center).
+pub const ISOMETRIC_COL_SEQ: [u8; 5] = [0, 1, 2, 4, 3];
+
+/// Returns the adjacent column neighbors on the isometric diagonal for a given column slot (0..4).
+/// - 0: [1]
+/// - 1: [0, 2]
+/// - 2: [1, 4]
+/// - 4: [2, 3]
+/// - 3: [4]
+pub fn isometric_col_neighbors(col: u8) -> &'static [u8] {
+    match col {
+        0 => &[1],
+        1 => &[0, 2],
+        2 => &[1, 4],
+        4 => &[2, 3],
+        3 => &[4],
+        _ => &[],
+    }
+}
+
 /// Resolve attack targets by `fight_area` values 1–8.
 ///
 /// For single/column/row/jump/cross/six/row-five, the positions are expanded
@@ -58,42 +79,46 @@ pub fn get_pos_attack_by_fight_area(
         2 => {
             let mut targets = Vec::new();
             push_if_alive(&mut targets, row as i16, col as i16);
-            push_if_alive(&mut targets, row as i16 - 1, col as i16);
-            if targets.len() < 2 {
-                push_if_alive(&mut targets, row as i16 + 1, col as i16);
-            }
+            let opp = (row ^ 1) as i16;
+            push_if_alive(&mut targets, opp, col as i16);
             targets
         }
         3 => {
             let mut targets = Vec::new();
-            for cell in cells
-                .iter()
-                .filter(|cell| cell.row == row && cell.id > 0 && cell.hp > 0 && cell.team != myteam)
-            {
-                targets.push(GridPos::new(cell.row, cell.col));
+            push_if_alive(&mut targets, row as i16, col as i16);
+            for &nc in isometric_col_neighbors(col) {
+                push_if_alive(&mut targets, row as i16, nc as i16);
             }
-            targets.into_iter().take(3).collect()
+            targets
         }
         4 => {
             let mut targets = Vec::new();
             push_if_alive(&mut targets, row as i16, col as i16);
-            push_if_alive(&mut targets, row as i16 - 2, col as i16);
-            push_if_alive(&mut targets, row as i16 + 2, col as i16);
+            for &nc in isometric_col_neighbors(col) {
+                push_if_alive(&mut targets, row as i16, nc as i16);
+            }
             targets
         }
         5 => {
             let mut targets = Vec::new();
             push_if_alive(&mut targets, row as i16, col as i16);
-            push_if_alive(&mut targets, row as i16 - 1, col as i16);
-            push_if_alive(&mut targets, row as i16 + 1, col as i16);
-            push_if_alive(&mut targets, row as i16, col as i16 - 1);
-            push_if_alive(&mut targets, row as i16, col as i16 + 1);
+            for &nc in isometric_col_neighbors(col) {
+                push_if_alive(&mut targets, row as i16, nc as i16);
+            }
+            let opp = (row ^ 1) as i16;
+            push_if_alive(&mut targets, opp, col as i16);
             targets
         }
         6 => {
             let mut targets = Vec::new();
-            for r in 0..4 {
-                push_if_alive(&mut targets, r, col as i16);
+            push_if_alive(&mut targets, row as i16, col as i16);
+            for &nc in isometric_col_neighbors(col) {
+                push_if_alive(&mut targets, row as i16, nc as i16);
+            }
+            let opp = (row ^ 1) as i16;
+            push_if_alive(&mut targets, opp, col as i16);
+            for &nc in isometric_col_neighbors(col) {
+                push_if_alive(&mut targets, opp, nc as i16);
             }
             targets
         }
@@ -190,25 +215,17 @@ where
         }
         3 => {
             targets.push(anchor);
-            if c > 0 && alive_at(r, c - 1) {
-                targets.push(GridPos::new(r, c - 1));
-            }
-            if c < 4 && alive_at(r, c + 1) {
-                targets.push(GridPos::new(r, c + 1));
+            for &nc in isometric_col_neighbors(c) {
+                if alive_at(r, nc) {
+                    targets.push(GridPos::new(r, nc));
+                }
             }
         }
         4 => {
             targets.push(anchor);
-            if c > 0 {
-                targets.push(if alive_at(r, c - 1) {
-                    GridPos::new(r, c - 1)
-                } else {
-                    anchor
-                });
-            }
-            if c < 4 {
-                targets.push(if alive_at(r, c + 1) {
-                    GridPos::new(r, c + 1)
+            for &nc in isometric_col_neighbors(c) {
+                targets.push(if alive_at(r, nc) {
+                    GridPos::new(r, nc)
                 } else {
                     anchor
                 });
@@ -216,11 +233,10 @@ where
         }
         5 => {
             targets.push(anchor);
-            if c > 0 && alive_at(r, c - 1) {
-                targets.push(GridPos::new(r, c - 1));
-            }
-            if c < 4 && alive_at(r, c + 1) {
-                targets.push(GridPos::new(r, c + 1));
+            for &nc in isometric_col_neighbors(c) {
+                if alive_at(r, nc) {
+                    targets.push(GridPos::new(r, nc));
+                }
             }
             let opp = r ^ 1;
             if alive_at(opp, c) {
@@ -229,21 +245,19 @@ where
         }
         6 => {
             targets.push(anchor);
-            if c > 0 && alive_at(r, c - 1) {
-                targets.push(GridPos::new(r, c - 1));
-            }
-            if c < 4 && alive_at(r, c + 1) {
-                targets.push(GridPos::new(r, c + 1));
+            for &nc in isometric_col_neighbors(c) {
+                if alive_at(r, nc) {
+                    targets.push(GridPos::new(r, nc));
+                }
             }
             let opp = r ^ 1;
             if alive_at(opp, c) {
                 targets.push(GridPos::new(opp, c));
             }
-            if c > 0 && alive_at(opp, c - 1) {
-                targets.push(GridPos::new(opp, c - 1));
-            }
-            if c < 4 && alive_at(opp, c + 1) {
-                targets.push(GridPos::new(opp, c + 1));
+            for &nc in isometric_col_neighbors(c) {
+                if alive_at(opp, nc) {
+                    targets.push(GridPos::new(opp, nc));
+                }
             }
         }
         7 => {

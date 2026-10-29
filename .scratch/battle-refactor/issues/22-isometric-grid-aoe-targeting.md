@@ -4,9 +4,9 @@
 
 **Blocked by:** 19: Phục hồi kênh lệnh chiến đấu 0x32 Sub 01/02 và Domain Enum BattleAction, 20: Tái cấu trúc vòng đời lượt đấu và đồng bộ timing mở hiệp 34 01
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] Cập nhật nhánh `3 =>` trong `expand_sl_danh` tuân thủ đúng thứ tự kề cận Isometric: tâm `2` lấy `{1, 2, 4}`, tâm `1` lấy `{0, 1, 2}`, tâm `4` lấy `{2, 3, 4}`, tâm `0` lấy `{0, 1}`, tâm `3` lấy `{3, 4}`.
-- [ ] Rà soát và đồng bộ các nhánh mở rộng khác (`sl_danh = 2, 5, 6`) bảo đảm tính đối xứng qua trục Isometric.
-- [ ] Bộ kiểm thử trong `tests/` (ví dụ `tests/battle_isometric_targeting_test.rs`) xác nhận danh sách ô mục tiêu trúng đòn khớp 100% với vùng highlight của client.
-- [ ] `cargo test --all-targets --no-fail-fast` vượt qua 100%.
+- [x] Cập nhật nhánh `3 =>` trong `expand_sl_danh` tuân thủ đúng thứ tự kề cận Isometric: tâm `2` lấy `{1, 2, 4}`, tâm `1` lấy `{0, 1, 2}`, tâm `4` lấy `{2, 3, 4}`, tâm `0` lấy `{0, 1}`, tâm `3` lấy `{3, 4}`.
+- [x] Rà soát và đồng bộ các nhánh mở rộng khác (`sl_danh = 2, 5, 6`) bảo đảm tính đối xứng qua trục Isometric.
+- [x] Bộ kiểm thử trong `tests/` (ví dụ `tests/battle_isometric_targeting_test.rs`) xác nhận danh sách ô mục tiêu trúng đòn khớp 100% với vùng highlight của client.
+- [x] `cargo test --all-targets --no-fail-fast` vượt qua 100%.

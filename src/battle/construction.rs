@@ -40,6 +40,12 @@ pub struct Battle {
     /// The designated quan-su member's `Int + Int2` sum for the per-turn SP
     /// regen block, captured at spawn.
     pub leader_qs_int: i64,
+    /// Optional opening NPC dialogue ID (emitted on turn 1 via 35 06).
+    pub opening_dialog: Option<u16>,
+    /// Tracks if opening dialog was already broadcast.
+    pub opening_dialog_sent: bool,
+    /// Dynamic Skill Delay Pacing for the last executed turn (in ms).
+    pub last_turn_delay_ms: u64,
 }
 
 impl Battle {
@@ -54,6 +60,9 @@ impl Battle {
             list_qs: HashMap::with_capacity(50),
             leader_id_qs: 0,
             leader_qs_int: 0,
+            opening_dialog: None,
+            opening_dialog_sent: false,
+            last_turn_delay_ms: 800,
         };
 
         // Create 20 cells (row 0..3, col 0..4)
@@ -83,6 +92,22 @@ impl Battle {
         let mut b = Self::new(id_battle, diahinh);
         b.rng = BattleRng::with_seeds(s0, s1, s2);
         b
+    }
+
+    /// Set an opening NPC dialogue ID builder-style.
+    pub fn with_opening_dialog(mut self, dialog_id: u16) -> Self {
+        self.opening_dialog = Some(dialog_id);
+        self
+    }
+
+    /// Set an opening NPC dialogue ID.
+    pub fn set_opening_dialog(&mut self, dialog_id: u16) {
+        self.opening_dialog = Some(dialog_id);
+    }
+
+    /// Return the Dynamic Skill Delay Pacing of the last executed turn in ms.
+    pub fn last_turn_delay_ms(&self) -> u64 {
+        self.last_turn_delay_ms
     }
 
     /// Add a player to the battle grid.

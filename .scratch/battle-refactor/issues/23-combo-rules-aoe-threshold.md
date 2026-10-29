@@ -6,11 +6,11 @@
 
 **Blocked by:** 19: Phục hồi kênh lệnh chiến đấu 0x32 Sub 01/02 và Domain Enum BattleAction, 20: Tái cấu trúc vòng đời lượt đấu và đồng bộ timing mở hiệp 34 01
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] Cập nhật `detect_combo` trong `runner.rs` để kiểm tra thuộc tính `nbTarget <= 3` của cả đấu sĩ ra đòn trước và đấu sĩ liên kích tiếp theo.
-- [ ] Chặn tuyệt đối không tạo combo nếu kỹ năng của một trong hai bên có `nbTarget >= 4`.
-- [ ] Viết integration test trong `tests/battle_combo_rules_test.rs` mô phỏng các cặp đấu sĩ cùng Agi:
+- [x] Cập nhật `detect_combo` trong `runner.rs` để kiểm tra thuộc tính `nbTarget <= 3` của cả đấu sĩ ra đòn trước và đấu sĩ liên kích tiếp theo.
+- [x] Chặn tuyệt đối không tạo combo nếu kỹ năng của một trong hai bên có `nbTarget >= 4`.
+- [x] Viết integration test trong `tests/battle_combo_rules_test.rs` mô phỏng các cặp đấu sĩ cùng Agi:
   - Cặp dùng Đánh thường + Ném đá (AoE 3): kích hoạt Combo thành công.
   - Cặp dùng Đánh thường + Loạn kích (AoE 4): bị từ chối Combo, đánh độc lập.
-- [ ] `cargo test --all-targets --no-fail-fast` vượt qua 100%.
+- [x] `cargo test --all-targets --no-fail-fast` vượt qua 100%.

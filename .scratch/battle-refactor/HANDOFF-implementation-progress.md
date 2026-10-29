@@ -35,17 +35,16 @@
 | 15 | [`issues/15-0b-fa-self-kind-04.md`](issues/15-0b-fa-self-kind-04.md) | ✅ completed | Marker self `0B FA` = `04` |
 | 16 | [`issues/16-35-06-battle-npc-talk-builder.md`](issues/16-35-06-battle-npc-talk-builder.md) | ✅ completed | Builder `35 06` thoại NPC / banner trận |
 | 17 | [`issues/17-35-0b-battle-chat-notice-builder.md`](issues/17-35-0b-battle-chat-notice-builder.md) | ✅ completed | Builder `35 0B` chat / thông báo trận đấu |
-| 18 | [`issues/18-battle-0x35-timing-wiring.md`](issues/18-battle-0x35-timing-wiring.md) | ⏳ ready-for-agent | Đấu nối timing `0x35` + dynamic delay pacing |
+| 18 | [`issues/18-battle-0x35-timing-wiring.md`](issues/18-battle-0x35-timing-wiring.md) | ✅ completed | Đấu nối timing `0x35` (4 pha) + dynamic delay pacing |
 | 19 | [`issues/19-restore-0x32-command-channel.md`](issues/19-restore-0x32-command-channel.md) | ✅ completed | Phục hồi kênh 0x32 Sub 01/02 + enum BattleAction |
 | 20 | [`issues/20-turn-lifecycle-timing-and-34-01.md`](issues/20-turn-lifecycle-timing-and-34-01.md) | ✅ completed | Barrier ack 0B FA 1.5s + phát 34 01 đầu hiệp |
 | 21 | [`issues/21-turn-action-finish-32-02-frame.md`](issues/21-turn-action-finish-32-02-frame.md) | ✅ completed | Builder 32 02 turn_action_finish |
-| 22 | [`issues/22-isometric-grid-aoe-targeting.md`](issues/22-isometric-grid-aoe-targeting.md) | ⏳ ready-for-agent | Chuẩn hóa lưới Isometric AoE [2, 1, 3, 0, 4] |
-| 23 | [`issues/23-combo-rules-aoe-threshold.md`](issues/23-combo-rules-aoe-threshold.md) | ⏳ ready-for-agent | Chặn kỹ năng AoE >= 4 tham gia Combo |
-| 24 | [`issues/24-capture-validation-gates.md`](issues/24-capture-validation-gates.md) | ⏳ ready-for-agent | 8 rào chắn bắt võ tướng (Lệch LV <= 5) |
+| 22 | [`issues/22-isometric-grid-aoe-targeting.md`](issues/22-isometric-grid-aoe-targeting.md) | ✅ completed | Chuẩn hóa lưới Isometric AoE [0, 1, 2, 4, 3] |
+| 23 | [`issues/23-combo-rules-aoe-threshold.md`](issues/23-combo-rules-aoe-threshold.md) | ✅ completed | Chặn kỹ năng AoE >= 4 tham gia Combo |
+| 24 | [`issues/24-capture-validation-gates.md`](issues/24-capture-validation-gates.md) | ✅ completed | 8 rào chắn bắt võ tướng (Lệch LV <= 5, kind 0x16) |
 
 **Tiến độ hiện tại**:
-- 19 ticket đã hoàn thành (02–13, 15, 16, 17, 19–21; Đợt 1 hoàn thành 100%, Đợt 2 hoàn thành 16 & 17; ticket 01 được thay thế bằng ticket 19).
-- 4 ticket sẵn sàng thực thi (`ready-for-agent`): 18 (Đợt 2 timing / wiring), 22 → 24 (Đợt 3).
+- 23 ticket đã hoàn thành (02–13, 15–24; Đợt 1 hoàn thành 100%, Đợt 2 hoàn thành 100% gồm 16, 17, 18, Đợt 3 hoàn thành 100% gồm 22, 23, 24; ticket 01 được thay thế bằng ticket 19).
 - Ticket 14 giữ nguyên cho người dùng chạy capture runtime (`ready-for-human`).
 - Đặc tả mới V2: [`spec_new.md`](spec_new.md). Quyết định kiến trúc: [`docs/adr/0006-battle-protocol-parity-and-turn-lifecycle.md`](../../docs/adr/0006-battle-protocol-parity-and-turn-lifecycle.md).
 
@@ -67,12 +66,12 @@
   - `your_turn` (`34 01`) và `turn_action_finish` (`32 02`).
 - `src/encoding.rs`:
   - Bổ sung fallback ánh xạ ký tự tiếng Việt Unicode sang VISCII 1.1 trong `char_to_viscii` và chuẩn hóa NFC trong `to_viscii`.
-- `src/battle/construction.rs` — 3 call-site dùng `team_for_row`; `member_battle_frame` marker self `05` → `04`.
+- `src/battle/construction.rs` — 3 call-site dùng `team_for_row`; `member_battle_frame` marker self `05` → `04`; thêm `opening_dialog` & tracking `last_turn_delay_ms`.
 - `src/battle/engine.rs` — helper `team_for_row(row) -> i64` (`row < 2 => 2`, ngược lại `1`); `get_hp_max`/`get_sp_max` re-derive khớp `FUN_0065a554`/`FUN_0065ad10`.
 - `src/battle/rng.rs` — stream tất định `BattleRng::random_skill` (seed `s0 + 12953`).
-- `src/battle/runner.rs` — call-site `reset_cell`; `push_level_up_rewards(...)`; `finish()` quét ô theo `team`/`typ`; bỏ `time_seeded()` ở skill 10016..10019; `drop_reward` (`35 04`).
-- `src/battle/service.rs` — `apply_gold` gửi `1A 01`; `apply_drop` gửi `17 06`; `apply_pet_exp` gửi `0F 08`; `Stat::Hpmax/Spmax → 0xCD/0xCE`.
-- `src/battle/manager.rs` — doc `op 0x32` → `0x0B`.
+- `src/battle/runner.rs` — call-site `reset_cell`; `push_level_up_rewards(...)`; `finish()` quét ô theo `team`/`typ`; bỏ `time_seeded()` ở skill 10016..10019; `drop_reward` (`35 04`); đấu nối 4 pha: Pha 1 hết hạn `clear_unit_status`/`purge_status`, Pha 2 `force_state7` trước `32 01`, Pha 3 `battle_unit_status` sau `32 01`, Pha 4 `battle_npc_talk` + dynamic skill delay pacing.
+- `src/battle/service.rs` — `apply_gold` gửi `1A 01`; `apply_drop` gửi `17 06`; `apply_pet_exp` gửi `0F 08`; `Stat::Hpmax/Spmax → 0xCD/0xCE`; khởi tạo `opening_dialog` từ `session.talking_battle`.
+- `src/battle/manager.rs` — doc `op 0x32` → `0x0B`; áp dụng dynamic sleep sau `run_turn` dựa trên `battle.last_turn_delay_ms()`.
 - `src/server/dispatcher.rs` — bỏ nhánh `OP_BATTLE_COMMAND (0x32)`.
 - `src/server/handlers/battle.rs` — `0x0B` là kênh lệnh duy nhất; parse sub 2/7/8/9/0A + log.
 - `src/server/inventory.rs` — builder chung `item_added_frame` (`17 06`, 14 byte).
@@ -83,10 +82,10 @@
 
 ### Bộ test tập trung trong `tests/`
 Toàn bộ test mới:
-`battle_command_channel_test.rs`, `battle_frames_test.rs`, `battle_cell_frames_test.rs`, `battle_item_frame_test.rs`, `battle_gold_frame_test.rs`, `battle_levelup_frames_test.rs`, `pet_stat_frame_test.rs`, `pet_recall_13_02_test.rs`, `battle_team_row_test.rs`, `battle_finish_generalization_test.rs`, `battle_rng_determinism_test.rs`, `texps_formula_test.rs`, `max_hp_sp_formula_test.rs`, `battle_state7_frame_test.rs`, `battle_status_frames_test.rs` (6 test mới cho 35 0E/0F/01), `ehuman_public_test.rs`, `battle_open_leader_test.rs`, `battle_open_self_kind_test.rs`, `battle_action_restore_test.rs` (3 test cho 32 01/02), `battle_turn_lifecycle_test.rs` (4 test cho 34 01/lifecycle), `battle_talk_notice_test.rs` (15 test cho 35 06/35 0B).
+`battle_command_channel_test.rs`, `battle_frames_test.rs`, `battle_cell_frames_test.rs`, `battle_item_frame_test.rs`, `battle_gold_frame_test.rs`, `battle_levelup_frames_test.rs`, `pet_stat_frame_test.rs`, `pet_recall_13_02_test.rs`, `battle_team_row_test.rs`, `battle_finish_generalization_test.rs`, `battle_rng_determinism_test.rs`, `texps_formula_test.rs`, `max_hp_sp_formula_test.rs`, `battle_state7_frame_test.rs`, `battle_status_frames_test.rs` (6 test mới cho 35 0E/0F/01), `ehuman_public_test.rs`, `battle_open_leader_test.rs`, `battle_open_self_kind_test.rs`, `battle_action_restore_test.rs` (3 test cho 32 01/02), `battle_turn_lifecycle_test.rs` (4 test cho 34 01/lifecycle), `battle_talk_notice_test.rs` (15 test cho 35 06/35 0B), `battle_timing_wiring_test.rs` (6 test cho 4 pha timing 0x35 & dynamic delay).
 
 ```bash
-cargo test --all-targets --no-fail-fast    # 335 passed / 0 failed (57 test binaries)
+cargo test --all-targets --no-fail-fast    # 341 passed / 0 failed (58 test binaries)
 ```
 
 ## 4. Tổng hợp phân tích làm rõ (Deep Research Findings)
@@ -137,20 +136,20 @@ cargo test --all-targets --no-fail-fast    # 335 passed / 0 failed (57 test bina
 
 ## 5. Danh sách các việc chuẩn bị làm (Upcoming Tasks)
 
-### Frontier (Sẵn sàng thực hiện ngay):
-1. **Ticket 16** ([`issues/16-35-06-battle-npc-talk-builder.md`](issues/16-35-06-battle-npc-talk-builder.md)):
-   - Xây dựng builder `packets::battle_npc_talk` (payload 11 byte `[35][06][k][actor_id:4B LE][tpl_id:4B LE]`) và helper `battle_npc_dialog`.
-   - Viết test trong `tests/battle_status_frames_test.rs`.
-2. **Ticket 17** ([`issues/17-35-0b-battle-chat-notice-builder.md`](issues/17-35-0b-battle-chat-notice-builder.md)):
-   - Xây dựng builder `packets::battle_chat_notice` (danh sách `[type:1B][len:1B][text:VISCII]`, tối đa 21 record).
-   - Viết test round-trip tiếng Việt và kiểm tra prefix.
+### Đã hoàn thành trong Đợt 2:
+- **Ticket 16** ([`issues/16-35-06-battle-npc-talk-builder.md`](issues/16-35-06-battle-npc-talk-builder.md)): Builder `35 06` thoại NPC & banner.
+- **Ticket 17** ([`issues/17-35-0b-battle-chat-notice-builder.md`](issues/17-35-0b-battle-chat-notice-builder.md)): Builder `35 0B` chat & thông báo trận.
+- **Ticket 18** ([`issues/18-battle-0x35-timing-wiring.md`](issues/18-battle-0x35-timing-wiring.md)): Đấu nối timing `0x35` 4 pha + Dynamic Skill Delay Pacing (`manager.rs` & `runner.rs`).
 
-### Phụ thuộc (Sau khi xong Ticket 16 & 17):
-3. **Ticket 18** ([`issues/18-battle-0x35-timing-wiring.md`](issues/18-battle-0x35-timing-wiring.md)):
-   - Đấu nối `packets::force_state7` (`35 03`) vào `src/battle/runner.rs` trước mỗi lượt đánh của unit.
-   - Đấu nối `packets::battle_unit_status` (`35 0F`) và `clear_unit_status` khi kích hoạt/hết hạn buff.
-   - Đấu nối `35 06` cho thoại mở màn trận đánh nhiệm vụ / boss.
-   - Viết integration test cho chuỗi frame theo đúng timing 4 pha.
+### Frontier (Sẵn sàng thực hiện ngay — Đợt 3: Targeting, Combo & Capture):
+1. **Ticket 22** ([`issues/22-isometric-grid-aoe-targeting.md`](issues/22-isometric-grid-aoe-targeting.md)):
+   - Chuẩn hóa thứ tự ô quét Isometric AoE: cột giữa trước, mở rộng dần theo chiều sâu `[2, 1, 3, 0, 4]`.
+   - Cập nhật ma trận mục tiêu cho hàng ngang 3 ô, 5 ô, toàn đội hình.
+2. **Ticket 23** ([`issues/23-combo-rules-aoe-threshold.md`](issues/23-combo-rules-aoe-threshold.md)):
+   - Rào chắn giới hạn kỹ năng tham gia Đòn Đánh Hội Đồng (Combo): chặn chiêu AoE diện rộng $\ge 4$ mục tiêu.
+   - Thẩm định logic hiệp đồng giữa người và NPC/Pet.
+3. **Ticket 24** ([`issues/24-capture-validation-gates.md`](issues/24-capture-validation-gates.md)):
+   - Xây dựng 8 rào chắn thẩm định cho lệnh bắt võ tướng (`0x0B sub 2`): chênh lệch cấp độ $\le 5$, cấm boss/quest, HP hiện tại, slot pet trống.
 
 ### Người dùng thực hiện sau:
 4. **Ticket 14** ([`issues/14-capture-verification.md`](issues/14-capture-verification.md)):
@@ -160,9 +159,8 @@ cargo test --all-targets --no-fail-fast    # 335 passed / 0 failed (57 test bina
 
 ## 6. Suggested skills cho phiên kế tiếp
 
-- **`tdd`** — Thực hiện Ticket 16 và 17 theo chu trình test-driven: viết test assert byte-exact trước trong `tests/battle_status_frames_test.rs`, sau đó viết builder trong `src/battle/packets.rs`.
-- **`reverse-engineer-anything`** — Tham chiếu thêm mã xuất Ghidra của `FUN_0064e064` (`35 06`) và `FUN_0075c518` (`35 0B`) nếu cần xác định thêm các template literal hay prefix đặc thù.
-- **`handoff`** — Tiếp tục cập nhật file này sau khi hoàn thành từng ticket 16, 17, 18.
+- **`tdd`** — Thực hiện Ticket 22 và 23 theo chu trình test-driven: viết test assert targeting và combo logic trong `tests/`, sau đó cập nhật logic tính toán trong `src/battle/targeting.rs` và `src/battle/damage.rs`.
+- **`handoff`** — Tiếp tục cập nhật file này sau khi hoàn thành từng ticket tiếp theo.
 
 ---
 

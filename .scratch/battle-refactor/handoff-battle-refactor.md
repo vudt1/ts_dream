@@ -1,6 +1,6 @@
 # HANDOFF: Chuẩn hóa Giao thức & Vòng đời Trận đấu (Battle Refactor V2)
 
-- **Ngày cập nhật**: 2026-10-24
+- **Ngày cập nhật**: 2026-10-26
 - **Dự án**: `ts_dream` (Rust game server cho TS Online PC `aLogin.exe`)
 - **Tập tin lưu**: `.scratch/battle-refactor/handoff-battle-refactor.md` (bản sao tại `/tmp/handoff-battle-refactor.md`)
 - **Phiên bản đặc tả hiện tại**: `2.0` (tham chiếu [`.scratch/battle-refactor/spec_new.md`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/.scratch/battle-refactor/spec_new.md))
@@ -8,67 +8,86 @@
 
 ---
 
-## 1. Tóm Tắt Tiến Độ: ĐÃ HOÀN THÀNH ĐỢT 1 (Tickets 19, 20, 21) & MỘT PHẦN ĐỢT 2 (Tickets 16, 17)
+## 1. Tóm Tắt Tiến Độ: ĐÃ HOÀN THÀNH 100% ĐỢT 1, ĐỢT 2 & ĐỢT 3 (Tickets 16 → 24)
 
-Toàn bộ các ticket sau đã được thực thi và xác minh nghiêm ngặt với 100% test suite xanh (57 test binaries, 335 passed, 0 failed):
-- **Đợt 1**: Ticket 19 (kênh lệnh `0x32` & domain enum `BattleAction`), Ticket 20 (barrier handshake `0B FA` & timing mở hiệp `34 01`), Ticket 21 (frame `32 02` `turn_action_finish`).
-- **Đợt 2 (Phần 1)**: Ticket 16 (builder `35 06` thoại NPC / banner trận) và Ticket 17 (builder `35 0B` battle chat & system notice).
-
-### 1.1 Chi tiết các ticket Đợt 2 vừa hoàn tất
-
-1. **Ticket 16: Builder `35 06` (Thoại NPC / banner diễn hoạt trong trận)**:
-   - **Mã máy client đối chiếu**: `FUN_0064e064` (`case 0x06` trong dispatcher Opcode `0x35` `FUN_007952ab`).
-   - **Cấu trúc frame**: `F4 44 0B 00 35 06` + `[k:1B]` + `[actor_id:4B LE]` + `[tpl_id:4B LE]` (Payload 11 bytes, frame 15 bytes).
-   - **Builders**:
-     - `packets::battle_npc_talk(k: u8, actor_id: u32, tpl_id: u32) -> String`
-     - `packets::battle_npc_dialog(dialog_id: u16) -> String` (quy ước Bear C# `PacketCreator(53, 6)` với `k=1`, `actor_id=0`, `tpl_id=dialog_id`).
-   - **Hiệu ứng**: Kích hoạt `THuman.Create`, đưa vào battle HUD và hiển thị toast banner 2000ms.
-
-2. **Ticket 17: Builder `35 0B` (Tin nhắn / bảng tin thông báo chiến đấu)**:
-   - **Mã máy client đối chiếu**: `FUN_0075c518` (`case 0x0B` trong `FUN_007952ab`).
-   - **Cấu trúc frame**: `F4 44` + `LE16(len)` + `35 0B` + `([type:1B][len:1B][text:len B])*n` (hỗ trợ tối đa 21 bản ghi gom nhóm).
-   - **Định dạng kênh**:
-     - `battle_notice_type::SYSTEM = 1`: Tiền tố Hàng 1 / thông báo hệ thống.
-     - `battle_notice_type::NOTICE = 2`: Tiền tố Hàng 2 / cảnh báo.
-     - `battle_notice_type::COMBAT = 3`: Tiền tố Hàng 3 / nhật ký chiến đấu.
-   - **Builders**:
-     - `packets::battle_chat_notice(entries: &[(u8, &str)]) -> String`
-     - `packets::battle_system_message(text: &str) -> String`
-     - `packets::battle_notice(msg_type: u8, text: &str) -> String`
-   - **Sửa lỗi mã hóa VISCII 1.1 cốt tử**: Trong [`src/encoding.rs`](src/encoding.rs), hàm `char_to_viscii` đã được sửa để ưu tiên `unicode_to_viscii` trước map mojibake CP1252. Nhờ đó, ký tự `'Õ'` (U+00D5) được mã hóa chuẩn thành byte `0xA0` (không bị map CP1252 ghi đè thành `0xD5` / chữ `'ạ'`), đồng thời `to_viscii` tự động chuẩn hóa NFD $\rightarrow$ NFC.
-
-### 1.2 Hồ sơ kiểm thử Đợt 2
-- Tạo mới [`tests/battle_talk_notice_test.rs`](tests/battle_talk_notice_test.rs) với 15 test cases toàn diện: byte parity, endianness, bear convention, empty entries, batching tối đa 21 entries, tiếng Việt VISCII round-trip, NFD normalization.
-- Chạy `cargo test --all-targets --no-fail-fast`: **57 test binaries, 335 passed, 0 failed, 0 ignored**.
+Toàn bộ 23/24 ticket của đợt tái cấu trúc đã hoàn tất với bộ test suite xanh 100%:
+- **Đợt 1 (Protocol Parity & Turn Lifecycle P0)**: 
+  - Ticket 19 (kênh lệnh `0x32` & domain enum `BattleAction`)
+  - Ticket 20 (barrier handshake `0B FA` & timing mở hiệp `34 01`)
+  - Ticket 21 (frame `32 02` `turn_action_finish`)
+- **Đợt 2 (Event 0x35 & Animation Timing P1)**: 
+  - Ticket 16 (builder `35 06` thoại NPC / banner trận)
+  - Ticket 17 (builder `35 0B` battle chat & system notice)
+  - Ticket 18 (đấu nối timing 4 pha `0x35` & dynamic skill delay pacing trong `runner.rs` và `manager.rs`)
+- **Đợt 3 (Isometric Grid, Combo Rules & Capture Gates P2)**:
+  - Ticket 22 (chuẩn hóa giải thuật quét ô AoE Isometric `[0, 1, 2, 4, 3]` theo client Delphi `00652454`)
+  - Ticket 23 (quy tắc liên kích Combo: chặn tuyệt đối kỹ năng AoE $\ge 4$ mục tiêu)
+  - Ticket 24 (hoàn thiện 8 rào chắn thẩm định thu phục NPC / bắt võ tướng `15001`)
 
 ---
 
-## 2. Trạng Thái Hiện Tại & Công Việc Tiếp Theo (Immediate Frontier)
+### 1.1 Chi tiết các ticket Đợt 3 đã hoàn tất
 
-Đợt 1 và phần builder của Đợt 2 đã xong. Nhiệm vụ tiếp theo là **Ticket 18**:
+#### 1. Ticket 22: Chuẩn hóa hình học Isometric ô lưới cho kỹ năng AoE (`targeting.rs`)
+- **Mã máy client đối chiếu**: `FUN_00652454` (`00652454_FUN_00652454.c`).
+- **Hình học đường chéo Isometric**: Thứ tự cột trên hàng ngang là `0 <-> 1 <-> 2 <-> 4 <-> 3` với `slot 2` là cột trung tâm.
+- **Triển khai**:
+  - Hằng số `ISOMETRIC_COL_SEQ = [0, 1, 2, 4, 3]` và hàm tra cứu kề cận `isometric_col_neighbors(col)`.
+  - Nhánh `3 =>` (Row 3): tâm `2` lấy `{1, 2, 4}`, tâm `1` lấy `{0, 1, 2}`, tâm `4` lấy `{2, 3, 4}`, tâm `0` lấy `{0, 1}`, tâm `3` lấy `{3, 4}`.
+  - Đồng bộ nhánh `2` (Trước-Sau `opp = r ^ 1`), nhánh `5` (Chữ thập / Cross), nhánh `6` (2 hàng $\times$ 3 cột), nhánh `7` (Full Row 5) và nhánh `8` (Full Team 10 ô) trong cả `expand_sl_danh` và `get_pos_attack_by_fight_area`.
+- **Hồ sơ test**: [`tests/battle_isometric_targeting_test.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/tests/battle_isometric_targeting_test.rs) (7 tests).
+
+#### 2. Ticket 23: Chuẩn hóa quy tắc hợp kích Combo theo giới hạn mục tiêu AoE (`runner.rs`)
+- **Mã máy client đối chiếu**: `FUN_00647164` và `FUN_005ab678`.
+- **Quy tắc**:
+  - Chỉ đòn đánh thường (`10000`) và các kỹ năng có phạm vi tác dụng $\le 3$ mục tiêu (`nbTarget <= 3` hoặc `fight_area <= 3`) mới được phép tham gia chuỗi Combo.
+  - Các kỹ năng AoE diện rộng từ 4 mục tiêu trở lên (`nbTarget >= 4`, ví dụ Loạn kích `13013`, Phi sa `10008`, Hồng thủy `11008`, Thiên băng `10012`) bị vô hiệu hóa Combo hoàn toàn.
+- **Triển khai**:
+  - Helper `skill_target_count(data, skill_id) -> u8` phân giải từ `BinarySkillDef.fight_area` hoặc `Skill.sl_danh`.
+  - Cập nhật `detect_combo` kiểm tra cả đấu sĩ hiện tại và đồng đội kế tiếp; nếu một trong hai có `target_count > 3` thì hủy combo.
+  - Kế thừa combo (`ts.combo_active == 1`): reset về 0 nếu đấu sĩ kế tiếp thi triển kỹ năng AoE $\ge 4$.
+- **Hồ sơ test**: [`tests/battle_combo_rules_test.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/tests/battle_combo_rules_test.rs) (4 tests).
+
+#### 3. Ticket 24: Hoàn thiện 8 bước kiểm định thu phục võ tướng (`apply_catch`)
+- **Mã máy client đối chiếu**: `FUN_0063cf58` (dòng 362–486 & 631–638).
+- **8 Rào chắn thẩm định**:
+  1. Chủ tướng hành động: Chỉ Player (`typ == 2 && id_char == 0`) mới được bắt; Pet (`typ == 4`) bị từ chối.
+  2. Chênh lệch cấp độ $\le 5$: `target.lv - attacker.lv <= 5`.
+  3. Loại thực thể hợp lệ: Cấm bắt player (`typ == 2`), pet đã có chủ (`typ == 4`), khí cụ (`typ == 9`), hoặc `typ == 14`, và `type3_id == 0`.
+  4. Cờ `can_capture == true` từ `Npc.dat` (`not_pet == 0`).
+  5. Chống trùng lặp: Người chơi chưa sở hữu `template_id` trong 4 ô pet active.
+  6. Sức chứa túi sủng vật: Còn ít nhất 1 ô trống (`contains(&0)`).
+  7. Kỹ năng Triệu gọi `14026`: Nếu NPC có `kind == 0x16` (chiến mã/chiến tượng), người chơi bắt buộc phải đã học kỹ năng `14026`.
+  8. Ngưỡng máu sinh lực: HP hiện tại của mục tiêu phải $< 50\%$ MaxHP.
+- **Triển khai**:
+  - Bổ sung `pub kind: u8` trên `Npc` và nạp từ `Npc.dat` chunk[15].
+  - Bổ sung `pub player_skills: Option<&'a HashMap<i64, Vec<u16>>>` và builder `.with_player_skills(...)` trên `BattleData`.
+  - Chuẩn hóa gói tin: khi bắt thành công, gửi `reset_cell` cho ô NPC và phát `Out::Catch`; nếu còn kẻ thù sống thì tiếp tục trận (`Outcome::Running`), nếu hết kẻ thù thì kết thúc thắng (`Outcome::PlayerWin`).
+- **Hồ sơ test**: [`tests/battle_catch_verification_test.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/tests/battle_catch_verification_test.rs) (11 tests).
+
+---
+
+## 2. Trạng Thái Hiện Tại & Công Việc Tiếp Theo
 
 ```text
-├── [ĐÃ XONG] ĐỢT 1: SỬA LỖI GIAO THỨC & VÒNG ĐỜI LƯỢT ĐẤU (P0)
+├── [ĐÃ XONG 100%] ĐỢT 1: SỬA LỖI GIAO THỨC & VÒNG ĐỜI LƯỢT ĐẤU (P0)
 │   ├── ✅ Ticket 19: issues/19-restore-0x32-command-channel.md
 │   ├── ✅ Ticket 20: issues/20-turn-lifecycle-timing-and-34-01.md
 │   └── ✅ Ticket 21: issues/21-turn-action-finish-32-02-frame.md
 │
-├── [ĐANG THỰC HIỆN] ĐỢT 2: HOÀN THIỆN BIẾN CỐ 0x35 & TIMING DIỄN HOẠT (P1)
+├── [ĐÃ XONG 100%] ĐỢT 2: HOÀN THIỆN BIẾN CỐ 0x35 & TIMING DIỄN HOẠT (P1)
 │   ├── ✅ Ticket 16: issues/16-35-06-battle-npc-talk-builder.md
 │   ├── ✅ Ticket 17: issues/17-35-0b-battle-chat-notice-builder.md
-│   └── ⏳ Ticket 18: issues/18-battle-0x35-timing-wiring.md (TIẾP THEO)
-│       └── Đấu nối timing 0x35 (35 03, 35 0F) + dynamic delay pacing (800ms - 3500ms) vào runner.rs
+│   └── ✅ Ticket 18: issues/18-battle-0x35-timing-wiring.md
 │
-└── ĐỢT 3: BÀN CỜ ISOMETRIC & GAMEPLAY PARITY (P2)
-    ├── ⏳ Ticket 22: issues/22-isometric-grid-aoe-targeting.md
-    ├── ⏳ Ticket 23: issues/23-combo-rules-aoe-threshold.md
-    └── ⏳ Ticket 24: issues/24-capture-validation-gates.md
+├── [ĐÃ XONG 100%] ĐỢT 3: BÀN CỜ ISOMETRIC & GAMEPLAY PARITY (P2)
+│   ├── ✅ Ticket 22: issues/22-isometric-grid-aoe-targeting.md
+│   ├── ✅ Ticket 23: issues/23-combo-rules-aoe-threshold.md
+│   └── ✅ Ticket 24: issues/24-capture-validation-gates.md
+│
+└── [DÀNH CHO NGƯỜI DÙNG]
+    └── ⏸ Ticket 14: issues/14-capture-verification.md (Chạy capture runtime thực tế)
 ```
-
-### Nhiệm vụ tiếp theo: **TICKET 18**
-- Tham chiếu: [`issues/18-battle-0x35-timing-wiring.md`](issues/18-battle-0x35-timing-wiring.md).
-- Đấu nối các gói tin `0x35` (`35 03` force state 7, `35 0E` unit action, `35 0F` status update, `35 06` npc talk, `35 0B` battle notice) vào các pha thực thi trong [`src/battle/runner.rs`](src/battle/runner.rs).
-- Bổ sung cấu hình dynamic animation delay pacing (800ms - 3500ms) theo từng loại chiêu thức để client có đủ thời gian vẽ hoạt ảnh đồ họa trước khi sang đòn đánh kế tiếp.
 
 ---
 
@@ -78,12 +97,3 @@ Toàn bộ các ticket sau đã được thực thi và xác minh nghiêm ngặt
 2. **Cơ sở dữ liệu**: Không ghi đè hoặc can thiệp trực tiếp `DB/ts_dream.db`. Mọi test DB dùng in-memory SQLite (`sqlite::memory:?cache=shared`).
 3. **Mã hóa chuỗi**: Chuỗi thoại và thông báo gửi client phải mã hóa **VISCII 1.1** (`crate::encoding`).
 4. **Git Policy**: **Tuyệt đối không tự ý `git commit`**. Người dùng sẽ commit thủ công.
-
----
-
-## 4. Suggested Skills Cho Agent Tiếp Theo
-
-Agent ở phiên tiếp theo nên kích hoạt các skill sau:
-- **`tdd`**: Áp dụng chu trình Test-Driven Development cho Ticket 16, 17, 18. Viết test assert byte-exact trước trong `tests/`, sau đó implement builder và timing wiring.
-- **`reverse-engineer-anything`**: Khi cần đối chiếu lại payload của `35 06` và `35 0B` với mã máy `client_pseudo_c/0064f7b4` và `0064fa58`.
-- **`code-review`**: Rà soát lại thay đổi sau khi hoàn thành Đợt 2 để đảm bảo tuân thủ tuyệt đối [ADR 0006](file:///mnt/d/VUDT/GIT_PCC/ts_dream/docs/adr/0006-battle-protocol-parity-and-turn-lifecycle.md) và [`CODING_STANDARDS.md`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/CODING_STANDARDS.md).

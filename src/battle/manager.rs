@@ -168,6 +168,45 @@ impl BattleManager {
         timeout: std::time::Duration,
         sink: Arc<dyn BattleSink>,
     ) -> BattleHandle {
+        self.spawn_timeout_with_skills(
+            battle,
+            npcs,
+            skills,
+            binary_skills,
+            items,
+            pet_slots,
+            players,
+            None,
+            texps,
+            per_exp,
+            world,
+            talking_battle,
+            map_id,
+            timeout,
+            sink,
+        )
+    }
+
+    /// Spawn with custom timeout and optional per-player learned skills.
+    #[allow(clippy::too_many_arguments)]
+    pub fn spawn_timeout_with_skills(
+        self: &Arc<Self>,
+        battle: Battle,
+        npcs: Arc<HashMap<i64, Npc>>,
+        skills: Arc<HashMap<i64, Skill>>,
+        binary_skills: Arc<HashMap<u16, BinarySkillDef>>,
+        items: Arc<HashMap<i64, Item>>,
+        pet_slots: Arc<HashMap<i64, [i64; 4]>>,
+        players: Arc<HashMap<i64, PlayerSnapshot>>,
+        player_skills: Option<Arc<HashMap<i64, Vec<u16>>>>,
+        texps: Arc<Vec<TexpRow>>,
+        per_exp: i64,
+        world: Option<Arc<StdRwLock<NpcWorld>>>,
+        talking_battle: i64,
+        map_id: i64,
+        timeout: std::time::Duration,
+        sink: Arc<dyn BattleSink>,
+    ) -> BattleHandle {
         let id = battle.id_battle;
         let (tx, rx) = mpsc::unbounded_channel();
         let ack_notify = Arc::new(tokio::sync::Notify::new());
@@ -188,7 +227,7 @@ impl BattleManager {
             let mut battle = battle;
             let mut rx = rx;
             // Build the per-task data from the tables it now owns.
-            let data = BattleData::new(
+            let mut data = BattleData::new(
                 &npcs,
                 &skills,
                 &items,
@@ -200,6 +239,9 @@ impl BattleManager {
                 map_id,
             )
             .with_binary_skills(&binary_skills);
+            if let Some(ref ps) = player_skills {
+                data = data.with_player_skills(ps.as_ref());
+            }
             let mut out: Vec<Out> = Vec::new();
 
             // Turn 1 Handshake Barrier: wait for 0B FA ack from client with 1.5s fallback (Ticket 20)
@@ -240,6 +282,17 @@ impl BattleManager {
                     sink.battle_ended(id, outcome);
                     break;
                 }
+
+                // Step 4: Dynamic Skill Delay Pacing (Ticket 18, ADR 0006)
+                // Sleep clamp(sum(delay) * 100ms, 800ms, 3500ms) after 32 02
+                // so the client can finish playing animations before receiving 34 01 for the next turn.
+                let delay_ms = battle.last_turn_delay_ms();
+                let sleep_dur = if timeout <= std::time::Duration::from_millis(500) {
+                    std::time::Duration::from_millis(delay_ms).min(std::time::Duration::from_millis(20))
+                } else {
+                    std::time::Duration::from_millis(delay_ms)
+                };
+                tokio::time::sleep(sleep_dur).await;
             }
             manager.battles.write().await.remove(&id);
         });

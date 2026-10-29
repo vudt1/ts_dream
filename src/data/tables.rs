@@ -8,6 +8,7 @@ use crate::encoding;
 pub struct Npc {
     pub id: i64,
     pub name: Vec<u8>, // VISCII bytes
+    pub kind: u8,
     pub lv: i64,
     pub thuoctinh: i64,
     pub hp: i64,
@@ -20,7 +21,7 @@ pub struct Npc {
     pub agi: i64,
     pub skill: [i64; 4],
     pub item: [i64; 6],
-    pub bat: i64,
+    pub can_capture: bool,
     pub reborn: i64,
     /// Bug-for-bug garble override (Chapter 4 §4.3/§4.6) — 23 NPC names.
     pub garble: Option<crate::encoding::GarbleSpec>,

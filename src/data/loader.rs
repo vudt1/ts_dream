@@ -469,6 +469,7 @@ impl GameData {
             let npc = Npc {
                 id: num_at(0, &f, "Npcs.txt")?,
                 name: encoding::to_viscii(name),
+                kind: 0,
                 lv: num_at(2, &f, "Npcs.txt")?,
                 thuoctinh: num_at(3, &f, "Npcs.txt")?,
                 hp: num_at(4, &f, "Npcs.txt")?,
@@ -493,7 +494,7 @@ impl GameData {
                     num_at(20, &f, "Npcs.txt")?,
                     num_at(21, &f, "Npcs.txt")?,
                 ],
-                bat: num_at(22, &f, "Npcs.txt")?,
+                can_capture: num_at(22, &f, "Npcs.txt")? == 0,
                 reborn: num_at(23, &f, "Npcs.txt")?,
                 garble: encoding::compute_garble(name),
             };

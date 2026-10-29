@@ -186,7 +186,7 @@ pub fn move_cell(src_row: u8, src_col: u8, dst_row: u8, dst_col: u8) -> String {
 /// NOTE: shipped (and tested) **unused**. The engine has no "attack animation"
 /// call-site, and **when** the client expects this frame must come from a real
 /// session capture (ticket 14); do not call it from `runner.rs` yet.
-///
+//
 // ============================================================================
 // Opcode 0x35: In-Battle Action & Status Synchronization
 // ============================================================================

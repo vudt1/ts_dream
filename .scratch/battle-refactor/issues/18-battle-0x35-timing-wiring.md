@@ -10,11 +10,11 @@
 
 **Blocked by:** 12: Builder 35 03 (ép state animation), 16: Builder 35 06 (Thoại NPC / banner diễn hoạt trong trận), 17: Builder 35 0B (Tin nhắn / bảng tin thông báo chiến đấu), 20: Tái cấu trúc vòng đời lượt đấu và đồng bộ timing mở hiệp 34 01, 21: Frame 32 02 kết thúc diễn hoạt hiệp đấu (turn_action_finish)
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] Runner phát `force_state7` cho ô kẻ tấn công ngay trước khi xử lý gói diễn hoạt hành động `32 01`.
-- [ ] Runner phát `battle_unit_status` cho các mục tiêu bị ảnh hưởng bởi kỹ năng buff/debuff chỉ số và phong ấn.
-- [ ] Runner phát `clear_unit_status` và `purge_status` khi hiệu ứng hết hạn vào đầu hiệp hoặc khi bị chiêu giải trừ dập tắt.
-- [ ] Task trận đấu trong `manager.rs` áp dụng dynamic sleep sau `32 02` để client kịp chiếu xong animation trước khi nhận `34 01` hiệp mới.
-- [ ] Integration test mô phỏng trận đấu kiểm tra chuỗi frame phát ra tuân thủ đúng thứ tự timing mà không gây lỗi hoặc treo client.
-- [ ] `cargo test --all-targets --no-fail-fast` vượt qua 100%.
+- [x] Runner phát `force_state7` cho ô kẻ tấn công ngay trước khi xử lý gói diễn hoạt hành động `32 01`.
+- [x] Runner phát `battle_unit_status` cho các mục tiêu bị ảnh hưởng bởi kỹ năng buff/debuff chỉ số và phong ấn.
+- [x] Runner phát `clear_unit_status` và `purge_status` khi hiệu ứng hết hạn vào đầu hiệp hoặc khi bị chiêu giải trừ dập tắt.
+- [x] Task trận đấu trong `manager.rs` áp dụng dynamic sleep sau `32 02` để client kịp chiếu xong animation trước khi nhận `34 01` hiệp mới.
+- [x] Integration test mô phỏng trận đấu kiểm tra chuỗi frame phát ra tuân thủ đúng thứ tự timing mà không gây lỗi hoặc treo client.
+- [x] `cargo test --all-targets --no-fail-fast` vượt qua 100%.

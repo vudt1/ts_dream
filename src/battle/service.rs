@@ -1398,10 +1398,36 @@ impl BattleService {
         battle.leader_id_qs = i64::from(session.id_qs);
         battle.leader_qs_int = self.leader_qs_int(session);
 
+        if session.talking_battle > 0 {
+            let dialog_id = if session.idtalking > 0 {
+                session.idtalking as u16
+            } else {
+                session.talking_battle as u16
+            };
+            battle.opening_dialog = Some(dialog_id);
+        }
+
         let mut players = HashMap::new();
         let mut pet_slots = HashMap::new();
+        let mut player_skills = HashMap::new();
         players.insert(lid, self.snapshot(session));
         pet_slots.insert(lid, self.pet_slots(session));
+        player_skills.insert(
+            lid,
+            session.skills.iter().map(|&(sk, _)| sk).collect::<Vec<u16>>(),
+        );
+        for mem in session.id_mem.iter().filter(|m| **m > 0) {
+            if let Ok(online) = self.online.try_read() {
+                if let Some(p) = online.get(&i64::from(*mem)) {
+                    if let Ok(s) = p.session.try_read() {
+                        player_skills.insert(
+                            i64::from(*mem),
+                            s.skills.iter().map(|&(sk, _)| sk).collect(),
+                        );
+                    }
+                }
+            }
+        }
         players.extend(extra_players);
         pet_slots.extend(extra_pets);
 
@@ -1411,6 +1437,7 @@ impl BattleService {
         let items = Arc::new(self.data.items.clone());
         let pet_slots = Arc::new(pet_slots);
         let players = Arc::new(players);
+        let player_skills = Arc::new(player_skills);
         let texps: Arc<Vec<TexpRow>> = Arc::new(self.data.texps.clone());
 
         if let Ok(mut members) = self.sink.members.lock() {
@@ -1426,7 +1453,7 @@ impl BattleService {
         let world = self.world.clone();
         let talking_battle = i64::from(session.talking_battle);
         let map_id = i64::from(session.map_id);
-        let handle = manager.spawn_timeout(
+        let handle = manager.spawn_timeout_with_skills(
             battle,
             npcs,
             skills,
@@ -1434,6 +1461,7 @@ impl BattleService {
             items,
             pet_slots,
             players,
+            Some(player_skills),
             texps,
             self.per_exp,
             world,

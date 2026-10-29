@@ -44,6 +44,22 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 - **Định nghĩa**: Một ô trong lưới chiến trận 4 hàng × 5 cột chứa một thực thể tham chiến (nhân vật, sủng vật, quái vật, thủ thành). Mang trạng thái HP/SP hiện tại, chỉ số chiến đấu (đã cộng trang bị), đội, level, buff/debuff và snapshot gói tin 23 byte gửi cho client mỗi khi thay đổi.
 - **Tránh dùng các từ mơ hồ**: *Cell*, *Unit*, *Grid Slot*.
 
+### Kênh Lệnh Chiến Đấu (Battle Command Channel) — opcode 0x32
+- **Định nghĩa**: Kênh giao tiếp duy nhất tiếp nhận các hành động chiến thuật của Nhân vật hoặc Sủng vật được gửi từ client trong trận đấu. Khung nhị phân cố định 10 bytes:
+  - Sub `0x01`: Đánh thường (`10000`), Thi triển kỹ năng, Phòng thủ (`17001`), Bỏ chạy (`18001`), Bắt võ tướng (`15001`).
+  - Sub `0x02`: Sử dụng vật phẩm chiến đấu mục tiêu trên lưới ô cờ.
+- **Ràng buộc (Invariants)**: Phân biệt tuyệt đối với kênh `0x0B` (vòng đời trận đấu và thao tác ngoài bản đồ). Không nhận lệnh chiến đấu qua `0x0B`.
+
+### Khung Mở Hiệp Đấu (Turn Prompt Frame) — opcode 0x34 sub 0x01
+- **Định nghĩa**: Gói tin nhị phân 2 bytes (`F4 44 02 00 34 01`) được Server gửi xuống Client ở đầu mỗi hiệp đấu. Kích hoạt client reset trạng thái 21 ô cờ, mở thanh menu điều khiển và khởi chạy bộ đếm lùi thời gian (mặc định 20 giây).
+
+### Khung Báo Dứt Hoạt Ảnh (Turn Action Finish Frame) — opcode 0x32 sub 0x02
+- **Định nghĩa**: Gói tin nhị phân 2 bytes (`F4 44 02 00 32 02`) được Server gửi xuống Client ở cuối mỗi chuỗi đòn đánh của hiệp đấu để client giải phóng hàng đợi diễn hoạt và kết thúc chuỗi hoạt ảnh chiêu thức.
+
+### Lưới Chiến Trận Isometric 4×5 (Isometric Battle Grid)
+- **Định nghĩa**: Ma trận 20 ô (4 hàng `grp 0..3` × 5 cột `slot 0..4`) hiển thị theo hình chiếu trục đo Isometric. Cột trung tâm là `slot 2`, xếp sang hai cánh theo thứ tự `[2, 1, 3, 0, 4]`.
+- **Ràng buộc (Invariants)**: `grp < 2` là Phe Địch (Phe 2); `grp >= 2` là Phe Ta (Phe 1). Các kỹ năng lan 3 mục tiêu (`sl_danh = 3`) khi nhắm ô tâm 2 phải lấy 2 ô kề Isometric là `{1, 2, 4}`.
+
 ### DiaHinh / Địa hình trận đấu
 - **Định nghĩa**: Mã định danh "địa hình" của một trận đấu, chỉ được echo vào packet mở bàn cờ và các biến thể packet thành viên (PK/NPC thường dùng `112`, NPC chủ động `4712`, trận thủ thành dùng `TeamDef[0]`, bàn mở cho thành viên PK dùng `7000`).
 - **Ràng buộc (Invariants)**: `DiaHinh` **không** ảnh hưởng targeting hay sát thương.
@@ -73,6 +89,16 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 
 ### Pet / Companion (Sủng vật / Đậu đậu)
 - **Định nghĩa**: Nhân vật phi người chơi (NPC) có thể thu phục hoặc chiêu mộ đồng hành cùng Nhân vật người chơi trong các trận đấu và di chuyển.
+
+### Thu phục Võ tướng / Bắt quái (Pet Capture) — skill 15001
+- **Định nghĩa**: Hành động người chơi sử dụng lệnh kỹ năng `15001` (hoặc đạo cụ Lưới bắt) để thu phục một NPC quái vật trên bàn cờ làm Sủng vật tùy thân (chuyển vào 1 trong 4 ô trống của `character_pets`).
+- **Ràng buộc (Invariants)**:
+  - Chỉ nhân vật chính (`typ == 2`) mới được bắt (Sủng vật không thể bắt).
+  - Quy tắc cấp độ: Độ chênh lệch cấp độ giữa nhân vật và võ tướng/NPC không được vượt quá 5 cấp (`npc.lv - player.lv <= 5`).
+  - NPC không mang cờ cấm bắt (`bat == 0` trong `Npc.dat`), không phải người chơi, Sủng vật có chủ hoặc khí cụ.
+  - Túi Sủng vật tùy thân phải còn ô trống (< 4 con) và chưa sở hữu võ tướng cùng `template_id`.
+  - Máu NPC phải dưới 50% MaxHP.
+  - Nếu NPC có thuộc tính đặc biệt (`FUN_00625128 == 0x16`), người chơi bắt buộc phải đã học kỹ năng Triệu gọi `14026`.
 
 ### Stat Allocation (Phân bổ chỉ số) — opcode 0x08
 - **Định nghĩa**: Hành động người chơi tiêu Point để tăng một chỉ số cơ bản (Int, Atk, Def, Agi, Hpx, Spx) hoặc tái tính Hpmax/Spmax. Mỗi thay đổi phát 1 packet stat `F4440C000801` (Type_Status + dấu + giá trị tuyệt đối).
