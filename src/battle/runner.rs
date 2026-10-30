@@ -147,6 +147,19 @@ pub fn skill_target_count(data: &BattleData<'_>, skill_id: i64) -> u8 {
     1
 }
 
+/// Check if a skill is eligible to participate in a combo (Ticket 23).
+/// Normal attack (10000 or 0) and any skill with skill_type == 1 (Active) can combo.
+/// Magic (2), debuffs (3), heals (4), guard (17) cannot combo.
+pub fn is_combo_eligible_skill(data: &BattleData<'_>, skill_id: i64) -> bool {
+    if skill_id == 10000 || skill_id == 0 {
+        return true;
+    }
+    let stype = binary_skill_def(data, skill_id)
+        .map(|s| i64::from(s.attribute))
+        .or_else(|| data.skills.get(&skill_id).map(|s| s.skill_type));
+    stype == Some(1)
+}
+
 fn binary_skill_input(data: &BattleData<'_>, skill_id: i64) -> Option<SkillFormulaInput> {
     if skill_id == 10_000 {
         return None;
@@ -427,11 +440,12 @@ impl Battle {
 
             // Average levels — only while the average is still 0.0 (first turn).
             if ts.avg1.is_none() {
+                let effective_lv = if c.reborn > 0 { 200 } else { c.lv };
                 if team == 1 {
-                    sum1 += c.lv;
+                    sum1 += effective_lv;
                     count1 += 1;
                 } else if team == 2 {
-                    sum2 += c.lv;
+                    sum2 += effective_lv;
                     count2 += 1;
                 }
             }
@@ -884,7 +898,7 @@ impl Battle {
         let skill_row = data.skills.get(&skill);
         let skill_def = binary_skill_def(data, skill);
         let skill_type = skill_def
-            .map(|s| i64::from(s.kind))
+            .map(|s| i64::from(s.attribute))
             .or_else(|| skill_row.map(|s| s.skill_type))
             .unwrap_or(match skill {
                 10000 => 1,
@@ -911,14 +925,12 @@ impl Battle {
             skill_lv = 3;
         }
 
-        // Inherited combo from the previous entity (only if current skill target count <= 3).
-        let current_targets = skill_target_count(data, skill);
-        if ts.combo_active == 1 {
-            if current_targets <= 3 {
-                num37 *= 1.3;
-            } else {
-                ts.combo_active = 0;
-            }
+        // Inherited combo from the previous entity (Ticket 23).
+        let inherited_combo = ts.combo_active == 1 && is_combo_eligible_skill(data, skill);
+        if ts.combo_active == 1 && !inherited_combo {
+            ts.combo_active = 0;
+        } else if inherited_combo {
+            num37 *= 1.3;
         }
 
         // Target list selection (types override the default list).
@@ -926,10 +938,14 @@ impl Battle {
             data, ts, team, row_attack, col_attack, num34, skill_type, skill, skill_lv, &attacker,
         );
 
-        // Combo detection: both attacker and partner must have nbTarget <= 3 and skill_type == 1.
-        if idx + 1 < sorted.len() && skill_type == 1 && current_targets <= 3 {
+        // Combo detection: attacker must be eligible to combo (Ticket 23).
+        if idx + 1 < sorted.len() && is_combo_eligible_skill(data, skill) {
             self.detect_combo(data, ts, sorted, idx, &attacker, &mut num37);
+        } else {
+            ts.combo_active = 0;
         }
+
+        let is_combo = inherited_combo || ts.combo_active == 1;
 
         let count = targets.len() as u8;
         let hit_times = skill_def
@@ -957,6 +973,7 @@ impl Battle {
                         &mut attacker,
                         &rear,
                         tpos,
+                        is_combo,
                         &mut num36,
                         &mut num37,
                         num34,
@@ -985,6 +1002,8 @@ impl Battle {
                             ts,
                             &mut attacker,
                             &mut target,
+                            tpos,
+                            is_combo,
                             &mut num36,
                             &mut num37,
                             num34,
@@ -1201,6 +1220,7 @@ impl Battle {
 
             // Drops & exp accumulation (§3.6).
             self.process_kills(data, ts, &mut attacker, out);
+            ts.combo_cells.clear();
 
             if !ts.text_troi.is_empty() {
                 out.push(Out::Broadcast(std::mem::take(&mut ts.text_troi)));
@@ -1233,75 +1253,64 @@ impl Battle {
         attacker: &WarInfo,
         num37: &mut f64,
     ) {
-        // Ticket 23: Disallow combo if attacker's skill has nbTarget >= 4
-        let attacker_targets = skill_target_count(data, attacker.id_skill);
-        if attacker_targets > 3 {
-            ts.combo_active = 0;
-            return;
-        }
-
         let (nr, nc) = sorted[idx + 1];
         let next = self.list_war[&crate::battle::engine::war_key(nr, nc)].clone();
         if next.id > 0 && next.team == attacker.team {
-            let next_type = data
-                .skills
-                .get(&next.id_skill)
-                .map(|s| s.skill_type)
-                .unwrap_or_else(|| {
-                    binary_skill_def(data, next.id_skill)
-                        .map(|s| s.kind as i64)
-                        .unwrap_or(if next.id_skill == 10000 || next.id_skill == 0 { 1 } else { 0 })
-                });
-            let next_targets = skill_target_count(data, next.id_skill);
-            if next_targets > 3 {
-                ts.combo_active = 0;
-                return;
-            }
-            if next_type == 1
+            if is_combo_eligible_skill(data, next.id_skill)
                 && next.row_attack == attacker.row_attack
                 && next.col_attack == attacker.col_attack
             {
-                let target_alive = self
-                    .cell(attacker.row_attack, attacker.col_attack)
-                    .map(|c| c.id > 0)
-                    .unwrap_or(false);
+                let target_cell = self.cell(attacker.row_attack, attacker.col_attack);
+                let target_alive = target_cell.map(|c| c.id > 0 && c.hp > 0).unwrap_or(false);
+                let target_lv = target_cell.map(|c| c.lv).unwrap_or(0);
                 if target_alive {
-                    if ts.combo_hi == 0 {
+                    let lvtb_team = avg_of(ts, attacker.team) as f64;
+                    if ts.combo_cells.is_empty() {
                         let diff = (next.agi - attacker.agi).abs();
-                        if diff <= 800 {
-                            if next.agi >= attacker.agi {
-                                ts.combo_hi = next.agi;
-                                ts.combo_lo = attacker.agi;
+                        if diff <= 11 {
+                            let (hi, lo) = if next.agi >= attacker.agi {
+                                (next.agi, attacker.agi)
                             } else {
-                                ts.combo_hi = attacker.agi;
-                                ts.combo_lo = next.agi;
-                            }
-                            ts.combo_active = damage::get_random_miss_combo(&mut self.rng.random_0);
+                                (attacker.agi, next.agi)
+                            };
+                            ts.combo_active = damage::get_random_miss_combo(
+                                &mut self.rng.random_0,
+                                lvtb_team,
+                                target_lv,
+                            );
                             ts.delay = next_delay(data, &next);
-                            if ts.combo_active == 1 && ts.text10.is_empty() {
-                                *num37 *= 1.3;
-                                add_combo_cell(ts, attacker.row, attacker.col, attacker.lv);
-                                add_combo_cell(ts, next.row, next.col, next.lv);
+                            if ts.combo_active == 1 {
+                                ts.combo_hi = hi;
+                                ts.combo_lo = lo;
+                                if ts.text10.is_empty() {
+                                    *num37 *= 1.3;
+                                    add_combo_cell(ts, attacker.row, attacker.col, attacker.lv);
+                                    add_combo_cell(ts, next.row, next.col, next.lv);
+                                }
                             }
                             return;
                         }
                     } else {
-                        let mid = (ts.combo_lo + ts.combo_hi) / 2;
-                        if (next.agi - mid).abs() <= 800 {
-                            if next.agi < ts.combo_lo {
-                                ts.combo_lo = next.agi;
-                            } else if next.agi > ts.combo_hi {
-                                ts.combo_hi = next.agi;
-                            }
-                            ts.combo_active = damage::get_random_miss_combo(&mut self.rng.random_0);
+                        let new_hi = ts.combo_hi.max(next.agi);
+                        let new_lo = ts.combo_lo.min(next.agi);
+                        if new_hi - new_lo <= 11 {
+                            ts.combo_active = damage::get_random_miss_combo(
+                                &mut self.rng.random_0,
+                                lvtb_team,
+                                target_lv,
+                            );
                             let nd = next_delay(data, &next);
                             if ts.delay <= nd {
                                 ts.delay = nd;
                             }
-                            if ts.combo_active == 1 && ts.text10.is_empty() {
-                                *num37 *= 1.3;
-                                add_combo_cell(ts, attacker.row, attacker.col, attacker.lv);
-                                add_combo_cell(ts, next.row, next.col, next.lv);
+                            if ts.combo_active == 1 {
+                                ts.combo_hi = new_hi;
+                                ts.combo_lo = new_lo;
+                                if ts.text10.is_empty() {
+                                    *num37 *= 1.3;
+                                    add_combo_cell(ts, attacker.row, attacker.col, attacker.lv);
+                                    add_combo_cell(ts, next.row, next.col, next.lv);
+                                }
                             }
                             return;
                         }
@@ -1424,6 +1433,8 @@ impl Battle {
         ts: &mut TurnState,
         attacker: &mut WarInfo,
         target: &mut WarInfo,
+        tpos: GridPos,
+        is_combo: bool,
         num36: &mut i64,
         num37: &mut f64,
         num34: i64,
@@ -1451,6 +1462,10 @@ impl Battle {
             binary_skill_input(data, skill),
         );
         *num36 = attack.damage;
+        let is_primary_target = tpos.row == attacker.row_attack && tpos.col == attacker.col_attack;
+        if is_combo && is_primary_target {
+            *num36 = (*num36 as f64 * 1.3).floor() as i64;
+        }
         let mut hit = if attack.hit {
             if attack.thunder {
                 2
@@ -1591,6 +1606,7 @@ impl Battle {
         attacker: &mut WarInfo,
         rear: &WarInfo,
         tpos: GridPos,
+        is_combo: bool,
         num36: &mut i64,
         num37: &mut f64,
         num34: i64,
@@ -1626,6 +1642,10 @@ impl Battle {
                 binary_skill_input(data, skill),
             );
             *num36 = attack.damage;
+        }
+        let is_primary_target = tpos.row == attacker.row_attack && tpos.col == attacker.col_attack;
+        if is_combo && is_primary_target {
+            *num36 = (*num36 as f64 * 1.3).floor() as i64;
         }
         let _ = (avg1, avg2);
         let mut hit = if *num36 > 0 { 1 } else { 0 };
@@ -3068,46 +3088,61 @@ impl Battle {
                 if attacker.lv - npc_lv <= 20 && npc_dead {
                     attacker.exp += reward_exp(attacker.lv, npc_lv);
                 }
-            }
-
-            let combo_cells = std::mem::take(&mut ts.combo_cells);
-            for entry in &combo_cells {
-                let (pr, pc, plv) = parse_cell_entry(entry);
-                if plv - npc_lv <= 20 && npc_dead {
-                    let exp = reward_exp(plv, npc_lv);
-                    if let Some(cell) = self.cell_mut(pr, pc) {
-                        cell.exp += exp;
+            } else {
+                for entry in &ts.combo_cells {
+                    let (pr, pc, plv) = parse_cell_entry(entry);
+                    if plv - npc_lv <= 20 && npc_dead {
+                        let exp = damage::calc_combo_exp(reward_exp(plv, npc_lv));
+                        if pr == attacker.row && pc == attacker.col {
+                            attacker.exp += exp;
+                        } else if let Some(cell) = self.cell_mut(pr, pc) {
+                            cell.exp += exp;
+                        }
+                    }
+                    if item_id > 0 {
+                        let caster = self.cell(pr, pc).cloned().unwrap_or_default();
+                        let owner = if caster.id_char != 0 {
+                            caster.id_char
+                        } else {
+                            caster.id
+                        };
+                        if owner > 0 {
+                            out.push(Out::Drop {
+                                item_id,
+                                npc_row,
+                                npc_col,
+                                row: pr,
+                                col: pc,
+                                owner,
+                            });
+                            out.push(Out::Broadcast(packets::drop_item(
+                                item_id as u16,
+                                npc_row,
+                                npc_col,
+                                pr,
+                                pc,
+                            )));
+                        }
+                    }
+                    if gold_reward > 0 {
+                        let caster = self.cell(pr, pc).cloned().unwrap_or_default();
+                        let owner = if caster.id_char != 0 {
+                            caster.id_char
+                        } else {
+                            caster.id
+                        };
+                        if owner > 0 {
+                            out.push(Out::Gold {
+                                owner,
+                                amount: gold_reward,
+                            });
+                        }
                     }
                 }
-                if item_id > 0 {
-                    let caster = self.cell(pr, pc).cloned().unwrap_or_default();
-                    let owner = if caster.id_char != 0 {
-                        caster.id_char
-                    } else {
-                        caster.id
-                    };
-                    if owner > 0 {
-                        out.push(Out::Drop {
-                            item_id,
-                            npc_row,
-                            npc_col,
-                            row: pr,
-                            col: pc,
-                            owner,
-                        });
-                        out.push(Out::Broadcast(packets::drop_item(
-                            item_id as u16,
-                            npc_row,
-                            npc_col,
-                            pr,
-                            pc,
-                        )));
-                    }
-                }
             }
-            ts.combo_cells = combo_cells;
         }
         ts.killed_npcs.clear();
+        ts.combo_cells.clear();
     }
 
     fn npc_respawn(&mut self, data: &BattleData, out: &mut Vec<Out>) {

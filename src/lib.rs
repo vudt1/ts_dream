@@ -5,6 +5,7 @@
 //! capture; DB-backed and accept-gated parts degrade gracefully.
 
 pub mod config;
+pub mod crafting;
 pub mod encoding;
 pub mod error;
 pub mod eve;

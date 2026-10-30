@@ -100,6 +100,29 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
   - Máu NPC phải dưới 50% MaxHP.
   - Nếu NPC có thuộc tính đặc biệt (`FUN_00625128 == 0x16`), người chơi bắt buộc phải đã học kỹ năng Triệu gọi `14026`.
 
+### Hợp kích / Combo (Battle Combo)
+- **Định nghĩa**: Cơ chế hợp lực liên hoàn trong chiến đấu theo lượt khi 2 hoặc nhiều đấu sĩ cùng phe hành động liên tiếp nhắm vào cùng một mục tiêu, kích hoạt chuỗi diễn hoạt hội đồng (mã giả client `20006`/`20007`) và nhân dồn sát thương $\times 1.3$ cho mỗi mắt xích.
+- **Ràng buộc (Invariants)**:
+  - Combo được quyết định **100% phía Server**; client hoàn toàn thụ động hiển thị theo chuỗi record `32 01`.
+  - Tiêu chí kỹ năng tham gia hợp kích: **Phụ thuộc 100% vào thuộc tính `skill_type == 1` (`Active`)** hoặc Đòn đánh thường (`10000`/`0`). Các kỹ năng Active nhiều mục tiêu (như Loạn kích `13013` 4 mục tiêu, Hỏa tiễn `12003` 3 mục tiêu, Ném đá `10005` 3 mục tiêu, Dương viêm `12031` 2 mục tiêu) đều được phép tham gia và kết nối combo bình thường.
+  - Các kỹ năng có `skill_type != 1` (Phép thuật/Buff `skill_type == 2` như Phi sa, Hồng thủy, Thiên băng; Debuff `skill_type == 3` như Băng phong, Cây tinh; Hồi máu `skill_type == 4` như Thanh lưu) **bị vô hiệu hóa combo hoàn toàn**.
+  - Hệ số dồn sát thương $\times 1.3$ áp dụng cho ô mục tiêu chính được khóa chung (`row_attack`, `col_attack`).
+
+### Chuỗi Hợp kích & Ngưỡng Agi Chuỗi (Combo Chain & Agi Span)
+- **Định nghĩa**: Một chuỗi liên kích gồm các đấu sĩ cùng phe xếp kề nhau trong thứ tự lượt đấu (`Agi DESC`) cùng tấn công một mục tiêu còn sống.
+- **Ràng buộc (Invariants)**:
+  - **Ngưỡng Agi Chuỗi (Agi Span)**: Chênh lệch Nhanh nhẹn giữa đấu sĩ có Agi cao nhất và thấp nhất trong toàn bộ chuỗi combo **không được vượt quá 11 điểm** ($\text{Max}(\text{Agi}_{\text{chuỗi}}) - \text{Min}(\text{Agi}_{\text{chuỗi}}) \le 11$).
+  - Phạm vi áp dụng theo **tập hợp tham gia thực tế** của từng chuỗi combo; không khóa cứng toàn đội nếu các thành viên khác tấn công mục tiêu khác hoặc có Agi nằm ngoài chuỗi.
+
+### Cấp Độ Trung Bình Đội Hình & Level Hiệu Dụng Trùng Sinh (LVTB & Reborn Effective Level)
+- **Định nghĩa**: Chỉ số cấp độ trung bình của một phe trong trận đấu, được tính một lần ở đầu hiệp đấu: $\text{LVTB} = \frac{\sum \text{Level\_Hiệu\_Dụng}}{\text{Tổng số đấu sĩ trên sân}}$.
+- **Ràng buộc (Invariants)**:
+  - **Level Hiệu Dụng Trùng Sinh (Reborn Effective Level)**: Bất kỳ đấu sĩ nào đã Trùng Sinh (`reborn > 0`) **bắt buộc được tính là Level 200** khi tính toán LVTB phe (`avg1`/`avg2`), bất kể cấp độ hiển thị thực tế là bao nhiêu. Áp dụng cho toàn bộ các trận đấu (cả PvE và PvP). Đấu sĩ chưa Trùng Sinh tính theo `lv` thực tế.
+  - **Ngưỡng Tỷ lệ Hợp kích 100%**: Khi $\text{LVTB}_{\text{team}} - \text{Level}_{\text{quái}} \ge 25 \implies$ Tỷ lệ kích hoạt combo đạt $100\%$.
+  - **Đường cong suy giảm khi thiếu cấp**: Khi $\text{LVTB}_{\text{team}} - \text{Level}_{\text{quái}} < 25$, tỷ lệ combo tính theo:
+    $$\text{Tỷ lệ (\%)} = \text{clamp}\!\left( \left\lfloor \frac{\text{LVTB}_{\text{team}} - 25}{\text{Level}_{\text{quái}}} \times 100\% \right\rfloor, 0, 100 \right)$$
+    (Nếu $\text{LVTB}_{\text{team}} \le 25 \implies 0\%$).
+
 ### Stat Allocation (Phân bổ chỉ số) — opcode 0x08
 - **Định nghĩa**: Hành động người chơi tiêu Point để tăng một chỉ số cơ bản (Int, Atk, Def, Agi, Hpx, Spx) hoặc tái tính Hpmax/Spmax. Mỗi thay đổi phát 1 packet stat `F4440C000801` (Type_Status + dấu + giá trị tuyệt đối).
 - **Ràng buộc (Invariants)**:
@@ -295,3 +318,39 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
   - Mở form bán: S→C `1B 03` (`F44402001B03`).
   - Mua đồ C→S `1B 01`: `index: u8` (0-based) + `count: u16 LE` (1..1250). Áp dụng quy tắc All-or-Nothing; nếu không đủ chỗ trả lỗi `1B 01 02`.
   - Bán đồ C→S `1B 02`: `slot: u8` (1-based `1..25`) + `qty: u8` (1..50).
+
+### Compound / Hợp thành căn bản
+- **Định nghĩa**: Tính năng người chơi kết hợp 2 đến 3 nguyên liệu (khoáng thạch, dược phẩm, trang bị phôi) để chế tạo ra vật phẩm mới thông qua bảng công thức `Data/Compound.Dat` (1.393 bản ghi).
+- **Ràng buộc (Invariants)**:
+  - **Quyền quyết định 100% thuộc Server**: Form `0x0079EE08` trong client chỉ là Developer Simulator offline (zero network calls). Gameplay trực tuyến dùng `form_compound`, gửi yêu cầu lên Server qua Opcode `0x17 Sub 0x39`.
+  - **Phạm vi ô chứa (Container Scope)**: Chỉ tiếp nhận nguyên liệu từ `homdo` (Túi chính, slot `1..=25`). Tuyệt đối từ chối các slot ngoài phạm vi hoặc tham chiếu sang `tuideo`/`luulang`.
+  - **Kiểm tra ô trống (Probe-First All-or-Nothing)**: Server thẩm định `free_slots >= 1` trước khi trừ nguyên liệu. Nếu `free_slots == 0`, từ chối ngay cả khi nguyên liệu sẽ bị xóa hết (đồng bộ 1-1 với client UI check `FUN_00768D38`).
+  - **Cơ chế Fallback khi trượt công thức**: Nếu không khớp bất kỳ công thức nào trong `Compound.Dat`, hệ thống chọn ngẫu nhiên loại (`kind`) của 1 nguyên liệu đầu vào, ép cấp mục tiêu $R_{\text{target}} = 1$ và trả về vật phẩm rác cấp 1 cùng loại trong `Item.dat` (chuẩn Delphi `FUN_0079A890`, không bao giờ mất trắng đồ).
+- **Tránh dùng các từ mơ hồ**: *Crafting* (quá chung chung), *Mix đồ* (từ lóng), *Formula.Dat* (bảng sát thương chiến đấu `TCalculator`, không phải công thức hợp thành).
+
+### compound_material / ratA (Chất liệu hợp thành)
+- **Định nghĩa**: Mã định danh chất liệu của vật phẩm (giá trị nguyên `1..37`, lưu tại `chunk[46]` của `Data/Item.Dat`). Dùng để sắp xếp tăng dần và ghép chuỗi thập phân tạo khóa `u32` tra cứu trong `Compound.Dat`.
+- **Ràng buộc (Invariants)**:
+  - Phân biệt tuyệt đối với `chunk[82]` (`raw_material_legacy` / hiển thị phụ trợ). Không được dùng `chunk[82]` thay cho `ratA`.
+- **Tránh dùng các từ mơ hồ**: *material* (gây xung đột với `chunk[82]`), *item_type*.
+
+### compound_rank / ratB (Cấp phẩm chất hợp thành)
+- **Định nghĩa**: Bậc phẩm chất hợp thành của vật phẩm (giá trị nguyên `1..10+`, lưu tại `chunk[47]` của `Data/Item.Dat`). Dùng để tính bậc phẩm chất trung bình $R_{\text{avg}}$ theo Banker's Rounding và quay số ngẫu nhiên cấp phẩm chất đầu ra $R_{\text{target}} \in [1, R_{\text{avg}} + 1]$.
+- **Ràng buộc (Invariants)**:
+  - Đại diện cho cấp độ phôi/khoáng thạch (khoáng 11..17 điểm hoặc trang bị lv 25..75).
+- **Tránh dùng các từ mơ hồ**: *rank* (tránh nhầm với Quân hàm `Rank.Dat`), *level* (tránh nhầm với `item.level` tại `chunk[83]`).
+
+### Socketing / Cường hóa Khảm (Khảm Lông & Khảm Tâm)
+- **Định nghĩa**: Tính năng nâng cấp trang bị bằng cách khảm Lông vũ (+1..+10) hoặc Tâm tăng chỉ số đặc biệt vào trang bị Hòm đồ chính, kết hợp giao diện chọn bảo vật/lông `TFT_SelectFeatherForm` (VMT `0x0058A3EC`, ctor `0x005B0BFC`).
+- **Ràng buộc (Invariants)**:
+  - Hoàn toàn độc lập với bảng tỷ lệ ngẫu nhiên của `Compound.Dat`.
+  - Không sinh ra item mới; tác động trực tiếp lên 2 thuộc tính động `element` (hệ nguyên tố: 1=Địa, 2=Thủy, 3=Hỏa, 4=Phong) và `elementvalue` (cấp cường hóa +1..+10) của vật phẩm trong túi đồ (`ThingData` và CSDL SQLite `inventories`).
+  - Giao thức chọn lông `TFT_SelectFeatherForm`: Client gửi Opcode `0x23 Subcode 0x03` với `elem_choice` (1..4) khi bấm xác nhận; nếu chưa chọn hệ (`elem_choice == 0`), hiển thị toast *"Hãy chọn lựa một trong các loại bảo vật"*.
+- **Tránh dùng các từ mơ hồ**: *Hợp thành lông*, *Compound feather*.
+
+### Scripted Crafting / Chế tạo Kịch bản NPC
+- **Định nghĩa**: Luồng chế tạo hoặc đổi vật phẩm thông qua hội thoại NPC (Thợ rèn, Dược sư, Nấu rượu, Event đổi đồ) được điều khiển bởi Động cơ Kịch bản `eve.emg` (Eve Script Engine).
+- **Ràng buộc (Invariants)**:
+  - Giao tiếp qua Opcode `0x14` (Dialog) $\rightarrow$ `0x01 Sub 0x09` / `0x14 Sub 0x01` $\rightarrow$ `0x18` (Eve Action).
+  - Sử dụng công thức cố định theo kịch bản (`CheckItem` $\rightarrow$ `DelItem` $\rightarrow$ `AddItem`), không sử dụng bảng tỷ lệ ngẫu nhiên của `Compound.Dat`.
+- **Tránh dùng các từ mơ hồ**: *Compound NPC*, *Shop Crafting*.

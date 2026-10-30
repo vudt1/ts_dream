@@ -381,15 +381,14 @@ pub async fn handle_account_mgmt(ctx: &mut OpcodeCtx<'_>) {
         // Sub 3: Redeem item_code / gift code (Ch5 §5.5).
         // Payload = `codeLen code passLen password` (two len-prefixed strings).
         3 => {
-            let Some((code, password)) = parse_gift_code(payload) else {
-                out.send(sys_msg_frame("Ma qua tang sai lieu qua tang khong hop le!"));
-                return;
-            };
-            let code_str = String::from_utf8_lossy(code).into_owned();
-            let pass_str = String::from_utf8_lossy(password).into_owned();
-            let Some(pool) = ctx.env.pool else {
-                return; // No DB (golden replay) — no-op, never a fake "invalid".
-            };
+            if let Some((code, password)) = parse_gift_code(payload) {
+                let consumed = 2 + code.len() + password.len();
+                if payload.len() == consumed {
+                    let code_str = String::from_utf8_lossy(code).into_owned();
+                    let pass_str = String::from_utf8_lossy(password).into_owned();
+                    let Some(pool) = ctx.env.pool else {
+                        return; // No DB (golden replay) — no-op, never a fake "invalid".
+                    };
 
             let id = i64::from(conn.session.id);
 
@@ -485,7 +484,12 @@ pub async fn handle_account_mgmt(ctx: &mut OpcodeCtx<'_>) {
                     out.send(sys_msg_frame("Loi he thong khi nhan ma qua tang!"));
                 }
             }
+            return;
         }
+    }
+
+    crate::server::handlers::crafting::handle_select_feather(ctx).await;
+}
         _ => {}
     }
 }

@@ -63,6 +63,8 @@ pub struct Item {
     pub rb_pet_from: i64,
     pub rb_pet_to: i64,
     pub add_pet: i64,
+    pub compound_material: i64,
+    pub compound_rank: i64,
     /// Bug-for-bug garble override (Chapter 4 §4.3/§4.6) — 99 item names.
     pub garble: Option<crate::encoding::GarbleSpec>,
 }

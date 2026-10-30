@@ -329,7 +329,7 @@ impl GameData {
         // mainKind 68 / 0x44, unimplemented in `dispatcher.rs`), keyed by
         // client-sent index — not the `(map_id, warpid)` talk-warp lookup in
         // `quest.rs` which reads `data.warps` (from `Warps.txt`, absent).
-        let optional_binary: [(&str, &str); 4] = [
+        let optional_binary: [(&str, &str); 5] = [
             // PC `Skill.Dat` is the authoritative source (preferred per ADR
             // 0002). `Skill_C.dat` is the mobile variant; if PC is absent
             // and mobile is present, fall back to the mobile parser.
@@ -337,6 +337,7 @@ impl GameData {
             ("Skill_C.dat", "skill"),
             ("eve.emg", "eve"),
             ("Mark.Dat", "mark"),
+            ("Compound.Dat", "compound"),
         ];
         for (file_name, _) in optional_binary {
             let Some(path) = resolve_data_file(data_dir, file_name) else {
@@ -349,6 +350,7 @@ impl GameData {
                 "skill_c.dat" => self.binary_skill_defs = SkillDatLoader::load(&bytes)?,
                 "eve.emg" => self.scene_eve_data = EveDataLoader::load(&bytes)?,
                 "mark.dat" => self.quest_marks = MarkDatLoader::load(&bytes)?,
+                "compound.dat" => self.compounds = CompoundDatLoader::load(&bytes)?,
                 _ => unreachable!("optional binary list contains unknown file"),
             }
         }
@@ -543,6 +545,8 @@ impl GameData {
                 rb_pet_from: num_at(22, &f, "Items.txt")?,
                 rb_pet_to: num_at(23, &f, "Items.txt")?,
                 add_pet: num_at(24, &f, "Items.txt")?,
+                compound_material: 0,
+                compound_rank: 0,
                 garble: encoding::compute_garble(name),
             };
             self.items.insert(item.id, item);

@@ -58,6 +58,10 @@ pub async fn handle_inventory(ctx: &mut OpcodeCtx<'_>) {
         36 => handle_auxiliary_bag(conn, payload, out).await,
         // Sub 37: Auxiliary bag move
         37 => handle_auxiliary_bag_move(conn, payload, out).await,
+        // Sub 39 (0x39): Compound / Mix items
+        0x39 => crate::server::handlers::crafting::handle_compound(ctx).await,
+        // Sub 3A (0x3A): Feather socketing into equipment
+        0x3A => crate::server::handlers::crafting::handle_socket_feather(ctx).await,
         // Sub 45: Warp item
         45 => handle_warp_jail(conn, payload, out).await,
         // Sub 46: Player reborn

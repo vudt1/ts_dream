@@ -23,7 +23,9 @@ pub struct ItemDef {
     pub attr2_kind: u16,
     pub attr2_item: u8,
     pub attr2_value: i32,
-    pub material: u8,
+    pub compound_material: u8,
+    pub compound_rank: u8,
+    pub display_material: u8,
     pub level: u8,
     pub fit_type: u8,
     pub special_ability: u16,
@@ -77,6 +79,8 @@ impl ItemDef {
             rb_pet_from: self.spare3 as i64,
             rb_pet_to: self.suit_id as i64,
             add_pet: self.role_count_index as i64,
+            compound_material: self.compound_material as i64,
+            compound_rank: self.compound_rank as i64,
             garble: self.garble.clone(),
             ..Default::default()
         };
@@ -195,8 +199,8 @@ impl ItemDatLoader {
                 attr2_value += 100;
             }
 
-            let _contribute = Self::dec8(chunk[46]);
-            let _sell_price_rate = Self::dec8(chunk[47]);
+            let compound_material = Self::dec8(chunk[46]);
+            let compound_rank = Self::dec8(chunk[47]);
             let fit_type = Self::dec8(chunk[48]);
             let special_ability = Self::dec8(chunk[49]) as u16;
 
@@ -221,7 +225,7 @@ impl ItemDatLoader {
                 ]));
             }
 
-            let material = Self::dec8(chunk[82]);
+            let display_material = Self::dec8(chunk[82]);
             let level = Self::dec8(chunk[83]);
             let price = Self::dec32(u32::from_le_bytes([
                 chunk[84], chunk[85], chunk[86], chunk[87],
@@ -281,7 +285,9 @@ impl ItemDatLoader {
                     attr2_kind,
                     attr2_item,
                     attr2_value,
-                    material,
+                    compound_material,
+                    compound_rank,
+                    display_material,
                     level,
                     fit_type,
                     special_ability,

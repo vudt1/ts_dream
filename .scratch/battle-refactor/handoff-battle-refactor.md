@@ -1,9 +1,9 @@
 # HANDOFF: Chuẩn hóa Giao thức & Vòng đời Trận đấu (Battle Refactor V2)
 
-- **Ngày cập nhật**: 2026-10-26
+- **Ngày cập nhật**: 2026-10-29
 - **Dự án**: `ts_dream` (Rust game server cho TS Online PC `aLogin.exe`)
 - **Tập tin lưu**: `.scratch/battle-refactor/handoff-battle-refactor.md` (bản sao tại `/tmp/handoff-battle-refactor.md`)
-- **Phiên bản đặc tả hiện tại**: `2.0` (tham chiếu [`.scratch/battle-refactor/spec_new.md`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/.scratch/battle-refactor/spec_new.md))
+- **Phiên bản đặc tả hiện tại**: `2.1` (tham chiếu [`.scratch/battle-refactor/spec_new.md`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/.scratch/battle-refactor/spec_new.md) và [`.scratch/battle-refactor/research-combo-rules.md`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/.scratch/battle-refactor/research-combo-rules.md))
 - **Theo dõi tiến độ chi tiết**: [`.scratch/battle-refactor/HANDOFF-implementation-progress.md`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/.scratch/battle-refactor/HANDOFF-implementation-progress.md)
 
 ---
@@ -19,9 +19,9 @@ Toàn bộ 23/24 ticket của đợt tái cấu trúc đã hoàn tất với b�
   - Ticket 16 (builder `35 06` thoại NPC / banner trận)
   - Ticket 17 (builder `35 0B` battle chat & system notice)
   - Ticket 18 (đấu nối timing 4 pha `0x35` & dynamic skill delay pacing trong `runner.rs` và `manager.rs`)
-- **Đợt 3 (Isometric Grid, Combo Rules & Capture Gates P2)**:
+- **Đợt 3 (Isometric Grid, Combo Rules V2 & Capture Gates P2)**:
   - Ticket 22 (chuẩn hóa giải thuật quét ô AoE Isometric `[0, 1, 2, 4, 3]` theo client Delphi `00652454`)
-  - Ticket 23 (quy tắc liên kích Combo: chặn tuyệt đối kỹ năng AoE $\ge 4$ mục tiêu)
+  - Ticket 23 (chuẩn hóa toàn diện Battle Combo Engine V2: Agi gap $\le 11$, LVTB Reborn 200, tỷ lệ suy giảm khi $\Delta \text{LV} < 25$, kích hoạt combo cho kỹ năng Active bao gồm Loạn Kích `13013`, sát thương $\times 1.3$, EXP $+8.6\%$, cách ly split-target)
   - Ticket 24 (hoàn thiện 8 rào chắn thẩm định thu phục NPC / bắt võ tướng `15001`)
 
 ---
@@ -37,16 +37,20 @@ Toàn bộ 23/24 ticket của đợt tái cấu trúc đã hoàn tất với b�
   - Đồng bộ nhánh `2` (Trước-Sau `opp = r ^ 1`), nhánh `5` (Chữ thập / Cross), nhánh `6` (2 hàng $\times$ 3 cột), nhánh `7` (Full Row 5) và nhánh `8` (Full Team 10 ô) trong cả `expand_sl_danh` và `get_pos_attack_by_fight_area`.
 - **Hồ sơ test**: [`tests/battle_isometric_targeting_test.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/tests/battle_isometric_targeting_test.rs) (7 tests).
 
-#### 2. Ticket 23: Chuẩn hóa quy tắc hợp kích Combo theo giới hạn mục tiêu AoE (`runner.rs`)
-- **Mã máy client đối chiếu**: `FUN_00647164` và `FUN_005ab678`.
-- **Quy tắc**:
-  - Chỉ đòn đánh thường (`10000`) và các kỹ năng có phạm vi tác dụng $\le 3$ mục tiêu (`nbTarget <= 3` hoặc `fight_area <= 3`) mới được phép tham gia chuỗi Combo.
-  - Các kỹ năng AoE diện rộng từ 4 mục tiêu trở lên (`nbTarget >= 4`, ví dụ Loạn kích `13013`, Phi sa `10008`, Hồng thủy `11008`, Thiên băng `10012`) bị vô hiệu hóa Combo hoàn toàn.
-- **Triển khai**:
-  - Helper `skill_target_count(data, skill_id) -> u8` phân giải từ `BinarySkillDef.fight_area` hoặc `Skill.sl_danh`.
-  - Cập nhật `detect_combo` kiểm tra cả đấu sĩ hiện tại và đồng đội kế tiếp; nếu một trong hai có `target_count > 3` thì hủy combo.
-  - Kế thừa combo (`ts.combo_active == 1`): reset về 0 nếu đấu sĩ kế tiếp thi triển kỹ năng AoE $\ge 4$.
-- **Hồ sơ test**: [`tests/battle_combo_rules_test.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/tests/battle_combo_rules_test.rs) (4 tests).
+#### 2. Ticket 23: Tái cấu trúc Battle Combo Engine V2 chuẩn TS Online (`runner.rs`, `damage.rs`, `skill_pc.rs`)
+- **Tài liệu nghiên cứu chuyên sâu**: [`.scratch/battle-refactor/research-combo-rules.md`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/.scratch/battle-refactor/research-combo-rules.md) & [`.scratch/battle-refactor/issues/23-combo-rules-aoe-threshold.md`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/.scratch/battle-refactor/issues/23-combo-rules-aoe-threshold.md).
+- **Mã máy client & dữ liệu đối chiếu**: `03_skill_and_combo.md` §3 (100% server-side), `Data/Skill.Dat` (377 records), `Data/skills.json` (376 entries).
+- **Quy tắc & Triển khai**:
+  1. **Agi Gap $\le 11$ điểm**: Xóa bỏ `diff <= 800`. Áp dụng trên tập hợp tham gia thực tế: mở chuỗi `|next.agi - attacker.agi| <= 11`, chuỗi nối dài $\ge 3$ người `max(combo_hi, next.agi) - min(combo_lo, next.agi) <= 11`. Không khóa cứng toàn đội, hỗ trợ split-target nhiều combo độc lập trong 1 turn.
+  2. **Tỷ lệ Hợp kích theo Level Quái**: `get_random_miss_combo(rng, lvtb_team, target_lv)` đạt $100\%$ khi $\text{LVTB} - \text{target\_lv} \ge 25$; giảm dần theo $\text{clamp}(\lfloor \frac{\text{LVTB} - 25}{\text{target\_lv}} \times 100\% \rfloor, 0, 100)$ khi $< 25$; rớt về $0\%$ khi $\text{LVTB} \le 25$.
+  3. **Level Hiệu dụng Trùng Sinh (Reborn = 200)**: Khi tính `avg1`/`avg2` ở đầu hiệp, đấu sĩ có `c.reborn > 0` được tính là **Level 200** cho mọi loại trận (PvE và PvP).
+  4. **Tiêu chí Kỹ năng phụ thuộc 100% vào `skill_type == 1` (`Active`)**:
+     - Cho phép combo: Đánh thường (`10000`/`0`) HOẶC mọi kỹ năng có `skill_type == 1` (`Active`), bao gồm cả **Loạn kích `13013` (4 mục tiêu)**, Hỏa tiễn `12003` (3 mục tiêu), Ném đá `10005` (3 mục tiêu), Đá lăn `10007` (2 mục tiêu), Dương viêm `12031` (2 mục tiêu).
+     - Cấm combo: Kỹ năng Phép thuật/Buff (`skill_type == 2` như Phi sa, Hồng thủy, Thiên băng), Debuff (`3`), Heal (`4`).
+  5. **Dữ liệu nhị phân `Skill.Dat`**: `skill_pc.rs:308` gán `fight_area: pc.nb_target` (offset 34) thay vì `pc.unk4` (luôn bằng 0).
+  6. **Khuếch đại Sát thương $\times 1.3$**: Áp dụng riêng cho ô mục tiêu chính được khóa chung (`row_attack`, `col_attack`). Các ô phụ trúng hiệu ứng lan AoE nhận sát thương cơ bản.
+  7. **Thưởng EXP $+8.6\%$ & Vàng/Drop**: Tích hợp `damage::calc_combo_exp` cho toàn bộ thành viên trong `ts.combo_cells`, chia vàng/drop, và dọn sạch `ts.combo_cells` sau hành động để cô lập tuyệt đối các hành động trong cùng 1 turn.
+- **Hồ sơ test**: [`tests/battle_combo_rules_test.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/tests/battle_combo_rules_test.rs) (11 tests toàn diện, bao gồm test Loạn kích combo, cách ly split-target, đường cong xác suất, cấp Trùng Sinh).
 
 #### 3. Ticket 24: Hoàn thiện 8 bước kiểm định thu phục võ tướng (`apply_catch`)
 - **Mã máy client đối chiếu**: `FUN_0063cf58` (dòng 362–486 & 631–638).
@@ -97,3 +101,13 @@ Toàn bộ 23/24 ticket của đợt tái cấu trúc đã hoàn tất với b�
 2. **Cơ sở dữ liệu**: Không ghi đè hoặc can thiệp trực tiếp `DB/ts_dream.db`. Mọi test DB dùng in-memory SQLite (`sqlite::memory:?cache=shared`).
 3. **Mã hóa chuỗi**: Chuỗi thoại và thông báo gửi client phải mã hóa **VISCII 1.1** (`crate::encoding`).
 4. **Git Policy**: **Tuyệt đối không tự ý `git commit`**. Người dùng sẽ commit thủ công.
+
+---
+
+## 4. Kỹ Năng Đề Xuất Cho Agent Kế Tiếp (Suggested Skills)
+
+Khi agent tiếp theo nhận phiên làm việc, nên gọi công cụ Skill cho các kỹ năng sau:
+- **`code-review`**: Đánh giá toàn bộ các thay đổi chưa commit trên nhánh `ss2` theo tiêu chuẩn kỹ thuật của dự án (Standards & Spec axis).
+- **`domain-modeling`**: Duy trì tính toàn vẹn của Ubiquitous Language trong [`GLOSSARY.md`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/GLOSSARY.md) cho các tính năng tiếp theo (chế đồ, giao dịch, nhiệm vụ).
+- **`test-audit`**: Đánh giá độ phủ và chất lượng của bộ test suite (35+ integration test files trong `tests/`).
+- **`reverse-engineer-anything`**: Nếu cần bóc tách các hành vi mạng chưa rõ khi chạy capture thực tế cho Ticket 14.

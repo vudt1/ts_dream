@@ -40,7 +40,7 @@
 | 20 | [`issues/20-turn-lifecycle-timing-and-34-01.md`](issues/20-turn-lifecycle-timing-and-34-01.md) | ✅ completed | Barrier ack 0B FA 1.5s + phát 34 01 đầu hiệp |
 | 21 | [`issues/21-turn-action-finish-32-02-frame.md`](issues/21-turn-action-finish-32-02-frame.md) | ✅ completed | Builder 32 02 turn_action_finish |
 | 22 | [`issues/22-isometric-grid-aoe-targeting.md`](issues/22-isometric-grid-aoe-targeting.md) | ✅ completed | Chuẩn hóa lưới Isometric AoE [0, 1, 2, 4, 3] |
-| 23 | [`issues/23-combo-rules-aoe-threshold.md`](issues/23-combo-rules-aoe-threshold.md) | ✅ completed | Chặn kỹ năng AoE >= 4 tham gia Combo |
+| 23 | [`issues/23-combo-rules-aoe-threshold.md`](issues/23-combo-rules-aoe-threshold.md) | ✅ completed | Chuẩn hóa toàn diện Combo: Agi <= 11, LVTB >= 25, Reborn 200, Active Type, Loạn kích combo, Dmg x1.3, Exp x1.086 |
 | 24 | [`issues/24-capture-validation-gates.md`](issues/24-capture-validation-gates.md) | ✅ completed | 8 rào chắn bắt võ tướng (Lệch LV <= 5, kind 0x16) |
 
 **Tiến độ hiện tại**:

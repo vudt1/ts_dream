@@ -305,7 +305,7 @@ pub fn pc_to_binary(pc: &PcSkillDef) -> BinarySkillDef {
         attribute: pc.skill_type,
         level: 0,
         fight_way: pc.nb_target,
-        fight_area: pc.unk4,
+        fight_area: pc.nb_target,
         round: pc.state,
         spend_second: pc.delay,
         hit_status: pc.unk11,

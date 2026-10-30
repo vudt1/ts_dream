@@ -76,9 +76,23 @@ pub fn get_random_miss_flee(
     randomize_with_percent(rng, 1, 0, percent)
 }
 
-/// Combo roll — always hits (percent 100) => returns 1.
-pub fn get_random_miss_combo(rng: &mut DotNetRandom) -> i64 {
-    randomize_with_percent(rng, 1, 0, 100)
+/// Combo roll: checks LVTB Team vs Target Level (Ticket 23).
+/// - 100% when LVTB - Target LV >= 25.
+/// - Clamped degradation when LVTB - Target LV < 25.
+/// - 0% when LVTB <= 25.
+pub fn get_random_miss_combo(rng: &mut DotNetRandom, lvtb_team: f64, target_lv: i64) -> i64 {
+    if target_lv <= 0 {
+        return 1;
+    }
+    if lvtb_team - target_lv as f64 >= 25.0 {
+        return 1;
+    }
+    let diff = lvtb_team - 25.0;
+    if diff <= 0.0 {
+        return 0;
+    }
+    let percent = ((diff / target_lv as f64) * 100.0).floor() as i64;
+    randomize_with_percent(rng, 1, 0, percent.clamp(0, 100))
 }
 
 /// Sequentially fold pairwise 50% rolls across `items`.

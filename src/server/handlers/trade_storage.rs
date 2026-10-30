@@ -9,7 +9,9 @@ use crate::protocol::{encoder, frame};
 use crate::server::dispatcher::{HandleOutcome, OpcodeCtx};
 use crate::protocol::GOLD_CAP;
 use crate::server::inventory;
-use crate::server::session::{lock_online_sessions, InventoryItem, PetState, Session, TradeState};
+use crate::server::session::{
+    lock_online_sessions, registry_update_if_online, InventoryItem, PetState, Session, TradeState,
+};
 
 /// Default trade timeout in milliseconds (60 seconds).
 pub const TRADE_TIMEOUT_MS: u64 = 60_000;
@@ -250,12 +252,6 @@ fn registry_get(id: u32) -> Option<Session> {
 }
 fn registry_put(s: Session) {
     lock_online_sessions().insert(s.id, s);
-}
-fn registry_update_if_online(s: &Session) {
-    let mut sessions = lock_online_sessions();
-    if sessions.contains_key(&s.id) {
-        sessions.insert(s.id, s.clone());
-    }
 }
 
 /// Op 0x19.

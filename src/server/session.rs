@@ -708,6 +708,14 @@ pub fn lock_online_sessions() -> std::sync::MutexGuard<'static, std::collections
     }
 }
 
+/// Updates an online player session in the central registry if they are currently online.
+pub fn registry_update_if_online(s: &Session) {
+    let mut sessions = lock_online_sessions();
+    if sessions.contains_key(&s.id) {
+        sessions.insert(s.id, s.clone());
+    }
+}
+
 /// Locks player operations in stable id order. A shop purchase locks buyer and
 /// seller; ordinary frames and disconnects lock only their own player. This
 /// prevents cross-player lost updates without blocking unrelated sessions.

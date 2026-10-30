@@ -47,6 +47,12 @@ pub fn item_added_frame(item: &InventoryItem) -> String {
     crate::protocol::frame("1706", &body)
 }
 
+/// The single `17 09` "item count changed" frame builder (S→C).
+pub fn item_count_changed_frame(slot: u8, count: u8) -> String {
+    let body = format!("{:02X}{:02X}", slot, count);
+    crate::protocol::frame("1709", &body)
+}
+
 /// Build an inventory item from its static template (`Data.Item`), carrying the
 /// base `_1`/`_2` stats, element and elemental bonus. Falls back to a bare
 /// id/count item when the id is not in the static table.
@@ -148,3 +154,52 @@ pub fn remove_item(bag: &mut Vec<InventoryItem>, item_id: u16, count: u32) -> u3
     bag.retain(|i| i.count > 0 || i.id == 0);
     removed
 }
+
+/// Upsert a single inventory item into SQLite `inventories` table.
+pub async fn upsert_inventory_slot<'a, E>(
+    executor: E,
+    char_id: i64,
+    storage_type: i64,
+    item: &InventoryItem,
+) -> Result<(), sqlx::Error>
+where
+    E: sqlx::Executor<'a, Database = sqlx::Sqlite>,
+{
+    use crate::db::modern::sqlite::inventories::{INVENTORY_COLUMNS, inventory_placeholders};
+    let sql = format!(
+        "INSERT INTO inventories ({}) VALUES ({})
+         ON CONFLICT(playerid, storagetype, slot) DO UPDATE SET
+         itemid=excluded.itemid, quantity=excluded.quantity, damage=excluded.damage,
+         element=excluded.element, elementvalue=excluded.elementvalue",
+        INVENTORY_COLUMNS,
+        inventory_placeholders(23)
+    );
+    sqlx::query(&sql)
+        .bind(char_id)
+        .bind(storage_type)
+        .bind(i64::from(item.slot))
+        .bind(i64::from(item.id))
+        .bind(i64::from(item.count))
+        .bind(i64::from(item.doben))
+        .bind(i64::from(item.long_val))
+        .bind(i64::from(item.giatri_long))
+        .bind(i64::from(item.khang))
+        .bind(0i64)
+        .bind(i64::from(item.texp))
+        .bind(0i64)
+        .bind(0i64)
+        .bind(0i64)
+        .bind(0i64)
+        .bind(0.0f64)
+        .bind(0i64)
+        .bind(0i64)
+        .bind(0i64)
+        .bind(0i64)
+        .bind(0i64)
+        .bind(0i64)
+        .bind(0i64)
+        .execute(executor)
+        .await?;
+    Ok(())
+}
+
