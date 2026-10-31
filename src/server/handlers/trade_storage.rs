@@ -251,7 +251,7 @@ fn registry_get(id: u32) -> Option<Session> {
     lock_online_sessions().get(&id).cloned()
 }
 fn registry_put(s: Session) {
-    lock_online_sessions().insert(s.id, s);
+    registry_update_if_online(&s);
 }
 
 /// Op 0x19.

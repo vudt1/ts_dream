@@ -1,6 +1,6 @@
 //! Comprehensive Economy Integration Tests (Tickets 01 - 07).
 //!
-//! - Strict compliance: In-memory SQLite (`sqlite::memory:?cache=shared`), never touches `DB/ts_dream.db`.
+//! - Strict compliance: official test DB `DB/ts_dream_test.db` (via `tests/common/test_db.rs`), never touches `DB/ts_dream.db`.
 //! - No `#[cfg(test)]` in `src/`.
 //! - Tests wire packet byte structures against `aLogin.exe` protocol specifications:
 //!   1. Currency model & post-login bank sync (`1A 04`, `1D 04`, shop_point preservation, GOLD_CAP clamp).
@@ -16,7 +16,6 @@ use ts_dream::battle::service::BattleService;
 use ts_dream::data::loader::GameData;
 use ts_dream::data::loaders::item::ItemDef;
 use ts_dream::db::modern::sqlite::SqliteRepositories;
-use ts_dream::db::pool::{bootstrap, DbPool};
 use ts_dream::protocol::{
     encoder, GOLD_CAP, NPC_SHOP_BUY_BAG_FULL, NPC_SHOP_BUY_DISRUPTED,
     NPC_SHOP_BUY_INSUFFICIENT_GOLD, NPC_SHOP_SELL_GOLD_FULL_ALT, NPC_SHOP_SELL_ITEM_NOT_FOUND,
@@ -37,17 +36,8 @@ use ts_dream::server::session::{
 };
 use ts_dream::server::spawn::build_logined_sequence_session;
 
-async fn setup_test_db() -> DbPool {
-    let pool = bootstrap("sqlite::memory:?cache=shared", None)
-        .await
-        .expect("bootstrap in-memory SQLite");
-    let schema = include_str!("../migrations/0001_init.sql");
-    sqlx::raw_sql(schema)
-        .execute(&pool.write)
-        .await
-        .expect("execute 0001_init.sql migration");
-    pool
-}
+mod common;
+use common::test_db::setup_test_db;
 
 fn create_test_conn(player_id: u32, db_char_id: i64) -> Conn {
     let mut conn = Conn::default();
@@ -525,7 +515,7 @@ async fn test_bank_deposit_withdraw_with_ui_unlock() {
         sender: None,
     };
 
-    // Create an account & character in in-memory DB
+    // Create an account & character in the test DB
     let acc_id = ts_dream::db::accounts::create(&pool, "pass1", "pass2")
         .await
         .expect("create account");

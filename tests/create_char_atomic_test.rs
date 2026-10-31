@@ -10,7 +10,6 @@
 //! - Enter-game short-circuit for charless authed sessions (no extra login).
 
 use ts_dream::db::modern::sqlite::SqliteRepositories;
-use ts_dream::db::pool::{bootstrap, DbPool};
 use ts_dream::protocol::SystemAlertReason;
 use ts_dream::server::dispatcher::{OpcodeCtx, ServerEnv};
 use ts_dream::server::handlers::character::handle_character;
@@ -18,17 +17,8 @@ use ts_dream::server::handlers::login::handle_enter_game;
 use ts_dream::server::session::{Conn, Session};
 use ts_dream::server::spawn;
 
-async fn setup_test_db() -> DbPool {
-    let pool = bootstrap("sqlite::memory:?cache=shared", None)
-        .await
-        .expect("bootstrap in-memory SQLite");
-    let schema = include_str!("../migrations/0001_init.sql");
-    sqlx::raw_sql(schema)
-        .execute(&pool.write)
-        .await
-        .expect("execute 0001_init.sql migration");
-    pool
-}
+mod common;
+use common::test_db::setup_test_db;
 
 fn create_payload(pass1: &[u8], pass2: &[u8]) -> Vec<u8> {
     let mut p = vec![

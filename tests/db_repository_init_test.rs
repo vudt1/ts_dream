@@ -1,24 +1,12 @@
 use ts_dream::db::modern::sqlite::SqliteRepositories;
 use ts_dream::db::modern::traits::{CharacterRepository, CharacterSeed, QuestRepository};
-use ts_dream::db::pool::{bootstrap, DbPool};
 use ts_dream::server::dispatcher::{HandleOutcome, OpcodeCtx, ServerEnv};
 use ts_dream::server::handlers::login::handle_login;
 use ts_dream::server::session::{Conn, HotkeySlot, InventoryItem, PetState, Session};
 use ts_dream::server::spawn;
 
-async fn setup_test_db() -> DbPool {
-    let pool = bootstrap("sqlite::memory:?cache=shared", None)
-        .await
-        .expect("bootstrap in-memory SQLite");
-
-    let schema = include_str!("../migrations/0001_init.sql");
-    sqlx::raw_sql(schema)
-        .execute(&pool.write)
-        .await
-        .expect("execute 0001_init.sql migration");
-
-    pool
-}
+mod common;
+use common::test_db::setup_test_db;
 
 #[tokio::test]
 async fn test_account_creation_and_auth() {

@@ -59,22 +59,12 @@ use tokio::net::TcpStream;
 use tokio::sync::RwLock;
 use ts_dream::db::modern::sqlite::SqliteRepositories;
 use ts_dream::db::modern::traits::CharacterSeed;
-use ts_dream::db::pool::{bootstrap, DbPool};
 use ts_dream::server::session::lock_online_sessions;
 use ts_dream::state::AppState;
 use ts_dream::web::server_control::ServerControl;
 
-async fn setup_test_db() -> DbPool {
-    let pool = bootstrap("sqlite::memory:?cache=shared", None)
-        .await
-        .expect("bootstrap SQLite");
-    let schema = include_str!("../migrations/0001_init.sql");
-    sqlx::raw_sql(schema)
-        .execute(&pool.write)
-        .await
-        .expect("init schema");
-    pool
-}
+mod common;
+use common::test_db::setup_test_db;
 
 fn build_login_wire(player_id: u32, pass: &[u8]) -> Vec<u8> {
     let mut payload = Vec::new();
@@ -137,7 +127,7 @@ async fn gm_kick_sends_protection_disconnect_alert_and_closes_socket() {
     let app = Arc::new(RwLock::new(AppState::new(1)));
     app.write().await.data_loaded = true;
 
-    let control = ServerControl::new(port, app.clone(), None, Some(pool));
+    let control = ServerControl::new(port, app.clone(), None, Some(pool.clone()));
     control.start().await.expect("start server");
 
     let mut sock = TcpStream::connect(("127.0.0.1", port))
@@ -214,7 +204,7 @@ async fn suspended_account_sends_account_locked_alert_and_closes_socket() {
     let app = Arc::new(RwLock::new(AppState::new(1)));
     app.write().await.data_loaded = true;
 
-    let control = ServerControl::new(port, app.clone(), None, Some(pool));
+    let control = ServerControl::new(port, app.clone(), None, Some(pool.clone()));
     control.start().await.expect("start server");
 
     let mut sock = TcpStream::connect(("127.0.0.1", port))
@@ -259,7 +249,7 @@ async fn double_login_live_incumbent_sends_alert_and_closes_new_socket() {
     let app = Arc::new(RwLock::new(AppState::new(1)));
     app.write().await.data_loaded = true;
 
-    let control = ServerControl::new(port, app.clone(), None, Some(pool));
+    let control = ServerControl::new(port, app.clone(), None, Some(pool.clone()));
     control.start().await.expect("start server");
 
     // Client 1 connects and logs in

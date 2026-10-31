@@ -7,26 +7,16 @@
 //!   are hydrated from template data after relog.
 //! - Per-instance fields (`khang`, `texp`, `long_val`, `giatri_long`) are preserved
 //!   across load/save cycles.
-//! - All DB operations use in-memory SQLite (zero production DB mutation).
+//! - All DB operations use the test DB `DB/ts_dream_test.db` (zero production DB mutation).
 
 use ts_dream::data::loader::GameData;
 use ts_dream::data::tables::Item;
 use ts_dream::db::modern::sqlite::SqliteRepositories;
 use ts_dream::db::modern::traits::CharacterSeed;
-use ts_dream::db::pool::{bootstrap, DbPool};
 use ts_dream::server::session::{InventoryItem, Session};
 
-async fn setup_test_db() -> DbPool {
-    let pool = bootstrap("sqlite::memory:?cache=shared", None)
-        .await
-        .expect("bootstrap SQLite");
-    let schema = include_str!("../migrations/0001_init.sql");
-    sqlx::raw_sql(schema)
-        .execute(&pool.write)
-        .await
-        .expect("execute schema");
-    pool
-}
+mod common;
+use common::test_db::setup_test_db;
 
 fn build_mock_game_data() -> GameData {
     let mut data = GameData::default();

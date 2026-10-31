@@ -1,24 +1,12 @@
 use ts_dream::db::modern::sqlite::SqliteRepositories;
 use ts_dream::db::modern::traits::CharacterSeed;
-use ts_dream::db::pool::{bootstrap, DbPool};
 use ts_dream::server::auto_save::fingerprint;
 use ts_dream::server::dispatcher::{HandleOutcome, OpcodeCtx, ServerEnv};
 use ts_dream::server::handlers::inventory::handle_inventory;
 use ts_dream::server::session::{Conn, InventoryItem, Session};
 
-async fn setup_test_db() -> DbPool {
-    let pool = bootstrap("sqlite::memory:?cache=shared", None)
-        .await
-        .expect("bootstrap in-memory SQLite");
-
-    let schema = include_str!("../migrations/0001_init.sql");
-    sqlx::raw_sql(schema)
-        .execute(&pool.write)
-        .await
-        .expect("execute 0001_init.sql migration");
-
-    pool
-}
+mod common;
+use common::test_db::setup_test_db;
 
 fn sample_item(slot: u8, id: u16, count: u8) -> InventoryItem {
     InventoryItem {

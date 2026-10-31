@@ -53,17 +53,8 @@ fn outbound_queue_capacity_invalid_env_is_rejected() {
 
 use tokio::io::AsyncWriteExt;
 
-async fn setup_test_db() -> ts_dream::db::pool::DbPool {
-    let pool = ts_dream::db::pool::bootstrap("sqlite::memory:?cache=shared", None)
-        .await
-        .expect("bootstrap SQLite");
-    let schema = include_str!("../migrations/0001_init.sql");
-    sqlx::raw_sql(schema)
-        .execute(&pool.write)
-        .await
-        .expect("run init schema");
-    pool
-}
+mod common;
+use common::test_db::setup_test_db;
 
 #[tokio::test]
 async fn full_outbound_queue_disconnects_client_without_blocking() {
@@ -90,7 +81,7 @@ async fn full_outbound_queue_disconnects_client_without_blocking() {
         .expect("create char");
 
     // Small queue capacity of 2
-    let control = ServerControl::new(port, app.clone(), None, Some(pool))
+    let control = ServerControl::new(port, app.clone(), None, Some(pool.clone()))
         .with_outbound_queue_capacity(2);
     control.start().await.expect("listener starts");
 

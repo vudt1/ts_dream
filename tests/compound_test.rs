@@ -231,19 +231,10 @@ fn test_compound_fallback_when_unmatched() {
 }
 
 // =========================================================================
-// Integration Test Helper: In-memory DB bootstrap
+// Integration Test Helper: shared test DB (DB/ts_dream_test.db)
 // =========================================================================
-async fn setup_test_db() -> ts_dream::db::pool::DbPool {
-    let pool = ts_dream::db::pool::bootstrap("sqlite::memory:?cache=shared", None)
-        .await
-        .expect("bootstrap in-memory SQLite");
-    let schema = include_str!("../migrations/0001_init.sql");
-    sqlx::raw_sql(schema)
-        .execute(&pool.write)
-        .await
-        .expect("execute 0001_init.sql migration");
-    pool
-}
+mod common;
+use common::test_db::setup_test_db;
 
 // =========================================================================
 // Test Ticket 05: Feather Socketing Pure Logic Engine

@@ -10,22 +10,12 @@ use std::time::Duration;
 use tokio::sync::{mpsc, RwLock};
 
 use ts_dream::db::modern::sqlite::SqliteRepositories;
-use ts_dream::db::pool::{bootstrap, DbPool};
 use ts_dream::server::session::{lock_online_sessions, Session};
 use ts_dream::state::AppState;
 use ts_dream::web::server_control::ServerControl;
 
-async fn setup_test_db() -> DbPool {
-    let pool = bootstrap("sqlite::memory:?cache=shared", None)
-        .await
-        .expect("bootstrap SQLite");
-    let schema = include_str!("../migrations/0001_init.sql");
-    sqlx::raw_sql(schema)
-        .execute(&pool.write)
-        .await
-        .expect("init schema");
-    pool
-}
+mod common;
+use common::test_db::setup_test_db;
 
 #[tokio::test]
 async fn live_incumbent_rejects_second_login() {
@@ -151,7 +141,7 @@ async fn dead_incumbent_socket_is_closed_over_tcp_when_evicted() {
     app.write().await.data_loaded = true;
 
     // Short idle timeout: 200 ms
-    let control = ServerControl::new(port, app.clone(), None, Some(pool))
+    let control = ServerControl::new(port, app.clone(), None, Some(pool.clone()))
         .with_idle_timeout(Duration::from_millis(200));
     control.start().await.expect("start server");
 

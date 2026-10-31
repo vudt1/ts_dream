@@ -18,181 +18,117 @@ Single-context layout — one [`GLOSSARY.md`](GLOSSARY.md) + `docs/adr/` at the 
 
 Mọi quy chuẩn viết mã, đồng thời (Two-Phase State Lock), đồng bộ Registry, wire parity và kiểm thử toàn vẹn slot **bắt buộc** phải tuân thủ [`CODING_STANDARDS.md`](CODING_STANDARDS.md).
 
-### Concurrency & Architecture ADRs
+### Architecture ADRs
 
-Quy chuẩn giao dịch nguyên tử, Two-Phase State Lock & 5 Containers: xem [`docs/adr/0005-economy-wire-parity-and-transactions.md`](docs/adr/0005-economy-wire-parity-and-transactions.md).
+Đọc ADR tương ứng trong `docs/adr/` trước khi sửa phân hệ đó:
+
+- Giao dịch nguyên tử, Two-Phase State Lock & 5 Containers (kinh tế, kho, trade): [`0005`](docs/adr/0005-economy-wire-parity-and-transactions.md).
+- Battle protocol & vòng đời lượt: [`0006`](docs/adr/0006-battle-protocol-parity-and-turn-lifecycle.md).
+- Compound / khảm lông (crafting): [`0007`](docs/adr/0007-compound-wire-parity-and-crafting-engine.md).
+- Công thức PC vs mobile, đổi tên module legacy: [`0002`](docs/adr/0002-pc-server-mobile-formula.md).
+
+### Wire protocol reference
+
+Tra cứu payload theo opcode: [`docs/client-opcodes.md`](docs/client-opcodes.md) (ánh xạ client ↔ server), `spec/exhaustive_by_opcode/opcode_<XX>_full_payloads.md` (payload đầy đủ từng opcode), `spec/client_*_handler.md` (đặc tả handler client đã dịch ngược).
 
 ---
 
 ## Tech Stack
 
-- **Ngôn ngữ & Runtime**: Rust (2021 edition) + Tokio 1 (`full` async runtime).
-- **Web Framework**: Axum 0.8 (Web admin dashboard phục vụ tại port 8090, chia sẻ cùng Tokio runtime với TCP Server).
-- **Template Engine**: Askama 0.12 (Biên dịch HTML thẳng vào binary, kết hợp HTMX).
-- **Database**: SQLite (kết nối qua SQLx 0.8 với `sqlite`, `runtime-tokio-rustls`, `migrate`), kiến trúc Dual-Pool: `read` (tối đa 16 sessions song song) và `write` (độc quyền 1 session chống `SQLITE_BUSY`), chế độ WAL (`PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;`). File cơ sở dữ liệu `DB/ts_dream.db`. Tự động flush WAL về file chính định kỳ và khi dừng TCP server/thoát tiến trình.
-- **Mã hóa & Định dạng Wire**: Giao thức TS Online (Header `F4 44`, XOR key `0xAD`, VISCII 1.1 text encoding).
-- **Thư viện bổ sung**: Serde, Serde JSON, TOML 0.8, Tracing + tracing-subscriber (env-filter), Anyhow, Thiserror 2, Hex, Chrono, Futures. Dev: Tempfile, Tower.
+- **Ngôn ngữ & Runtime**: Rust (2021 edition) + Tokio 1 (`full`).
+- **Web Admin**: Axum 0.8 + Askama 0.12 + HTMX, port 8090, chung Tokio runtime với Game TCP (port 6414).
+- **Database**: SQLite qua SQLx 0.8, Dual-Pool `read` (16 kết nối) / `write` (1 kết nối độc quyền, chống `SQLITE_BUSY`), WAL + `synchronous = NORMAL`. File `DB/ts_dream.db`; WAL được checkpoint định kỳ và khi dừng server.
+- **Wire**: Header `F4 44`, XOR key `0xAD`, text VISCII 1.1.
+- **Cấu hình**: file TOML + biến môi trường `TS_*` (xem [`src/config.rs`](src/config.rs)).
 
 ---
 
 ## Hướng Dẫn Kiểm Thử (Testing Guide)
 
-- **Vị trí duy nhất cho test**: Mọi unit test / integration test mới **phải** đặt trong thư mục `tests/` ở repo root. **Cấm** `#[cfg(test)]` inline trong `src/` (kể cả `mod tests` nhỏ). Nếu cần test pure-logic, tạo file `tests/<feature>_test.rs` và import qua `ts_dream::...` public API.
-- **Tách biệt DB Test và DB Production**: Tuyệt đối **không** chạy test ghi đè lên file production `DB/ts_dream.db`. Test chạm cơ sở dữ liệu có thể thực hiện theo 2 cách:
-  1. **In-memory SQLite (`sqlite::memory:?cache=shared`)**: Tối ưu cho unit test / repository test vì tốc độ thực thi tức thì, 0 disk I/O, độc lập giữa các test runner và tự hủy sau khi xong.
-  2. **File DB riêng cho test (`DB/ts_dream_test.db` hoặc tempfile)**: Phù hợp cho integration test kiểm thử WAL checkpoint hoặc persist. Biến môi trường chỉ định:
-     ```bash
-     TS_TEST_DB_URL=sqlite://DB/ts_dream_test.db cargo test --test <test_name>
-     ```
-     File `*test.db` luôn được `.gitignore` loại trừ, không commit vào kho mã nguồn.
-- **Quy chuẩn Test Nghiệp Vụ Đa Phiên & Trao Đổi Đồ**:
-  - *Kiểm thử số lượng lẻ và tính toàn vẹn slot*: Mọi test thao tác vật phẩm (chuyển kho, bán sạp, trade) phải truyền số lượng lẻ và kiểm tra các slot phụ cận không bị ảnh hưởng (chống collateral transfer bug).
-  - *Kiểm thử luồng tự nhiên qua Dispatcher*: Không can thiệp thủ công `sessions.insert` giữa các bước test của giao dịch đa bên (P2P Trade); phải để server tự xử lý đồng bộ qua `registry_update_if_online`.
-- **Khi chạy lại test suite** (sau khi scaffold lại):
-  ```bash
-  cargo test --all-targets --no-fail-fast
-  ```
+Chi tiết đầy đủ tại `CODING_STANDARDS.md` §3. Các điểm thao tác hằng ngày:
+
+- **Vị trí test**: mọi test đặt trong `tests/<feature>_test.rs`, import qua public API `ts_dream::...`; helper dùng chung ở `tests/common/`. `src/` không chứa `#[cfg(test)]` (chốt chặn bởi `tests/architecture_guardrails_test.rs`).
+- **Negative test**: mỗi User Story trong spec có test từ chối tương ứng, assert cả thông báo lỗi/Toast gửi về client.
+- **DB test**: gọi `common::test_db::setup_test_db()` — DB chính thức `DB/ts_dream_test.db` (override bằng `TS_TEST_DB_URL`), tự reset schema và khóa tuần tự (chi tiết §3.4). Production `DB/ts_dream.db` chỉ dành cho server.
+- **Vật phẩm & đa phiên**: số lượng lẻ + assert slot phụ cận nguyên vẹn; P2P trade đồng bộ tự nhiên qua dispatcher (`registry_update_if_online`).
+- **Chu kỳ chạy**: khi phát triển chạy `cargo test --test <feature>_test`; chạy `cargo test --all-targets --no-fail-fast` một lần ở bước chốt trước handoff.
 
 ---
 
 ## Cấu trúc Codebase (Codebase Structure)
 
+Bảng opcode → handler: nguồn sự thật duy nhất là [`src/server/dispatcher.rs`](src/server/dispatcher.rs) (Level-1) và hàm `handle_*` trong từng handler (Level-2 sub-opcode); hằng số `OP_*` ở [`src/protocol/mod.rs`](src/protocol/mod.rs).
+
 ```text
 ts_dream/
-├── Cargo.toml                  # Khai báo crate & phụ thuộc
-├── build.rs                    # Đóng gói Data/ và DB/ vào cạnh binary khi cargo build
-├── GLOSSARY.md                  # Từ vựng miền (Domain Glossary & Ubiquitous Language)
-├── CODING_STANDARDS.md          # Quy chuẩn viết mã, đồng thời, wire parity & test integrity
-├── AGENTS.md                   # Hướng dẫn Agent, Tech Stack & Cấu trúc Codebase
-├── LICENSE & README.md         # Giấy phép & hướng dẫn dựng dự án
-├── TS_Server_OP_Code_basic.md  # Đặc tả opcode giao thức TS Online tham khảo
-├── DB/                         # Thư mục chứa cơ sở dữ liệu SQLite (ts_dream.db, ts_dream.db-wal, ts_dream.db-shm)
-├── Data/                       # Dữ liệu tĩnh game (Item.dat, Npc.dat, Warp.Dat, eve.emg 9.8MB, Formula.Dat, BlissBag.Dat, Compound.Dat, Astrolabe.Dat, CityEx.Dat, EVOStatus.Dat, v.v.)
-├── templates/
-│   └── dashboard.html          # Template HTML duy nhất cho Web Dashboard (Askama + HTMX)
-│
-├── spec/
-│   └── codebase_design.md      # Thiết kế kiến trúc ban đầu
-├── migrations/
-│   ├── 0001_init.sql           # SQLx migration legacy
-│   
-├── golden/                     # 18 golden packets (01-hello → 18-player-trade) để diffing khi test (giữ lại, không phải test source)
-├── tests/                      # Thư mục test tập trung — **hiện trống** (tạm thời không cần test)
-│   └── .gitkeep                # Scaffold sẵn cho test tương lai; mọi test mới phải đặt ở đây, cấm #[cfg(test)] trong src/
+├── AGENTS.md / CODING_STANDARDS.md / GLOSSARY.md
+├── PRODUCTION_RUNBOOK.md       # Vận hành production (port, profile PC/aLogin, quy trình chạy)
+├── build.rs                    # Copy Data/ và DB/ cạnh binary khi cargo build
+├── Data/                       # Dữ liệu tĩnh game: *.Dat/*.dat, eve.emg, ground.mmg, *.json
+├── DB/                         # SQLite: ts_dream.db (production), ts_dream_test.db (test, gitignored)
+├── migrations/0001_init.sql    # Schema SQLx
+├── templates/dashboard.html    # Template Askama duy nhất của Web Dashboard
+├── docs/
+│   ├── adr/                    # ADR 0001..000N
+│   ├── agents/                 # Hướng dẫn issue tracker, triage labels, domain docs
+│   └── client-opcodes.md       # Ánh xạ opcode client Delphi ↔ server
+├── spec/                       # Đặc tả dịch ngược: exhaustive_by_opcode/, client_*_handler.md, server_main_opcode.md
+├── client_delphi/aLogin.exe    # Binary client PC tham chiếu
+├── client_pseudo_c/            # Pseudo-C/ASM decompile từ aLogin.exe (tra cứu, không sửa)
+├── examples/                   # Công cụ debug: dump_eve.rs, verify_skill_pc.rs
+├── tests/                      # Toàn bộ integration/unit test (<feature>_test.rs)
 └── src/
-    ├── main.rs                 # Entry point: Config → SQLite bootstrap → seed map drops → Web Admin (8090) + Game TCP (6414) + AutoSave + WAL Flush
-    ├── lib.rs                  # Module root cho thư viện ts_dream
-    ├── config.rs               # Xử lý file cấu hình + env TS_* (port, database_url, wal_checkpoint_interval_secs, data_dir)
-    ├── state.rs                # AppState chia sẻ dữ liệu qua Arc<RwLock<AppState>>
-    ├── error.rs                # Định nghĩa lỗi
-    ├── encoding.rs             # Xử lý mã hóa VISCII 1.1 / Big5 / UTF-8
-    ├── harness.rs              # Test harness hỗ trợ kiểm thử packet capture diffing
-    ├── db/                     # Repository layer — mọi SQL tập trung, unit-testable
-    │   ├── mod.rs              # Tổ chức module db
-    │   ├── pool.rs             # SQLite Dual-Pool (DbPool: read + write), WAL pragmas, periodic checkpoint & shutdown flush
-    │   ├── accounts.rs         # Truy vấn accounts (login)
-    │   ├── persist.rs          # Ghi-through players/skills/items/pets (no-op khi Option<&DbPool> là None)
-    │   ├── item_code.rs        # Nhận mã quà (item_code), degrade khi không có DB
-    │   └── modern/             # Schema 3NF: models + repository traits + SQLite impls (src/db/modern/sqlite/) + transactions nguyên tử
-    ├── protocol/               # Bộ mã hóa/giải mã XOR 0xAD, PacketReader, PacketWriter, Codecs
-    │   ├── mod.rs              # Hằng số giao thức (HEADER_TS_MAGIC, XOR_KEY, MIN_VERSION, MAX_LEVEL)
-    │   ├── frame.rs            # Phân tách khung tin (Frame F4 44)
-    │   ├── codec.rs            # Codec XOR 0xAD & opcode/subcode
-    │   ├── reader.rs           # PacketReader Zero-copy Little-Endian & VISCII string
-    │   ├── writer.rs           # PacketWriter Fluent builder buffer nhị phân
-    │   ├── encoder.rs          # Primitive encoders
-    │   └── codecs/             # Domain codecs
-    │       ├── mod.rs          # Export codecs
-    │       ├── thing_data.rs   # ThingDataCodec (35-byte item struct chuẩn hóa)
-    │       ├── player_info.rs  # PlayerCard (15B + name) & FriendExtra (20B)
-    │       └── ehuman.rs       # Bảng hằng ehuman (mã loại entity: EHuman, dùng cho record 0B FA / 0B 05)
-    ├── eve/                    # 4-Tier Eve Script Engine (Động cơ sự kiện kịch bản)
-    │   ├── mod.rs              # Export Eve Engine modules
-    │   ├── state.rs            # PlayerEventState snapshot & EveStateBuilder
-    │   ├── evaluator.rs        # EveConditionEvaluator (15 condition classes, 6 ops)
-    │   ├── resolver.rs         # EveChainResolver (ghép chuỗi AND & sắp xếp 4 tầng ưu tiên)
-    │   ├── group.rs            # GroupData weighted random resolver
-    │   └── auto_chain.rs       # EveAutoChainEngine (4 lớp chống lặp: same cond, re-question, re-battle, dup item)
-    ├── server/                 # TCP Server listener (Port 6414), Session, Systems & Handlers
-    │   ├── dispatcher.rs       # Bộ điều phối Level-1 phân luồng theo Main Opcode
-    │   ├── response.rs         # ResponseSender abstraction (đóng gói typed response packets)
-    │   ├── player_state.rs     # PlayerStateManager (quản lý HP, SP, base stats, equipment bonus)
-    │   ├── trade_system.rs     # TradeSystem (giao dịch 2 người chơi 2-phase atomic)
-    │   ├── auto_save.rs        # AutoSaveService (background interval task tự động lưu dirty state mỗi 3 phút)
-    │   ├── session.rs          # Quản lý phiên kết nối (Session, InventoryItem, offline state)
-    │   ├── spawn.rs            # Spawner quản lý đối tượng/entity trong map
-    │   ├── character_sheet.rs  # Bảng chỉ số nhân vật
-    │   ├── inventory.rs        # Quản lý túi đồ nhân vật
-    │   ├── pet_box.rs          # Quản lý hộp thú nuôi
-    │   ├── map_drops.rs        # Registry drop vật phẩm trên map (ItemOnMap.txt)
-    │   └── handlers/           # Level-2 Modular Opcode Handlers
-    │       ├── mod.rs          # Khai báo và dispatch các handler con
-    │       ├── login.rs        # Đăng nhập / xác thực (Opcode 0x01)
-    │       ├── character.rs    # Tạo / xóa nhân vật (Opcode 0x01)
-    │       ├── movement.rs     # Di chuyển / chuyển map (Opcode 0x05, 0x06)
-    │       ├── chat.rs         # Chat + lệnh slash (Opcode 0x02)
-    │       ├── party.rs        # Nhóm / Party / Quân sư (Opcode 0x14)
-    │       ├── skills.rs       # Học kỹ năng, reborn (Opcode 0x1C)
-    │       ├── stats.rs        # Phân bổ chỉ số (Opcode 0x08)
-    │       ├── battle.rs       # Battle handler (Opcode 0x0B, 0x32)
-    │       ├── quest.rs        # Nhiệm vụ legacy (quest) + hội thoại H6 (Opcode 0x18)
-    │       ├── npc_event.rs    # Tích hợp Eve Engine xử lý sự kiện NPC/Door/Fight (Opcode 0x18)
-    │       ├── inventory.rs    # Túi đồ / sắp xếp / thả vật phẩm (Opcode 0x17)
-    │       ├── use_item/       # Sử dụng vật phẩm (Opcode 0x17 sub 15)
-    │       │   ├── mod.rs      # Dispatcher & helper chung
-    │       │   ├── rewards.rs  # Lucky-box random rewards + fixed multi-item packs
-    │       │   ├── books.rs    # Sách skill / Texp / god / pet-stat / HP-store
-    │       │   ├── misc.rs     # Doll summon, dice, special frames, no-op ids, full-heal
-    │       │   └── reborn.rs   # Reborn-by-item + close socket
-    │       ├── shops.rs        # Cửa hàng NPC & người chơi (Opcode 0x17 sub 30..33, 0x0C)
-    │       ├── trade_storage.rs# Giao dịch & kho (Opcode 0x17 sub 51..52, 0x19, 0x1A)
-    │       ├── pet_actions.rs  # Hành động thú nuôi (Opcode 0x0F, 0x2C)
-    │       ├── expressions.rs  # Biểu cảm (Opcode 0x04)
-    │       ├── talk.rs         # Hội thoại NPC cơ bản (Opcode 0x18)
-    │       └── system.rs       # Hệ thống / ping / time (Opcode 0x00, 0x0A)
-    ├── web/                    # Web Admin Server (Axum)
-    │   ├── app.rs              # Router Dashboard (SSE log packet realtime, tạo tài khoản)
-    │   ├── server_control.rs   # Điều khiển server (start/stop)
-    │   └── static/             # Asset tĩnh (htmx.min.js)
-    ├── battle/                 # Battle Engine: Turn-based combat, RNG, damage math, targeting
-    │   ├── engine.rs           # Core battle engine (turn loop)
-    │   ├── manager.rs          # Battle manager
-    │   ├── runner.rs           # Battle runner (vòng đấu, hành động)
-    │   ├── service.rs          # Service layer (battle requests/rewards)
-    │   ├── damage.rs           # Damage math
-    │   ├── targeting.rs        # Chọn mục tiêu
-    │   ├── rng.rs              # Random number generation (3 luồng độc lập)
-    │   ├── construction.rs     # Khởi tạo battle instances (Player vs NPC, TeamDef, PK)
-    │   ├── npc_world.rs        # NPC tuần tra trên bản đồ (NpcOnMapWalk)
-    │   └── packets.rs          # Packet battle đi/đến client
-    └── data/                   # Binary Data Loaders & Data structures
-        ├── loader.rs           # Loader chính (`GameData`, nạp .Dat & eve.emg, gate DataLoaded)
-        ├── reader.rs           # `DatReader` nhị phân (Little-Endian, XOR decoding, reverse string)
-        ├── loaders/            # 9 bộ Binary Data Loaders
-        │   ├── mod.rs          # Export loaders
-        │   ├── item.rs         # `ItemDatLoader` (Item.dat 3.09 MB, 54 trường dữ liệu)
-        │   ├── npc.rs          # `NpcDatLoader` (Npc.dat 612 KB, chỉ số, skill, drop)
-        │   ├── eve.rs          # `EveDataLoader` (eve.emg 9.8 MB, 3,823 scene entries, 9 sections)
-        │   ├── warp.rs         # `WarpDatLoader` (Warp.Dat / Warp_C.dat)
-        │   ├── formula.rs      # `FormulaDatLoader` (Formula.Dat)
-        │   ├── bliss_bag.rs    # `BlissBagDatLoader` (BlissBag.Dat)
-        │   ├── compound.rs     # `CompoundDatLoader` (Compound.Dat)
-        │   ├── astrolabe.rs    # `AstrolabeDatLoader` (Astrolabe.Dat)
-        │   ├── city_ex.rs      # `CityExDatLoader` (CityEx.Dat)
-        │   └── evo_status.rs   # `EVOStatusDatLoader` (EVOStatus.Dat)
-        ├── ini.rs              # Đọc INI files legacy
-        ├── tables.rs           # Bảng tra cứu dữ liệu (Element, Job, Exp, etc.)
-        └── texps.rs            # Load công thức tăng điểm kinh nghiệm (TEXP)
+    ├── main.rs                 # Entry: Config → SQLite → seed map drops → Web (8090) + Game TCP (6414) + AutoSave + WAL flush
+    ├── lib.rs                  # Module root (khai báo toàn bộ module public)
+    ├── config.rs               # Config TOML + env TS_*
+    ├── state.rs                # AppState dùng chung (Arc<RwLock<AppState>>)
+    ├── error.rs / encoding.rs  # Lỗi chung / VISCII 1.1, Big5, UTF-8
+    ├── protocol/               # Frame F4 44, codec XOR 0xAD, PacketReader/Writer, encoder, hằng số OP_*
+    │   ├── system_alert.rs     # Frame cảnh báo/ngắt kết nối (0x00, chỉ S→C)
+    │   └── codecs/             # thing_data (item 35B), player_info, ehuman, npc_talk (0x14), quest_sync (0x18)
+    ├── crafting/               # Domain engine thuần (không I/O)
+    │   ├── basic/              # Compound theo Compound.Dat: algorithm, catalog, validator
+    │   └── socketing/          # Khảm lông +1..+10: feather, rate_table
+    ├── eve/                    # Eve Script Engine: state, evaluator, resolver, group, auto_chain
+    ├── battle/                 # Battle engine: engine, manager, runner, service, combat_formula,
+    │                           # damage, targeting, rng, construction, npc_world, packets
+    ├── data/                   # Loader dữ liệu nhị phân
+    │   ├── loader.rs           # GameData: nạp toàn bộ Data/
+    │   ├── reader.rs           # DatReader (LE, XOR, reverse string)
+    │   ├── loaders/            # Một file mỗi định dạng (item, npc, eve, skill_pc, warp, ground, rank, compound, ...)
+    │   └── ini.rs / tables.rs / texps.rs
+    ├── db/                     # Repository layer — mọi SQL tập trung tại đây
+    │   ├── pool.rs             # DbPool dual-pool, WAL checkpoint & shutdown flush
+    │   ├── accounts.rs / persist.rs / item_code.rs
+    │   ├── catalog.rs          # Asset provenance (file Data/ đã nạp, size, hash)
+    │   ├── domain.rs           # Truy vấn guild, world boss, ghi audit
+    │   └── modern/             # Schema 3NF: model, traits, transactions nguyên tử, sqlite/ (impl)
+    ├── server/
+    │   ├── dispatcher.rs       # Level-1: route theo main opcode
+    │   ├── session.rs          # Session, registry online, lock_player_operations
+    │   ├── spawn.rs            # Entity trên map, sys_msg_frame
+    │   ├── response.rs / player_state.rs / character_sheet.rs / inventory.rs / pet_box.rs
+    │   ├── trade_system.rs     # Trade 2 người chơi 2-phase atomic
+    │   ├── map_drops.rs / auto_save.rs
+    │   ├── gm.rs               # Lệnh GM qua chat
+    │   └── handlers/           # Level-2 handlers theo miền: login, character, movement, chat,
+    │                           # party, skills, stats, battle, talk, npc_event, quest, quest_sync,
+    │                           # inventory, use_item/, crafting, shops, trade_storage,
+    │                           # pet_actions, expressions, system, unimplemented (opcode chưa port)
+    └── web/                    # Axum: app.rs (router, SSE log), server_control.rs, static/htmx.min.js
 ```
+
+---
 
 ## Quy Chuẩn Đồng Thời & Trạng Thái Phiên (Concurrency Rules)
 
-- **Thứ tự khóa RAM (Lock Ordering)**: Mọi thao tác giữa 2 người chơi (Trade, Party, PK, Mua sạp) **bắt buộc** phải gọi `lock_player_operations([min(id1, id2), max(id1, id2)]).await` **trước khi** đọc dữ liệu từ `registry_get(partner_id)`.
-- **Đồng bộ Session Registry**: Mọi thay đổi trên `ctx.conn.session` trong luồng tương tác nhiều người chơi phải gọi `registry_update_if_online(&ctx.conn.session)` để các phiên khác đọc được trạng thái mới nhất.
-- **Kênh thông báo hệ thống**: Dùng duy nhất `crate::server::spawn::sys_msg_frame(msg)` cho thông báo kênh `020102`. Cấm dùng `020B`.
-- **Quy chuẩn chi tiết**: Xem toàn diện tại [`CODING_STANDARDS.md`](CODING_STANDARDS.md).
+Chi tiết tại `CODING_STANDARDS.md` §1–2. Ba hard guardrail:
+
+- **Lock ordering**: thao tác 2 người chơi (Trade, Party, PK, mua sạp) gọi `lock_player_operations([min(id1, id2), max(id1, id2)]).await` **trước khi** đọc `registry_get(partner_id)`.
+- **Đồng bộ registry**: sau biến động túi đồ/trạng thái, gọi duy nhất `crate::server::session::registry_update_if_online(&conn.session)`. Handler không chạm `lock_online_sessions().insert(...)` (chốt chặn bởi `tests/architecture_guardrails_test.rs`).
+- **Thông báo hệ thống**: dùng `crate::server::spawn::sys_msg_frame(msg)` (kênh `020102`); kênh `020B` không dùng cho mục đích này.
 
 ## Tool Execution Constraints
-- Không tự ý commit source, user sẽ tự commit source thủ công.
-- Tránh grep đệ quy toàn repo không giới hạn; loại trừ `Data/npc_drops.json` và `Data/Warps.txt` (tham chiếu `.ignore`) để tiết kiệm token và tránh treo tiến trình.
----
+
+- User tự commit thủ công; agent để thay đổi ở working tree.
+- Tìm kiếm tôn trọng `.ignore` (Data nhị phân, `Data/npc_drops.json`, `Data/Warps.txt`, `DB/`, `target/`, `client_delphi/`); khi grep, giới hạn trong `src/`, `tests/`, `docs/`, `spec/` để tiết kiệm token và tránh treo tiến trình.

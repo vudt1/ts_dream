@@ -19,8 +19,8 @@
 //!   (`NpcTalkCodec` / `QuestSyncCodec`), except the two fixed legacy frames
 //!   `F44402001407` (fade) and `F44402001408` (close dialog).
 //!
-//! **Persistence tests** bootstrap `sqlite::memory:?cache=shared` /
-//! `tempfile` DBs running `0001_init.sql` — the *single* idempotent baseline
+//! **Persistence tests** bootstrap the shared test DB (`DB/ts_dream_test.db`),
+//! running `0001_init.sql` — the *single* idempotent baseline
 //! (since 2026-09-22 the three `character_quest_*` tables + `completioncount`
 //! live there; there is no separate `0002` migration). The degradation test
 //! re-creates a *pre-CP6* baseline by dropping the quest tables + column.
@@ -32,7 +32,7 @@ use ts_dream::data::loader::GameData;
 use ts_dream::data::loaders::{EveFightData, EveResult, EveSceneInfo, SceneEveData};
 use ts_dream::data::tables::Warp;
 use ts_dream::db::modern::sqlite::SqliteRepositories;
-use ts_dream::db::pool::{bootstrap, DbPool};
+use ts_dream::db::pool::DbPool;
 use ts_dream::eve::auto_chain::{EventPhase, EventSession};
 use ts_dream::protocol::codecs::npc_talk::{NpcTalkCodec, TalkLockMode};
 use ts_dream::protocol::codecs::quest_sync::QuestSyncCodec;
@@ -752,18 +752,8 @@ fn snapshot_state_wires_quest_and_event_context() {
 // Persistence (migration 0002) + auto-save fingerprint
 // ============================================================================
 
-/// Schema for the round-trip test: `0001` alone (the single idempotent
-/// baseline — the Eve tables were merged into it on 2026-09-22).
-async fn setup_test_db() -> DbPool {
-    let pool = bootstrap("sqlite::memory:?cache=shared", None)
-        .await
-        .expect("bootstrap in-memory SQLite");
-    sqlx::raw_sql(include_str!("../migrations/0001_init.sql"))
-        .execute(&pool.write)
-        .await
-        .expect("execute 0001_init.sql migration");
-    pool
-}
+mod common;
+use common::test_db::setup_test_db;
 
 /// Minimal `accounts` + `characters` rows so `save()`/`load()` have a target.
 async fn seed_character(pool: &DbPool, account_id: i64) {
@@ -852,18 +842,12 @@ async fn persistence_round_trip_eve_state() {
 
 #[tokio::test]
 async fn persistence_degrades_when_quest_tables_are_missing() {
-    // Isolated file DB: apply 0001 then *re-create a pre-CP6 baseline* —
-    // drop the Eve/quest tables and the `completioncount` column. Models a
-    // database created before Checkpoint 6 (ADR 0004: `pool::migrate` is a
-    // no-op, so a live DB only gets new tables by applying the script) —
-    // save/load must degrade, never fail.
-    let dir = tempfile::tempdir().expect("tempdir");
-    let url = format!("sqlite://{}", dir.path().join("no_eve.db").display());
-    let pool = bootstrap(&url, None).await.expect("bootstrap file db");
-    sqlx::raw_sql(include_str!("../migrations/0001_init.sql"))
-        .execute(&pool.write)
-        .await
-        .expect("execute 0001_init.sql migration");
+    // Shared test DB (freshly reset with 0001) then *re-create a pre-CP6
+    // baseline* — drop the Eve/quest tables and the `completioncount` column.
+    // Models a database created before Checkpoint 6 (ADR 0004: `pool::migrate`
+    // is a no-op, so a live DB only gets new tables by applying the script) —
+    // save/load must degrade, never fail. The next `setup_test_db` resets it.
+    let pool = setup_test_db().await;
     sqlx::raw_sql(
         "DROP TABLE IF EXISTS character_quest_tasks;
          DROP TABLE IF EXISTS character_quest_dont;

@@ -6,7 +6,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use ts_dream::data::loader::GameData;
-use ts_dream::db::pool::{bootstrap, DbPool};
 use ts_dream::server::auto_save;
 use ts_dream::server::dispatcher::{dispatch, HandleOutcome, OpcodeCtx, ServerEnv};
 use ts_dream::server::handlers::movement;
@@ -19,17 +18,8 @@ fn data_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("Data")
 }
 
-async fn setup_test_db() -> DbPool {
-    let pool = bootstrap("sqlite::memory:?cache=shared", None)
-        .await
-        .expect("bootstrap in-memory SQLite");
-    let schema = include_str!("../migrations/0001_init.sql");
-    sqlx::raw_sql(schema)
-        .execute(&pool.write)
-        .await
-        .expect("execute 0001_init.sql migration");
-    pool
-}
+mod common;
+use common::test_db::setup_test_db;
 
 fn test_ctx<'a>(
     conn: &'a mut Conn,

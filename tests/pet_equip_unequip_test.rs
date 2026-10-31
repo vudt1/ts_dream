@@ -1,22 +1,10 @@
 use ts_dream::db::modern::sqlite::SqliteRepositories;
-use ts_dream::db::pool::{bootstrap, DbPool};
 use ts_dream::server::dispatcher::{HandleOutcome, OpcodeCtx, ServerEnv};
 use ts_dream::server::handlers::inventory::handle_inventory;
 use ts_dream::server::session::{Conn, InventoryItem, PetState, Session};
 
-async fn setup_test_db() -> DbPool {
-    let pool = bootstrap("sqlite::memory:?cache=shared", None)
-        .await
-        .expect("bootstrap in-memory SQLite");
-
-    let schema = include_str!("../migrations/0001_init.sql");
-    sqlx::raw_sql(schema)
-        .execute(&pool.write)
-        .await
-        .expect("execute 0001_init.sql migration");
-
-    pool
-}
+mod common;
+use common::test_db::setup_test_db;
 
 #[tokio::test]
 async fn test_pet_equip_and_unequip_flow() {

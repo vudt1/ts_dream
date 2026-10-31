@@ -2,6 +2,11 @@
 
 Tài liệu quy chuẩn lập trình và tiêu chuẩn thiết kế kiến trúc dành cho các **Reviewer Agents** (`/code-review`) và **Implementation Agents** khi làm việc trên codebase `ts_dream`.
 
+> [!IMPORTANT]
+> **Định vị Phạm vi Tiêu chuẩn (Scope of Standards)**:
+> - `CODING_STANDARDS.md` dành trọn vẹn cho các **Đánh giá Thiết kế & Kiến trúc (Judgement Calls)**: Two-Phase State Lock, tính nguyên tử DB, phân định ranh giới module (deep modules & clear seams), phản hồi lỗi wire parity và tính toàn vẹn trạng thái đa phiên.
+> - Các quy tắc cơ học (như cấm `#[cfg(test)]` trong `src/`, cấm gọi trực tiếp `lock_online_sessions().insert(...)` trong handler, dọn dẹp legacy aliases, cấm chuỗi literal hex `F4440400...`) được tự động hóa và chốt chặn xác thực qua kiểm thử cơ học tại [`tests/architecture_guardrails_test.rs`](tests/architecture_guardrails_test.rs) hoặc checklist kiểm thử trong Spec template.
+
 ---
 
 ## 1. Concurrency & State Lock Standards (Quy chuẩn Đồng thời & Khóa phiên)
@@ -66,17 +71,25 @@ Khi thực hiện bất kỳ giao dịch nào tương tác giữa 2 người ch�
   - Toàn bộ việc đồng bộ session phải diễn ra tự nhiên thông qua mã nguồn server (`registry_update_if_online`).
 
 ### 3.4 Tách biệt Cơ sở Dữ liệu
-- Mọi bài test tương tác cơ sở dữ liệu phải chạy trên In-memory SQLite:
-  `sqlite::memory:?cache=shared`
-- Tuyệt đối không chạy test ghi đè lên file production `DB/ts_dream.db`.
+- DB test chính thức là file SQLite riêng `DB/ts_dream_test.db` (gitignored), chạy cùng chế độ WAL + dual-pool như production để test phản ánh đúng hành vi persist/checkpoint.
+- Test nối DB qua helper `tests/common/test_db.rs` (`mod common;` + `common::test_db::setup_test_db().await`). Helper đọc `TS_TEST_DB_URL` (mặc định `sqlite://<repo>/DB/ts_dream_test.db`), khóa toàn cục để các test DB trong cùng binary chạy tuần tự, xóa sạch schema rồi chạy lại `migrations/0001_init.sql` → mỗi test bắt đầu từ DB trống, độc lập và lặp lại được.
+- File production `DB/ts_dream.db` chỉ dành cho server; test luôn trỏ tới `DB/ts_dream_test.db`.
+
+### 3.5 Nguyên Tắc "Every User Story must have a Negative Test"
+- Khi viết test cho một phân hệ (`tests/<feature>_test.rs`), **bắt buộc** phải có nhóm test kiểm tra các trường hợp từ chối (Rejection/Validation Error) tương ứng với từng User Story trong `spec.md`.
+- Không chỉ kiểm tra trạng thái trả về mà **bắt buộc** phải kiểm tra thông báo lỗi/Toast gửi về cho client qua wire (`sys_msg_frame` hoặc native error frame) không bị sai lệch hay che khuất (tránh bug masked error).
+
+### 3.6 Chu Kỳ Chạy Test & Chốt Chặn Handoff
+- Khi phát triển và sửa lỗi, chỉ chạy test tập trung cho tính năng đang làm (`cargo test --test <feature>_test`) để giữ chu kỳ phản hồi nhanh (tight loop).
+- **Chỉ chạy lại toàn bộ test suite** (`cargo test --all-targets --no-fail-fast`) ở bước chốt chặn cuối cùng trước khi bàn giao (handoff).
 
 ---
 
 ## 4. Code Health & Smell Baseline (Tiêu chuẩn Sạch mã nguồn)
 
 - **Tránh Magic Number / Primitive Obsession**:
-  Sử dụng các hằng số định danh miền (domain constants) đã được khai báo trong `src/protocol/mod.rs` (ví dụ: dùng `BANK_SUB_WITHDRAW` thay vì literal số `1`).
+  Sử dụng các hằng số định danh miền (domain constants) đã được khai báo trong `src/protocol/mod.rs` (ví dụ: dùng `BANK_SUB_WITHDRAW` thay vì literal số `1`). Các chuỗi literal hex (`F4440400...`) phải được thay thế bằng helper (như `item_count_changed_frame`), được chốt chặn bởi `tests/architecture_guardrails_test.rs`.
 - **Phân nhánh Sub-Opcode Tường Minh (Explicit Sub-Opcode Branching)**:
   Khi xử lý dispatch hoặc sinh phản hồi theo sub-opcode nhị phân (`u8`), **cấm** sử dụng fallback `else` vô điều kiện. Luôn phân nhánh tường minh (`if sub == CONST_A ... else if sub == CONST_B ... else { /* drop / no-op */ }`) để các gói tin mang sub-opcode lạ hoặc rác không bao giờ kích hoạt nhầm trạng thái mở khóa UI hay đột biến dữ liệu.
 - **Khử Duplicated Code & Legacy Aliases**:
-  Các logic định dạng frame dùng chung (như format 11-byte item không slot `storage_entry_no_slot`, frame mở khóa nút bấm UI ngân hàng) phải được trích xuất thành helper dùng chung. Khi chuẩn hóa API mới, phải chuyển đổi dứt điểm toàn bộ call-site và loại bỏ alias cũ.
+  Các logic định dạng frame dùng chung (như format 11-byte item không slot `storage_entry_no_slot`, frame mở khóa nút bấm UI ngân hàng) phải được trích xuất thành helper dùng chung. Khi chuẩn hóa API mới, phải chuyển đổi dứt điểm toàn bộ call-site và loại bỏ alias cũ (được kiểm tra tự động bởi `tests/architecture_guardrails_test.rs`).

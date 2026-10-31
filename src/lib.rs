@@ -66,4 +66,3 @@ pub mod battle {
     pub mod targeting;
 }
 
-pub mod harness;
