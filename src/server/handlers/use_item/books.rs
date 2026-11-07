@@ -83,7 +83,7 @@ pub async fn handle(ctx: &mut UseCtx<'_>) -> bool {
                 .get(&i64::from(skill_id))
                 .map(|s| s.sp.min(255) as u8)
                 .unwrap_or(0);
-            persist::upsert_skill(ctx.pool, pid, skill_id, lv, sp, 0).await;
+            let _ = persist::upsert_skill(ctx.pool, pid, skill_id, lv, sp, 0).await;
             // Remove 1 of the item id.
             ctx.conn.session.remove_homdo_item(id, 1);
             // Learn packet: F4440C0008016E01 + le32(lv) + le32(skillid).
@@ -111,19 +111,57 @@ pub async fn handle(ctx: &mut UseCtx<'_>) -> bool {
                     .get(&i64::from(sk))
                     .map(|s| s.sp.min(255) as u8)
                     .unwrap_or(0);
-                persist::upsert_skill(ctx.pool, pid, sk, lv, sp, 0).await;
+                let _ = persist::upsert_skill(ctx.pool, pid, sk, lv, sp, 0).await;
             }
         }
         ctx.consume().await;
         return true;
     }
 
+    // --- Consumable 46180 ("Cải vận phù"): Exorcise ghost ---
+    if id == 46180 {
+        if ctx.conn.session.ghost == 1 {
+            ctx.conn.session.ghost = 0;
+            persist::update_player(ctx.pool, pid, "ghost", 0).await;
+            crate::server::session::registry_update_if_online(&ctx.conn.session);
+            let sync_frame = crate::server::spawn::state_sync_frame(pid, 1, 0);
+            ctx.out.send(sync_frame.clone());
+            ctx.out.broadcast(pid, sync_frame);
+            ctx.consume().await;
+        } else {
+            ctx.sys_msg("Ban khong bi ma theo");
+        }
+        return true;
+    }
+
     // --- God book 46169 (god <= 240 gate, silent write, then consume). ---
     if id == 46169 {
         if ctx.conn.session.god <= 240 {
+            let was_zero = ctx.conn.session.god == 0;
             ctx.conn.session.god += 10;
-            // The god column update does NOT emit a stat packet.
+            persist::update_player(ctx.pool, pid, "god", ctx.conn.session.god as i64).await;
+            crate::server::session::registry_update_if_online(&ctx.conn.session);
+            if was_zero {
+                let sync_frame = crate::server::spawn::state_sync_frame(pid, 2, 1);
+                ctx.out.send(sync_frame.clone());
+                ctx.out.broadcast(pid, sync_frame);
+            }
         }
+        ctx.consume().await;
+        return true;
+    }
+
+    // --- Consumable 46644 ("Cửu Thiên Chiến Kỳ"): Reset weekly quota ---
+    if id == 46644 {
+        crate::server::handlers::quest_sync::set_quest_task(&mut ctx.conn.session, ctx.out, 12310, 0);
+        let _ = crate::db::persist::persist_sessions_transaction(
+            ctx.pool,
+            &[&ctx.conn.session],
+            &["quest"],
+        )
+        .await;
+        crate::server::session::registry_update_if_online(&ctx.conn.session);
+        ctx.sys_msg("Da thiet lap lai luot Chinh Phuc Cuu Thien!");
         ctx.consume().await;
         return true;
     }

@@ -73,6 +73,8 @@ pub struct WarInfo {
     pub type19_id: i64,
     pub type19_lv: i64,
     pub type19_turn: i64,
+    pub hoa_huyet_lv: i64,
+    pub sach_dong_lv: i64,
 }
 
 impl WarInfo {

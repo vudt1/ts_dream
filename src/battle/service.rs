@@ -365,12 +365,36 @@ impl BattleSink for BattleSinkImpl {
                             // used, so they land after the battle's own end
                             // frames). Runs before the snapshot below so the
                             // resumed stat writes persist too.
-                            let (eve_frames, next_battle) =
-                                crate::server::handlers::talk::resume_eve_after_battle(
+                            let pool_opt = self.pool.try_read().ok().and_then(|p| p.clone());
+                            let pool_ref = pool_opt.as_ref();
+                            let (eve_frames, next_battle) = if let Ok(handle) = tokio::runtime::Handle::try_current() {
+                                match handle.runtime_flavor() {
+                                    tokio::runtime::RuntimeFlavor::CurrentThread => {
+                                        crate::server::handlers::talk::resume_eve_after_battle_sync(
+                                            &mut s,
+                                            outcome,
+                                            self.data.as_ref(),
+                                        )
+                                    }
+                                    _ => {
+                                        tokio::task::block_in_place(|| {
+                                            handle.block_on(crate::server::handlers::talk::resume_eve_after_battle(
+                                                &mut s,
+                                                outcome,
+                                                self.data.as_ref(),
+                                                pool_ref,
+                                            ))
+                                        })
+                                    }
+                                }
+                            } else {
+                                futures::executor::block_on(crate::server::handlers::talk::resume_eve_after_battle(
                                     &mut s,
                                     outcome,
                                     self.data.as_ref(),
-                                );
+                                    pool_ref,
+                                ))
+                            };
                             for f in &eve_frames {
                                 let _ = p.frames.try_send(f.clone());
                             }
@@ -594,6 +618,7 @@ fn apply_player_stat(s: &mut Session, stat: Stat, value: i64) -> Option<String> 
         Stat::Point => (Some(0x26), |s, v| s.point = clamp_u16(v)),
         Stat::SkillPoint => (Some(0x25), |s, v| s.skill_point = clamp_u16(v)),
         Stat::Fai => (Some(0x40), |s, v| s.tiengtam = clamp_u16(v)),
+        Stat::God => (None, |s, v| s.god = v.clamp(0, u32::MAX as i64) as u32),
     };
     apply(s, value);
     byte.map(|b| packets::status_update(b, value.clamp(i32::MIN as i64, i32::MAX as i64) as i32))
@@ -628,6 +653,8 @@ pub struct BattleService {
     next_battle: AtomicI32,
     /// Per-turn input wait (default 21 s).
     input_timeout: std::time::Duration,
+    /// Special events & North Star quiz manager
+    pub events: Arc<crate::server::events::EventLifecycleManager>,
 }
 
 impl Default for BattleService {
@@ -668,7 +695,14 @@ impl BattleService {
             per_exp: 1,
             next_battle: AtomicI32::new(1),
             input_timeout: std::time::Duration::from_secs(21),
+            events: Arc::new(crate::server::events::EventLifecycleManager::default()),
         }
+    }
+
+    /// Attach a custom Special Events Lifecycle Manager.
+    pub fn with_events(mut self, events: Arc<crate::server::events::EventLifecycleManager>) -> Self {
+        self.events = events;
+        self
     }
 
     /// Attach the DB pool used for post-battle persistence.
@@ -1120,9 +1154,108 @@ impl BattleService {
         )
     }
 
+    /// Check if a battle is an active North Star quiz battle.
+    pub fn is_north_star_battle(&self, battle_id: i32) -> bool {
+        self.events.is_north_star_battle(battle_id)
+    }
+
+    /// Abort an ongoing battle and remove registered handles / quizzes.
+    pub fn abort_battle(&self, battle_id: i32) {
+        if let Ok(mut handles) = self.handles.lock() {
+            handles.remove(&battle_id);
+        }
+        if let Ok(mut cells) = self.join_cells.lock() {
+            cells.remove(&battle_id);
+        }
+        self.events.remove_quiz(battle_id);
+    }
+
+    /// Start a special PvE North Star Quiz battle against NPC 1643 or 1644.
+    /// Emits S->C 10 01 modal question frame strictly to the Party Leader.
+    pub fn start_north_star_battle(
+        &self,
+        leader_session: &mut Session,
+        npc_id: i64,
+        diahinh: i32,
+    ) -> (i32, String) {
+        let npc = self.data.npcs.get(&npc_id).cloned().unwrap_or_else(|| {
+            let name_bytes = if npc_id == 1644 {
+                crate::encoding::viscii_encode("Nam Tinh Quân")
+            } else {
+                crate::encoding::viscii_encode("Bắc Tinh Quân")
+            };
+            crate::data::tables::Npc {
+                id: npc_id,
+                name: name_bytes,
+                lv: 100,
+                thuoctinh: 1,
+                hp: 10000,
+                sp: 10000,
+                atk: 100,
+                def: 100,
+                agi: 100,
+                ..Default::default()
+            }
+        });
+
+        let id = self.next_battle_id();
+        let terrain = if diahinh > 0 { diahinh } else { 112 };
+        let mut battle = Battle::new(id, terrain);
+        let lid = i64::from(leader_session.id);
+
+        battle.add_player(leader_session, lid, 3, 2);
+        battle.load_leader_pets(leader_session, lid, 3);
+
+        // Spawn North Star NPC at opposing center cell
+        battle.add_npc(&npc, 0, 1, 2, 0);
+
+        leader_session.battle_id = id;
+
+        // Set battle_id for party members in online sessions
+        {
+            let mut online = crate::server::session::lock_online_sessions();
+            for &mem in &leader_session.id_mem {
+                if mem > 0 && mem != leader_session.id {
+                    if let Some(m_sess) = online.get_mut(&mem) {
+                        m_sess.battle_id = id;
+                    }
+                }
+            }
+        }
+
+        if let Ok(mut members) = self.sink.members.lock() {
+            members.insert(lid);
+            for &mem in &leader_session.id_mem {
+                if mem > 0 && mem != leader_session.id {
+                    members.insert(i64::from(mem));
+                }
+            }
+        }
+
+        self.record_join_cells(id, &battle);
+
+        let handle = crate::battle::manager::BattleHandle::dummy(id);
+        if let Ok(mut h) = self.handles.lock() {
+            h.insert(id, handle);
+        }
+
+        let start = battle.npc_battle_start_packets(terrain);
+        for packet in start {
+            match packet {
+                crate::battle::construction::StartPacket::To { player, frame } => self.sink.send_to(player, frame),
+                crate::battle::construction::StartPacket::Map { player, frame } => self.sink.send_map(player, frame),
+            }
+        }
+
+        // Register quiz with the EventLifecycleManager
+        let (_question, modal_frame) = self.events.register_quiz(id, leader_session.id, None);
+
+        (id, modal_frame)
+    }
+
     /// Register a player in an existing battle (op 0x0B sub 4 join).
     pub fn join_battle(&self, session: &mut Session, battle_id: i32) -> bool {
-        if session.battle_id != 0 || !self.battle_exists(battle_id) {
+        if session.battle_id != 0 || !self.battle_exists(battle_id) || self.is_north_star_battle(battle_id) {
             return false;
         }
         session.battle_id = battle_id;
@@ -1299,6 +1432,8 @@ impl BattleService {
             spx: i64::from(session.spx),
             hpx2: i64::from(session.hpx2),
             spx2: i64::from(session.spx2),
+            god: session.god,
+            ghost: session.ghost,
         }
     }
 

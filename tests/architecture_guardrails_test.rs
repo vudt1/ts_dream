@@ -127,3 +127,15 @@ fn test_crafting_handler_uses_item_count_changed_frame() {
         );
     }
 }
+
+#[test]
+fn test_respec_handler_uses_item_count_changed_frame() {
+    let respec_handler = Path::new("src/server/handlers/respec.rs");
+    if respec_handler.exists() {
+        let content = fs::read_to_string(respec_handler).expect("read respec.rs");
+        assert!(
+            !content.contains("F44404001709"),
+            "respec.rs must use crate::server::inventory::item_count_changed_frame instead of hardcoded 'F44404001709'"
+        );
+    }
+}

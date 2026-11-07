@@ -148,6 +148,73 @@ pub fn player_appear(
 // Positional mirror of the fixed frame layout: each argument maps to one
 // field of the wire body, so the long parameter list is intentional.
 #[allow(clippy::too_many_arguments)]
+pub fn stats_full(
+    thuoctinh: u8,
+    hp: u16,
+    sp: u16,
+    int1: u16,
+    atk: u16,
+    def: u16,
+    agi: u16,
+    hpx: u16,
+    spx: u16,
+    lv: u8,
+    texp: u32,
+    skill_point: u16,
+    point: u16,
+    tiengtam: u16,
+    hp_max: u16,
+    sp_max: u16,
+    atk2: u32,
+    def2: u32,
+    int2: u32,
+    agi2: u32,
+    hpx2: u32,
+    spx2: u32,
+    reborn: u8,
+    job: u8,
+    skills_hex: &str,
+) -> String {
+    let mut builder = crate::protocol::codecs::StatsPacketBuilder {
+        thuoctinh,
+        hp,
+        sp,
+        int1,
+        atk,
+        def,
+        agi,
+        hpx,
+        spx,
+        lv,
+        texp,
+        skill_point,
+        point,
+        tiengtam: u32::from(tiengtam),
+        hp_max,
+        sp_max,
+        atk2,
+        def2,
+        int2,
+        agi2,
+        hpx2,
+        spx2,
+        reborn,
+        job,
+        skills: Vec::new(),
+    };
+    if let Ok(hex_bytes) = hex::decode(skills_hex) {
+        let mut cursor = 0;
+        while cursor + 2 < hex_bytes.len() {
+            let skill_id = u16::from_le_bytes([hex_bytes[cursor], hex_bytes[cursor + 1]]);
+            let level = hex_bytes[cursor + 2];
+            builder.skills.push((skill_id, level));
+            cursor += 3;
+        }
+    }
+    builder.build_frame_hex()
+}
+
+#[allow(clippy::too_many_arguments)]
 pub fn stats(
     thuoctinh: u8,
     hp: u16,
@@ -173,41 +240,10 @@ pub fn stats(
     spx2: u32,
     skills_hex: &str,
 ) -> String {
-    let mut body = String::new();
-    body.push_str(&format!("{:02X}", thuoctinh));
-    for v in [
-        encoder::le16(hp),
-        encoder::le16(sp),
-        encoder::le16(int1),
-        encoder::le16(atk),
-        encoder::le16(def),
-        encoder::le16(agi),
-        encoder::le16(hpx),
-        encoder::le16(spx),
-        format!("{:02X}", lv),
-        encoder::le32(texp),
-        encoder::le16(skill_point),
-        encoder::le16(point),
-        // Tiengtam travels as LE32.
-        encoder::le32(u32::from(tiengtam)),
-        encoder::le16(hp_max),
-        encoder::le16(sp_max),
-        encoder::le32(atk2),
-        encoder::le32(def2),
-        encoder::le32(int2),
-        encoder::le32(agi2),
-        encoder::le32(hpx2),
-        encoder::le32(spx2),
-    ] {
-        body.push_str(&v);
-    }
-    // Literal `F401`×5 (10 bytes: 5 × u16 = 500 at offset 0x3C..0x45) + 43 zero bytes (offset 0x46..0x70) + skill list.
-    // Client parser `FUN_0072E9A0` expects fixed 112 bytes header (RestPayload), then 3B/skill until end of buffer (closing G-07).
-    body.push_str("F401F401F401F401F401");
-    body.push_str(&"00".repeat(43));
-    body.push_str(skills_hex);
-
-    crate::protocol::frame(OPCODE_STATS, &body)
+    stats_full(
+        thuoctinh, hp, sp, int1, atk, def, agi, hpx, spx, lv, texp, skill_point, point, tiengtam,
+        hp_max, sp_max, atk2, def2, int2, agi2, hpx2, spx2, 0, 0, skills_hex,
+    )
 }
 /// Build the skill-list hex from (skillId, level) pairs used in the stats
 /// frame: each entry is `le16(skillId)` + `lv`.
@@ -528,8 +564,8 @@ pub fn build_logined_sequence_session_ext(s: &Session) -> Vec<String> {
     frames.push(player_appear(
         s.id,
         s.sex,
-        0,
-        0,
+        s.ghost,
+        (s.god > 0) as u8,
         s.map_id,
         s.map_x,
         s.map_y,
@@ -543,32 +579,7 @@ pub fn build_logined_sequence_session_ext(s: &Session) -> Vec<String> {
     ));
 
     // 3. Step 3: stats (op 0x05 sub 0x03)
-    let skills_hex = skill_list(&s.skills);
-    frames.push(stats(
-        s.thuoctinh,
-        s.hp,
-        s.sp,
-        s.int1,
-        s.atk,
-        s.def,
-        s.agi,
-        s.hpx,
-        s.spx,
-        s.level,
-        s.texp,
-        s.skill_point,
-        s.point,
-        s.tiengtam,
-        s.hp_max,
-        s.sp_max,
-        s.atk2,
-        s.def2,
-        s.int2,
-        s.agi2,
-        s.hpx2,
-        s.spx2,
-        &skills_hex,
-    ));
+    frames.push(crate::protocol::codecs::StatsPacketBuilder::from_session(s).build_frame_hex());
 
     // 4. Step 4: SendPlayerOnline — broadcast to the map, owned by the server loop.
 
@@ -659,7 +670,38 @@ pub fn build_logined_sequence_session_ext(s: &Session) -> Vec<String> {
     //     character's Logined1 byte stream is unchanged (golden parity).
     frames.extend(crate::server::handlers::quest_sync::sync_frames(s));
 
+    // 23. Step 23: Reborn 2 dragon balls (17 4D) & hero ball slots (17 4E)
+    if s.reborn >= 2 {
+        frames.push(dragon_balls_frame(s.ball_point, s.dragon_balls));
+        frames.push(hero_ball_slots_frame(&s.skill_rb2));
+    }
+
     frames
+}
+
+/// Build Reborn 2 dragon balls packet (opcode 0x17 sub 0x4D).
+/// Format: 17 4D <ball_point: u8> <active_ball_indices: K × u8 (1..12)>.
+pub fn dragon_balls_frame(ball_point: u8, dragon_balls_mask: u16) -> String {
+    let mut body = format!("{:02X}", ball_point);
+    for i in 1..=12 {
+        if (dragon_balls_mask & (1 << (i - 1))) != 0 {
+            body.push_str(&format!("{:02X}", i));
+        }
+    }
+    crate::protocol::frame("174D", &body)
+}
+
+/// Build Reborn 2 hero ball slots packet (opcode 0x17 sub 0x4E).
+/// Format: 17 4E <repeating 3B: {slot: u8 (1..8), skill_id: u16 LE}>.
+pub fn hero_ball_slots_frame(skill_rb2: &[u16; 8]) -> String {
+    let mut body = String::new();
+    for (idx, &skill_id) in skill_rb2.iter().enumerate() {
+        if skill_id > 0 {
+            let slot = (idx + 1) as u8;
+            body.push_str(&format!("{:02X}{}", slot, encoder::le16(skill_id)));
+        }
+    }
+    crate::protocol::frame("174E", &body)
 }
 
 /// Assemble a Logined1 sequence wrapper. `ok_all` carries the ordered frames
@@ -671,4 +713,10 @@ pub fn logined_sequence(ok: Vec<String>, _id: u32) -> HandleOutcome {
         out.send(f);
     }
     out
+}
+
+/// Real-time synchronizer frame builder `S→C 18 08 [playerId: u32 LE][type: u16 LE][value: u8]`.
+/// type: 1 = Ghost, 2 = God.
+pub fn state_sync_frame(char_id: u32, kind: u16, value: u8) -> String {
+    crate::protocol::codecs::QuestSyncCodec::build_state_flag_hex(char_id, kind, value)
 }

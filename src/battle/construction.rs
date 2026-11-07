@@ -7,6 +7,7 @@ use crate::battle::engine::{team_for_row, war_key, WarInfo};
 use crate::battle::packets;
 use crate::battle::rng::BattleRng;
 use crate::data::tables::Npc;
+use crate::protocol::*;
 use crate::server::session::{PetState, Session};
 use std::collections::HashMap;
 
@@ -46,6 +47,9 @@ pub struct Battle {
     pub opening_dialog_sent: bool,
     /// Dynamic Skill Delay Pacing for the last executed turn (in ms).
     pub last_turn_delay_ms: u64,
+    /// Optional sequential waves for continuous dungeon battles (e.g. 40 NPC).
+    pub waves: Vec<Vec<(crate::data::tables::Npc, u8, u8)>>,
+    pub current_wave: usize,
 }
 
 impl Battle {
@@ -63,6 +67,8 @@ impl Battle {
             opening_dialog: None,
             opening_dialog_sent: false,
             last_turn_delay_ms: 800,
+            waves: Vec::new(),
+            current_wave: 0,
         };
 
         // Create 20 cells (row 0..3, col 0..4)
@@ -110,6 +116,46 @@ impl Battle {
         self.last_turn_delay_ms
     }
 
+    /// Set sequential waves for continuous in-engine wave battles (e.g. 40 NPC).
+    pub fn set_waves(&mut self, waves: Vec<Vec<(crate::data::tables::Npc, u8, u8)>>) {
+        self.waves = waves;
+        self.current_wave = 0;
+    }
+
+    /// Advance to the next wave if one is queued.
+    /// Defeated enemy cells (team 2) are cleared and reset frames emitted.
+    /// New wave NPCs are populated and entity frames emitted without reloading the map.
+    pub fn advance_wave(&mut self, out: &mut Vec<crate::battle::runner::Out>) -> bool {
+        if self.current_wave + 1 < self.waves.len() {
+            // 1. Clear defeated enemy cells (rows 0..2)
+            for row in 0..2u8 {
+                for col in 0..5u8 {
+                    let key = war_key(row, col);
+                    if let Some(cell) = self.list_war.get(&key) {
+                        if cell.team == 2 && cell.id > 0 {
+                            out.push(crate::battle::runner::Out::Broadcast(packets::reset_cell(row, col)));
+                        }
+                    }
+                    self.clear_cell(row, col);
+                }
+            }
+            // 2. Advance wave index
+            self.current_wave += 1;
+            let next_npcs = self.waves[self.current_wave].clone();
+            // 3. Populate new wave NPCs
+            for (idx, (npc, row, col)) in next_npcs.into_iter().enumerate() {
+                let id_on_map = (idx + 1) as i64;
+                self.add_npc(&npc, id_on_map, row, col, 3);
+                if let Some(cell) = self.cell(row, col) {
+                    out.push(crate::battle::runner::Out::Broadcast(packets::entity_npc(&cell.packet_hex())));
+                }
+            }
+            true
+        } else {
+            false
+        }
+    }
+
     /// Add a player to the battle grid.
     ///
     /// `row` is 3 for team 1, 0 for team 2. `col` is the column (2 = leader).
@@ -138,6 +184,62 @@ impl Battle {
             cell.reborn = session.reborn as i64;
             cell.row = row;
             cell.col = col;
+
+            // Apply Job passive skill bonuses
+            for &(skill_id, lv_u8) in &session.skills {
+                let lv = lv_u8 as i64;
+                if lv <= 0 {
+                    continue;
+                }
+                match skill_id {
+                    SKILL_TYRANT_AURA => {
+                        // Bá khí (+Atk)
+                        cell.atk += lv * 3;
+                    }
+                    SKILL_MOUNTAIN_BREAKER => {
+                        // Lực bạt sơn hề (+Atk, +MaxHP)
+                        cell.atk += lv * 2;
+                        cell.hp_max += lv * 30;
+                        cell.hp = (cell.hp + lv * 30).min(cell.hp_max);
+                    }
+                    SKILL_HERO_AURA => {
+                        // Anh khí hộ thân (+Def)
+                        cell.def += lv * 4;
+                    }
+                    SKILL_MIND_EYE => {
+                        // Tâm nhãn (+Agi)
+                        cell.agi += lv * 3;
+                    }
+                    SKILL_TACTICAL_STRATEGY => {
+                        // Dụng kế (+Int)
+                        cell.int1 += lv * 4;
+                    }
+                    SKILL_TACTICAL_DEFENSE => {
+                        // Trí thủ (+Def, +Int)
+                        cell.def += lv * 2;
+                        cell.int1 += lv * 2;
+                    }
+                    SKILL_ENEMY_RESISTANCE => {
+                        // Ngự địch (+Def)
+                        cell.def += lv * 3;
+                    }
+                    SKILL_INSTIGATION => {
+                        // Sách động (+tỷ lệ xuất chiêu hiệu ứng)
+                        cell.sach_dong_lv = lv;
+                    }
+                    SKILL_CELESTIAL_INTUITION => {
+                        // Tiên khiếu (+Int, +MaxSP)
+                        cell.int1 += lv * 3;
+                        cell.sp_max += lv * 20;
+                        cell.sp = (cell.sp + lv * 20).min(cell.sp_max);
+                    }
+                    SKILL_BLOOD_SPIRIT_CONVERSION => {
+                        // Hóa Huyết Hoàn Hồn
+                        cell.hoa_huyet_lv = lv;
+                    }
+                    _ => {}
+                }
+            }
         }
     }
 

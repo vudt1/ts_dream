@@ -7,6 +7,7 @@
 
 use crate::battle::construction::Battle;
 use crate::battle::damage;
+use crate::battle::dispel;
 use crate::battle::engine::WarInfo;
 use crate::battle::combat_formula::{self, SkillFormulaInput};
 use crate::battle::npc_world::NpcWorld;
@@ -14,6 +15,7 @@ use crate::battle::packets;
 use crate::battle::packets::{attack_status, miss_status, troi_byte};
 use crate::battle::targeting::{self, CellInfo, GridPos};
 use crate::data::tables::{BinarySkillDef, Item, Npc, Skill};
+use crate::protocol::*;
 use crate::protocol::encoder;
 use std::collections::HashMap;
 
@@ -99,6 +101,8 @@ pub struct PlayerSnapshot {
     pub spx: i64,
     pub hpx2: i64,
     pub spx2: i64,
+    pub god: u32,
+    pub ghost: u8,
 }
 
 fn binary_skill_def<'a>(data: &'a BattleData<'_>, skill_id: i64) -> Option<&'a BinarySkillDef> {
@@ -122,6 +126,7 @@ fn skill_sp(data: &BattleData<'_>, skill_id: i64) -> i64 {
 fn skill_round(data: &BattleData<'_>, skill_id: i64, skill_lv: i64) -> i64 {
     binary_skill_def(data, skill_id)
         .map(|skill| i64::from(skill.round))
+        .filter(|&r| r > 0)
         .unwrap_or_else(|| damage::get_turn(skill_id, skill_lv))
 }
 
@@ -169,7 +174,11 @@ fn binary_skill_input(data: &BattleData<'_>, skill_id: i64) -> Option<SkillFormu
             element: def.element,
             numerical: i64::from(def.numerical),
             attribute: def.attribute,
-            round: i64::from(def.round),
+            round: if def.round > 0 {
+                i64::from(def.round)
+            } else {
+                damage::get_turn(skill_id, 1)
+            },
             hit_status: i64::from(def.hit_status),
         });
     }
@@ -243,6 +252,7 @@ pub enum Stat {
     Point,
     SkillPoint,
     Fai,
+    God,
 }
 
 /// Database write target.
@@ -362,6 +372,9 @@ impl Battle {
     ) -> Outcome {
         // Outcome check at loop top.
         if self.all_enemies_dead() {
+            if self.advance_wave(out) {
+                return Outcome::Running;
+            }
             return Outcome::PlayerWin;
         }
         if self.all_players_dead() {
@@ -383,10 +396,14 @@ impl Battle {
         // `Round((QS.Int + QS.Int2) / 15.0)` per turn, capped at SpMax, both
         // the player cells and their pet cells, with DB writes.
         self.leader_sp_regen(out);
+        self.job_passive_regen(out);
 
         self.emit_phase4_cleanup(data, &mut ts, out);
 
         if self.count_enemies_alive() == 0 {
+            if self.advance_wave(out) {
+                return Outcome::Running;
+            }
             return Outcome::PlayerWin;
         }
         if self.count_players_alive() == 0 {
@@ -954,8 +971,11 @@ impl Battle {
 
         for tpos in targets {
             ts.last_target = (tpos.row, tpos.col);
-            let mut target =
-                self.list_war[&crate::battle::engine::war_key(tpos.row, tpos.col)].clone();
+            let mut target = if tpos.row == row && tpos.col == col {
+                attacker.clone()
+            } else {
+                self.list_war[&crate::battle::engine::war_key(tpos.row, tpos.col)].clone()
+            };
 
             for _hit in 0..hit_times {
                 if target.hp <= 0 {
@@ -1059,7 +1079,16 @@ impl Battle {
                         out,
                     ),
                     4 => self.apply_buff4(data, ts, &mut target, skill, skill_lv, out),
-                    5 => self.apply_dispel5(data, ts, &mut target, skill, out),
+                    5 => self.apply_dispel(
+                        data,
+                        ts,
+                        &attacker,
+                        &mut target,
+                        skill,
+                        skill_lv,
+                        5,
+                        out,
+                    ),
                     6 => self.apply_sp_restore(
                         data,
                         ts,
@@ -1113,18 +1142,32 @@ impl Battle {
                         avg2,
                         out,
                     ),
-                    16 => self.apply_dispel16(data, ts, &mut target, skill, out),
-                    18 => self.apply_cleanse18(
+                    16 => self.apply_dispel(
                         data,
                         ts,
-                        &mut attacker,
+                        &attacker,
                         &mut target,
                         skill,
                         skill_lv,
+                        16,
                         out,
                     ),
-                    19 => self.apply_buff19(data, ts, &mut target, skill, skill_lv, out),
+                    18 => self.apply_dispel(
+                        data,
+                        ts,
+                        &attacker,
+                        &mut target,
+                        skill,
+                        skill_lv,
+                        18,
+                        out,
+                    ),
+                    19 => self.apply_buff19(data, ts, &attacker, &mut target, skill, skill_lv, out),
                     _ => {}
+                }
+
+                if tpos.row == row && tpos.col == col {
+                    attacker = target.clone();
                 }
 
                 // Attacker Type4 13005 drops after acting.
@@ -1149,8 +1192,12 @@ impl Battle {
                     attacker.id_skill = 0;
                 }
 
-                self.write_cell(&mut target, (tpos.row, tpos.col));
-                self.write_cell(&mut attacker, (row, col));
+                if tpos.row == row && tpos.col == col {
+                    self.write_cell(&mut attacker, (row, col));
+                } else {
+                    self.write_cell(&mut target, (tpos.row, tpos.col));
+                    self.write_cell(&mut attacker, (row, col));
+                }
             }
         }
 
@@ -1337,16 +1384,29 @@ impl Battle {
         attacker: &WarInfo,
     ) -> Vec<GridPos> {
         let cells = self.cell_infos();
+        if skill == i64::from(SKILL_HOLY_SPIRIT) {
+            return targeting::get_pos_attack_default(&cells, team, row_attack, col_attack, 1);
+        }
+        if skill == i64::from(SKILL_CELESTIAL_SHIELD) {
+            return targeting::get_pos_attack_type4(&cells, team, row_attack, col_attack, 1);
+        }
         if let Some(def) = binary_skill_def(data, skill) {
-            let is_heal = def.element == 2 && def.attribute == 25;
-            return targeting::get_pos_attack_by_fight_area(
-                &cells,
-                team,
-                row_attack,
-                col_attack,
-                def.fight_area,
-                is_heal,
-            );
+            let fight_area = if skill == i64::from(SKILL_HEAVEN_THUNDER) && def.fight_area == 0 {
+                8
+            } else {
+                def.fight_area
+            };
+            if fight_area > 0 {
+                let is_heal = def.element == 2 && def.attribute == 25;
+                return targeting::get_pos_attack_by_fight_area(
+                    &cells,
+                    team,
+                    row_attack,
+                    col_attack,
+                    fight_area,
+                    is_heal,
+                );
+            }
         }
         let mut targets = if ts.combo_active == 1 {
             targeting::get_pos_attack_combo(&cells, team, row_attack, col_attack, num34)
@@ -1828,6 +1888,7 @@ impl Battle {
                 attacker.reborn,
                 target.reborn,
             );
+            self.apply_sach_dong_reroll(attacker, &mut hit);
             let mut adl = attack_status::ATTACK;
             if hit == miss_status::MISS as i64 {
                 byte_val = troi_byte::MISS;
@@ -1962,226 +2023,38 @@ impl Battle {
             .push_str(&packets::skilling_int(r, c, hit, adl, 1, byte_val, 0, 1));
     }
 
-    /// Type 5 — dispel Type4 / cure.
-    fn apply_dispel5(
+    /// Dispel and cleanse handler (Archetypes A, B, C via ts_dream::battle::dispel).
+    #[allow(clippy::too_many_arguments)]
+    fn apply_dispel(
         &mut self,
         data: &BattleData,
         ts: &mut TurnState,
+        attacker: &WarInfo,
         target: &mut WarInfo,
         skill: i64,
+        skill_lv: i64,
+        skill_type: i64,
         out: &mut Vec<Out>,
     ) {
         ts.delay = skill_delay(data, skill);
-        let (r, c) = (target.row, target.col);
-        match skill {
-            11014 => {
-                let hit = if target.type4_id == 10010 {
-                    target.type4_id = 0;
-                    target.type4_lv = 0;
-                    target.type4_turn = 0;
-                    out.push(Out::Broadcast(packets::purge_status(
-                        r,
-                        c,
-                        packets::PURGE_TYPE_BUFF,
-                    )));
-                    out.push(Out::Broadcast(packets::clear_unit_status(
-                        r,
-                        c,
-                        packets::STATUS_DEF_MODIFIER,
-                    )));
-                    miss_status::ATTACK
-                } else {
-                    miss_status::MISS
-                };
-                ts.text10.push_str(&packets::skilling_int(
-                    r,
-                    c,
-                    hit,
-                    0,
-                    1,
-                    troi_byte::TYPE4,
-                    0,
-                    1,
-                ));
-            }
-            14007 => {
-                let hit = if target.type4_id == 14008 {
-                    target.type4_id = 0;
-                    target.type4_lv = 0;
-                    target.type4_turn = 0;
-                    out.push(Out::Broadcast(packets::purge_status(
-                        r,
-                        c,
-                        packets::PURGE_TYPE_BUFF,
-                    )));
-                    out.push(Out::Broadcast(packets::clear_unit_status(
-                        r,
-                        c,
-                        packets::STATUS_DEF_MODIFIER,
-                    )));
-                    miss_status::ATTACK
-                } else {
-                    miss_status::MISS
-                };
-                ts.text10.push_str(&packets::skilling_int(
-                    r,
-                    c,
-                    hit,
-                    0,
-                    1,
-                    troi_byte::TYPE4,
-                    0,
-                    1,
-                ));
-            }
-            14014 => {
-                let hit = if target.type4_id == 14015 {
-                    target.type4_id = 0;
-                    target.type4_lv = 0;
-                    target.type4_turn = 0;
-                    out.push(Out::Broadcast(packets::purge_status(
-                        r,
-                        c,
-                        packets::PURGE_TYPE_BUFF,
-                    )));
-                    out.push(Out::Broadcast(packets::clear_unit_status(
-                        r,
-                        c,
-                        packets::STATUS_DEF_MODIFIER,
-                    )));
-                    miss_status::ATTACK
-                } else {
-                    miss_status::MISS
-                };
-                ts.text10.push_str(&packets::skilling_int(
-                    r,
-                    c,
-                    hit,
-                    0,
-                    1,
-                    troi_byte::TYPE4,
-                    0,
-                    1,
-                ));
-            }
-            14022 => {
-                let hit = if target.type4_id == 10021 {
-                    target.type4_id = 0;
-                    target.type4_lv = 0;
-                    target.type4_turn = 0;
-                    out.push(Out::Broadcast(packets::purge_status(
-                        r,
-                        c,
-                        packets::PURGE_TYPE_BUFF,
-                    )));
-                    out.push(Out::Broadcast(packets::clear_unit_status(
-                        r,
-                        c,
-                        packets::STATUS_DEF_MODIFIER,
-                    )));
-                    miss_status::ATTACK
-                } else {
-                    miss_status::MISS
-                };
-                ts.text10.push_str(&packets::skilling_int(
-                    r,
-                    c,
-                    hit,
-                    0,
-                    1,
-                    troi_byte::TYPE4,
-                    0,
-                    1,
-                ));
-            }
-            _ => {
-                let had_type3 = target.type3_id > 0;
-                let had_type4 = target.type4_id > 0;
-                let had_type15 = target.type15_id > 0;
-                let had_type19 = target.type19_id > 0;
-                target.type3_id = 0;
-                target.type3_lv = 0;
-                target.type3_turn = 0;
-                target.type4_id = 0;
-                target.type4_lv = 0;
-                target.type4_turn = 0;
-                target.type15_id = 0;
-                target.type15_lv = 0;
-                target.type15_turn = 0;
-                target.type19_id = 0;
-                target.type19_lv = 0;
-                target.type19_turn = 0;
-                if had_type3 {
-                    out.push(Out::Broadcast(packets::purge_status(
-                        r,
-                        c,
-                        packets::PURGE_TYPE_DISABLE,
-                    )));
-                    out.push(Out::Broadcast(packets::clear_unit_status(
-                        r,
-                        c,
-                        packets::STATUS_SEAL_RESIST_PCT,
-                    )));
-                }
-                if had_type4 {
-                    out.push(Out::Broadcast(packets::purge_status(
-                        r,
-                        c,
-                        packets::PURGE_TYPE_BUFF,
-                    )));
-                    out.push(Out::Broadcast(packets::clear_unit_status(
-                        r,
-                        c,
-                        packets::STATUS_DEF_MODIFIER,
-                    )));
-                    out.push(Out::Broadcast(packets::clear_unit_status(
-                        r,
-                        c,
-                        packets::STATUS_ATK_MODIFIER,
-                    )));
-                }
-                if had_type15 {
-                    out.push(Out::Broadcast(packets::purge_status(
-                        r,
-                        c,
-                        packets::PURGE_TYPE_DEBUFF,
-                    )));
-                    out.push(Out::Broadcast(packets::clear_unit_status(
-                        r,
-                        c,
-                        packets::STATUS_DEF_MODIFIER,
-                    )));
-                    out.push(Out::Broadcast(packets::clear_unit_status(
-                        r,
-                        c,
-                        packets::STATUS_ATK_MODIFIER,
-                    )));
-                }
-                if had_type19 {
-                    out.push(Out::Broadcast(packets::purge_status(
-                        r,
-                        c,
-                        packets::PURGE_TYPE_AURA,
-                    )));
-                    out.push(Out::Broadcast(packets::clear_unit_status(
-                        r,
-                        c,
-                        packets::STATUS_DMG_BONUS_PCT,
-                    )));
-                }
-                ts.text10.push_str(&packets::skilling_int(
-                    r,
-                    c,
-                    miss_status::ATTACK,
-                    0,
-                    5,
-                    troi_byte::MISS,
-                    0,
-                    1,
-                ));
-                ts.text10.push_str("DD000001DE000001DF000001E1000001");
-            }
+        let outcome = dispel::execute_dispel(attacker, target, skill, skill_lv, skill_type);
+        let fragment = dispel::build_action_fragment(
+            skill,
+            skill_type,
+            &outcome,
+            target.row,
+            target.col,
+        );
+        for pkt in outcome.broadcast_packets {
+            out.push(Out::Broadcast(pkt));
         }
+        if outcome.hp_healed > 0 {
+            self.write_hp(target, target.hp, out);
+        }
+        if outcome.sp_restored > 0 {
+            self.write_sp(target, target.sp, out);
+        }
+        ts.text10.push_str(&fragment);
     }
 
     /// Type 6 — SP restore.
@@ -2203,7 +2076,7 @@ impl Battle {
         } else if skill == 11006 {
             amount = damage::banker_round(attacker.int1 as f64 * 0.1 * skill_lv as f64) as i64;
         }
-        if attacker.id == target.id {
+        if attacker.row == target.row && attacker.col == target.col {
             amount = 0;
         }
         if target.sp + amount <= target.sp_max {
@@ -2388,6 +2261,9 @@ impl Battle {
                 });
                 out.push(Out::Broadcast(packets::reset_cell(target.row, target.col)));
                 if self.count_enemies_alive() == 0 {
+                    if self.advance_wave(out) {
+                        return Outcome::Running;
+                    }
                     return Outcome::PlayerWin;
                 }
                 return Outcome::Running;
@@ -2601,6 +2477,7 @@ impl Battle {
                 attacker.reborn,
                 target.reborn,
             );
+            self.apply_sach_dong_reroll(attacker, &mut hit);
             let mut adl = attack_status::ATTACK;
             if hit == miss_status::MISS as i64 {
                 byte_val = troi_byte::MISS;
@@ -2668,210 +2545,14 @@ impl Battle {
         }
     }
 
-    /// Type 16 — dispel Type4 pair.
-    fn apply_dispel16(
-        &mut self,
-        data: &BattleData,
-        ts: &mut TurnState,
-        target: &mut WarInfo,
-        skill: i64,
-        out: &mut Vec<Out>,
-    ) {
-        ts.delay = skill_delay(data, skill);
-        let clears = match skill {
-            10014 => target.type4_id == 10015,
-            10009 => target.type4_id == 10010,
-            _ => false,
-        };
-        let hit = if clears {
-            target.type4_id = 0;
-            target.type4_lv = 0;
-            target.type4_turn = 0;
-            let (r, c) = (target.row, target.col);
-            out.push(Out::Broadcast(packets::purge_status(
-                r,
-                c,
-                packets::PURGE_TYPE_BUFF,
-            )));
-            out.push(Out::Broadcast(packets::clear_unit_status(
-                r,
-                c,
-                packets::STATUS_DEF_MODIFIER,
-            )));
-            miss_status::ATTACK
-        } else {
-            miss_status::MISS
-        };
-        let (r, c) = (target.row, target.col);
-        ts.text10.push_str(&packets::skilling_int(
-            r,
-            c,
-            hit,
-            0,
-            1,
-            troi_byte::TYPE4,
-            0,
-            1,
-        ));
-    }
 
-    /// Type 18 — cleanse + heal.
+    /// Type 19 — Type19 buff / debuff / job active mechanics.
     #[allow(clippy::too_many_arguments)]
-    fn apply_cleanse18(
-        &mut self,
-        data: &BattleData,
-        ts: &mut TurnState,
-        attacker: &mut WarInfo,
-        target: &mut WarInfo,
-        skill: i64,
-        skill_lv: i64,
-        out: &mut Vec<Out>,
-    ) {
-        ts.delay = skill_delay(data, skill);
-        let (mut hp, mut sp) = (
-            damage::banker_round(attacker.int1 as f64 * 0.5) as i64,
-            damage::banker_round(attacker.int1 as f64 * 0.5) as i64,
-        );
-        match skill {
-            11016 => {
-                hp = 400;
-                sp = 100;
-            }
-            11017 => {
-                hp = 500;
-                sp = 150;
-            }
-            11018 => {
-                hp = 600;
-                sp = 200;
-            }
-            11019 => {
-                hp = 700;
-                sp = 250;
-            }
-            _ => {}
-        }
-        let (r, c) = (target.row, target.col);
-        if attacker.team == target.team {
-            let had_type3 = target.type3_id > 0;
-            let had_type15 = target.type15_id > 0;
-            target.type3_id = 0;
-            target.type3_lv = 0;
-            target.type3_turn = 0;
-            target.type15_id = 0;
-            target.type15_lv = 0;
-            target.type15_turn = 0;
-            if had_type3 {
-                out.push(Out::Broadcast(packets::purge_status(
-                    r,
-                    c,
-                    packets::PURGE_TYPE_DISABLE,
-                )));
-                out.push(Out::Broadcast(packets::clear_unit_status(
-                    r,
-                    c,
-                    packets::STATUS_SEAL_RESIST_PCT,
-                )));
-            }
-            if had_type15 {
-                out.push(Out::Broadcast(packets::purge_status(
-                    r,
-                    c,
-                    packets::PURGE_TYPE_DEBUFF,
-                )));
-                out.push(Out::Broadcast(packets::clear_unit_status(
-                    r,
-                    c,
-                    packets::STATUS_DEF_MODIFIER,
-                )));
-                out.push(Out::Broadcast(packets::clear_unit_status(
-                    r,
-                    c,
-                    packets::STATUS_ATK_MODIFIER,
-                )));
-            }
-            if target.hp + hp <= target.hp_max {
-                target.hp += hp;
-                self.write_hp(target, target.hp, out);
-            } else if target.hp + hp > target.hp_max {
-                hp = target.hp_max - target.hp;
-                target.hp = target.hp_max;
-                self.write_hp(target, target.hp_max, out);
-            } else if target.hp == target.hp_max {
-                hp = 0;
-            }
-            if target.sp + sp <= target.sp_max {
-                target.sp += sp;
-                self.write_sp(target, target.sp, out);
-            } else if target.sp + sp > target.sp_max {
-                sp = target.sp_max - target.sp;
-                target.sp = target.sp_max;
-                self.write_sp(target, target.sp_max, out);
-            } else if target.sp == target.sp_max {
-                sp = 0;
-            }
-            let _ = skill_lv;
-            ts.text10.push_str(&packets::skilling_int(
-                r,
-                c,
-                miss_status::ATTACK,
-                0,
-                4,
-                troi_byte::TYPE3,
-                0,
-                1,
-            ));
-            ts.text10.push_str("DF000001");
-            ts.text10
-                .push_str(&format!("19{}00", encoder::le16(hp as u16)));
-            ts.text10
-                .push_str(&format!("1A{}00", encoder::le16(sp as u16)));
-        } else {
-            target.type4_id = 0;
-            target.type4_lv = 0;
-            target.type4_turn = 0;
-            target.type19_id = 0;
-            target.type19_lv = 0;
-            target.type19_turn = 0;
-            out.push(Out::Broadcast(packets::purge_status(
-                r,
-                c,
-                packets::PURGE_TYPE_BUFF,
-            )));
-            out.push(Out::Broadcast(packets::clear_unit_status(
-                r,
-                c,
-                packets::STATUS_DEF_MODIFIER,
-            )));
-            out.push(Out::Broadcast(packets::purge_status(
-                r,
-                c,
-                packets::PURGE_TYPE_AURA,
-            )));
-            out.push(Out::Broadcast(packets::clear_unit_status(
-                r,
-                c,
-                packets::STATUS_DMG_BONUS_PCT,
-            )));
-            ts.text10.push_str(&packets::skilling_int(
-                r,
-                c,
-                miss_status::ATTACK,
-                0,
-                2,
-                troi_byte::TYPE4,
-                0,
-                1,
-            ));
-            ts.text10.push_str("E1000001");
-        }
-    }
-
-    /// Type 19 — Type19 debuff.
     fn apply_buff19(
         &mut self,
         data: &BattleData,
         ts: &mut TurnState,
+        attacker: &WarInfo,
         target: &mut WarInfo,
         skill: i64,
         skill_lv: i64,
@@ -2879,35 +2560,116 @@ impl Battle {
     ) {
         let _ = out;
         ts.delay = skill_delay(data, skill);
-        let turn = skill_round(data, skill, skill_lv);
-        let (hit, adl) = if target.type19_id == 0 {
+        let turn = if skill == i64::from(SKILL_TYRANT_WILL)
+            || skill == i64::from(SKILL_CELESTIAL_SHIELD)
+            || skill == i64::from(SKILL_ENERGY_CONCENTRATION)
+        {
+            (2 + skill_lv / 2).clamp(2, 4)
+        } else {
+            skill_round(data, skill, skill_lv)
+        };
+        let (hit, adl) = if target.type19_id == 0 || skill == i64::from(SKILL_HOLY_SPIRIT) {
             (miss_status::ATTACK, attack_status::ATTACK)
         } else {
             (miss_status::MISS, attack_status::DEF)
         };
         let mut byte_val = troi_byte::MISS;
+        let mut dmg = 0u16;
         if hit == miss_status::ATTACK {
-            byte_val = troi_byte::TYPE19;
-            target.type19_id = skill;
-            target.type19_lv = skill_lv;
-            target.type19_turn = turn;
-            if skill == 13020 {
-                let bonus = (target.agi as f64 * (0.03 * skill_lv as f64)).ceil() as i64;
-                ts.agi_13020 += bonus;
-                target.agi += bonus;
+            if skill == i64::from(SKILL_HOLY_SPIRIT) {
+                // Thánh Linh thuật: removes beneficial buffs on target and inflicts holy damage scaled with INT
+                let (r, c) = (target.row, target.col);
+                if target.type4_id > 0 {
+                    target.type4_id = 0;
+                    target.type4_lv = 0;
+                    target.type4_turn = 0;
+                    out.push(Out::Broadcast(packets::purge_status(
+                        r,
+                        c,
+                        packets::PURGE_TYPE_BUFF,
+                    )));
+                }
+                if target.type15_id > 0 {
+                    target.type15_id = 0;
+                    target.type15_lv = 0;
+                    target.type15_turn = 0;
+                    out.push(Out::Broadcast(packets::purge_status(
+                        r,
+                        c,
+                        packets::PURGE_TYPE_BUFF,
+                    )));
+                }
+                if target.type19_id > 0 {
+                    target.type19_id = 0;
+                    target.type19_lv = 0;
+                    target.type19_turn = 0;
+                    out.push(Out::Broadcast(packets::purge_status(
+                        r,
+                        c,
+                        packets::PURGE_TYPE_AURA,
+                    )));
+                    out.push(Out::Broadcast(packets::clear_unit_status(
+                        r,
+                        c,
+                        packets::STATUS_DMG_BONUS_PCT,
+                    )));
+                }
+                let matk = attacker.int1.max(1);
+                let holy_dmg = ((matk / 2) + (skill_lv * 40)).max(50);
+                self.apply_target_hp(target, holy_dmg, out);
+                byte_val = troi_byte::HP;
+                dmg = holy_dmg as u16;
+            } else {
+                byte_val = troi_byte::TYPE19;
+                target.type19_id = skill;
+                target.type19_lv = skill_lv;
+                target.type19_turn = turn;
+                if skill == 13020 {
+                    let bonus = (target.agi as f64 * (0.03 * skill_lv as f64)).ceil() as i64;
+                    ts.agi_13020 += bonus;
+                    target.agi += bonus;
+                }
+                let val = (skill_lv * 5).clamp(1, 100) as u16;
+                ts.status_frames.push(packets::battle_unit_status(
+                    target.row,
+                    target.col,
+                    packets::STATUS_DMG_BONUS_PCT,
+                    turn.clamp(1, 255) as u8,
+                    val,
+                ));
             }
-            let val = (skill_lv * 5).clamp(1, 100) as u16;
-            ts.status_frames.push(packets::battle_unit_status(
-                target.row,
-                target.col,
-                packets::STATUS_DMG_BONUS_PCT,
-                turn.clamp(1, 255) as u8,
-                val,
-            ));
         }
         let (r, c) = (target.row, target.col);
         ts.text10
-            .push_str(&packets::skilling_int(r, c, hit, adl, 1, byte_val, 0, 1));
+            .push_str(&packets::skilling_int(r, c, hit, adl, 1, byte_val, dmg, 1));
+    }
+
+    /// Per-turn HP/SP restoration for Tiên passive 14052 (Hóa Huyết Hoàn Hồn).
+    fn job_passive_regen(&mut self, out: &mut Vec<Out>) {
+        let keys: Vec<String> = self.keys.clone();
+        for k in keys {
+            let Some(cell) = self.list_war.get(&k).cloned() else {
+                continue;
+            };
+            if cell.typ == 2 && cell.hoa_huyet_lv > 0 && cell.hp > 0 {
+                let hp_restore = cell.hoa_huyet_lv * 15;
+                let sp_restore = cell.hoa_huyet_lv * 10;
+                let new_hp = (cell.hp + hp_restore).min(cell.hp_max);
+                let new_sp = (cell.sp + sp_restore).min(cell.sp_max);
+                if new_hp != cell.hp {
+                    self.write_hp(&cell, new_hp, out);
+                    if let Some(c) = self.list_war.get_mut(&k) {
+                        c.hp = new_hp;
+                    }
+                }
+                if new_sp != cell.sp {
+                    self.write_sp(&cell, new_sp, out);
+                    if let Some(c) = self.list_war.get_mut(&k) {
+                        c.sp = new_sp;
+                    }
+                }
+            }
+        }
     }
 
     // ---- HP/SP DB write helpers ------------------------------------------
@@ -3001,6 +2763,19 @@ impl Battle {
         }
         // `33 01` propId `0x1A` — in-battle SP refresh. See `write_hp`.
         out.push(Out::Broadcast(packets::set_sp(c.row, c.col, value)));
+    }
+
+    /// Áp dụng cơ chế đổ xúc xắc cứu đòn của Sách Động (Instigation):
+    /// Nếu đòn đánh bị tính là MISS và người tấn công có học Sách Động,
+    /// có tỷ lệ bonus = (sach_dong_lv * 2)% đổi kết quả thành ATTACK.
+    #[inline]
+    pub fn apply_sach_dong_reroll(&mut self, attacker: &WarInfo, hit: &mut i64) {
+        if *hit == miss_status::MISS as i64 && attacker.sach_dong_lv > 0 {
+            let bonus = (attacker.sach_dong_lv * 2).clamp(1, 100) as i32;
+            if self.rng.random_0.next_range(0, 100) < bonus {
+                *hit = miss_status::ATTACK as i64;
+            }
+        }
     }
 
     fn apply_target_hp(&self, target: &mut WarInfo, dmg: i64, out: &mut Vec<Out>) {
@@ -3224,6 +2999,7 @@ impl Battle {
                 if cell.reborn == 2 {
                     exp = damage::banker_round(exp as f64 / 2.0) as i64;
                 }
+                exp = crate::battle::combat_formula::apply_god_ghost_exp(exp, snap.god, snap.ghost);
                 let new_texp = snap.texp + exp;
                 out.push(Out::Db(DbUpdate {
                     target: DbTarget::Player(player),
@@ -3245,6 +3021,25 @@ impl Battle {
                         crate::battle::engine::get_sp_max(cell.reborn, snap.job, new_lv, snap.spx)
                             + snap.spx2;
                     push_level_up_rewards(player, new_lv, lv_ups, new_hp_max, new_sp_max, out);
+                }
+            }
+
+            // Decrement God of Fortune buff on victory
+            if won && !fled && cell.hp > 0 && snap.god > 0 {
+                let new_god = snap.god.saturating_sub(1);
+                out.push(Out::Db(DbUpdate {
+                    target: DbTarget::Player(player),
+                    stat: Stat::God,
+                    value: new_god as i64,
+                }));
+                if new_god == 0 {
+                    let frame = crate::protocol::codecs::QuestSyncCodec::build_state_flag_hex(
+                        player as u32,
+                        2,
+                        0,
+                    );
+                    out.push(Out::ToPlayer(player, frame.clone()));
+                    out.push(Out::Broadcast(frame));
                 }
             }
 

@@ -48,6 +48,7 @@ fn snapshot() -> PlayerSnapshot {
         spx: 0,
         hpx2: 0,
         spx2: 0,
+        ..Default::default()
     }
 }
 

@@ -251,6 +251,7 @@ pub struct Session {
     pub gold: u32,
     pub tiengtam: u16,
     pub god: u32,
+    pub ghost: u8,
     pub hp_store: u32,
     pub sp_store: u32,
     /// Counter field (`newbie`), incremented by item 46238.
@@ -262,6 +263,10 @@ pub struct Session {
 
     // Skills: list of (skill_id, level)
     pub skills: Vec<(u16, u8)>,
+    // Reborn 2 Dragon Balls & 8 Hero Ball sockets
+    pub ball_point: u8,
+    pub dragon_balls: u16,
+    pub skill_rb2: [u16; 8],
     // Hotkeys: 1..10
     pub hotkeys: [HotkeySlot; 11],
 
@@ -399,6 +404,7 @@ impl Default for Session {
             gold: 0,
             tiengtam: 1,
             god: 0,
+            ghost: 0,
             hp_store: 10000,
             sp_store: 10000,
             newbie: 0,
@@ -406,6 +412,9 @@ impl Default for Session {
             color: "0000000000000000".to_string(),
 
             skills: Vec::new(),
+            ball_point: 0,
+            dragon_balls: 0,
+            skill_rb2: [0; 8],
             hotkeys: [HotkeySlot::empty(); 11],
 
             homdo: Vec::new(),

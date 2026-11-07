@@ -47,6 +47,8 @@ pub struct ServerControl {
     pub idle_timeout: Duration,
     /// Bounded queue capacity for per-client outbound frames (ticket 03).
     pub outbound_queue_capacity: usize,
+    /// Special events lifecycle manager
+    pub events: Arc<crate::server::events::EventLifecycleManager>,
 }
 
 impl ServerControl {
@@ -56,8 +58,11 @@ impl ServerControl {
         data: Option<Arc<GameData>>,
         pool: Option<DbPool>,
     ) -> Self {
+        let events = Arc::new(crate::server::events::EventLifecycleManager::from_data_dir(
+            std::path::Path::new("Data"),
+        ));
         let gd = data.clone().unwrap_or_else(|| Arc::new(GameData::default()));
-        let mut svc = BattleService::new(gd);
+        let mut svc = BattleService::new(gd).with_events(events.clone());
         if let Some(p) = pool.as_ref() {
             svc = svc.with_pool(p.clone());
         }
@@ -80,6 +85,7 @@ impl ServerControl {
             player_disconnect_tx,
             idle_timeout: Duration::from_secs(crate::config::Config::default().idle_timeout_secs),
             outbound_queue_capacity: crate::config::Config::default().outbound_queue_capacity,
+            events,
         }
     }
 
@@ -92,6 +98,20 @@ impl ServerControl {
     /// Override the outbound frame queue capacity (used by config wiring and tests).
     pub fn with_outbound_queue_capacity(mut self, cap: usize) -> Self {
         self.outbound_queue_capacity = cap;
+        self
+    }
+
+    /// Override the Special Events Lifecycle Manager (used by tests).
+    pub fn with_events(mut self, events: Arc<crate::server::events::EventLifecycleManager>) -> Self {
+        self.events = events.clone();
+        let gd = self.data.clone().unwrap_or_else(|| Arc::new(GameData::default()));
+        let mut svc = BattleService::new(gd).with_events(events);
+        if let Some(p) = self.pool.as_ref() {
+            svc = svc.with_pool(p.clone());
+        }
+        let battle_service = Arc::new(svc);
+        BattleService::install_eve_backref(&battle_service);
+        self.battle_service = battle_service;
         self
     }
 
@@ -180,6 +200,7 @@ impl ServerControl {
         let data_clone = self.data.clone();
         let pool_clone = self.pool.clone();
         let control_clone = self.clone();
+        let control_watchdog = self.clone();
         let idle = self.idle_timeout;
         let cap = self.outbound_queue_capacity;
         let mut shutdown_rx = shutdown_sender.subscribe();
@@ -214,7 +235,87 @@ impl ServerControl {
             }
         });
 
+        // Periodic 1s watchdog for event starvation (120m), graceful drain (3m), and 45s quiz timeout
+        let mut watchdog_shutdown_rx = shutdown_sender.subscribe();
+        tokio::spawn(async move {
+            let mut tick_counter: u64 = 0;
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
+            loop {
+                tokio::select! {
+                    _ = interval.tick() => {
+                        tick_counter = tick_counter.wrapping_add(1);
+                        if tick_counter % 5 == 0 {
+                            control_watchdog.events.check_watchdog();
+                        }
+                        let expired = control_watchdog.events.get_timed_out_quizzes();
+                        for res in expired {
+                            control_watchdog.resolve_quiz_timeout(res).await;
+                        }
+                    }
+                    _ = watchdog_shutdown_rx.recv() => {
+                        break;
+                    }
+                }
+            }
+        });
+
         Ok(true)
+    }
+
+    /// Automatically resolve an expired North Star quiz battle:
+    /// emits 10 02 02 failure dialog, drops leader HP to 1, sets Ghost debuff,
+    /// evacuates party members, aborts battle, and persists penalty.
+    pub async fn resolve_quiz_timeout(&self, res: crate::server::events::QuizAnswerResult) {
+        let leader_id = res.leader_id;
+        // 1. S->C 10 02 02 Failure dialog
+        self.send_to(leader_id, &res.result_frame).await;
+        // 2. Leader HP = 1
+        self.send_to(leader_id, &crate::battle::packets::status_update(1, 1)).await;
+        // 3. S->C 18 08 [playerId][01 00][01]
+        self.send_to(leader_id, &crate::server::spawn::state_sync_frame(leader_id, 1, 1)).await;
+        // 4. battle_trailer
+        self.send_to(leader_id, &crate::battle::packets::battle_trailer()).await;
+
+        let member_ids = {
+            let mut online = crate::server::session::lock_online_sessions();
+            if let Some(leader) = online.get_mut(&leader_id) {
+                leader.hp = 1;
+                leader.ghost = 1;
+                leader.battle_id = 0;
+                leader.id_mem
+            } else {
+                [0; 4]
+            }
+        };
+
+        // Evacuate party members
+        {
+            let mut online = crate::server::session::lock_online_sessions();
+            for &mem_id in &member_ids {
+                if mem_id > 0 && mem_id != leader_id {
+                    if let Some(mem) = online.get_mut(&mem_id) {
+                        mem.battle_id = 0;
+                    }
+                }
+            }
+        }
+        for mem_id in member_ids {
+            if mem_id > 0 && mem_id != leader_id {
+                self.send_to(mem_id, &crate::battle::packets::battle_trailer()).await;
+            }
+        }
+
+        // Abort battle in battle_service
+        self.battle_service.abort_battle(res.battle_id);
+
+        // Persist to DB if pool available
+        if let Some(pool) = self.pool.as_ref() {
+            let mut dummy = crate::server::session::Session::default();
+            dummy.id = leader_id;
+            dummy.hp = 1;
+            dummy.ghost = 1;
+            let _ = crate::db::persist::persist_sessions_transaction(Some(pool), &[&dummy], &["hp", "ghost"]).await;
+        }
     }
 
     /// Immediately stop server: shuts listener, sends close to connection handlers,
@@ -224,6 +325,9 @@ impl ServerControl {
         if !is_running {
             return Err((StatusCode::CONFLICT, "server not running".to_string()));
         }
+
+        // Cascading emergency drain across all active special events
+        self.events.emergency_cascading_stop(self).await;
 
         // Send shutdown signal to listener
         if let Some(tx) = self.shutdown_tx.lock().await.take() {
@@ -273,6 +377,9 @@ impl ServerControl {
         if !is_running {
             return Err((StatusCode::CONFLICT, "server not running".to_string()));
         }
+
+        // Cascading emergency drain across all active events prior to the 5-second countdown
+        self.events.emergency_cascading_stop(self).await;
 
         // 5-second countdown broadcasting 020C
         for count in (1..=5).rev() {
@@ -419,8 +526,44 @@ impl ServerControl {
         self.unregister_client(player_id).await;
         crate::server::auto_save::forget_player(player_id);
         let session_opt = lock_online_sessions().remove(&player_id);
-        if let Some(session) = session_opt {
+        if let Some(mut session) = session_opt {
             if session.authed && session.id > 0 {
+                if session.battle_id > 0 {
+                    let bid = session.battle_id;
+                    self.battle_service.leave_battle(&mut session);
+                    if self.events.is_north_star_battle(bid) {
+                        self.events.remove_quiz(bid);
+                        self.battle_service.abort_battle(bid);
+                        for &mem_id in &session.id_mem {
+                            if mem_id > 0 && mem_id != session.id {
+                                let mut map = lock_online_sessions();
+                                if let Some(mem) = map.get_mut(&mem_id) {
+                                    if mem.battle_id == bid {
+                                        mem.battle_id = 0;
+                                        self.battle_service.send_to(
+                                            i64::from(mem_id),
+                                            crate::battle::packets::battle_trailer(),
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if matches!(session.map_id, 10851 | 10852 | 12911..=12928 | 49960..=49969) {
+                    let fallback_map = if session.savemap > 0 {
+                        session.savemap
+                    } else if matches!(session.map_id, 10851 | 10852) {
+                        12001
+                    } else if (12911..=12928).contains(&session.map_id) {
+                        12003
+                    } else {
+                        33033
+                    };
+                    session.map_id = fallback_map;
+                    session.map_x = 400;
+                    session.map_y = 400;
+                }
                 let _ = crate::db::persist::persist_sessions_transaction(
                     self.pool.as_ref(),
                     &[&session],

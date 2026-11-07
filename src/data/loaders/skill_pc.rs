@@ -278,10 +278,10 @@ fn parse_record(rec: &[u8]) -> Result<PcSkillDef> {
 /// - `unk3` (u32) → `numerical` (raw; semantics differ from mobile `numerical`)
 /// - `skill_type` → `attribute` (best-effort — PC semantics for this byte
 ///   aren't fully verified, but it lines up with mobile `attribute` byte)
-/// - `round` field is missing in PC layout → derived from `state` byte
+/// - `round` is pinned to 0 — the PC layout has no round field; see `round:` below
 /// - `delay` → `spend_second`
-/// - `state` → `round` (best-effort; the C# `state` field name suggests
-///   "skill state/effect" rather than duration — mapping is provisional)
+/// - `state` → (unused) PC `state` is the client's visual sprite animation ID
+///   (`0x35 0x01`), NOT a combat round duration; it must never map to `round`
 /// - `max_lvl` → `max_lv`
 /// - `require_sk` → pre_skill_id1
 /// - `unk21` → pre_skill_id2 (best-effort; PC has many unknown u16 fields)
@@ -306,7 +306,10 @@ pub fn pc_to_binary(pc: &PcSkillDef) -> BinarySkillDef {
         level: 0,
         fight_way: pc.nb_target,
         fight_area: pc.nb_target,
-        round: pc.state,
+        // Note: PC Skill.Dat record has no round field. pc.state represents the client
+        // visual sprite animation ID (e.g. 1=Ice, 3=Tree, 103=Mirror, 171=Poison). Do NOT map
+        // pc.state to round; combat turn durations are determined by damage::get_turn.
+        round: 0,
         spend_second: pc.delay,
         hit_status: pc.unk11,
         how_much_times: pc.grade,

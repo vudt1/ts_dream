@@ -202,8 +202,13 @@ fn handle_pk_or_attack(
         3 => handle_attack_npc(conn, payload, service),
         4 => {
             if payload.len() >= 5 {
-                let leader = encoder::u32_le_slice(&payload[1..5]) as i32;
-                service.join_battle(&mut conn.session, leader);
+                let target = encoder::u32_le_slice(&payload[1..5]) as i64;
+                let battle_id = service.target_battle(target).unwrap_or(target as i32);
+                if service.is_north_star_battle(battle_id) {
+                    out.send(crate::server::events::anti_spectate_frame());
+                    return;
+                }
+                service.join_battle(&mut conn.session, battle_id);
             }
         }
         5 => {
@@ -378,3 +383,73 @@ fn skill_level_for(session: &Session, skill_id: i64, row: u8) -> i64 {
         .map(|(_, lv)| i64::from(*lv))
         .unwrap_or(1)
 }
+
+/// Handle Opcode 0x10 (OP_GM_MANAGE) sub 1 — North Star Quiz Answer submission.
+pub async fn handle_quiz_answer(ctx: &mut OpcodeCtx<'_>) {
+    if ctx.sub != 1 || ctx.payload.len() < 4 {
+        return;
+    }
+    let answer_index = encoder::u32_le_slice(ctx.payload);
+    let leader_id = ctx.conn.session.id;
+
+    let res_opt = ctx.service.events.submit_answer(leader_id, answer_index);
+    let Some(res) = res_opt else {
+        return;
+    };
+
+    // 1. Send S->C 10 02 01 (Correct) or 10 02 02 (Incorrect) modal result dialog
+    ctx.out.send(res.result_frame);
+
+    if res.is_correct {
+        // Correct answer:
+        // +10 God buff (capped at 240)
+        ctx.conn.session.god = ctx.conn.session.god.saturating_add(10).min(240);
+        // S->C 18 08 [playerId][02 00][01]
+        ctx.out.send(crate::server::spawn::state_sync_frame(leader_id, 2, 1));
+        // Exit combat with victory
+        ctx.service.leave_battle(&mut ctx.conn.session);
+        ctx.out.send(crate::battle::packets::battle_trailer());
+    } else {
+        // Incorrect answer:
+        // Leader HP drops to 1
+        ctx.conn.session.hp = 1;
+        ctx.out.send(crate::battle::packets::status_update(1, 1));
+        // Afflict Leader with Ghost debuff
+        ctx.conn.session.ghost = 1;
+        // S->C 18 08 [playerId][01 00][01]
+        ctx.out.send(crate::server::spawn::state_sync_frame(leader_id, 1, 1));
+        // Exit combat
+        ctx.service.leave_battle(&mut ctx.conn.session);
+        ctx.out.send(crate::battle::packets::battle_trailer());
+    }
+
+    // Evacuate party members from combat cleanly
+    let member_ids = ctx.conn.session.id_mem;
+    {
+        let mut online = crate::server::session::lock_online_sessions();
+        for &mem_id in &member_ids {
+            if mem_id > 0 && mem_id != leader_id {
+                if let Some(mem) = online.get_mut(&mem_id) {
+                    mem.battle_id = 0;
+                }
+                ctx.service.send_to(i64::from(mem_id), crate::battle::packets::battle_trailer());
+            }
+        }
+    }
+    // Clean up battle instance
+    ctx.service.abort_battle(res.battle_id);
+
+    // Two-Phase State Lock / Registry Sync
+    crate::server::session::registry_update_if_online(&ctx.conn.session);
+
+    // Persistence to DB
+    if let Some(pool) = ctx.env.pool {
+        let cols = if res.is_correct {
+            &["god"][..]
+        } else {
+            &["hp", "ghost"][..]
+        };
+        let _ = crate::db::persist::persist_sessions_transaction(Some(pool), &[&ctx.conn.session], cols).await;
+    }
+}
+

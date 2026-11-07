@@ -250,8 +250,10 @@ impl GameData {
             d.load_warps(&p)?;
         }
 
-        // 10. Skills.txt
-        if let Some(p) = resolve_data_file(data_dir, "Skills.txt") {
+        // 10. skills.json (canonical 376 records) or legacy Skills.txt
+        if let Some(p) = resolve_data_file(data_dir, "skills.json") {
+            d.load_skills_json(&p)?;
+        } else if let Some(p) = resolve_data_file(data_dir, "Skills.txt") {
             d.load_skills(&p)?;
         }
 
@@ -353,6 +355,11 @@ impl GameData {
                 "compound.dat" => self.compounds = CompoundDatLoader::load(&bytes)?,
                 _ => unreachable!("optional binary list contains unknown file"),
             }
+        }
+
+        // skills.json — Canonical 376 records matching aLogin.exe client space.
+        if let Some(path) = resolve_data_file(data_dir, "skills.json") {
+            self.load_skills_json(&path)?;
         }
 
         // Talk-warp exception: `Warps.txt` is the only text asset in
@@ -550,6 +557,77 @@ impl GameData {
                 garble: encoding::compute_garble(name),
             };
             self.items.insert(item.id, item);
+        }
+        Ok(())
+    }
+
+    /// skills.json — Canonical 376 records matching aLogin.exe client space.
+    fn load_skills_json(&mut self, path: &Path) -> Result<()> {
+        #[derive(serde::Deserialize)]
+        struct SkillJsonRecord {
+            id: i64,
+            #[serde(default)]
+            name: String,
+            #[serde(rename = "spCost", default)]
+            sp_cost: i64,
+            #[serde(rename = "skPoint", default)]
+            sk_point: i64,
+            #[serde(default)]
+            element: i64,
+            #[serde(default)]
+            grade: i64,
+            #[serde(rename = "skillType", default)]
+            skill_type: i64,
+            #[serde(rename = "nbTarget", default)]
+            nb_target: i64,
+            #[serde(default)]
+            delay: i64,
+            #[serde(default)]
+            state: i64,
+            #[serde(rename = "maxLvl", default)]
+            max_lvl: i64,
+            #[serde(rename = "requireSk", default)]
+            require_sk: i64,
+        }
+
+        let content = std::fs::read_to_string(path)
+            .map_err(|e| TsError::Data(format!("read {}: {}", path.display(), e)))?;
+        let records: Vec<SkillJsonRecord> = serde_json::from_str(&content)
+            .map_err(|e| TsError::Data(format!("deserialize {}: {}", path.display(), e)))?;
+        for rec in records {
+            let reborn = if (10027..=10034).contains(&rec.id)
+                || (11027..=11034).contains(&rec.id)
+                || (12027..=12034).contains(&rec.id)
+                || (13026..=13034).contains(&rec.id)
+            {
+                2
+            } else if (10020..=10026).contains(&rec.id)
+                || (11020..=11026).contains(&rec.id)
+                || (12020..=12026).contains(&rec.id)
+                || (13019..=13025).contains(&rec.id)
+                || (14038..=14054).contains(&rec.id)
+            {
+                1
+            } else {
+                0
+            };
+            let skill = Skill {
+                id: rec.id,
+                name: rec.name,
+                sp: rec.sp_cost,
+                point: rec.sk_point,
+                thuoctinh: rec.element,
+                id_dk: [rec.require_sk, 0, 0, 0, 0, 0],
+                lv_max: rec.max_lvl,
+                skill_type: rec.skill_type,
+                do_manh: rec.grade,
+                sl_danh: rec.nb_target,
+                reborn,
+                combo: 0,
+                delay: rec.delay,
+                troi_buff: rec.state,
+            };
+            self.skills.insert(skill.id, skill);
         }
         Ok(())
     }

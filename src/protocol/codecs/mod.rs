@@ -9,6 +9,7 @@ pub mod ehuman;
 pub mod npc_talk;
 pub mod player_info;
 pub mod quest_sync;
+pub mod stats;
 pub mod thing_data;
 
 pub use npc_talk::{
@@ -21,4 +22,6 @@ pub use quest_sync::{
     SUB_QUEST_DONT_BULK, SUB_QUEST_DONT_SINGLE, SUB_QUEST_FULL, SUB_QUEST_ITEM_ADD,
     SUB_QUEST_ITEM_CLEAR, SUB_QUEST_ITEM_REMOVE, SUB_QUEST_TASK_LOG,
 };
+pub use stats::StatsPacketBuilder;
 pub use thing_data::{ThingData, ThingDataCodec, THING_DATA_SIZE};
+

@@ -309,6 +309,9 @@ pub fn get_turn(id_skill: i64, lv_skill: i64) -> i64 {
             10 => 5,
             _ => 3,
         },
-        _ => 3,
+        _ => {
+            tracing::debug!(skill_id = id_skill, "uncataloged skill hit default turn fallback (3)");
+            3
+        }
     }
 }

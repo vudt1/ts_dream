@@ -139,6 +139,24 @@ fn try_trigger_random_encounter(ctx: &mut OpcodeCtx) {
     conn.session.encounter_steps = 0;
     conn.session.encounter_threshold = rng.next_range(15, 31) as u32;
 
+    // Special Event: North Star Quiz encounter hook (Ticket 02)
+    if ctx.service.events.is_event_active(crate::server::events::EVENT_NORTH_STAR) {
+        let rate = ctx.service.events.get_north_star_rate();
+        let roll = rng.next_range(1, 101) as u8;
+        if roll <= rate {
+            let npc_id = if rng.next_range(0, 2) == 0 { 1643 } else { 1644 };
+            let diahinh = scene
+                .scene_infos
+                .get(&1)
+                .map(|s| s.background_no as i32)
+                .unwrap_or(112);
+            let (_battle_id, modal_frame) =
+                ctx.service.start_north_star_battle(&mut conn.session, npc_id, diahinh);
+            ctx.out.send(modal_frame);
+            return;
+        }
+    }
+
     // Resolve battle from encounter's event list
     let state = crate::server::handlers::npc_event::snapshot_state(&conn.session);
     let mut chosen_fight_id: Option<u16> = None;

@@ -659,6 +659,30 @@ pub mod troi_byte {
     pub const HOCHU: u8 = 0x0E; // 14
 }
 
+/// Action subcode byte constants (client 0x32 action fragments).
+pub mod action_subcode {
+    pub const HP: u8 = 0x19;
+    pub const SP: u8 = 0x1A;
+}
+
+/// Dispel & cleanse sub-effect fragments.
+pub mod sub_effect {
+    /// Type 3 disable purge sub-effect fragment: troi 0xDD, 0 damage, buff 1 ("DD000001").
+    pub const PURGE_TYPE3: &str = "DD000001";
+    /// Type 15 debuff purge sub-effect fragment: troi 0xDF, 0 damage, buff 1 ("DF000001").
+    pub const PURGE_TYPE15: &str = "DF000001";
+}
+
+/// Builds an HP heal sub-action entry (`19` + LE16(hp) + `00`).
+pub fn sub_action_hp(hp: u16) -> String {
+    format!("{:02X}{}00", action_subcode::HP, encoder::le16(hp))
+}
+
+/// Builds an SP restore sub-action entry (`1A` + LE16(sp) + `00`).
+pub fn sub_action_sp(sp: u16) -> String {
+    format!("{:02X}{}00", action_subcode::SP, encoder::le16(sp))
+}
+
 /// TroiBuffEnd byte constants.
 pub mod troi_end_byte {
     pub const TYPE3: u8 = 1;

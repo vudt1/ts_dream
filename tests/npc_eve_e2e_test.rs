@@ -41,7 +41,7 @@ use ts_dream::server::dispatcher::{dispatch, HandleOutcome, ServerEnv};
 use ts_dream::server::handlers::npc_event::snapshot_state;
 use ts_dream::server::handlers::shops::gold_frame;
 use ts_dream::server::handlers::stats::build_stat_update;
-use ts_dream::server::handlers::talk::{execute_event_step, resume_eve_after_battle};
+use ts_dream::server::handlers::talk::{execute_event_step, resume_eve_after_battle_sync as resume_eve_after_battle};
 use ts_dream::server::session::{lock_online_sessions, Conn, InventoryItem, Session};
 use ts_dream::server::spawn;
 

@@ -60,6 +60,16 @@ impl BattleHandle {
     pub fn ack_scene(&self) {
         self.ack_notify.notify_one();
     }
+
+    /// Construct a dummy battle handle (used by quiz battles where turns do not run).
+    pub fn dummy(id: i32) -> Self {
+        let (tx, _rx) = mpsc::unbounded_channel();
+        Self {
+            id,
+            tx,
+            ack_notify: Arc::new(tokio::sync::Notify::new()),
+        }
+    }
 }
 
 /// The registry of live battles (id assignment precedes increment).

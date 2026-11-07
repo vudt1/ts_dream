@@ -10,6 +10,7 @@
 
 use crate::battle::engine::WarInfo;
 use crate::battle::rng::DotNetRandom;
+use crate::protocol::*;
 
 const MAX_BASE_DAMAGE: i64 = 50_000;
 const ATTRIBUTE_INT: u8 = 27;
@@ -70,7 +71,8 @@ pub fn calculate_attack(
     let reborn_diff = (attacker.reborn - target.reborn).max(0);
     let reborn_multiplier = 1.0 + 0.1 * reborn_diff as f64;
     let random_factor = 0.9 + rng.next_range(0, 10_000) as f64 / 10_000.0 * 0.2;
-    let thunder = rng.next_range(0, 100) < (5 + attacker.agi / 10).clamp(1, 50) as i32;
+    let thunder = attacker.type19_id == SKILL_TYRANT_WILL as i64
+        || rng.next_range(0, 100) < (5 + attacker.agi / 10).clamp(1, 50) as i32;
     let thunder_multiplier = if thunder { 1.5 } else { 1.0 };
     let pvp_multiplier = if target.typ == 2 || target.typ == 4 {
         0.5
@@ -84,7 +86,7 @@ pub fn calculate_attack(
     };
     let defend_multiplier = if target.id_skill == 17_001 { 0.5 } else { 1.0 };
 
-    let damage = (reduced as f64
+    let mut damage = (reduced as f64
         * element_multiplier
         * reborn_multiplier
         * random_factor
@@ -95,8 +97,15 @@ pub fn calculate_attack(
         .round()
         .max(1.0) as i64;
 
+    if target.type19_id == SKILL_ENERGY_CONCENTRATION as i64 {
+        damage = (damage * 7) / 10;
+    } else if target.type19_id == SKILL_CELESTIAL_SHIELD as i64 {
+        damage = damage / 2;
+    }
+    damage = damage.max(1);
+
     let (inflicted_status, status_rounds) = if skill.hit_status > 0 && skill.round > 0 {
-        let status_chance = (50 + (attacker.int1 - target.int1) / 2).clamp(10, 90);
+        let status_chance = (50 + (attacker.int1 - target.int1) / 2 + attacker.sach_dong_lv * 2).clamp(10, 95);
         if rng.next_range(0, 100) < status_chance as i32 {
             (skill.hit_status, skill.round)
         } else {
@@ -145,3 +154,18 @@ pub fn element_multiplier(attacker: u8, defender: i64) -> f64 {
         _ => 1.0,
     }
 }
+
+/// Adjust experience gained based on God of Fortune and Ghost buffs.
+/// - If god > 0: exp * 1.5
+/// - If ghost == 1: exp * 0.5 (50% reduction)
+pub fn apply_god_ghost_exp(exp: i64, god: u32, ghost: u8) -> i64 {
+    let mut modified = exp as f64;
+    if god > 0 {
+        modified *= 1.5;
+    }
+    if ghost == 1 {
+        modified *= 0.5;
+    }
+    crate::battle::damage::banker_round(modified) as i64
+}
+

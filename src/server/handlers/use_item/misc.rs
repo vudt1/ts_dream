@@ -33,8 +33,16 @@ pub async fn handle(ctx: &mut UseCtx<'_>) -> bool {
     let id = ctx.id;
     let pid = ctx.conn.session.id;
 
-    // --- No-op ids (fall through to the shared end-feedback tail, no consume). ---
-    if matches!(id, 46013 | 46014 | 46015 | 46042 | 46091) {
+    // --- Respec items: Memory Manual (46035 / 46166) opens TBK_SkillRegressForm (2A 01),
+    //     Careful Pouch (46203) opens TBK_AttrRegressForm (2A 02).
+    //     Items are consumed upon downgrade confirmation in 0x2A handler, not here. ---
+    if matches!(id, 46035 | 46166) {
+        ctx.out.send("F44402002A01".to_string());
+        ctx.end_feedback();
+        return true;
+    }
+    if id == 46203 {
+        ctx.out.send("F44402002A02".to_string());
         ctx.end_feedback();
         return true;
     }

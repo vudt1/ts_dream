@@ -553,9 +553,9 @@ fn dynamic_skill_delay_pacing_calculation_and_clamping() {
 fn dispel_and_cleanse_emits_purge_and_clear_status() {
     let npcs = HashMap::new();
     let mut skills = HashMap::new();
-    // Skill 11014 (Dispel Type4 10010, skill_type = 5)
+    // Skill 10009 (Dispel Type4 10010, skill_type = 5)
     skills.insert(
-        11014,
+        ts_dream::battle::dispel::SKILL_GIAI_KET_GIOI,
         Skill {
             skill_type: 5,
             sl_danh: 1,
@@ -579,7 +579,7 @@ fn dispel_and_cleanse_emits_purge_and_clear_status() {
     let texps: Vec<TexpRow> = Vec::new();
     let data = create_test_data(&npcs, &skills, &pet_slots, &players, &texps);
 
-    // --- Part 1: Dispel (Skill 11014, skill_type 5) on enemy buff ---
+    // --- Part 1: Dispel (Skill 10009, skill_type 5) on enemy buff ---
     let mut battle = Battle::new(1, 0);
     // Attacker at (3, 2)
     {
@@ -611,7 +611,7 @@ fn dispel_and_cleanse_emits_purge_and_clear_status() {
             target_row: 0,
             target_col: 2,
             action: BattleAction::CastSkill {
-                skill_id: 11014,
+                skill_id: ts_dream::battle::dispel::SKILL_GIAI_KET_GIOI,
                 skill_lv: 1,
             },
         },

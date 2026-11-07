@@ -97,6 +97,8 @@ pub struct DashboardTemplate {
     pub guilds: Vec<db::domain::GuildRow>,
     pub world_bosses: Vec<db::domain::WorldBossRow>,
     pub initial_logs: Vec<LogEvent>,
+    pub events: Vec<crate::server::events::SpecialEvent>,
+    pub north_star_rate: u8,
 }
 
 impl IntoResponse for DashboardTemplate {
@@ -169,6 +171,10 @@ pub fn router(state: WebState) -> axum::Router {
         .route("/api/config/perexp", get(get_perexp).post(set_perexp))
         .route("/api/db/status", get(db_status))
         .route("/api/db/status/stream", get(db_status_stream))
+        .route("/api/events", get(list_special_events))
+        .route("/api/events/{id}/start", axum::routing::post(start_special_event))
+        .route("/api/events/{id}/stop", axum::routing::post(stop_special_event))
+        .route("/api/events/north_star/rate", axum::routing::post(set_north_star_encounter_rate))
         .with_state(s)
 }
 
@@ -207,6 +213,11 @@ async fn index(State(s): State<WebState>) -> Response {
         None => Vec::new(),
     };
 
+    let (events, north_star_rate) = match &s.server_control {
+        Some(control) => (control.events.list_events(), control.events.get_north_star_rate()),
+        None => (Vec::new(), 5),
+    };
+
     let template = DashboardTemplate {
         running,
         perexp,
@@ -219,6 +230,8 @@ async fn index(State(s): State<WebState>) -> Response {
         guilds,
         world_bosses,
         initial_logs,
+        events,
+        north_star_rate,
     };
 
     template.into_response()
@@ -538,3 +551,181 @@ async fn db_status_stream(State(s): State<WebState>) -> Response {
     });
     axum::response::sse::Sse::new(stream).into_response()
 }
+
+async fn list_special_events(State(s): State<WebState>) -> Json<Vec<crate::server::events::SpecialEvent>> {
+    let events = if let Some(ref control) = s.server_control {
+        control.events.list_events()
+    } else {
+        Vec::new()
+    };
+    Json(events)
+}
+
+async fn start_special_event(
+    State(s): State<WebState>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    let Some(ref control) = s.server_control else {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({ "error": "Game server is stopped. Please start the server first" })),
+        )
+            .into_response();
+    };
+
+    let is_running = control.is_running().await;
+    match control.events.start_event(&id, is_running) {
+        Ok(()) => {
+            if let Some(ref pool) = s.pool {
+                let _ = crate::db::domain::write_audit(
+                    pool,
+                    Some(1),
+                    "event_start",
+                    Some("special_event"),
+                    None,
+                    Some(&id),
+                )
+                .await;
+            }
+            htmx_or_json(
+                &headers,
+                || render_events_card(&control.events),
+                json!({ "ok": true, "event": id, "status": "Active" }),
+            )
+        }
+        Err((code, msg)) => (code, Json(json!({ "error": msg }))).into_response(),
+    }
+}
+
+async fn stop_special_event(
+    State(s): State<WebState>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    let Some(ref control) = s.server_control else {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({ "error": "Game server is stopped. Please start the server first" })),
+        )
+            .into_response();
+    };
+
+    match control.events.stop_event(&id) {
+        Ok(()) => {
+            if let Some(ref pool) = s.pool {
+                let _ = crate::db::domain::write_audit(
+                    pool,
+                    Some(1),
+                    "event_stop",
+                    Some("special_event"),
+                    None,
+                    Some(&id),
+                )
+                .await;
+            }
+            htmx_or_json(
+                &headers,
+                || render_events_card(&control.events),
+                json!({ "ok": true, "event": id, "status": "Ending" }),
+            )
+        }
+        Err((code, msg)) => (code, Json(json!({ "error": msg }))).into_response(),
+    }
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct RatePayload {
+    pub rate: Option<u8>,
+}
+
+async fn set_north_star_encounter_rate(
+    State(s): State<WebState>,
+    payload: Result<FormOrJson<RatePayload>, StatusCode>,
+) -> Response {
+    let rate = match payload {
+        Ok(FormOrJson::Json(p)) | Ok(FormOrJson::Form(p)) => p.rate.unwrap_or(5),
+        Err(_) => 5,
+    };
+
+    if let Some(ref control) = s.server_control {
+        control.events.set_north_star_rate(rate);
+        if let Some(ref pool) = s.pool {
+            let details = format!("rate={}", control.events.get_north_star_rate());
+            let _ = crate::db::domain::write_audit(
+                pool,
+                Some(1),
+                "event_rate_change",
+                Some("special_event"),
+                None,
+                Some(&details),
+            )
+            .await;
+        }
+        Json(json!({ "ok": true, "rate": control.events.get_north_star_rate() })).into_response()
+    } else {
+        (
+            StatusCode::CONFLICT,
+            Json(json!({ "error": "Server control unavailable" })),
+        )
+            .into_response()
+    }
+}
+
+pub fn render_events_card(mgr: &crate::server::events::EventLifecycleManager) -> String {
+    let events = mgr.list_events();
+    let rate = mgr.get_north_star_rate();
+    let mut html = String::from(
+        r##"<div class="card" id="special-events-card" style="margin-bottom: 24px;">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>Special Events Control Plane</span>
+            <span style="font-size: 12px; color: var(--text-muted);">Strict Mutex & 120m Starvation Watchdog</span>
+        </div>
+        <div style="margin-bottom: 16px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px; display: flex; align-items: center; gap: 16px;">
+            <label style="font-size: 13px; font-weight: 600; color: var(--text-secondary);">North Star Encounter Rate: <span id="rate-display">"##,
+    );
+    html.push_str(&format!("{rate}%"));
+    html.push_str(
+        r##"</span></label>
+            <input type="range" name="rate" min="1" max="30" value=""##,
+    );
+    html.push_str(&format!("{rate}"));
+    html.push_str(
+        r##"" style="flex: 1;" hx-post="/api/events/north_star/rate" hx-trigger="change" hx-swap="none" oninput="document.getElementById('rate-display').innerText = this.value + '%'">
+        </div>
+        <table class="data-table" style="width: 100%;">
+            <thead>
+                <tr>
+                    <th>Event ID</th>
+                    <th>Name</th>
+                    <th>Status</th>
+                    <th>Participants</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>"##,
+    );
+    for e in events {
+        let badge_class = match e.phase {
+            crate::server::events::EventPhase::Active => "status-online",
+            crate::server::events::EventPhase::Ending => "status-connecting",
+            _ => "status-offline",
+        };
+        html.push_str(&format!(
+            r##"<tr>
+                <td style="font-weight: 600;">{}</td>
+                <td>{}</td>
+                <td><span class="status-badge {}">{}</span></td>
+                <td>{}</td>
+                <td>
+                    <button class="btn btn-green" style="padding: 4px 10px; font-size: 12px;" hx-post="/api/events/{}/start" hx-target="#special-events-card" hx-swap="outerHTML">Start</button>
+                    <button class="btn btn-red" style="padding: 4px 10px; font-size: 12px; margin-left: 6px;" hx-post="/api/events/{}/stop" hx-target="#special-events-card" hx-swap="outerHTML">Stop</button>
+                </td>
+            </tr>"##,
+            e.id, e.name, badge_class, e.phase, e.participants, e.id, e.id
+        ));
+    }
+    html.push_str(r##"</tbody></table></div>"##);
+    html
+}
+

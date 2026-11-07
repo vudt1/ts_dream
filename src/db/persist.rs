@@ -46,6 +46,8 @@ fn character_column(column: &str) -> Option<&'static str> {
         "Reborn" | "rebornstage" => "rebornstage",
         "Job" | "jobtype" => "jobtype",
         "Hair" | "hair" => "hair",
+        "Ghost" | "ghost" => "ghost",
+        "God" | "god" => "god",
         _ => return None,
     })
 }
@@ -402,10 +404,14 @@ pub async fn upsert_skill(
     lv: u8,
     sp: u8,
     save: u8,
-) {
-    let Some(pool) = pool else { return };
+) -> Result<(), sqlx::Error> {
+    let Some(pool) = pool else { return Ok(()); };
     if let Err(e) = sqlx::query("INSERT INTO character_skills (playerid, skillid, level, sp, saveflag) VALUES (?, ?, ?, ?, ?) ON CONFLICT(playerid, skillid) DO UPDATE SET level=excluded.level, sp=excluded.sp, saveflag=excluded.saveflag")
-        .bind(i64::from(player_id)).bind(i64::from(skill_id)).bind(i64::from(lv)).bind(i64::from(sp)).bind(i64::from(save)).execute(&pool.write).await { tracing::warn!("modern upsert_skill failed: {e}"); }
+        .bind(i64::from(player_id)).bind(i64::from(skill_id)).bind(i64::from(lv)).bind(i64::from(sp)).bind(i64::from(save)).execute(&pool.write).await {
+        tracing::warn!("modern upsert_skill failed: {e}");
+        return Err(e);
+    }
+    Ok(())
 }
 
 pub async fn delete_reborn_skills(pool: Option<&DbPool>, player_id: u32) {

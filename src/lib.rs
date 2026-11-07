@@ -45,6 +45,7 @@ pub mod server {
     pub mod session;
     pub mod spawn;
     pub mod trade_system;
+    pub mod events;
 }
 
 pub mod web {
@@ -55,6 +56,7 @@ pub mod web {
 pub mod battle {
     pub mod construction;
     pub mod damage;
+    pub mod dispel;
     pub mod engine;
     pub mod manager;
     pub mod combat_formula;

@@ -250,8 +250,8 @@ pub async fn handle_login_complete(ctx: &mut OpcodeCtx<'_>) {
     let my_appear = spawn::player_appear(
         conn.session.id,
         conn.session.sex,
-        0,
-        0,
+        conn.session.ghost,
+        (conn.session.god > 0) as u8,
         conn.session.map_id,
         conn.session.map_x,
         conn.session.map_y,
@@ -286,8 +286,8 @@ pub async fn handle_login_complete(ctx: &mut OpcodeCtx<'_>) {
         let o_appear = spawn::player_appear(
             other.id,
             other.sex,
-            0,
-            0,
+            other.ghost,
+            (other.god > 0) as u8,
             other.map_id,
             other.map_x,
             other.map_y,

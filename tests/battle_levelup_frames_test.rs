@@ -112,6 +112,7 @@ fn finish_level_up_emits_frames_in_contract_order() {
             spx: 0,
             hpx2: 0,
             spx2: 0,
+            ..Default::default()
         },
     );
     let texps = texps_one_level();
@@ -200,6 +201,7 @@ fn finish_without_level_up_emits_no_levelup_frame() {
             spx: 0,
             hpx2: 0,
             spx2: 0,
+            ..Default::default()
         },
     );
     let texps = texps_one_level();

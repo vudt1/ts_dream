@@ -48,6 +48,13 @@ pub const OPCODE_STORE: &str = "2304";
 pub const OPCODE_SERVER_NAME: &str = "2709";
 pub const OPCODE_HOTKEYS: &str = "2801";
 
+// Element Types (Thuoctinh: 1 = Earth/Địa, 2 = Water/Thủy, 3 = Fire/Hỏa, 4 = Wind/Phong, 5 = Mind/Tâm)
+pub const ELEMENT_EARTH: u8 = 1;
+pub const ELEMENT_WATER: u8 = 2;
+pub const ELEMENT_FIRE: u8  = 3;
+pub const ELEMENT_WIND: u8  = 4;
+pub const ELEMENT_MIND: u8  = 5;
+
 // ============================================================================
 // Server Main Opcodes
 // ============================================================================
@@ -518,3 +525,25 @@ pub fn frame(code: &str, body: &str) -> String {
     let total_len = (code.len() + body.len()) / 2;
     format!("{TS_MAGIC_HEADER}{}{code}{body}", encoder::le16(total_len as u16))
 }
+
+// ============================================================================
+// Job Skill IDs (Hệ Tâm - 4 Nghề: Hiệp, Dũng, Quân, Nho)
+// ============================================================================
+pub const SKILL_GREAT_CYCLE: u16 = 14038;             // Đại chu thiên (gốc chung 4 nghề)
+pub const SKILL_TYRANT_AURA: u16 = 14039;             // Bá khí (+ATK passive)
+pub const SKILL_TYRANT_WILL: u16 = 14040;             // Bá ý (100% crit buff 2..4 lượt)
+pub const SKILL_MOUNTAIN_BREAKER: u16 = 14041;        // Lực bạt sơn hề (+ATK/MaxHP passive)
+pub const SKILL_RAGING_SURGE: u16 = 14042;            // Sóng cuồng / Nộ đào chiến đạp (AoE vật lý)
+pub const SKILL_HERO_AURA: u16 = 14043;               // Anh khí hộ thân (+DEF passive)
+pub const SKILL_CELESTIAL_SHIELD: u16 = 14044;        // Thiên thần thuẫn (giảm 50% sát thương nhận vào)
+pub const SKILL_MIND_EYE: u16 = 14045;                // Tâm nhãn (+AGI passive)
+pub const SKILL_ENERGY_CONCENTRATION: u16 = 14046;    // Ngưng khí hộ thân (giảm 30% sát thương)
+pub const SKILL_TACTICAL_STRATEGY: u16 = 14047;       // Dụng kế (+INT passive)
+pub const SKILL_TACTICAL_DEFENSE: u16 = 14048;        // Trí thủ (+DEF/+INT passive)
+pub const SKILL_ENEMY_RESISTANCE: u16 = 14049;        // Ngự địch (+DEF passive)
+pub const SKILL_INSTIGATION: u16 = 14050;             // Sách động (+tỷ lệ xuất chiêu hiệu ứng)
+pub const SKILL_CELESTIAL_INTUITION: u16 = 14051;     // Tiên khiếu (+INT/+MaxSP passive)
+pub const SKILL_BLOOD_SPIRIT_CONVERSION: u16 = 14052; // Hóa Huyết Hoàn Hồn (hồi phục HP/SP mỗi lượt)
+pub const SKILL_HOLY_SPIRIT: u16 = 14053;             // Thánh Linh thuật (dispel buff & sát thương thánh đơn mục tiêu)
+pub const SKILL_HEAVEN_THUNDER: u16 = 14054;          // Càn Khôn Thiên Lôi (ma pháp lôi điện toàn đội)
+

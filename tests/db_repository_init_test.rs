@@ -230,6 +230,7 @@ async fn test_session_load_and_save() {
         gold: 5000,
         tiengtam: 0,
         god: 0,
+        ghost: 0,
         hp_store: 0,
         sp_store: 0,
         newbie: 1,
@@ -304,6 +305,9 @@ async fn test_session_load_and_save() {
         encounter_threshold: 20,
         last_battle_end_ms: 0,
         last_chat_ms: 0,
+        ball_point: 0,
+        dragon_balls: 0,
+        skill_rb2: [0; 8],
     };
 
     // Save session
@@ -368,6 +372,7 @@ async fn test_session_load_and_save() {
         gold: 0,
         tiengtam: 0,
         god: 0,
+        ghost: 0,
         hp_store: 0,
         sp_store: 0,
         newbie: 0,
@@ -400,6 +405,9 @@ async fn test_session_load_and_save() {
         encounter_threshold: 20,
         last_battle_end_ms: 0,
         last_chat_ms: 0,
+        ball_point: 0,
+        dragon_balls: 0,
+        skill_rb2: [0; 8],
     };
 
     let loaded = repos
@@ -732,6 +740,7 @@ async fn test_nonexistent_and_edge_cases() {
         gold: 0,
         tiengtam: 0,
         god: 0,
+        ghost: 0,
         hp_store: 0,
         sp_store: 0,
         newbie: 0,
@@ -764,6 +773,9 @@ async fn test_nonexistent_and_edge_cases() {
         encounter_threshold: 20,
         last_battle_end_ms: 0,
         last_chat_ms: 0,
+        ball_point: 0,
+        dragon_balls: 0,
+        skill_rb2: [0; 8],
     };
     let found = repos
         .sessions()
