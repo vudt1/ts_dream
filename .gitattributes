@@ -1,0 +1,39 @@
+# Chuẩn hóa line ending: nội dung lưu trong Git là LF,
+# nhưng khi checkout ra working tree (Windows) luôn là CRLF.
+
+* text=auto
+
+# Mã nguồn Rust
+*.rs        text eol=crlf
+*.toml      text eol=crlf
+build.rs    text eol=crlf
+
+# Web / template
+*.html      text eol=crlf
+*.css       text eol=crlf
+*.js        text eol=crlf
+
+# Database / script
+*.sql       text eol=crlf
+*.py        text eol=crlf
+*.kt        text eol=crlf
+
+# Tài liệu & dữ liệu dạng text
+*.md        text eol=crlf
+*.txt       text eol=crlf
+*.tsv       text eol=crlf
+*.hex       text eol=crlf
+*.json      text eol=crlf
+*.jsonl     text eol=crlf
+LICENSE     text eol=crlf
+.gitignore  text eol=crlf
+.gitattributes text eol=crlf
+.gitkeep    text eol=crlf
+
+# Nhị phân — không bao giờ chuyển đổi line ending
+*.dat       binary
+*.bin       binary
+*.mmg       binary
+*.emg       binary
+*.db        binary
+*.pyc       binary
