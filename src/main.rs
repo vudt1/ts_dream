@@ -146,6 +146,7 @@ async fn main() -> anyhow::Result<()> {
             Some(data.clone()),
             Some(pool.clone()),
         )
+        .with_bind_host(cfg.game_host.clone())
         .with_idle_timeout(std::time::Duration::from_secs(cfg.idle_timeout_secs))
         .with_outbound_queue_capacity(cfg.outbound_queue_capacity),
     );
@@ -158,7 +159,11 @@ async fn main() -> anyhow::Result<()> {
         server_control: Some(server_control.clone()),
     };
     let web_router = ts_dream::web::app::router(web_state);
-    let web_addr = std::net::SocketAddr::from(([0, 0, 0, 0], cfg.web_port));
+    let web_ip: std::net::IpAddr = cfg
+        .game_host
+        .parse()
+        .unwrap_or(std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)));
+    let web_addr = std::net::SocketAddr::new(web_ip, cfg.web_port);
     tokio::spawn(async move {
         match tokio::net::TcpListener::bind(web_addr).await {
             Ok(listener) => {

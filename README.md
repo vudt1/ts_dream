@@ -39,19 +39,21 @@ cargo build --release
 
 | Mục | Giá trị |
 | --- | ------- |
+| Server host | `0.0.0.0` |
 | Game TCP port | `6414` |
 | Web admin port | `8090` |
-| Database | MySQL 8 — `mysql://user:pass@localhost:3306/ts_dream` |
+| Database | SQLite (`DB/ts_dream.db`) / MySQL 8 |
 | Tự tạo DB khi thiếu | `true` |
 
 ### Biến môi trường (`TS_*` — ghi đè lên file `ts_dream.toml`)
 
 | Biến | Mặc định | Ý nghĩa |
 | --- | --- | --- |
-| `TS_GAME_PORT` | `6414` | Port TCP game server - không được thay đổi|
+| `TS_GAME_HOST` | `0.0.0.0` | Địa chỉ IP/host lắng nghe cho cả Game TCP và Web Dashboard (`127.0.0.1` khi test nội bộ để tránh firewall, `0.0.0.0` cho public) |
+| `TS_GAME_PORT` | `6414` | Port TCP game server - không được thay đổi |
 | `TS_WEB_PORT` | `8090` | Port web admin dashboard |
 | `TS_DATA_DIR` | `./Data` | Thư mục dữ liệu tĩnh (`ts_server_old/Data/`) |
-| `TS_DATABASE_URL` | `mysql://user:pass@localhost:3306/ts_dream` | Chuỗi kết nối MySQL |
+| `TS_DATABASE_URL` | `mysql://user:pass@localhost:3306/ts_dream` | Chuỗi kết nối MySQL (deprecated) |
 | `TS_PEREXP_DEFAULT` | `0` | Giá trị PerEXP ban đầu runtime |
 | `TS_DB_AUTO_CREATE` | `true` | Tự tạo database khi chưa tồn tại (`true`/`false`) |
 

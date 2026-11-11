@@ -49,6 +49,8 @@ pub struct ServerControl {
     pub outbound_queue_capacity: usize,
     /// Special events lifecycle manager
     pub events: Arc<crate::server::events::EventLifecycleManager>,
+    /// Host or IP address to bind (defaults to "127.0.0.1" for tests; production sets "0.0.0.0").
+    pub bind_host: String,
 }
 
 impl ServerControl {
@@ -86,7 +88,14 @@ impl ServerControl {
             idle_timeout: Duration::from_secs(crate::config::Config::default().idle_timeout_secs),
             outbound_queue_capacity: crate::config::Config::default().outbound_queue_capacity,
             events,
+            bind_host: "127.0.0.1".to_string(),
         }
+    }
+
+    /// Override the bind host (defaults to "127.0.0.1" for tests; production sets "0.0.0.0").
+    pub fn with_bind_host(mut self, host: impl Into<String>) -> Self {
+        self.bind_host = host.into();
+        self
     }
 
     /// Override the idle timeout (used by config wiring and tests).
@@ -176,11 +185,15 @@ impl ServerControl {
         let (shutdown_sender, _) = broadcast::channel::<()>(1);
         *self.shutdown_tx.lock().await = Some(shutdown_sender.clone());
 
-        let addr = std::net::SocketAddr::from(([0, 0, 0, 0], self.game_port));
+        let bind_ip: std::net::IpAddr = self
+            .bind_host
+            .parse()
+            .unwrap_or_else(|_| std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)));
+        let addr = std::net::SocketAddr::new(bind_ip, self.game_port);
         let listener = match tokio::net::TcpListener::bind(addr).await {
             Ok(l) => l,
             Err(e) => {
-                let err_msg = format!("Failed to bind port {}: {e}", self.game_port);
+                let err_msg = format!("Failed to bind {addr}: {e}");
                 app.push_log("error", err_msg.clone());
                 return Err(err_msg);
             }
@@ -190,8 +203,7 @@ impl ServerControl {
         app.push_log(
             "system",
             format!(
-                "Game server started listening on 0.0.0.0:{}",
-                self.game_port
+                "Game server started listening on {addr}"
             ),
         );
         drop(app);

@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
 pub struct Config {
+    pub game_host: String,
     pub game_port: u16,
     pub web_port: u16,
     pub data_dir: PathBuf,
@@ -32,6 +33,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            game_host: "0.0.0.0".to_string(),
             game_port: 6414,
             web_port: 8090,
             data_dir: PathBuf::from("./Data"),
@@ -101,6 +103,8 @@ impl Config {
             Config::default()
         };
 
+        cfg.game_host = env_override("TS_GAME_HOST", cfg.game_host, |s| Ok(s.trim().to_string()))
+            .map_err(|e| TsError::Config(format!("TS_GAME_HOST: {e}")))?;
         cfg.game_port = env_override("TS_GAME_PORT", cfg.game_port, parse_u16)
             .map_err(|e| TsError::Config(format!("TS_GAME_PORT: {e}")))?;
         cfg.web_port = env_override("TS_WEB_PORT", cfg.web_port, parse_u16)
