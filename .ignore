@@ -1,0 +1,18 @@
+# Data nhị phân (game data)
+Data/*.dat
+Data/*.Dat
+Data/*.emg
+Data/*.mmg
+
+# File dữ liệu lớn được chỉ định trong AGENTS.md
+Data/npc_drops.json
+Data/Warps.txt
+
+# Cơ sở dữ liệu SQLite
+DB/
+
+# Thư mục build Cargo / Rust
+target/
+
+# Client Delphi nhị phân tham chiếu
+client_delphi/

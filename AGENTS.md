@@ -132,3 +132,4 @@ Chi tiết tại `CODING_STANDARDS.md` §1–2. Ba hard guardrail:
 
 - User tự commit thủ công; agent để thay đổi ở working tree.
 - Tìm kiếm tôn trọng `.ignore` (Data nhị phân, `Data/npc_drops.json`, `Data/Warps.txt`, `DB/`, `target/`, `client_delphi/`); khi grep, giới hạn trong `src/`, `tests/`, `docs/`, `spec/` để tiết kiệm token và tránh treo tiến trình.
+- Tuyệt đối không chạy lệnh `cargo update`, `cargo clean` hay tự ý xóa file `Cargo.lock` khi user không yêu cầu cụ thể.
