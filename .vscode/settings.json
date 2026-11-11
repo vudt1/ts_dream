@@ -1,0 +1,38 @@
+{
+    "files.encoding": "utf8",
+    "files.autoGuessEncoding": true,
+    "files.exclude": {
+        "**/.settings": true,
+        "**/target": true,
+        "**/node_modules": true,
+        "**/dist": true
+    },
+    "search.exclude": {
+        "**/.git": true,
+        "**/target": true,
+        "**/node_modules": true,
+        "**/dist": true,
+        "**/build": true
+    },
+    "files.watcherExclude": {
+        "**/node_modules": true,
+        "**/target": true,
+        "**/dist": true
+    },
+    "search.useIgnoreFiles": true,
+    "search.useGlobalIgnoreFiles": true,
+    "search.followSymlinks": false,
+    "terminal.integrated.fontFamily": "Consolas",
+    "terminal.integrated.fontSize": 14,
+    "terminal.integrated.profiles.windows": {
+        "powershell-utf8": {
+            "path": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+            "args": [
+                "-NoLogo",
+                "-Command",
+                "chcp 65001; powershell"
+            ]
+        }
+    },
+    "terminal.integrated.defaultProfile.windows": "powershell-utf8"
+}

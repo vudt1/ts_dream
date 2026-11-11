@@ -19,7 +19,6 @@ Cargo.lock
 .DS_Store
 Thumbs.db
 .idea/
-.vscode/
 *.swp
 
 # Workspace / agent state

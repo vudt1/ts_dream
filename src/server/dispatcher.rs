@@ -25,7 +25,7 @@ use crate::protocol::{
 };
 use crate::server::handlers::{
     battle, character, chat, expressions, inventory, login, movement, npc_event, party,
-    pet_actions, shops, skills, stats, system, talk, trade_storage, unimplemented,
+    pet_actions, respec, shops, skills, stats, system, talk, trade_storage, unimplemented,
 };
 use crate::db::pool::DbPool;
 use crate::server::session::Conn;
@@ -352,6 +352,9 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         // OP_HOTKEY (0x28) — Hotkey / skill bar
         OP_HOTKEY => stats::handle_hotkey(ctx).await,
 
+        // OP_RESET (0x2A) — Respec system (Memory Manual & Careful Pouch)
+        OP_RESET => respec::handle_respec(ctx).await,
+
         // OP_REBORN_PET (0x2C) — Pet reborn
         OP_REBORN_PET => skills::handle_pet_reborn(ctx).await,
 
@@ -372,7 +375,6 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         | OP_EXP_LEVEL
         | OP_RANK_ANNOUNCE
         | OP_QUEST
-        | OP_RESET
         | OP_COMPOUND
         | OP_REBORN
         | OP_SERVER_SWITCH

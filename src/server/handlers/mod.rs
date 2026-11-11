@@ -13,6 +13,7 @@ pub mod party;
 pub mod pet_actions;
 pub mod quest;
 pub mod quest_sync;
+pub mod respec;
 pub mod shops;
 pub mod skills;
 pub mod stats;
