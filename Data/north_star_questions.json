@@ -1,0 +1,387 @@
+[
+  {
+    "id": 1,
+    "question": "Ai là người kết nghĩa đào viên cùng Lưu Bị và Trương Phi?",
+    "options": [
+      "Quan Vũ",
+      "Triệu Vân",
+      "Mã Siêu",
+      "Hoàng Trung"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 2,
+    "question": "Vũ khí nổi tiếng của Trương Phi có tên là gì?",
+    "options": [
+      "Thanh Long Yển Nguyệt Đao",
+      "Bát Xà Mâu",
+      "Phương Thiên Họa Kích",
+      "Ỷ Thiên Kiếm"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 3,
+    "question": "Ai được mệnh danh là Ngọa Long tiên sinh trong Tam Quốc?",
+    "options": [
+      "Bàng Thống",
+      "Tư Mã Ý",
+      "Gia Cát Lượng",
+      "Chu Du"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 4,
+    "question": "Thời gian tối đa để trả lời Vấn Đáp Bắc Tinh Quân là bao nhiêu?",
+    "options": [
+      "30 giây",
+      "60 giây",
+      "90 giây",
+      "45 giây"
+    ],
+    "answer": 4
+  },
+  {
+    "id": 5,
+    "question": "Khi có Thần Tài đi theo, kinh nghiệm nhận được tăng lên bao nhiêu?",
+    "options": [
+      "1.5 lần",
+      "1.2 lần",
+      "2.0 lần",
+      "3.0 lần"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 6,
+    "question": "Ngựa Xích Thố ban đầu là của ai trước khi Đổng Trác tặng cho Lữ Bố?",
+    "options": [
+      "Lý Túc",
+      "Đổng Trác",
+      "Đinh Nguyên",
+      "Tào Tháo"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 7,
+    "question": "Trận đánh nào kết thúc thế cục đối đầu lớn giữa Tào Tháo và Viên Thiệu ở phương Bắc?",
+    "options": [
+      "Trận Xích Bích",
+      "Trận Di Lăng",
+      "Trận Quan Độ",
+      "Trận Hào Đình"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 8,
+    "question": "Trong Tam Quốc Diễn Nghĩa, ai là người 'tam cố thảo lư' mời Gia Cát Lượng xuất sơn?",
+    "options": [
+      "Tào Tháo",
+      "Tôn Quyền",
+      "Lưu Biểu",
+      "Lưu Bị"
+    ],
+    "answer": 4
+  },
+  {
+    "id": 9,
+    "question": "Vị tướng nào một mình vượt qua năm ải, chém sáu tướng của Tào Tháo?",
+    "options": [
+      "Quan Vũ",
+      "Triệu Vân",
+      "Trương Phi",
+      "Hoàng Trung"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 10,
+    "question": "Ai là người xưng đế, chính thức lập ra nhà Ngụy thời Tam Quốc?",
+    "options": [
+      "Tào Tháo",
+      "Tào Phi",
+      "Tào Thực",
+      "Tào Duệ"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 11,
+    "question": "Chiến dịch Xích Bích nổi tiếng diễn ra trên con sông nào?",
+    "options": [
+      "Hoàng Hà",
+      "Hán Thủy",
+      "Trường Giang",
+      "Hoài Hà"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 12,
+    "question": "Trong Ngũ Hổ Tướng nước Thục, ai là người lớn tuổi nhất?",
+    "options": [
+      "Quan Vũ",
+      "Trương Phi",
+      "Mã Siêu",
+      "Hoàng Trung"
+    ],
+    "answer": 4
+  },
+  {
+    "id": 13,
+    "question": "Ai đã liều mình cứu ấu chúa A Đẩu trong trận Đương Dương - Trường Bản?",
+    "options": [
+      "Triệu Vân",
+      "Trương Phi",
+      "Quan Vũ",
+      "Gia Cát Lượng"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 14,
+    "question": "Phụng Sồ là danh hiệu của vị mưu sĩ nào thời Tam Quốc?",
+    "options": [
+      "Từ Thứ",
+      "Bàng Thống",
+      "Pháp Chính",
+      "Quách Gia"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 15,
+    "question": "Người đã lập kế 'Thuyền cỏ mượn tên' trong trận Xích Bích là ai?",
+    "options": [
+      "Chu Du",
+      "Lỗ Túc",
+      "Gia Cát Lượng",
+      "Hoàng Cái"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 16,
+    "question": "Tên tự (biểu tự) của Trương Phi trong Tam Quốc Diễn Nghĩa là gì?",
+    "options": [
+      "Vân Trường",
+      "Tử Long",
+      "Dực Đức",
+      "Mạnh Đức"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 17,
+    "question": "Trong TS Online, NPC nào giúp người chơi giải trừ trạng thái Con Ma?",
+    "options": [
+      "Bà Gọi Hồn",
+      "Tiên Đồng",
+      "Lưu Bị",
+      "Trương Phi"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 18,
+    "question": "Vật phẩm phù chú nào trong TS Online dùng để hóa giải Con Ma ngay lập tức?",
+    "options": [
+      "Sách Thần Tài",
+      "Cải vận phù",
+      "Vé ưu đãi",
+      "Hồi phục đan"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 19,
+    "question": "Vũ khí nổi tiếng của Lữ Bố có tên là gì?",
+    "options": [
+      "Bát Xà Mâu",
+      "Thanh Long Đao",
+      "Phương Thiên Họa Kích",
+      "Song Cổ Kiếm"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 20,
+    "question": "Tác giả của tiểu thuyết cổ điển Tam Quốc Diễn Nghĩa là ai?",
+    "options": [
+      "Thi Nại Am",
+      "Ngô Thừa Ân",
+      "Tào Tuyết Cần",
+      "La Quán Trung"
+    ],
+    "answer": 4
+  },
+  {
+    "id": 21,
+    "question": "Quan Vũ đã trảm tướng nào của Viên Thiệu tại trận Bạch Mã?",
+    "options": [
+      "Nhan Lương",
+      "Văn Xú",
+      "Hoa Hùng",
+      "Nhan Lương và Văn Xú"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 22,
+    "question": "Ai là đại đô đốc Đông Ngô dùng hỏa công thiêu rụi 700 dặm doanh trại Lưu Bị ở Di Lăng?",
+    "options": [
+      "Chu Du",
+      "Lục Tốn",
+      "Lỗ Túc",
+      "Lữ Mông"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 23,
+    "question": "Vị danh y thời Tam Quốc đã thực hiện phẫu thuật cạo xương trị độc cho Quan Vũ là ai?",
+    "options": [
+      "Biển Thước",
+      "Trương Trọng Cảnh",
+      "Hoa Đà",
+      "Tôn Tư Mạc"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 24,
+    "question": "Trong TS Online, thuộc tính nào khắc chế thuộc tính Địa?",
+    "options": [
+      "Hỏa",
+      "Thủy",
+      "Địa",
+      "Phong"
+    ],
+    "answer": 4
+  },
+  {
+    "id": 25,
+    "question": "Ai là tướng Đông Ngô đã chịu nhục hình khổ nhục kế để trá hàng Tào Tháo tại Xích Bích?",
+    "options": [
+      "Hoàng Cái",
+      "Cam Ninh",
+      "Lăng Thống",
+      "Thái Sử Từ"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 26,
+    "question": "Quân sư đầu tiên giúp Lưu Bị đánh bại Tào Nhân tại Tân Dã là ai?",
+    "options": [
+      "Gia Cát Lượng",
+      "Từ Thứ",
+      "Bàng Thống",
+      "Pháp Chính"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 27,
+    "question": "Cặp chị em mỹ nhân Giang Đông lấy Tôn Sách và Chu Du có tên gọi là gì?",
+    "options": [
+      "Tứ Đại Mỹ Nhân",
+      "Tam Kiều",
+      "Nhị Kiều",
+      "Song Mỹ"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 28,
+    "question": "Ải hiểm trở nơi Lữ Bố một mình giao tranh với Tam anh kết nghĩa là ải nào?",
+    "options": [
+      "Đồng Quan",
+      "Hàm Cốc Quan",
+      "Kiếm Các",
+      "Hổ Lao Quan"
+    ],
+    "answer": 4
+  },
+  {
+    "id": 29,
+    "question": "Mưu sĩ Bàng Thống của Lưu Bị không may trúng tên tử trận tại địa danh nào?",
+    "options": [
+      "Lạc Phượng Pha",
+      "Định Quân Sơn",
+      "Bạch Đế Thành",
+      "Kỳ Sơn"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 30,
+    "question": "Trong TS Online, NPC Bắc Tinh Quân phụ trách Vấn Đáp có ID là bao nhiêu?",
+    "options": [
+      "1644",
+      "1643",
+      "1752",
+      "15162"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 31,
+    "question": "Trong TS Online, NPC Nam Tinh Quân có ID là bao nhiêu?",
+    "options": [
+      "1643",
+      "1752",
+      "1644",
+      "15312"
+    ],
+    "answer": 3
+  },
+  {
+    "id": 32,
+    "question": "Tào Tháo từng khen ngợi 'Sinh con phải như...' khi nhắc đến vị quân chủ nào?",
+    "options": [
+      "Lưu Bị",
+      "Viên Thiệu",
+      "Mã Siêu",
+      "Tôn Quyền"
+    ],
+    "answer": 4
+  },
+  {
+    "id": 33,
+    "question": "Ai là người dùng kế liên hoàn gả Điêu Thuyền để ly gián Đổng Trác và Lữ Bố?",
+    "options": [
+      "Vương Doãn",
+      "Lý Túc",
+      "Tào Tháo",
+      "Trần Cung"
+    ],
+    "answer": 1
+  },
+  {
+    "id": 34,
+    "question": "Khi bị Con Ma (Ghost) ám trong TS Online, điểm kinh nghiệm nhận được giảm bao nhiêu?",
+    "options": [
+      "30%",
+      "50%",
+      "70%",
+      "20%"
+    ],
+    "answer": 2
+  },
+  {
+    "id": 35,
+    "question": "Mưu sĩ tài hoa nào qua đời khi mới 38 tuổi khiến Tào Tháo thương tiếc khôn nguôi?",
+    "options": [
+      "Tuân Úc",
+      "Tuân Du",
+      "Quách Gia",
+      "Trình Dục"
+    ],
+    "answer": 3
+  }
+]
