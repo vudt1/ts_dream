@@ -368,3 +368,33 @@ async fn test_encounter_rate_audit_log_persisted() {
     assert_eq!(logs[0].2.as_deref(), Some("rate=20"));
 }
 
+#[tokio::test]
+async fn test_dashboard_renders_special_events_card() {
+    let app = Arc::new(RwLock::new(AppState::new(1)));
+    app.write().await.running = true;
+
+    let control = Arc::new(ServerControl::new(19228, app.clone(), None, None));
+    let state = WebState {
+        app: app.clone(),
+        pool: None,
+        data: None,
+        server_control: Some(control.clone()),
+    };
+
+    let req = Request::builder()
+        .uri("/")
+        .method("GET")
+        .body(Body::empty())
+        .unwrap();
+
+    let resp = router(state).oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let body_str = String::from_utf8_lossy(&bytes);
+    assert!(body_str.contains(r#"id="special-events-card""#), "dashboard must render #special-events-card");
+    assert!(body_str.contains("/api/events/north_star/rate"), "dashboard must have north_star rate slider");
+    assert!(body_str.contains("/api/events/north_star/start"), "dashboard must have start button");
+    assert!(body_str.contains("/api/events/north_star/stop"), "dashboard must have stop button");
+}
+

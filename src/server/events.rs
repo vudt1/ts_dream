@@ -76,6 +76,7 @@ pub struct NorthStarQuestion {
     pub id: u32,
     pub question: String,
     pub options: [String; 4],
+    #[serde(alias = "answer")]
     pub correct: u32, // 1..=4
 }
 
@@ -285,6 +286,11 @@ impl EventLifecycleManager {
     /// Get default quiz timeout duration.
     pub fn get_quiz_timeout(&self) -> Duration {
         self.default_quiz_timeout
+    }
+
+    /// Get total number of loaded questions in the question bank.
+    pub fn get_question_bank_len(&self) -> usize {
+        self.question_bank.len()
     }
 
     /// Check if a specific event is in Active phase.

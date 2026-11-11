@@ -723,4 +723,34 @@ async fn test_quiz_party_members_evacuated_on_leader_disconnect() {
     );
 }
 
+#[test]
+fn test_north_star_questions_json_canonical_bank() {
+    let path = std::path::Path::new("Data");
+    let mgr = ts_dream::server::events::EventLifecycleManager::from_data_dir(path);
+    assert_eq!(
+        mgr.get_question_bank_len(),
+        35,
+        "loaded question bank must contain 35 canonical questions"
+    );
+
+    let questions_str = std::fs::read_to_string("Data/north_star_questions.json")
+        .expect("read Data/north_star_questions.json");
+    let parsed: Vec<ts_dream::server::events::NorthStarQuestion> =
+        serde_json::from_str(&questions_str).expect("parse json");
+    assert_eq!(parsed.len(), 35, "question bank must contain 35 canonical questions");
+    for q in &parsed {
+        assert!(q.id >= 1 && q.id <= 35, "question id out of range: {}", q.id);
+        assert!(!q.question.is_empty(), "question text must not be empty");
+        assert_eq!(q.options.len(), 4, "must have 4 options");
+        for opt in &q.options {
+            assert!(!opt.is_empty(), "option text must not be empty");
+        }
+        assert!(
+            q.correct >= 1 && q.correct <= 4,
+            "correct answer must be between 1 and 4, got {}",
+            q.correct
+        );
+    }
+}
+
 

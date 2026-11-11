@@ -74,7 +74,9 @@ CREATE TABLE IF NOT EXISTS characters (
     mapx        INTEGER DEFAULT 0,              -- Tọa độ trục X của nhân vật trên bản đồ hiện tại
     mapy        INTEGER DEFAULT 0,              -- Tọa độ trục Y của nhân vật trên bản đồ hiện tại
     jobtype     INTEGER DEFAULT 0,              -- Nghề nghiệp: 0=Dân thường, 1=Hiệp sĩ, 2=Nho gia, 3=Hiền triết, 4=Bá vương
-    newbie      INTEGER DEFAULT 0               -- Đánh dấu tân thủ nhận quà đặc biệt (0 = Chưa nhận, 1 = Đã nhận)
+    newbie      INTEGER DEFAULT 0,              -- Đánh dấu tân thủ nhận quà đặc biệt (0 = Chưa nhận, 1 = Đã nhận)
+    ghost       INTEGER NOT NULL DEFAULT 0,     -- Trạng thái Ma theo (0 = Bình thường, 1 = Bị ma ám giảm 50% EXP)
+    god         INTEGER NOT NULL DEFAULT 0      -- Số trận còn lại được Thần Tài phù trợ (tăng 50% EXP)
 );
 
 -- ============================================================================
@@ -295,6 +297,21 @@ CREATE TABLE IF NOT EXISTS gm_audit_log (
     details           TEXT NOT NULL,
     created_at        INTEGER NOT NULL
 );
+
+-- ============================================================================
+-- admin_audit_log — Nhật ký ghi lại các thao tác quản trị trên Web Admin.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS admin_audit_log (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    admin_id    INTEGER NULL,
+    action      TEXT NOT NULL,
+    target_type TEXT NULL,
+    target_id   INTEGER NULL,
+    details     TEXT NULL,
+    created_at  INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS admin_audit_log_action_idx ON admin_audit_log (action);
 
 -- ============================================================================
 -- character_quest_tasks — dòng nhật ký nhiệm vụ phía client (Opcode 0x18

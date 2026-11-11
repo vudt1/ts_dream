@@ -19,7 +19,9 @@ use ts_dream::server::handlers::npc_event::{
     auto_chain_after, resolve_npc_event, set_eve_events_enabled, snapshot_state,
     snapshot_state_with_context, NpcTrigger,
 };
-use ts_dream::server::handlers::talk::{execute_event_step, resume_eve_after_battle};
+use ts_dream::server::handlers::talk::{
+    execute_event_step, resume_eve_after_battle_sync as resume_eve_after_battle,
+};
 use ts_dream::server::session::{lock_online_sessions, Session};
 use ts_dream::server::spawn;
 
