@@ -8,6 +8,7 @@ pub mod compound;
 pub mod dispatch;
 pub mod eve;
 pub mod evo_status;
+pub mod festival;
 pub mod formula;
 pub mod ground;
 pub mod item;
@@ -36,6 +37,7 @@ pub use eve::{
     SceneEveData,
 };
 pub use evo_status::{EVOStatusDatLoader, EVOStatusDef};
+pub use festival::{FestivalDatLoader, FestivalDef, FESTIVAL_PARITY_DATE_DWORD};
 pub use formula::{FormulaDatLoader, FormulaParams};
 pub use ground::GroundMmgLoader;
 pub use item::{ItemDatLoader, ItemDef};

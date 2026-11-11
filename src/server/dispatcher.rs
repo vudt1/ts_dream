@@ -24,7 +24,7 @@ use crate::protocol::{
     OP_WORLD_OBJECT, OP_ZM_CHESS,
 };
 use crate::server::handlers::{
-    battle, character, chat, expressions, inventory, login, movement, npc_event, party,
+    arena, battle, character, chat, expressions, festival, guild, inventory, login, movement, npc_event, party,
     pet_actions, respec, shops, skills, stats, system, talk, trade_storage, unimplemented,
 };
 use crate::db::pool::DbPool;
@@ -46,6 +46,15 @@ impl<'a> ServerEnv<'a> {
     pub fn none() -> Self {
         Self {
             pool: None,
+            repos: None,
+            hub: None,
+            sender: None,
+        }
+    }
+
+    pub fn with_pool(pool: &'a DbPool) -> Self {
+        Self {
+            pool: Some(pool),
             repos: None,
             hub: None,
             sender: None,
@@ -364,6 +373,27 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         // OP_ITEM_MALL (0x42) — GM / Mall shop
         OP_ITEM_MALL => system::handle_gm_shop(ctx).await,
 
+        // OP_JOB_CHANGE (0x24) — Arena scoreboard or Festival trigger
+        OP_JOB_CHANGE => {
+            if ctx.sub == 0x19 {
+                festival::handle_festival(ctx).await;
+            } else {
+                arena::handle_arena(ctx).await;
+            }
+        }
+
+        // OP_RANK_ANNOUNCE (0x27) — Guild operations
+        OP_RANK_ANNOUNCE => guild::handle_guild(ctx).await,
+
+        // OP_NAVAL_COMBAT (0x40) — Naval bombardment
+        OP_NAVAL_COMBAT => guild::handle_naval_combat(ctx).await,
+
+        // OP_BOAT_RACE (0x46) — Dragon boat racing
+        OP_BOAT_RACE => guild::handle_boat_race(ctx).await,
+
+        // OP_ARENA_WATERWAR (0x3F) — Water War temporary boat inventory lifecycle
+        OP_ARENA_WATERWAR => guild::handle_water_war(ctx).await,
+
         // Documented client opcodes whose full semantics are being ported from
         // the Kotlin/mobile reference. They are deliberately routed through a
         // bounded unimplemented boundary rather than silently discarded.
@@ -371,9 +401,7 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         | OP_GM_MANAGE
         | OP_WORLD_OBJECT
         | OP_ITEM_INFO
-        | OP_JOB_CHANGE
         | OP_EXP_LEVEL
-        | OP_RANK_ANNOUNCE
         | OP_QUEST
         | OP_COMPOUND
         | OP_REBORN
@@ -385,12 +413,9 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         | OP_DOMINO
         | OP_ZM_CHESS
         | OP_LOTTO
-        | OP_ARENA_WATERWAR
-        | OP_NAVAL_COMBAT
         | OP_RECOMMEND
         | OP_RESERVED_44
         | OP_CHILD
-        | OP_BOAT_RACE
         | OP_ANTI_ADDICTION
         | OP_SLOT_MACHINE
         | OP_GM_ANNOUNCE => unimplemented::handle(ctx),

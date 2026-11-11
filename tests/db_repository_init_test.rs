@@ -308,6 +308,11 @@ async fn test_session_load_and_save() {
         ball_point: 0,
         dragon_balls: 0,
         skill_rb2: [0; 8],
+        guild_id: 0,
+        boat_inventory: Vec::new(),
+        boat_last_paddle: 0,
+        boat_paddle_tokens: 5.0,
+        boat_last_paddle_ms: 0,
     };
 
     // Save session
@@ -408,6 +413,11 @@ async fn test_session_load_and_save() {
         ball_point: 0,
         dragon_balls: 0,
         skill_rb2: [0; 8],
+        guild_id: 0,
+        boat_inventory: Vec::new(),
+        boat_last_paddle: 0,
+        boat_paddle_tokens: 5.0,
+        boat_last_paddle_ms: 0,
     };
 
     let loaded = repos
@@ -776,6 +786,11 @@ async fn test_nonexistent_and_edge_cases() {
         ball_point: 0,
         dragon_balls: 0,
         skill_rb2: [0; 8],
+        guild_id: 0,
+        boat_inventory: Vec::new(),
+        boat_last_paddle: 0,
+        boat_paddle_tokens: 5.0,
+        boat_last_paddle_ms: 0,
     };
     let found = repos
         .sessions()

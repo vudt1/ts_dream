@@ -1,10 +1,13 @@
 //! Handlers package for opcode business logic.
 
+pub mod arena;
 pub mod battle;
 pub mod character;
 pub mod chat;
 pub mod crafting;
 pub mod expressions;
+pub mod festival;
+pub mod guild;
 pub mod inventory;
 pub mod login;
 pub mod movement;

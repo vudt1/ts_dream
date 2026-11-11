@@ -27,6 +27,10 @@ pub async fn handle_inventory(ctx: &mut OpcodeCtx<'_>) {
         crate::server::handlers::trade_storage::handle_storage_transfer(ctx).await;
         return;
     }
+    if ctx.sub == 0x6E {
+        crate::server::handlers::arena::handle_arena(ctx).await;
+        return;
+    }
     let conn = &mut ctx.conn;
     let out = &mut ctx.out;
     let pool = ctx.env.pool;

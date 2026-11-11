@@ -28,7 +28,7 @@ impl SqliteSessionRepository<'_> {
                     COALESCE(m.gold, 0) AS gold, COALESCE(m.bankgold, 0) AS bank_gold,
                     COALESCE(m.shoppoint, 0) AS shop_point,
                     c.newbie,
-                    c.ghost, c.god
+                    c.ghost, c.god, c.guild_id
              FROM characters c
              LEFT JOIN character_money m ON m.playerid = c.playerid
              WHERE c.playerid = ?
@@ -73,6 +73,7 @@ impl SqliteSessionRepository<'_> {
         session.newbie = row.get::<i64, _>("newbie") as u32;
         session.ghost = row.try_get::<i64, _>("ghost").map(clamp_u8).unwrap_or(0);
         session.god = row.try_get::<i64, _>("god").map(|v| v.max(0) as u32).unwrap_or(0);
+        session.guild_id = row.try_get::<i64, _>("guild_id").map(|v| v.max(0) as u32).unwrap_or(0);
 
         session.homdo = self.load_items(session.db_character_id, StorageType::Bag).await?;
         session.tientrang = self.load_items(session.db_character_id, StorageType::Bank).await?;
@@ -302,7 +303,7 @@ impl SqliteSessionRepository<'_> {
         sqlx::query(
             "UPDATE characters SET level=?, jobtype=?, gender=?, hair=?, element=?, rebornstage=?, curhp=?, maxhp=?, cursp=?, maxsp=?,
              freepoints=?, skillpoint=?, baseint=?, baseatk=?, basedef=?, basehpx=?, basespx=?, baseagi=?, reputation=?, mapid=?, mapx=?, mapy=?,
-             pk=?, curexp=?, newbie=?, ghost=?, god=? WHERE playerid=?",
+             pk=?, curexp=?, newbie=?, ghost=?, god=?, guild_id=? WHERE playerid=?",
         )
         .bind(i64::from(session.level)).bind(i64::from(session.job)).bind(i64::from(session.sex)).bind(i64::from(session.hair))
         .bind(i64::from(session.thuoctinh)).bind(i64::from(session.reborn)).bind(i64::from(session.hp)).bind(i64::from(session.hp_max))
@@ -310,7 +311,7 @@ impl SqliteSessionRepository<'_> {
         .bind(i64::from(session.int1)).bind(i64::from(session.atk)).bind(i64::from(session.def)).bind(i64::from(session.hpx))
         .bind(i64::from(session.spx)).bind(i64::from(session.agi)).bind(i64::from(session.tiengtam)).bind(i64::from(session.map_id)).bind(i64::from(session.map_x))
         .bind(i64::from(session.map_y)).bind(i64::from(session.pk)).bind(i64::from(session.texp)).bind(i64::from(session.newbie))
-        .bind(i64::from(session.ghost)).bind(i64::from(session.god))
+        .bind(i64::from(session.ghost)).bind(i64::from(session.god)).bind(i64::from(session.guild_id))
         .bind(character_id).execute(&mut *tx).await?;
         sqlx::query("INSERT INTO character_money (playerid, gold, bankgold, shoppoint) VALUES (?, ?, ?, ?) ON CONFLICT(playerid) DO UPDATE SET gold=excluded.gold, bankgold=excluded.bankgold, shoppoint=excluded.shoppoint")
             .bind(character_id).bind(i64::from(session.gold)).bind(i64::from(session.bank_gold)).bind(i64::from(session.shop_point)).execute(&mut *tx).await?;
@@ -542,8 +543,8 @@ impl SqliteSessionRepository<'_> {
             "INSERT INTO characters (playerid, name, level, gender, hair, element,
              rebornstage, curhp, maxhp, cursp, maxsp, curexp, nextexp, freepoints, skillpoint,
              baseint, baseatk, basedef, basehpx, basespx, baseagi,
-             reputation, pk, mapid, mapx, mapy, jobtype, newbie, ghost, god)
-             VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 0, 0, ?, ?)",
+             reputation, pk, mapid, mapx, mapy, jobtype, newbie, ghost, god, guild_id)
+             VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 0, 0, ?, ?, ?)",
         )
         .bind(account_id).bind(name)
         .bind(seed.level).bind(seed.sex).bind(seed.hair)
@@ -555,7 +556,7 @@ impl SqliteSessionRepository<'_> {
         .bind(i64::from(session.hpx)).bind(i64::from(session.spx)).bind(i64::from(session.agi))
         .bind(i64::from(session.tiengtam))
         .bind(i64::from(session.map_id)).bind(i64::from(session.map_x)).bind(i64::from(session.map_y))
-        .bind(i64::from(session.ghost)).bind(i64::from(session.god))
+        .bind(i64::from(session.ghost)).bind(i64::from(session.god)).bind(i64::from(session.guild_id))
         .execute(&mut *tx).await?;
         // 2. Money ledger.
         sqlx::query("INSERT INTO character_money (playerid, gold, bankgold, shoppoint) VALUES (?, ?, ?, ?)")

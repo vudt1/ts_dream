@@ -67,6 +67,7 @@ pub struct GameData {
     pub npc_defs: HashMap<u16, NpcDef>,
     pub warp_defs: HashMap<usize, WarpDef>,
     pub scene_eve_data: HashMap<u32, SceneEveData>,
+    pub festivals: HashMap<u32, crate::data::loaders::festival::FestivalDef>,
     /// Raw bytes for every accepted binary asset. Typed loaders project the
     /// known catalogs above; untyped catalogs remain available for the next
     /// typed port without ever admitting text files into production boot.
@@ -289,6 +290,13 @@ impl GameData {
             d.quest_marks = MarkDatLoader::load(&bytes)?;
         }
 
+        // 14. Festival.Dat (seasonal festival configurations)
+        if let Some(p) = resolve_data_file(data_dir, "Festival.Dat") {
+            let bytes = std::fs::read(&p)
+                .map_err(|e| TsError::Data(format!("read {}: {}", p.display(), e)))?;
+            d.festivals = crate::data::loaders::festival::FestivalDatLoader::load(&bytes)?;
+        }
+
         d.texps = compute_texps();
         d.loaded = true;
         Ok(d)
@@ -331,7 +339,7 @@ impl GameData {
         // mainKind 68 / 0x44, unimplemented in `dispatcher.rs`), keyed by
         // client-sent index — not the `(map_id, warpid)` talk-warp lookup in
         // `quest.rs` which reads `data.warps` (from `Warps.txt`, absent).
-        let optional_binary: [(&str, &str); 5] = [
+        let optional_binary: [(&str, &str); 6] = [
             // PC `Skill.Dat` is the authoritative source (preferred per ADR
             // 0002). `Skill_C.dat` is the mobile variant; if PC is absent
             // and mobile is present, fall back to the mobile parser.
@@ -340,6 +348,7 @@ impl GameData {
             ("eve.emg", "eve"),
             ("Mark.Dat", "mark"),
             ("Compound.Dat", "compound"),
+            ("Festival.Dat", "festival"),
         ];
         for (file_name, _) in optional_binary {
             let Some(path) = resolve_data_file(data_dir, file_name) else {
@@ -353,6 +362,7 @@ impl GameData {
                 "eve.emg" => self.scene_eve_data = EveDataLoader::load(&bytes)?,
                 "mark.dat" => self.quest_marks = MarkDatLoader::load(&bytes)?,
                 "compound.dat" => self.compounds = CompoundDatLoader::load(&bytes)?,
+                "festival.dat" => self.festivals = crate::data::loaders::festival::FestivalDatLoader::load(&bytes)?,
                 _ => unreachable!("optional binary list contains unknown file"),
             }
         }

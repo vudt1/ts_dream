@@ -35,6 +35,112 @@ pub async fn list_guilds(pool: &DbPool) -> Result<Vec<GuildRow>, sqlx::Error> {
     .await
 }
 
+pub async fn create_guild(pool: &DbPool, name: &str, leader_id: i64) -> Result<i64, sqlx::Error> {
+    let mut tx = pool.write.begin().await?;
+    let res = sqlx::query("INSERT INTO guilds (name, leader_id) VALUES (?, ?)")
+        .bind(name)
+        .bind(leader_id)
+        .execute(&mut *tx)
+        .await?;
+    let guild_id = res.last_insert_rowid();
+
+    sqlx::query("INSERT INTO guild_members (guild_id, char_id, rank) VALUES (?, ?, 2)")
+        .bind(guild_id)
+        .bind(leader_id)
+        .execute(&mut *tx)
+        .await?;
+
+    sqlx::query("UPDATE characters SET guild_id = ? WHERE playerid = ?")
+        .bind(guild_id)
+        .bind(leader_id)
+        .execute(&mut *tx)
+        .await?;
+
+    tx.commit().await?;
+    Ok(guild_id)
+}
+
+pub async fn add_guild_member(pool: &DbPool, guild_id: i64, char_id: i64, rank: i64) -> Result<(), sqlx::Error> {
+    let mut tx = pool.write.begin().await?;
+    sqlx::query("INSERT OR REPLACE INTO guild_members (guild_id, char_id, rank) VALUES (?, ?, ?)")
+        .bind(guild_id)
+        .bind(char_id)
+        .bind(rank)
+        .execute(&mut *tx)
+        .await?;
+
+    sqlx::query("UPDATE characters SET guild_id = ? WHERE playerid = ?")
+        .bind(guild_id)
+        .bind(char_id)
+        .execute(&mut *tx)
+        .await?;
+
+    tx.commit().await?;
+    Ok(())
+}
+
+pub async fn remove_guild_member(pool: &DbPool, char_id: i64) -> Result<(), sqlx::Error> {
+    let mut tx = pool.write.begin().await?;
+    sqlx::query("DELETE FROM guild_members WHERE char_id = ?")
+        .bind(char_id)
+        .execute(&mut *tx)
+        .await?;
+
+    sqlx::query("UPDATE characters SET guild_id = 0 WHERE playerid = ?")
+        .bind(char_id)
+        .execute(&mut *tx)
+        .await?;
+
+    tx.commit().await?;
+    Ok(())
+}
+
+pub async fn transfer_guild_leadership(pool: &DbPool, guild_id: i64, new_leader_id: i64) -> Result<(), sqlx::Error> {
+    let mut tx = pool.write.begin().await?;
+    sqlx::query("UPDATE guild_members SET rank = 0 WHERE guild_id = ? AND rank = 2")
+        .bind(guild_id)
+        .execute(&mut *tx)
+        .await?;
+
+    sqlx::query("UPDATE guilds SET leader_id = ? WHERE guild_id = ?")
+        .bind(new_leader_id)
+        .bind(guild_id)
+        .execute(&mut *tx)
+        .await?;
+
+    sqlx::query("UPDATE guild_members SET rank = 2 WHERE guild_id = ? AND char_id = ?")
+        .bind(guild_id)
+        .bind(new_leader_id)
+        .execute(&mut *tx)
+        .await?;
+
+    tx.commit().await?;
+    Ok(())
+}
+
+pub async fn update_guild_badge(pool: &DbPool, guild_id: i64, badge: &[u8]) -> Result<(), sqlx::Error> {
+    let mut tx = pool.write.begin().await?;
+    sqlx::query("UPDATE guilds SET badge = ? WHERE guild_id = ?")
+        .bind(badge)
+        .bind(guild_id)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(())
+}
+
+pub async fn update_city_owner(pool: &DbPool, city_id: i64, guild_id: Option<i64>) -> Result<(), sqlx::Error> {
+    let mut tx = pool.write.begin().await?;
+    sqlx::query("UPDATE guild_cities SET guild_id = ?, updated_at = strftime('%s', 'now') WHERE city_id = ?")
+        .bind(guild_id)
+        .bind(city_id)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(())
+}
+
+
 pub async fn list_world_bosses(pool: &DbPool) -> Result<Vec<WorldBossRow>, sqlx::Error> {
     sqlx::query_as::<_, WorldBossRow>(
         "SELECT b.boss_id, b.npc_id, b.scene_id, b.state, b.hp, b.hp_max, b.starts_at, b.ends_at,

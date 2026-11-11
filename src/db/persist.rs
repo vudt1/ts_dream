@@ -48,6 +48,7 @@ fn character_column(column: &str) -> Option<&'static str> {
         "Hair" | "hair" => "hair",
         "Ghost" | "ghost" => "ghost",
         "God" | "god" => "god",
+        "GuildId" | "guild_id" => "guild_id",
         _ => return None,
     })
 }

@@ -179,13 +179,21 @@ fn test_logined_sequence_clear_tientrang_and_luulang_flag() {
     assert_eq!(seq_with_luulang.len(), seq_default.len() + 1);
 
     // Verify build_logined_sequence_session delegates directly to build_logined_sequence_session_ext
+    // Filter out dynamic time banner frame to avoid second-boundary rollover races
+    let strip_time = |frames: &[String]| -> Vec<String> {
+        frames
+            .iter()
+            .filter(|f| !f.contains("54686F69206769616E"))
+            .cloned()
+            .collect()
+    };
     assert_eq!(
-        ts_dream::server::spawn::build_logined_sequence_session(&session),
-        seq_default
+        strip_time(&ts_dream::server::spawn::build_logined_sequence_session(&session)),
+        strip_time(&seq_default)
     );
     assert_eq!(
-        ts_dream::server::spawn::build_logined_sequence_session(&session_with_luulang),
-        seq_with_luulang
+        strip_time(&ts_dream::server::spawn::build_logined_sequence_session(&session_with_luulang)),
+        strip_time(&seq_with_luulang)
     );
 }
 

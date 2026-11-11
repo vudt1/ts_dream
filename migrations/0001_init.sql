@@ -76,7 +76,8 @@ CREATE TABLE IF NOT EXISTS characters (
     jobtype     INTEGER DEFAULT 0,              -- Nghề nghiệp: 0=Dân thường, 1=Hiệp sĩ, 2=Nho gia, 3=Hiền triết, 4=Bá vương
     newbie      INTEGER DEFAULT 0,              -- Đánh dấu tân thủ nhận quà đặc biệt (0 = Chưa nhận, 1 = Đã nhận)
     ghost       INTEGER NOT NULL DEFAULT 0,     -- Trạng thái Ma theo (0 = Bình thường, 1 = Bị ma ám giảm 50% EXP)
-    god         INTEGER NOT NULL DEFAULT 0      -- Số trận còn lại được Thần Tài phù trợ (tăng 50% EXP)
+    god         INTEGER NOT NULL DEFAULT 0,     -- Số trận còn lại được Thần Tài phù trợ (tăng 50% EXP)
+    guild_id    INTEGER NOT NULL DEFAULT 0      -- Mã bang hội (0 = Chưa gia nhập bang hội)
 );
 
 -- ============================================================================
@@ -348,4 +349,65 @@ CREATE TABLE IF NOT EXISTS character_quest_items (
     count    INTEGER NOT NULL DEFAULT 0,    -- Số lượng (không vượt 255)
     PRIMARY KEY (playerid, itemid)
 );
+
+-- ============================================================================
+-- Guild Warfare & City Siege Subsystem (Ticket 07)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS guilds (
+    guild_id    INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL UNIQUE,
+    leader_id   INTEGER NOT NULL,
+    level       INTEGER NOT NULL DEFAULT 1,
+    experience  INTEGER NOT NULL DEFAULT 0,
+    treasury    INTEGER NOT NULL DEFAULT 0,
+    status      TEXT NOT NULL DEFAULT 'active',
+    badge       BLOB,
+    notice      TEXT NOT NULL DEFAULT '',
+    created_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+);
+
+CREATE TABLE IF NOT EXISTS guild_members (
+    guild_id     INTEGER NOT NULL,
+    char_id      INTEGER NOT NULL PRIMARY KEY,
+    rank         INTEGER NOT NULL DEFAULT 0,
+    contribution INTEGER NOT NULL DEFAULT 0,
+    joined_at    INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+    FOREIGN KEY(guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS guild_ranks (
+    guild_id    INTEGER NOT NULL,
+    rank_id     INTEGER NOT NULL,
+    name        TEXT NOT NULL,
+    permissions INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY(guild_id, rank_id),
+    FOREIGN KEY(guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS guild_logs (
+    log_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id   INTEGER NOT NULL,
+    char_id    INTEGER,
+    action     TEXT NOT NULL,
+    details    TEXT,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+    FOREIGN KEY(guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS guild_cities (
+    city_id    INTEGER PRIMARY KEY,
+    city_name  TEXT NOT NULL,
+    guild_id   INTEGER,
+    tax_rate   INTEGER NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+    FOREIGN KEY(guild_id) REFERENCES guilds(guild_id) ON DELETE SET NULL
+);
+
+INSERT OR IGNORE INTO guild_cities (city_id, city_name) VALUES
+    (1, 'Tho Xuan'),
+    (2, 'Truong An'),
+    (3, 'Giang Lang'),
+    (4, 'Khuc A'),
+    (5, 'Lac Duong');
+
 
