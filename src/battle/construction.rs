@@ -50,6 +50,8 @@ pub struct Battle {
     /// Optional sequential waves for continuous dungeon battles (e.g. 40 NPC).
     pub waves: Vec<Vec<(crate::data::tables::Npc, u8, u8)>>,
     pub current_wave: usize,
+    pub challenger_id: u32,
+    pub is_40_npc: bool,
 }
 
 impl Battle {
@@ -69,6 +71,8 @@ impl Battle {
             last_turn_delay_ms: 800,
             waves: Vec::new(),
             current_wave: 0,
+            challenger_id: 0,
+            is_40_npc: false,
         };
 
         // Create 20 cells (row 0..3, col 0..4)
@@ -148,6 +152,15 @@ impl Battle {
                 self.add_npc(&npc, id_on_map, row, col, 3);
                 if let Some(cell) = self.cell(row, col) {
                     out.push(crate::battle::runner::Out::Broadcast(packets::entity_npc(&cell.packet_hex())));
+                }
+            }
+            // Defeating all enemies in wave N (1 <= N < 40) advances QuestStep(218) to N + 1
+            if self.is_40_npc || self.challenger_id > 0 {
+                let next_step = (self.current_wave + 1) as u8;
+                let ch_id = self.challenger_id;
+                let mut online = crate::server::session::lock_online_sessions();
+                if let Some(session) = online.get_mut(&ch_id) {
+                    session.quest_tasks.insert(218, (0, next_step));
                 }
             }
             true

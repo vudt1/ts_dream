@@ -253,6 +253,7 @@ pub struct Session {
     pub god: u32,
     pub ghost: u8,
     pub guild_id: u32,
+    pub pending_guild_invite: Option<(u32, u32)>,
     pub boat_inventory: Vec<InventoryItem>,
     pub boat_last_paddle: u8,
     pub boat_paddle_tokens: f64,
@@ -411,6 +412,7 @@ impl Default for Session {
             god: 0,
             ghost: 0,
             guild_id: 0,
+            pending_guild_invite: None,
             boat_inventory: Vec::new(),
             boat_last_paddle: 0,
             boat_paddle_tokens: 5.0,
@@ -733,6 +735,12 @@ pub fn registry_update_if_online(s: &Session) {
     if sessions.contains_key(&s.id) {
         sessions.insert(s.id, s.clone());
     }
+}
+
+/// Registers a player session into the central online registry for login / test setup.
+pub fn registry_register_for_login(s: &Session) {
+    let mut sessions = lock_online_sessions();
+    sessions.insert(s.id, s.clone());
 }
 
 /// Locks player operations in stable id order. A shop purchase locks buyer and

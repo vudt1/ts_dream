@@ -504,6 +504,8 @@ async fn test_quiz_incorrect_answer_penalizes_ghost_and_hp1() {
     assert!(out.outgoing.iter().any(|f| f.frame == "F4440300100202"), "must emit incorrect answer modal frame 10 02 02");
     // Leader HP drops to 1
     assert_eq!(conn.session.hp, 1, "leader HP must drop to 1");
+    let hp1_frame = ts_dream::battle::packets::status_update(0x19, 1);
+    assert!(out.outgoing.iter().any(|f| f.frame == hp1_frame), "must emit HP status_update with attribute 0x19");
     // Afflicted with Ghost
     assert_eq!(conn.session.ghost, 1, "leader must receive ghost debuff");
     // Emits S->C 18 08 [playerId][01 00][01]
@@ -825,6 +827,135 @@ fn test_seasonal_announcements_17_39_format_and_breadth() {
         let hex_frame = seasonal_announcement_frame(code);
         assert_eq!(hex_frame, format!("F44403001739{:02X}", code));
     }
+}
+
+// =========================================================================
+// Ticket 10: North Star Quiz Dispatcher, HP=1 Parity, Offline Persistence & Map Scope
+// =========================================================================
+
+#[tokio::test]
+async fn test_quiz_live_dispatcher_routing() {
+    let data = GameData::default();
+    let service = BattleService::default();
+
+    let custom_q = ts_dream::server::events::NorthStarQuestion {
+        id: 99,
+        question: "Cau hoi live dispatcher".to_string(),
+        options: ["A".to_string(), "B".to_string(), "C".to_string(), "D".to_string()],
+        correct: 2,
+    };
+    let (_q, _frame) = service.events.register_quiz(555, 9001, Some(custom_q));
+
+    let mut conn = Conn::default();
+    conn.session.id = 9001;
+    conn.session.battle_id = 555;
+    conn.session.god = 0;
+
+    // Send C->S 10 01 through live Level-1 dispatcher
+    let mut packet = vec![0xF4, 0x44, 0x06, 0x00, ts_dream::protocol::OP_GM_MANAGE, 0x01];
+    packet.extend_from_slice(&2u32.to_le_bytes()); // Correct answer B (2)
+
+    let outcome = ts_dream::server::dispatcher::dispatch(&mut conn, &packet, &data, &service, &ServerEnv::none()).await;
+
+    // Verify routed to quiz handler and answered correctly
+    assert!(outcome.outgoing.iter().any(|f| f.frame == "F4440300100201"), "dispatcher must route OP_GM_MANAGE to quiz handler");
+    assert_eq!(conn.session.god, 10, "god buff incremented on correct answer via dispatcher");
+    assert_eq!(conn.session.battle_id, 0, "battle ended");
+}
+
+#[tokio::test]
+async fn test_quiz_offline_timeout_db_persistence_and_relogin() {
+    let db = setup_test_db().await;
+    let repos = SqliteRepositories::new((*db).clone());
+
+    let acc_id = ts_dream::db::accounts::create(&db, "quiz_offline_acc", "pass")
+        .await
+        .expect("create account");
+
+    // Create character in DB
+    let seed = CharacterSeed {
+        level: 20,
+        sex: 1,
+        hair: 1,
+        element: 1,
+        map_id: 12001,
+        map_x: 400,
+        map_y: 400,
+    };
+    repos.characters().create(acc_id, b"QuizOfflineChar", &seed).await.expect("create character");
+    let char_id = acc_id;
+
+    let app = std::sync::Arc::new(tokio::sync::RwLock::new(ts_dream::state::AppState::new(100)));
+    let control = ts_dream::web::server_control::ServerControl::new(6414, app, None, Some((*db).clone()));
+
+    // Create session for player 8888
+    let session = Session {
+        id: 8888,
+        db_character_id: char_id,
+        hp: 1500,
+        ghost: 0,
+        authed: true,
+        ..Default::default()
+    };
+    repos.sessions().save(&session).await.expect("save initial session");
+
+    // Register active quiz with 0ms timeout (immediate expiration)
+    let events = std::sync::Arc::new(
+        ts_dream::server::events::EventLifecycleManager::default()
+            .with_quiz_timeout(std::time::Duration::from_millis(0)),
+    );
+    let service = BattleService::default().with_events(events);
+
+    // Register online temporarily so register_quiz captures char_id
+    ts_dream::server::session::registry_register_for_login(&session);
+    let (_q, _frame) = service.events.register_quiz(777, 8888, None);
+
+    // Player goes offline BEFORE timeout is resolved: remove from online sessions!
+    ts_dream::server::session::lock_online_sessions().remove(&8888);
+    assert!(ts_dream::server::session::lock_online_sessions().get(&8888).is_none());
+
+    // Timeout occurs and server resolves it
+    let expired = service.events.get_timed_out_quizzes();
+    assert_eq!(expired.len(), 1);
+    control.resolve_quiz_timeout(expired.into_iter().next().unwrap()).await;
+
+    // Relogin from DB
+    let mut reloaded = Session {
+        id: 8888,
+        ..Default::default()
+    };
+    repos.sessions().load(char_id, &mut reloaded).await.expect("reload session from DB");
+
+    assert_eq!(reloaded.hp, 1, "persisted HP must be 1 even after offline timeout");
+    assert_eq!(reloaded.ghost, 1, "persisted ghost must be 1 even after offline timeout");
+}
+
+#[tokio::test]
+async fn test_north_star_map_scope_filtering() {
+    let mgr = ts_dream::server::events::EventLifecycleManager::default();
+
+    // 1. Special dungeon and event maps are always rejected regardless of allowlist
+    assert!(!mgr.is_north_star_map_allowed(10851), "40 NPC arena map must be rejected");
+    assert!(!mgr.is_north_star_map_allowed(10852), "40 NPC arena map must be rejected");
+    assert!(!mgr.is_north_star_map_allowed(12911), "2K dungeon floor must be rejected");
+    assert!(!mgr.is_north_star_map_allowed(12928), "2K dungeon floor must be rejected");
+    assert!(!mgr.is_north_star_map_allowed(49960), "Nine heavens floor must be rejected");
+    assert!(!mgr.is_north_star_map_allowed(49969), "Nine heavens floor must be rejected");
+    assert!(!mgr.is_north_star_map_allowed(60510), "Dragon boat map must be rejected");
+    assert!(!mgr.is_north_star_map_allowed(60521), "Dragon boat map must be rejected");
+
+    // 2. Default allowlist is empty -> all wild maps allowed
+    assert!(mgr.is_north_star_map_allowed(12001), "wild map 12001 allowed when allowlist empty");
+    assert!(mgr.is_north_star_map_allowed(13002), "wild map 13002 allowed when allowlist empty");
+
+    // 3. Set explicit allowlist: only [12001, 12002]
+    mgr.set_north_star_maps(vec![12001, 12002]);
+    assert!(mgr.is_north_star_map_allowed(12001), "map 12001 is in allowlist");
+    assert!(mgr.is_north_star_map_allowed(12002), "map 12002 is in allowlist");
+    assert!(!mgr.is_north_star_map_allowed(13002), "map 13002 not in allowlist must be rejected");
+    // Special dungeon maps still rejected even if added to allowlist!
+    mgr.set_north_star_maps(vec![10851, 12001]);
+    assert!(!mgr.is_north_star_map_allowed(10851), "dungeon map must remain rejected even if in allowlist");
 }
 
 

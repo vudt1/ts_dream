@@ -356,7 +356,13 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         OP_ACCOUNT => system::handle_account_mgmt(ctx).await,
 
         // OP_LOGIN_COMPLETE (0x25) — Login Complete / Map Loaded
-        OP_LOGIN_COMPLETE => login::handle_login_complete(ctx).await,
+        OP_LOGIN_COMPLETE => {
+            if ctx.sub == 0x03 {
+                arena::handle_arena(ctx).await;
+            } else {
+                login::handle_login_complete(ctx).await;
+            }
+        }
 
         // OP_HOTKEY (0x28) — Hotkey / skill bar
         OP_HOTKEY => stats::handle_hotkey(ctx).await,
@@ -394,15 +400,19 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         // OP_ARENA_WATERWAR (0x3F) — Water War temporary boat inventory lifecycle
         OP_ARENA_WATERWAR => guild::handle_water_war(ctx).await,
 
+        // OP_QUEST (0x29) — City Siege / Quest system
+        OP_QUEST => guild::handle_city_siege(ctx).await,
+
+        // OP_GM_MANAGE (0x10) — North Star Quiz answers
+        OP_GM_MANAGE => battle::handle_quiz_answer(ctx).await,
+
         // Documented client opcodes whose full semantics are being ported from
         // the Kotlin/mobile reference. They are deliberately routed through a
         // bounded unimplemented boundary rather than silently discarded.
         OP_FRIEND_INVITE
-        | OP_GM_MANAGE
         | OP_WORLD_OBJECT
         | OP_ITEM_INFO
         | OP_EXP_LEVEL
-        | OP_QUEST
         | OP_COMPOUND
         | OP_REBORN
         | OP_SERVER_SWITCH

@@ -229,10 +229,10 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 ### Deferred Drift (Đã Cleanup Sau ADR 0001)
 - **Định nghĩa**: Tập hợp các trường/cột schema thuộc `characters`/`inventories`/`character_pets`/`character_missions` mà **migration 0001_init.sql chưa định nghĩa** nhưng source Rust vẫn tham chiếu. Sau cleanup, các tham chiếu này đã bị xóa khỏi Rust (giữ in-memory hoặc xóa hoàn toàn); migration **không** được sửa.
 - **Ràng buộc (Invariants)**:
-  - `Session` struct vẫn giữ các field deferred (`int2, atk2, def2, hpx2, spx2, agi2, texp, god, hp_store, sp_store, tiengtam, gocnhin, pk, tham_chien, savemap, color, fight_npc_id, title_id`) cho wire packet + in-memory state, **nhưng persist về DB không còn thực hiện** — restart = mất state.
+  - `Session` struct vẫn giữ các field deferred (`int2, atk2, def2, hpx2, spx2, agi2, texp, hp_store, sp_store, tiengtam, gocnhin, pk, tham_chien, savemap, color, fight_npc_id, title_id`) cho wire packet + in-memory state, **nhưng persist về DB không còn thực hiện** — restart = mất state.
   - `quest_steps`/`warp_steps` đã bị xóa khỏi `Session` — toàn bộ quest state mất khi restart. Persist lại cần `character_missions.npc_id/warp_id` (migration mới).
   - `PetState.int2/atk2/def2/hpx2/spx2/agi2` (in-memory, set = 0 tại load).
-  - `Session.newbie` là **DUY NHẤT** field còn persist từ deferred list (vì cần cho TSVN gift guard).
+  - `Session.newbie`, `Session.god`, và `Session.ghost` đã được định nghĩa cột chính thức trong `characters` và **persist đầy đủ xuống SQLite**.
 - **Trường đã xóa hoàn toàn khỏi Rust**: `db::players` (file orphan), `db::quest` (file orphan), `src/server/handlers/quest::save_map` (chỉ còn in-memory, comment ghi rõ).
 
 ### Combat Damage Formula
@@ -354,3 +354,35 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
   - Giao tiếp qua Opcode `0x14` (Dialog) $\rightarrow$ `0x01 Sub 0x09` / `0x14 Sub 0x01` $\rightarrow$ `0x18` (Eve Action).
   - Sử dụng công thức cố định theo kịch bản (`CheckItem` $\rightarrow$ `DelItem` $\rightarrow$ `AddItem`), không sử dụng bảng tỷ lệ ngẫu nhiên của `Compound.Dat`.
 - **Tránh dùng các từ mơ hồ**: *Compound NPC*, *Shop Crafting*.
+
+### Thần Tài / Phúc Thần (God of Fortune — `FGod`)
+- **Định nghĩa**: Trạng thái chúc phúc của Nhân vật lưu số trận chiến dã ngoại còn hiệu lực (`god`, tối đa 240 trận), hiển thị biểu tượng Thần Tài bay lơ lửng trên đầu avatar.
+- **Ràng buộc (Invariants)**:
+  - Mỗi trận thắng PvE dã ngoại nhân kinh nghiệm nhận được với hệ số $1.5\times$ và trừ `god` đi 1 trận.
+  - Khi chuyển trạng thái giữa `0` và `> 0`, đồng bộ thời gian thực qua gói `S→C 18 08` (`kind = 2`, `val = 1` hoặc `0`) và truyền `(god > 0) as u8` tại byte 6 của gói `player_appear` (`0x03`).
+  - Lưu bền vững qua các lần đăng nhập và chuyển bản đồ.
+
+### Con Ma / Thần Xui (Ghost Debuff — `FGhost`)
+- **Định nghĩa**: Trạng thái trừng phạt đeo bám Nhân vật (`ghost == 1`), hiển thị biểu tượng Con Ma xanh lam trên đầu avatar và giảm $50\%$ kinh nghiệm ($0.5\times$ EXP) trong mọi trận chiến PvE cho đến khi được giải trừ.
+- **Ràng buộc (Invariants)**:
+  - Không tự giảm theo số trận chiến; chỉ được hóa giải khi tương tác với NPC "Bà Gọi Hồn" (`1752`, phí 500 Kim) hoặc sử dụng đạo cụ "Cải vận phù" (`46180`). Sủng vật "Bà Gọi Hồn" không có khả năng giải trừ.
+  - Đồng bộ thời gian thực qua gói `S→C 18 08` (`kind = 1`, `val = 1` hoặc `0`; khi về `0` client phát âm thanh `WA0006.wav` và thông báo *"Thần xui đã rời xa bạn!"*) và truyền tại byte 5 của gói `player_appear` (`0x03`).
+  - Lưu bền vững qua các lần đăng nhập và chuyển bản đồ.
+
+### Vấn Đáp Bắc Tinh Quân (North Star Quiz Encounter)
+- **Định nghĩa**: Trận chiến PvE đặc biệt kích hoạt ngẫu nhiên khi di chuyển trên bản đồ dã ngoại trong thời gian sự kiện mở, đối diện Bắc Tinh Quân (`1643`) hoặc Nam Tinh Quân (`1644`) với hộp thoại trắc nghiệm 4 đáp án (`Opcode 0x10`) trong 45 giây.
+- **Ràng buộc (Invariants)**:
+  - Cấm tuyệt đối người chơi ngoài trận vào quan chiến (từ chối bằng `S→C 21 01 03`).
+  - Khóa toàn bộ thao tác chiến đấu thường; chỉ Đội trưởng nhận câu hỏi, trả lời và chịu phần thưởng (`+10` trận Thần Tài) hoặc hình phạt (rút máu hiện tại về `1` qua thuộc tính `0x19` và gán Con Ma). Các thành viên tổ đội đi cùng giữ nguyên trạng thái độc lập.
+
+### Quân Đoàn (Guild — Opcode `0x27`)
+- **Định nghĩa**: Tổ chức liên minh người chơi có Quân Chủ đứng đầu, danh sách thành viên, phân cấp chức vụ, huy hiệu nhị phân 288-byte và quyền tham gia Công Thành Chiến (`0x29`) / Thủy Chiến (`0x3F`, `0x40`).
+- **Ràng buộc (Invariants)**:
+  - Gia nhập Quân Đoàn bắt buộc qua quy trình 2 bước có sự đồng thuận: người mời gửi lời mời (`0x27 0x02`), người được mời phải phản hồi chấp thuận (`0x27 0x03`) mới trở thành thành viên chính thức.
+  - Chỉ Quân Chủ mới có quyền trục xuất thành viên hoặc chuyển nhượng chức vị Quân Chủ. Mọi tương tác giữa 2 người chơi đều phải khóa đồng bộ hai pha.
+
+### Túi Chiến Thuyền (Boat Inventory)
+- **Định nghĩa**: Không gian chứa đạo cụ thủy chiến tạm thời gồm 25 ô (`1..=25`), chỉ tồn tại trong phiên tham gia Thủy Chiến (`0x3F`).
+- **Ràng buộc (Invariants)**:
+  - Khởi tạo qua `S→C 17 64` khi vào bản đồ Thủy Chiến (cấp đạn dược thủy chiến mặc định để khai hỏa Hải Pháo `0x40 0x01`) và xóa sạch hoàn toàn qua `S→C 17 65` khi rời Thủy Chiến hoặc khi sự kiện dừng khẩn cấp.
+  - Tách biệt hoàn toàn với 5 Container Vật phẩm vĩnh viễn của Nhân vật; không bao giờ lưu trữ lâu dài sang túi đồ thường.

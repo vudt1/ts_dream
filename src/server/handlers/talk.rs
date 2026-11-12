@@ -22,7 +22,7 @@ use crate::server::handlers::quest_sync::{remove_quest_task, set_quest_dont, set
 use crate::server::handlers::shops::gold_frame;
 use crate::server::handlers::stats::build_stat_update;
 use crate::db::pool::DbPool;
-use crate::server::session::{Conn, InventoryItem, Session};
+use crate::server::session::{Conn, Session};
 
 /// Reset the legacy talk-context fields (`typetalk`, menu, warp confirm)
 /// plus the active event session — the packet-less half of [`end_talk_session`],
@@ -89,7 +89,7 @@ pub async fn handle_talk(ctx: &mut OpcodeCtx<'_>) {
     let pool = ctx.env.pool;
     let (sub, payload) = (ctx.sub, ctx.payload);
     match sub {
-        1 => handle_talk_start(conn, payload, data, pool, out).await,
+        1 => handle_talk_start(conn, payload, data, Some(ctx.service), pool, out).await,
         4 => end_talk(conn, out),
         6 => handle_talk_continue(conn, payload, data, pool, out).await,
         8 => handle_talk_warp(conn, payload, data, &ctx.env, out).await,
@@ -123,7 +123,7 @@ fn resolve_npc(data: &GameData, conn: &Conn, map_object_id: i32) -> Option<(i32,
             return Some((i32::from(npc.npc_id), in_range));
         }
     }
-    if matches!(map_object_id, 1752 | 15162 | 15312 | 61209 | 20001) {
+    if crate::server::handlers::event_npcs::is_event_npc(map_object_id) {
         return Some((map_object_id, true));
     }
     None
@@ -748,6 +748,7 @@ async fn handle_talk_start(
     conn: &mut Conn,
     payload: &[u8],
     data: &GameData,
+    service: Option<&crate::battle::service::BattleService>,
     pool: Option<&DbPool>,
     out: &mut HandleOutcome,
 ) {
@@ -796,235 +797,16 @@ async fn handle_talk_start(
         return;
     }
 
-    // Special Event NPCs (Tickets 01, 04, 05)
-    if template_id == 1752 {
-        if !in_range {
-            end_talk(conn, out);
-            return;
-        }
-        if conn.session.ghost == 1 {
-            if conn.session.gold >= 500 {
-                conn.session.gold -= 500;
-                conn.session.ghost = 0;
-                out.send(gold_frame(conn.session.gold));
-                let sync = crate::server::spawn::state_sync_frame(conn.session.id, 1, 0);
-                out.send(sync.clone());
-                out.broadcast(conn.session.id, &sync);
-                let _ = crate::db::persist::persist_sessions_transaction(
-                    pool,
-                    &[&conn.session],
-                    &["stats"],
-                )
-                .await;
-                crate::server::session::registry_update_if_online(&conn.session);
-                out.send(crate::server::spawn::sys_msg_frame("Da hoa giai ma theo!"));
-            } else {
-                out.send(crate::server::spawn::sys_msg_frame("Khong du tien"));
-            }
-        } else {
-            out.send(crate::server::spawn::sys_msg_frame("Ban khong bi ma theo"));
-        }
-        end_talk(conn, out);
-        return;
-    }
-
-    if template_id == 15162 {
-        if !in_range {
-            end_talk(conn, out);
-            return;
-        }
-        if conn.session.id_leader > 0 && conn.session.id_leader != conn.session.id {
-            out.send(crate::server::spawn::sys_msg_frame("Chi doi truong moi co the dang ky"));
-            end_talk(conn, out);
-            return;
-        }
-        let ticket_count = conn.session.remove_homdo_item(46072, 1);
-        let allowed = if ticket_count > 0 {
-            out.send(conn.session.dump_homdo());
-            true
-        } else if conn.session.gold >= 1000 {
-            conn.session.gold -= 1000;
-            out.send(gold_frame(conn.session.gold));
-            true
-        } else {
-            false
-        };
-
-        if allowed {
-            crate::server::handlers::quest_sync::set_quest_task(&mut conn.session, out, 218, 1);
-            let old_map = conn.session.map_id;
-            conn.session.map_id = 10851;
-            conn.session.map_x = 400;
-            conn.session.map_y = 400;
-            crate::server::session::registry_update_if_online(&conn.session);
-            out.send("F44402001407");
-            out.send(crate::server::spawn::build_relocate_packet(conn.session.id, 10851, 400, 400, 0));
-            out.broadcast_to_map(conn.session.id, old_map, crate::battle::packets::hide_from_map(conn.session.id));
-            let _ = crate::db::persist::persist_sessions_transaction(
-                pool,
-                &[&conn.session],
-                &["stats"],
-            )
-            .await;
-        } else {
-            out.send(crate::server::spawn::sys_msg_frame("Khong du tien hoac ve loi dai"));
-        }
-        end_talk(conn, out);
-        return;
-    }
-
-    if template_id == 15312 {
-        if !in_range {
-            end_talk(conn, out);
-            return;
-        }
-        if conn.session.id_leader > 0 && conn.session.id_leader != conn.session.id {
-            out.send(crate::server::spawn::sys_msg_frame("Chi doi truong moi co the dang ky"));
-            end_talk(conn, out);
-            return;
-        }
-        let party_count = 1 + conn.session.id_mem.iter().filter(|&&m| m > 0 && m != conn.session.id).count();
-        if party_count != 1 && party_count != 5 {
-            out.send(crate::server::spawn::sys_msg_frame("Chi cho phep to doi 1 nguoi hoac 5 nguoi"));
-            end_talk(conn, out);
-            return;
-        }
-        crate::server::handlers::quest_sync::set_quest_task(&mut conn.session, out, 212, 1);
-        let alert_frame = crate::protocol::codecs::NpcTalkCodec::build_event_alert_hex(2);
-        out.send(alert_frame.clone());
-        out.broadcast(conn.session.id, alert_frame);
-
-        let old_map = conn.session.map_id;
-        conn.session.map_id = 12911;
-        conn.session.map_x = 400;
-        conn.session.map_y = 400;
-        crate::server::session::registry_update_if_online(&conn.session);
-        out.send("F44402001407");
-        out.send(crate::server::spawn::build_relocate_packet(conn.session.id, 12911, 400, 400, 0));
-        out.broadcast_to_map(conn.session.id, old_map, crate::battle::packets::hide_from_map(conn.session.id));
-
-        if conn.session.id_leader == conn.session.id && conn.session.id > 0 {
-            for member in conn.session.id_mem {
-                if member > 0 && member != conn.session.id {
-                    let member_old_map = {
-                        let mut online = crate::server::session::lock_online_sessions();
-                        if let Some(mem) = online.get_mut(&member) {
-                            let m_old = mem.map_id;
-                            mem.map_id = 12911;
-                            mem.map_x = 400;
-                            mem.map_y = 400;
-                            m_old
-                        } else {
-                            old_map
-                        }
-                    };
-                    out.send_to(member, "F44402001407");
-                    out.send_to(member, crate::server::spawn::build_relocate_packet(member, 12911, 400, 400, 0));
-                    out.broadcast_to_map(member, member_old_map, crate::battle::packets::hide_from_map(member));
-                }
-            }
-        }
-        let _ = crate::db::persist::persist_sessions_transaction(
-            pool,
-            &[&conn.session],
-            &["stats"],
-        )
-        .await;
-        end_talk(conn, out);
-        return;
-    }
-
-    if template_id == 61209 {
-        if !in_range {
-            end_talk(conn, out);
-            return;
-        }
-        if conn.session.id_leader > 0 && conn.session.id_leader != conn.session.id {
-            out.send(crate::server::spawn::sys_msg_frame("Chi doi truong moi co the dang ky"));
-            end_talk(conn, out);
-            return;
-        }
-        let has_companion = conn.session.active_pet_stt > 0
-            && conn.session.pets.iter().any(|p| p.stt == conn.session.active_pet_stt && p.id == 14735);
-        if !has_companion {
-            out.send(crate::server::spawn::sys_msg_frame("Can phai co Hau Ton di theo"));
-            end_talk(conn, out);
-            return;
-        }
-        let quota_step = conn.session.quest_tasks.get(&12310).map(|&(_, s)| s).unwrap_or(0);
-        if quota_step != 0 {
-            out.send(crate::server::spawn::sys_msg_frame("Hien tai van chua den luc..."));
-            end_talk(conn, out);
-            return;
-        }
-        crate::server::handlers::quest_sync::set_quest_task(&mut conn.session, out, 12309, 1);
-        let old_map = conn.session.map_id;
-        conn.session.map_id = 49960;
-        conn.session.map_x = 400;
-        conn.session.map_y = 400;
-        crate::server::session::registry_update_if_online(&conn.session);
-        out.send("F44402001407");
-        out.send(crate::server::spawn::build_relocate_packet(conn.session.id, 49960, 400, 400, 0));
-        out.broadcast_to_map(conn.session.id, old_map, crate::battle::packets::hide_from_map(conn.session.id));
-        let _ = crate::db::persist::persist_sessions_transaction(
-            pool,
-            &[&conn.session],
-            &["stats"],
-        )
-        .await;
-        end_talk(conn, out);
-        return;
-    }
-
-    if template_id == 20001 {
-        if !in_range {
-            end_talk(conn, out);
-            return;
-        }
-        if conn.session.map_id == 49969 {
-            crate::server::handlers::quest_sync::set_quest_task(&mut conn.session, out, 12310, 1);
-            if let Some(item_def) = data.items.get(&26051) {
-                let item = InventoryItem::from_template(item_def, 1);
-                conn.session.add_homdo_item(item);
-            }
-            if let Some(item_def) = data.items.get(&23086) {
-                let item = InventoryItem::from_template(item_def, 1);
-                conn.session.add_homdo_item(item);
-            }
-            out.send(conn.session.dump_homdo());
-            out.send(crate::server::spawn::sys_msg_frame("Chuc mung da vuot qua Cuu Thien!"));
-        } else if (49960..=49968).contains(&conn.session.map_id) {
-            if let Some(item_def) = data.items.get(&26051) {
-                let item = InventoryItem::from_template(item_def, 1);
-                conn.session.add_homdo_item(item);
-                out.send(conn.session.dump_homdo());
-            }
-            out.send(crate::server::spawn::sys_msg_frame("Nhan duoc phan thuong tu Thung Bau Vat!"));
-        } else if matches!(conn.session.map_id, 12927 | 12928) {
-            if let Some(item_def) = data.items.get(&23086) {
-                let item = InventoryItem::from_template(item_def, 1);
-                conn.session.add_homdo_item(item);
-            }
-            if let Some(item_def) = data.items.get(&26051) {
-                let item = InventoryItem::from_template(item_def, 1);
-                conn.session.add_homdo_item(item);
-            }
-            let cred_id = if conn.session.map_id == 12927 { 46049 } else { 46050 };
-            if let Some(item_def) = data.items.get(&cred_id) {
-                let item = InventoryItem::from_template(item_def, 1);
-                conn.session.add_homdo_item(item);
-            }
-            out.send(conn.session.dump_homdo());
-            out.send(crate::server::spawn::sys_msg_frame("Giai cuu thanh cong!"));
-        }
-        crate::server::session::registry_update_if_online(&conn.session);
-        let _ = crate::db::persist::persist_sessions_transaction(
-            pool,
-            &[&conn.session],
-            &["homdo", "quest"],
-        )
-        .await;
-        end_talk(conn, out);
+    // Special Event NPCs (Tickets 01, 04, 05, 09, 12, 13 -> event_npcs.rs)
+    if crate::server::handlers::event_npcs::try_handle_event_npc(
+        template_id,
+        in_range,
+        conn,
+        data,
+        service,
+        pool,
+        out,
+    ).await {
         return;
     }
 

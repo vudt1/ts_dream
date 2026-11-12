@@ -110,6 +110,28 @@ async fn test_guild_creation_and_invite_2phase_lock() {
         assert!(out.outgoing.iter().any(|f| f.frame.starts_with("F444") && f.frame.contains("2702")));
     }
 
+    // 3. Player 2 accepts invite via opcode 0x27 sub 0x03
+    {
+        conn2.session.pending_guild_invite = lock_online_sessions().get(&2002).unwrap().pending_guild_invite;
+        let mut out = HandleOutcome::default();
+        let payload = [1u8];
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn2,
+            data: &data,
+            service: &service,
+            out: &mut out,
+            opcode: 0x27,
+            sub: 0x03,
+            payload: &payload,
+            decoded: &[],
+            env: ServerEnv::with_pool(&pool),
+        };
+
+        handle_guild(&mut ctx).await;
+        assert_eq!(conn2.session.guild_id, conn1.session.guild_id, "Player 2 should join guild after consent");
+        assert!(out.outgoing.iter().any(|f| f.frame.contains("270301")));
+    }
+
     // Clean up
     {
         let mut online = lock_online_sessions();
@@ -404,6 +426,25 @@ async fn test_guild_leadership_transfer_and_kick_authorization() {
         handle_guild(&mut ctx).await;
     }
 
+    // Player 2 accepts invite via 0x27 sub 0x03
+    {
+        conn2.session.pending_guild_invite = lock_online_sessions().get(&9102).unwrap().pending_guild_invite;
+        let mut out = HandleOutcome::default();
+        let payload = [1u8];
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn2,
+            data: &data,
+            service: &service,
+            out: &mut out,
+            opcode: 0x27,
+            sub: 0x03,
+            payload: &payload,
+            decoded: &[],
+            env: ServerEnv::with_pool(&pool),
+        };
+        handle_guild(&mut ctx).await;
+    }
+
     // Member 2 is now member in online sessions
     {
         let online = lock_online_sessions();
@@ -480,4 +521,343 @@ async fn test_guild_leadership_transfer_and_kick_authorization() {
         online.remove(&9101);
         online.remove(&9102);
     }
+}
+
+#[tokio::test]
+async fn test_guild_consent_decline_and_uninvited_rejection() {
+    let pool = setup_test_db().await;
+    let data = GameData::default();
+    let service = BattleService::default();
+
+    let mut conn = Conn::default();
+    conn.session.id = 8001;
+    ts_dream::server::session::registry_register_for_login(&conn.session);
+
+    // 1. Uninvited accept should reject
+    {
+        let mut out = HandleOutcome::default();
+        let payload = [1u8];
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out,
+            opcode: 0x27,
+            sub: 0x03,
+            payload: &payload,
+            decoded: &[],
+            env: ServerEnv::with_pool(&pool),
+        };
+        handle_guild(&mut ctx).await;
+        let expected = ts_dream::server::spawn::sys_msg_frame("Khong co loi moi gia nhap quan doan");
+        assert!(out.outgoing.iter().any(|f| f.frame == expected));
+    }
+
+    // 2. Decline flow (choice = 0)
+    conn.session.pending_guild_invite = Some((8002, 10));
+    {
+        let mut out = HandleOutcome::default();
+        let payload = [0u8];
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out,
+            opcode: 0x27,
+            sub: 0x03,
+            payload: &payload,
+            decoded: &[],
+            env: ServerEnv::with_pool(&pool),
+        };
+        handle_guild(&mut ctx).await;
+        assert_eq!(conn.session.guild_id, 0);
+        assert_eq!(conn.session.pending_guild_invite, None);
+        let expected = ts_dream::server::spawn::sys_msg_frame("Da tu choi loi moi quan doan");
+        assert!(out.outgoing.iter().any(|f| f.frame == expected));
+    }
+
+    lock_online_sessions().remove(&8001);
+}
+
+#[tokio::test]
+async fn test_guild_sub_opcode_aliases() {
+    let pool = setup_test_db().await;
+    let data = GameData::default();
+    let service = BattleService::default();
+
+    let mut conn1 = Conn::default();
+    conn1.session.id = 8101;
+    let mut conn2 = Conn::default();
+    conn2.session.id = 8102;
+
+    ts_dream::server::session::registry_register_for_login(&conn1.session);
+    ts_dream::server::session::registry_register_for_login(&conn2.session);
+
+    // Create guild
+    let guild_id = create_guild(&pool, "AliasGuild", 8101).await.expect("create guild");
+    conn1.session.guild_id = guild_id as u32;
+    ts_dream::server::session::registry_update_if_online(&conn1.session);
+
+    // Add player 2
+    ts_dream::db::domain::add_guild_member(&pool, guild_id, 8102, 0).await.expect("add member");
+    conn2.session.guild_id = guild_id as u32;
+    ts_dream::server::session::registry_update_if_online(&conn2.session);
+
+    // 1. Kick alias 0x07 (instead of 0x04)
+    {
+        let mut out = HandleOutcome::default();
+        let payload = 8102u32.to_le_bytes();
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn1,
+            data: &data,
+            service: &service,
+            out: &mut out,
+            opcode: 0x27,
+            sub: 0x07, // Alias of 0x04
+            payload: &payload,
+            decoded: &[],
+            env: ServerEnv::with_pool(&pool),
+        };
+        handle_guild(&mut ctx).await;
+        let expected = ts_dream::server::spawn::sys_msg_frame("Da truc xuat thanh vien khoi quan doan");
+        assert!(out.outgoing.iter().any(|f| f.frame == expected));
+        assert_eq!(lock_online_sessions().get(&8102).unwrap().guild_id, 0);
+    }
+
+    // Re-add player 2 for transfer test
+    ts_dream::db::domain::add_guild_member(&pool, guild_id, 8102, 0).await.expect("re-add member");
+    {
+        let mut online = lock_online_sessions();
+        online.get_mut(&8102).unwrap().guild_id = guild_id as u32;
+    }
+
+    // 2. Transfer alias 0x0A (instead of 0x05)
+    {
+        let mut out = HandleOutcome::default();
+        let payload = 8102u32.to_le_bytes();
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn1,
+            data: &data,
+            service: &service,
+            out: &mut out,
+            opcode: 0x27,
+            sub: 0x0A, // Alias of 0x05
+            payload: &payload,
+            decoded: &[],
+            env: ServerEnv::with_pool(&pool),
+        };
+        handle_guild(&mut ctx).await;
+        let expected = ts_dream::server::spawn::sys_msg_frame("Chuyen nhuong chuc vu Quan Chu thanh cong!");
+        assert!(out.outgoing.iter().any(|f| f.frame == expected));
+    }
+
+    // 3. Badge upload alias 0x12 (instead of 0x06)
+    {
+        let mut out = HandleOutcome::default();
+        let payload = vec![0xAB; 288];
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn2, // new leader 8102
+            data: &data,
+            service: &service,
+            out: &mut out,
+            opcode: 0x27,
+            sub: 0x12, // Alias of 0x06
+            payload: &payload,
+            decoded: &[],
+            env: ServerEnv::with_pool(&pool),
+        };
+        handle_guild(&mut ctx).await;
+        let expected = ts_dream::server::spawn::sys_msg_frame("Cap nhat huy hieu quan doan thanh cong!");
+        assert!(out.outgoing.iter().any(|f| f.frame == expected));
+    }
+
+    lock_online_sessions().remove(&8101);
+    lock_online_sessions().remove(&8102);
+}
+
+#[tokio::test]
+async fn test_guild_negative_cases() {
+    let pool = setup_test_db().await;
+    let data = GameData::default();
+    let service = BattleService::default();
+
+    let mut conn = Conn::default();
+    conn.session.id = 8201;
+    conn.session.guild_id = 99;
+    ts_dream::server::session::registry_register_for_login(&conn.session);
+
+    // 1. Self-invite -> rejected
+    {
+        let mut out = HandleOutcome::default();
+        let payload = 8201u32.to_le_bytes();
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out,
+            opcode: 0x27,
+            sub: 0x02,
+            payload: &payload,
+            decoded: &[],
+            env: ServerEnv::with_pool(&pool),
+        };
+        handle_guild(&mut ctx).await;
+        let expected = ts_dream::server::spawn::sys_msg_frame("Khong the tu moi chinh minh");
+        assert!(out.outgoing.iter().any(|f| f.frame == expected));
+    }
+
+    // 2. Self-kick -> rejected
+    {
+        let mut out = HandleOutcome::default();
+        let payload = 8201u32.to_le_bytes();
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out,
+            opcode: 0x27,
+            sub: 0x04,
+            payload: &payload,
+            decoded: &[],
+            env: ServerEnv::with_pool(&pool),
+        };
+        handle_guild(&mut ctx).await;
+        let expected = ts_dream::server::spawn::sys_msg_frame("Khong the tu truc xuat chinh minh");
+        assert!(out.outgoing.iter().any(|f| f.frame == expected));
+    }
+
+    // 3. Self-transfer -> rejected
+    {
+        let mut out = HandleOutcome::default();
+        let payload = 8201u32.to_le_bytes();
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out,
+            opcode: 0x27,
+            sub: 0x05,
+            payload: &payload,
+            decoded: &[],
+            env: ServerEnv::with_pool(&pool),
+        };
+        handle_guild(&mut ctx).await;
+        let expected = ts_dream::server::spawn::sys_msg_frame("Khong the chuyen nhuong cho chinh minh");
+        assert!(out.outgoing.iter().any(|f| f.frame == expected));
+    }
+
+    // 4. Action without guild (guild_id == 0)
+    conn.session.guild_id = 0;
+    {
+        let mut out = HandleOutcome::default();
+        let payload = 8202u32.to_le_bytes();
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out,
+            opcode: 0x27,
+            sub: 0x02,
+            payload: &payload,
+            decoded: &[],
+            env: ServerEnv::with_pool(&pool),
+        };
+        handle_guild(&mut ctx).await;
+        let expected = ts_dream::server::spawn::sys_msg_frame("Ban chua co quan doan");
+        assert!(out.outgoing.iter().any(|f| f.frame == expected));
+    }
+
+    lock_online_sessions().remove(&8201);
+}
+
+#[tokio::test]
+async fn test_city_siege_dispatcher_routing() {
+    let pool = setup_test_db().await;
+    let data = GameData::default();
+    let service = BattleService::default();
+    let env = ServerEnv::with_pool(&pool);
+
+    let mut conn = Conn::default();
+    conn.session.id = 8301;
+    ts_dream::server::session::registry_register_for_login(&conn.session);
+
+    // 1. Dispatch 0x29 0x0F (City ownership table query)
+    // Frame: F4 44 [len: 2B LE] 29 0F
+    let packet_29_0f = vec![0xF4, 0x44, 0x02, 0x00, 0x29, 0x0F];
+    let outcome = ts_dream::server::dispatcher::dispatch(&mut conn, &packet_29_0f, &data, &service, &env).await;
+    assert!(outcome.outgoing.iter().any(|f| f.frame.starts_with("F444") && f.frame.contains("290F05")));
+
+    // 2. Dispatch 0x29 0x09 (Notice)
+    let packet_29_09 = vec![0xF4, 0x44, 0x04, 0x00, 0x29, 0x09, 0x01, 0x02];
+    let outcome = ts_dream::server::dispatcher::dispatch(&mut conn, &packet_29_09, &data, &service, &env).await;
+    assert!(outcome.outgoing.iter().any(|f| f.frame.starts_with("F444") && f.frame.contains("29090102")));
+
+    lock_online_sessions().remove(&8301);
+}
+
+#[tokio::test]
+async fn test_naval_combat_ammo_consumption_and_depletion() {
+    let pool = setup_test_db().await;
+    let data = GameData::default();
+    let service = BattleService::default();
+
+    let mut conn = Conn::default();
+    conn.session.id = 8401;
+    ts_dream::server::session::registry_register_for_login(&conn.session);
+
+    // 1. Enter Water War -> provisions 10 ammo in slot 1 (id 46080)
+    let init_frame = enter_water_war(&mut conn.session);
+    assert_eq!(conn.session.boat_inventory.len(), 25);
+    assert_eq!(conn.session.boat_inventory[0].id, 46080);
+    assert_eq!(conn.session.boat_inventory[0].count, 10);
+    assert!(init_frame.contains("176419"));
+
+    // 2. Fire cannon 10 times -> ammo counts down to 0
+    for i in 1..=10 {
+        let mut out = HandleOutcome::default();
+        // payload: action(1B) + target_id(4B LE) + param(1B)
+        let mut payload = vec![0x01];
+        payload.extend_from_slice(&8402u32.to_le_bytes());
+        payload.push(1);
+
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out,
+            opcode: 0x40,
+            sub: 0x01,
+            payload: &payload,
+            decoded: &[],
+            env: ServerEnv::with_pool(&pool),
+        };
+        ts_dream::server::handlers::guild::handle_naval_combat(&mut ctx).await;
+        assert_eq!(conn.session.boat_inventory[0].count, 10 - i);
+    }
+    assert_eq!(conn.session.boat_inventory[0].id, 0);
+
+    // 3. 11th shot should be rejected due to no ammo
+    {
+        let mut out = HandleOutcome::default();
+        let mut payload = vec![0x01];
+        payload.extend_from_slice(&8402u32.to_le_bytes());
+        payload.push(1);
+
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out,
+            opcode: 0x40,
+            sub: 0x01,
+            payload: &payload,
+            decoded: &[],
+            env: ServerEnv::with_pool(&pool),
+        };
+        ts_dream::server::handlers::guild::handle_naval_combat(&mut ctx).await;
+        let expected = ts_dream::server::spawn::sys_msg_frame("Khong du dan duoc thuy chien!");
+        assert!(out.outgoing.iter().any(|f| f.frame == expected));
+    }
+
+    lock_online_sessions().remove(&8401);
 }

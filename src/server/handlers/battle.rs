@@ -413,7 +413,7 @@ pub async fn handle_quiz_answer(ctx: &mut OpcodeCtx<'_>) {
         // Incorrect answer:
         // Leader HP drops to 1
         ctx.conn.session.hp = 1;
-        ctx.out.send(crate::battle::packets::status_update(1, 1));
+        ctx.out.send(crate::battle::packets::status_update(0x19, 1));
         // Afflict Leader with Ghost debuff
         ctx.conn.session.ghost = 1;
         // S->C 18 08 [playerId][01 00][01]

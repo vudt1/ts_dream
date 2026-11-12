@@ -7,7 +7,7 @@
 //! - Dragon Boat Racing (`0x46`) with alternating paddle inputs and token bucket rate limiter (5/sec).
 
 use crate::encoding;
-use crate::protocol::encoder;
+use crate::protocol::{self, encoder};
 use crate::server::dispatcher::OpcodeCtx;
 use crate::server::session::{
     lock_online_sessions, lock_player_operations, registry_update_if_online, InventoryItem,
@@ -120,10 +120,15 @@ pub fn boat_inventory_clear_frame() -> String {
 pub fn enter_water_war(session: &mut crate::server::session::Session) -> String {
     session.boat_inventory = Vec::with_capacity(25);
     for slot in 1..=25 {
+        let (id, count) = if slot == 1 {
+            (46080, 10)
+        } else {
+            (0, 0)
+        };
         session.boat_inventory.push(InventoryItem {
             slot: slot as u8,
-            id: 0,
-            count: 0,
+            id,
+            count,
             ..Default::default()
         });
     }
@@ -238,10 +243,18 @@ pub async fn handle_guild(ctx: &mut OpcodeCtx<'_>) {
         // 0x02: Guild Invite (Two-Phase State Lock on 2 players)
         0x02 => {
             if ctx.payload.len() < 4 {
+                ctx.out.send(sys_msg_frame("Goi tin moi khong hop le"));
                 return;
             }
             let target_id = u32::from_le_bytes([ctx.payload[0], ctx.payload[1], ctx.payload[2], ctx.payload[3]]);
             if target_id == 0 || target_id == my_id {
+                ctx.out.send(sys_msg_frame("Khong the tu moi chinh minh"));
+                return;
+            }
+
+            let my_guild_id = ctx.conn.session.guild_id;
+            if my_guild_id == 0 {
+                ctx.out.send(sys_msg_frame("Ban chua co quan doan"));
                 return;
             }
 
@@ -262,27 +275,16 @@ pub async fn handle_guild(ctx: &mut OpcodeCtx<'_>) {
                 return;
             }
 
-            let my_guild_id = ctx.conn.session.guild_id;
-            if my_guild_id == 0 {
-                ctx.out.send(sys_msg_frame("Ban chua co quan doan"));
-                return;
-            }
-
-            // Phase 2: Add member
-            if let Some(pool) = ctx.env.pool {
-                let _ = crate::db::domain::add_guild_member(pool, my_guild_id as i64, target_id as i64, 0).await;
-            }
-
-            // Update target in-memory online session
+            // Phase 2: Record pending invite on target session without committing to DB yet
             {
                 let mut online = lock_online_sessions();
                 if let Some(target_sess) = online.get_mut(&target_id) {
-                    target_sess.guild_id = my_guild_id;
+                    target_sess.pending_guild_invite = Some((my_id, my_guild_id));
                 }
             }
 
             // Build invite notification frame: S→C 27 02 [my_id: 4B LE][my_guild_id: 4B LE]
-            let mut invite_frame = vec![0x27, 0x02];
+            let mut invite_frame = vec![protocol::OP_RANK_ANNOUNCE, 0x02];
             invite_frame.extend_from_slice(&my_id.to_le_bytes());
             invite_frame.extend_from_slice(&my_guild_id.to_le_bytes());
             let flen = invite_frame.len() as u16;
@@ -301,13 +303,59 @@ pub async fn handle_guild(ctx: &mut OpcodeCtx<'_>) {
             ctx.out.send(sys_msg_frame("Da gui loi moi gia nhap quan doan"));
         }
 
-        // 0x04: Guild Kick
-        0x04 => {
+        // 0x03: Guild Invite Response (Accept / Decline)
+        0x03 => {
+            let choice = ctx.payload.first().copied().unwrap_or(1);
+            let Some((inviter_id, guild_id)) = ctx.conn.session.pending_guild_invite.take() else {
+                ctx.out.send(sys_msg_frame("Khong co loi moi gia nhap quan doan"));
+                return;
+            };
+
+            if choice == 0 {
+                // Declined
+                ctx.out.send(sys_msg_frame("Da tu choi loi moi quan doan"));
+                if let Some(hub) = ctx.env.hub {
+                    let msg = sys_msg_frame("Doi phuong da tu choi loi moi quan doan");
+                    hub.send_to(inviter_id, &msg).await;
+                }
+                return;
+            }
+
+            // Accepted: lock ordering strictly min, max
+            let first = my_id.min(inviter_id);
+            let second = my_id.max(inviter_id);
+            let _guards = lock_player_operations([first, second]).await;
+
+            if let Some(pool) = ctx.env.pool {
+                match crate::db::domain::add_guild_member(pool, guild_id as i64, my_id as i64, 0).await {
+                    Ok(_) => {
+                        ctx.conn.session.guild_id = guild_id;
+                        registry_update_if_online(&ctx.conn.session);
+                        ctx.out.send(encoder::hex(&[0xF4, 0x44, 0x03, 0x00, protocol::OP_RANK_ANNOUNCE, 0x03, 0x01]));
+                        ctx.out.send(sys_msg_frame("Gia nhap quan doan thanh cong!"));
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to add guild member: {e}");
+                        ctx.out.send(sys_msg_frame("Khong the gia nhap quan doan"));
+                    }
+                }
+            } else {
+                ctx.conn.session.guild_id = guild_id;
+                registry_update_if_online(&ctx.conn.session);
+                ctx.out.send(encoder::hex(&[0xF4, 0x44, 0x03, 0x00, protocol::OP_RANK_ANNOUNCE, 0x03, 0x01]));
+                ctx.out.send(sys_msg_frame("Gia nhap quan doan thanh cong!"));
+            }
+        }
+
+        // 0x04 | 0x07: Guild Kick
+        0x04 | 0x07 => {
             if ctx.payload.len() < 4 {
+                ctx.out.send(sys_msg_frame("Goi tin truc xuat khong hop le"));
                 return;
             }
             let target_id = u32::from_le_bytes([ctx.payload[0], ctx.payload[1], ctx.payload[2], ctx.payload[3]]);
-            if target_id == my_id {
+            if target_id == 0 || target_id == my_id {
+                ctx.out.send(sys_msg_frame("Khong the tu truc xuat chinh minh"));
                 return;
             }
             let my_guild_id = ctx.conn.session.guild_id;
@@ -330,71 +378,118 @@ pub async fn handle_guild(ctx: &mut OpcodeCtx<'_>) {
                     return;
                 }
 
-                let _ = crate::db::domain::remove_guild_member(pool, target_id as i64).await;
-            }
+                match crate::db::domain::remove_guild_member(pool, target_id as i64).await {
+                    Ok(_) => {
+                        {
+                            let mut online = lock_online_sessions();
+                            if let Some(target_sess) = online.get_mut(&target_id) {
+                                target_sess.guild_id = 0;
+                            }
+                        }
 
-            // Clear target's guild_id in online sessions
-            {
-                let mut online = lock_online_sessions();
-                if let Some(target_sess) = online.get_mut(&target_id) {
-                    target_sess.guild_id = 0;
+                        if let Some(hub) = ctx.env.hub {
+                            hub.send_to(target_id, &sys_msg_frame("Ban da bi truc xuat khoi quan doan")).await;
+                        }
+
+                        ctx.out.send(sys_msg_frame("Da truc xuat thanh vien khoi quan doan"));
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to remove guild member: {e}");
+                        ctx.out.send(sys_msg_frame("Khong the truc xuat thanh vien"));
+                    }
                 }
-            }
+            } else {
+                // Without DB pool, e.g. tests without DB
+                {
+                    let mut online = lock_online_sessions();
+                    if let Some(target_sess) = online.get_mut(&target_id) {
+                        target_sess.guild_id = 0;
+                    }
+                }
 
-            if let Some(hub) = ctx.env.hub {
-                hub.send_to(target_id, &sys_msg_frame("Ban da bi truc xuat khoi quan doan")).await;
-            }
+                if let Some(hub) = ctx.env.hub {
+                    hub.send_to(target_id, &sys_msg_frame("Ban da bi truc xuat khoi quan doan")).await;
+                }
 
-            ctx.out.send(sys_msg_frame("Da truc xuat thanh vien khoi quan doan"));
+                ctx.out.send(sys_msg_frame("Da truc xuat thanh vien khoi quan doan"));
+            }
         }
 
-        // 0x05: Guild Leadership Transfer (Two-Phase State Lock)
-        0x05 => {
+        // 0x05 | 0x0A: Guild Leadership Transfer (Two-Phase State Lock)
+        0x05 | 0x0A => {
             if ctx.payload.len() < 4 {
+                ctx.out.send(sys_msg_frame("Goi tin chuyen nhuong khong hop le"));
                 return;
             }
             let new_leader_id = u32::from_le_bytes([ctx.payload[0], ctx.payload[1], ctx.payload[2], ctx.payload[3]]);
-            if new_leader_id == my_id {
+            if new_leader_id == 0 || new_leader_id == my_id {
+                ctx.out.send(sys_msg_frame("Khong the chuyen nhuong cho chinh minh"));
                 return;
             }
+            let my_guild_id = ctx.conn.session.guild_id;
+            if my_guild_id == 0 {
+                ctx.out.send(sys_msg_frame("Ban chua co quan doan"));
+                return;
+            }
+
             let first = my_id.min(new_leader_id);
             let second = my_id.max(new_leader_id);
             let _guards = lock_player_operations([first, second]).await;
 
-            let my_guild_id = ctx.conn.session.guild_id;
-            if my_guild_id != 0 {
-                if let Some(pool) = ctx.env.pool {
-                    let is_leader = sqlx::query_scalar::<_, i64>("SELECT leader_id FROM guilds WHERE guild_id = ?")
-                        .bind(my_guild_id as i64)
-                        .fetch_optional(&pool.read)
-                        .await
-                        .ok()
-                        .flatten()
-                        == Some(my_id as i64);
+            if let Some(pool) = ctx.env.pool {
+                let is_leader = sqlx::query_scalar::<_, i64>("SELECT leader_id FROM guilds WHERE guild_id = ?")
+                    .bind(my_guild_id as i64)
+                    .fetch_optional(&pool.read)
+                    .await
+                    .ok()
+                    .flatten()
+                    == Some(my_id as i64);
 
-                    if !is_leader {
-                        ctx.out.send(sys_msg_frame("Chi co Quan Chu moi co quyen chuyen nhuong!"));
-                        return;
-                    }
-
-                    let _ = crate::db::domain::transfer_guild_leadership(pool, my_guild_id as i64, new_leader_id as i64).await;
+                if !is_leader {
+                    ctx.out.send(sys_msg_frame("Chi co Quan Chu moi co quyen chuyen nhuong!"));
+                    return;
                 }
+
+                match crate::db::domain::transfer_guild_leadership(pool, my_guild_id as i64, new_leader_id as i64).await {
+                    Ok(_) => {
+                        ctx.out.send(sys_msg_frame("Chuyen nhuong chuc vu Quan Chu thanh cong!"));
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to transfer guild leadership: {e}");
+                        ctx.out.send(sys_msg_frame("Khong the chuyen nhuong chuc vu"));
+                    }
+                }
+            } else {
                 ctx.out.send(sys_msg_frame("Chuyen nhuong chuc vu Quan Chu thanh cong!"));
             }
         }
 
-        // 0x06: 288-byte Badge Upload
-        0x06 => {
-            if ctx.payload.len() >= 288 {
-                let badge = &ctx.payload[..288];
-                let my_guild_id = ctx.conn.session.guild_id;
-                if my_guild_id != 0 {
-                    if let Some(pool) = ctx.env.pool {
-                        let _ = crate::db::domain::update_guild_badge(pool, my_guild_id as i64, badge).await;
+        // 0x06 | 0x12: 288-byte Badge Upload
+        0x06 | 0x12 => {
+            let my_guild_id = ctx.conn.session.guild_id;
+            if my_guild_id == 0 {
+                ctx.out.send(sys_msg_frame("Ban chua co quan doan"));
+                return;
+            }
+            if ctx.payload.len() < 288 {
+                ctx.out.send(sys_msg_frame("Du lieu huy hieu khong du 288 bytes"));
+                return;
+            }
+            let badge = &ctx.payload[..288];
+            if let Some(pool) = ctx.env.pool {
+                match crate::db::domain::update_guild_badge(pool, my_guild_id as i64, badge).await {
+                    Ok(_) => {
+                        ctx.out.send(encoder::hex(&[0xF4, 0x44, 0x03, 0x00, protocol::OP_RANK_ANNOUNCE, 0x06, 0x00]));
+                        ctx.out.send(sys_msg_frame("Cap nhat huy hieu quan doan thanh cong!"));
                     }
-                    ctx.out.send(encoder::hex(&[0xF4, 0x44, 0x03, 0x00, 0x27, 0x06, 0x00]));
-                    ctx.out.send(sys_msg_frame("Cap nhat huy hieu quan doan thanh cong!"));
+                    Err(e) => {
+                        tracing::warn!("Failed to update guild badge: {e}");
+                        ctx.out.send(sys_msg_frame("Khong the cap nhat huy hieu"));
+                    }
                 }
+            } else {
+                ctx.out.send(encoder::hex(&[0xF4, 0x44, 0x03, 0x00, protocol::OP_RANK_ANNOUNCE, 0x06, 0x00]));
+                ctx.out.send(sys_msg_frame("Cap nhat huy hieu quan doan thanh cong!"));
             }
         }
 
@@ -472,9 +567,65 @@ pub async fn handle_boat_race(ctx: &mut OpcodeCtx<'_>) {
     }
 }
 
+/// Handle City Siege requests (Opcode 0x29).
+pub async fn handle_city_siege(ctx: &mut OpcodeCtx<'_>) {
+    match ctx.sub {
+        // Sub 0x0F: City ownership query
+        0x0F => {
+            let default_cities = [
+                (CITY_THO_XUAN, 0, ""),
+                (CITY_TRUONG_AN, 0, ""),
+                (CITY_GIANG_LANG, 0, ""),
+                (CITY_KHUC_A, 0, ""),
+                (CITY_LAC_DUONG, 0, ""),
+            ];
+            ctx.out.send(city_ownership_frame(&default_cities));
+        }
+        // Sub 0x09: City siege notice / announcement echo
+        0x09 => {
+            if ctx.payload.len() >= 2 {
+                let notice_code = ctx.payload[0];
+                let city_id = ctx.payload[1];
+                let extra = if ctx.payload.len() > 3 {
+                    let len = ctx.payload[2] as usize;
+                    if ctx.payload.len() >= 3 + len {
+                        Some(encoding::viscii_decode(&ctx.payload[3..3 + len]))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                let frame = city_siege_notice_frame(notice_code, city_id, extra.as_deref());
+                ctx.out.send(&frame);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Handle Naval Combat Bombardment (Opcode 0x40).
 pub async fn handle_naval_combat(ctx: &mut OpcodeCtx<'_>) {
     if ctx.sub == 0x01 && ctx.payload.len() >= 5 {
+        // Find first slot in boat_inventory with id > 0 and count > 0
+        let slot_opt = ctx
+            .conn
+            .session
+            .boat_inventory
+            .iter_mut()
+            .find(|item| item.id > 0 && item.count > 0);
+
+        let Some(slot) = slot_opt else {
+            ctx.out.send(sys_msg_frame("Khong du dan duoc thuy chien!"));
+            return;
+        };
+
+        slot.count = slot.count.saturating_sub(1);
+        if slot.count == 0 {
+            slot.id = 0;
+        }
+        registry_update_if_online(&ctx.conn.session);
+
         let action = ctx.payload[0];
         let target_id = u32::from_le_bytes([ctx.payload[1], ctx.payload[2], ctx.payload[3], ctx.payload[4]]);
         let param = if ctx.payload.len() >= 6 { ctx.payload[5] } else { 1 };

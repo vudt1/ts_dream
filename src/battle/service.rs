@@ -102,6 +102,7 @@ struct BattleSinkImpl {
     /// no battle-spawn machinery. Unset (bare service instances in tests) =
     /// the chained request is logged and skipped, never left parked.
     eve_service: std::sync::OnceLock<std::sync::Weak<BattleService>>,
+    pub active_40_npc: Arc<Mutex<HashMap<i32, u32>>>,
 }
 
 impl BattleSink for BattleSinkImpl {
@@ -334,7 +335,7 @@ impl BattleSink for BattleSinkImpl {
         }
     }
 
-    fn battle_ended(&self, _id: i32, outcome: Outcome) {
+    fn battle_ended(&self, id: i32, outcome: Outcome) {
         // Clear battle state for every participant (battle is over) and
         // snapshot their sessions for post-battle persistence.
         let now_ms = std::time::SystemTime::now()
@@ -342,6 +343,7 @@ impl BattleSink for BattleSinkImpl {
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0);
         let mut ended_sessions: Vec<Session> = Vec::new();
+        let arena_40_challenger = self.active_40_npc.lock().unwrap().remove(&id);
         // CP6 #4: a battle started from an Eve script parks its session in
         // `AwaitingBattle`; collect the resume here. A battle hit *during*
         // the resumed walk needs the spawn machinery (`members` lock still
@@ -360,6 +362,12 @@ impl BattleSink for BattleSinkImpl {
                             s.battle_id = 0;
                             s.last_battle_end_ms = now_ms;
                             s.encounter_steps = 0;
+                            if outcome == Outcome::PlayerWin && arena_40_challenger == Some(*id as u32) {
+                                let victory_frames = crate::server::handlers::event_npcs::resolve_40_npc_victory(&mut s, self.data.as_ref());
+                                for f in victory_frames {
+                                    let _ = p.frames.try_send(f);
+                                }
+                            }
                             // CP6 #4 — resume the parked Eve session (frames
                             // go out on the same channel the battle just
                             // used, so they land after the battle's own end
@@ -419,7 +427,21 @@ impl BattleSink for BattleSinkImpl {
                         s.battle_id = 0;
                         s.last_battle_end_ms = now_ms;
                         s.encounter_steps = 0;
+                        if outcome == Outcome::PlayerWin && arena_40_challenger == Some(*id as u32) {
+                            let _ = crate::server::handlers::event_npcs::resolve_40_npc_victory(s, self.data.as_ref());
+                        }
                         ended_sessions.push(s.clone());
+                    }
+                }
+            }
+            if outcome == Outcome::PlayerWin {
+                if let Some(cid) = arena_40_challenger {
+                    if !ids.contains(&(cid as i64)) {
+                        let mut map = crate::server::session::lock_online_sessions();
+                        if let Some(s) = map.get_mut(&cid) {
+                            let _ = crate::server::handlers::event_npcs::resolve_40_npc_victory(s, self.data.as_ref());
+                            ended_sessions.push(s.clone());
+                        }
                     }
                 }
             }
@@ -655,6 +677,8 @@ pub struct BattleService {
     input_timeout: std::time::Duration,
     /// Special events & North Star quiz manager
     pub events: Arc<crate::server::events::EventLifecycleManager>,
+    /// Active 40-NPC Arena continuous battles (battle_id -> challenger_id)
+    pub active_40_npc: Arc<Mutex<HashMap<i32, u32>>>,
 }
 
 impl Default for BattleService {
@@ -676,12 +700,14 @@ impl BattleService {
                 &data.npc_on_map,
             ))))
         };
+        let active_40_npc = Arc::new(Mutex::new(HashMap::new()));
         let sink = Arc::new(BattleSinkImpl {
             online: Arc::clone(&online),
             members: Arc::new(Mutex::new(HashSet::new())),
             data: Arc::clone(&data),
             pool: Arc::clone(&pool),
             eve_service: std::sync::OnceLock::new(),
+            active_40_npc: Arc::clone(&active_40_npc),
         });
         BattleService {
             manager: Arc::new(BattleManager::new()),
@@ -696,6 +722,7 @@ impl BattleService {
             next_battle: AtomicI32::new(1),
             input_timeout: std::time::Duration::from_secs(21),
             events: Arc::new(crate::server::events::EventLifecycleManager::default()),
+            active_40_npc,
         }
     }
 
@@ -1251,6 +1278,95 @@ impl BattleService {
         let (_question, modal_frame) = self.events.register_quiz(id, leader_session.id, None);
 
         (id, modal_frame)
+    }
+
+    /// Start continuous 40-NPC Arena battle with 40 preloaded escalating waves.
+    pub fn start_40_npc_battle(
+        &self,
+        leader_session: &mut Session,
+        waves: Vec<Vec<(crate::data::tables::Npc, u8, u8)>>,
+    ) -> (i32, Vec<String>) {
+        let id = self.next_battle_id();
+        let terrain = 112;
+        let mut battle = Battle::new(id, terrain);
+        battle.challenger_id = leader_session.id;
+        battle.is_40_npc = true;
+        let lid = i64::from(leader_session.id);
+
+        battle.add_player(leader_session, lid, 3, 2);
+        battle.load_leader_pets(leader_session, lid, 3);
+
+        let member_cols = [1u8, 3, 0, 4];
+        let mut extra_members = Vec::new();
+        let mut extra_start = Vec::new();
+        let mut extra_players = HashMap::new();
+        let mut extra_pets = HashMap::new();
+
+        if let Some(online) = try_read_online_with_retry(&self.online, 10, std::time::Duration::from_millis(2)) {
+            if let Some(p) = online.get(&lid) {
+                if let Some(mut s) = try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2)) {
+                    *s = leader_session.clone();
+                    s.battle_id = id;
+                }
+            }
+        }
+
+        {
+            let mut map = crate::server::session::lock_online_sessions();
+            if let Some(s) = map.get_mut(&leader_session.id) {
+                s.battle_id = id;
+            }
+            for (i, &mem_id) in leader_session.id_mem.iter().filter(|&&m| m > 0).enumerate().take(4) {
+                let mid = i64::from(mem_id);
+                if let Some(s) = map.get_mut(&mem_id) {
+                    if s.battle_id != 0 {
+                        continue;
+                    }
+                    s.battle_id = id;
+                    let col = member_cols[i];
+                    battle.add_player(s, lid, 3, col);
+                    battle.load_member_pet(s, lid, 3, col);
+
+                    extra_members.push(mid);
+                    extra_players.insert(mid, self.snapshot(s));
+                    extra_pets.insert(mid, self.pet_slots(s));
+
+                    let frames = battle.member_battle_frame(terrain, mid);
+                    extra_start.extend(frames);
+                }
+            }
+        }
+
+        if let Some(wave1) = waves.first() {
+            for (idx, (npc, row, col)) in wave1.iter().enumerate() {
+                let id_on_map = (idx + 1) as i64;
+                battle.add_npc(npc, id_on_map, *row, *col, 3);
+            }
+        }
+        battle.set_waves(waves);
+
+        self.sink.active_40_npc.lock().unwrap().insert(id, leader_session.id);
+
+        let start = battle.npc_battle_start_packets(terrain);
+        let mut leader_packets = Vec::new();
+        for packet in &start {
+            if let crate::battle::construction::StartPacket::To { player, frame } = packet {
+                if *player == lid {
+                    leader_packets.push(frame.clone());
+                }
+            }
+        }
+
+        self.spawn_battle(
+            battle,
+            leader_session,
+            extra_players,
+            extra_pets,
+            extra_members,
+            extra_start,
+        );
+
+        (id, leader_packets)
     }
 
     /// Register a player in an existing battle (op 0x0B sub 4 join).

@@ -369,6 +369,7 @@ async fn test_rescue_2k_floor_rewards() {
     conn.session.map_id = 12927; // Floor 17 (Đại Kiều)
     conn.session.map_x = 400;
     conn.session.map_y = 400;
+    conn.session.quest_tasks.insert(212, (0, 17));
 
     let mut out = HandleOutcome::default();
     let payload = [0x21, 0x4E]; // NPC 20001
@@ -578,6 +579,7 @@ async fn test_cuu_thien_floor_chest_and_final_quota() {
     conn.session.map_id = 49969;
     conn.session.map_x = 400;
     conn.session.map_y = 400;
+    conn.session.quest_tasks.insert(12309, (0, 10));
 
     let mut out = HandleOutcome::default();
     let payload = [0x21, 0x4E];
@@ -656,4 +658,481 @@ async fn test_dungeon_disconnect_evacuation_to_savemap() {
     };
     repos.sessions().load(acc_id, &mut reloaded).await.expect("session must exist in DB");
     assert_eq!(reloaded.map_id, 12001, "disconnected player must be evacuated to savemap 12001");
+}
+
+// =========================================================================
+// Ticket 12: Continuous Dungeon 40-NPC Wave Launch, Escalation & Completion
+// =========================================================================
+
+#[tokio::test]
+async fn test_40_npc_wave_challenger_npc_14628_registration_gate() {
+    let data = GameData::default();
+    let service = BattleService::default();
+
+    // 1. Challenger without registration (QuestStep 218 == 0) -> Rejected
+    {
+        let mut conn = Conn::default();
+        conn.session.id = 4101;
+        conn.session.map_id = 10851;
+        conn.session.map_x = 400;
+        conn.session.map_y = 400;
+
+        let mut out = HandleOutcome::default();
+        let payload = (14628u16).to_le_bytes(); // NPC 14628
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out,
+            opcode: 0x14,
+            sub: 1,
+            payload: &payload,
+            decoded: &[],
+            env: ServerEnv::none(),
+        };
+
+        handle_talk(&mut ctx).await;
+        assert_eq!(conn.session.battle_id, 0, "must not start battle when unregistered");
+        let expected = ts_dream::server::spawn::sys_msg_frame("Chua dang ky tham gia loi dai 40 NPC!");
+        assert!(
+            out.outgoing.iter().any(|f| f.contains(&expected) || f == &expected),
+            "must emit registration rejection sys_msg_frame (020102)"
+        );
+    }
+
+    // 2. Challenger with active registration (QuestStep 218 == 1) -> Starts 40 NPC battle
+    {
+        let mut conn = Conn::default();
+        conn.session.id = 4102;
+        conn.session.map_id = 10851;
+        conn.session.map_x = 400;
+        conn.session.map_y = 400;
+        conn.session.quest_tasks.insert(218, (0, 1));
+        ts_dream::server::session::registry_register_for_login(&conn.session);
+
+        let mut out = HandleOutcome::default();
+        let payload = (14628u16).to_le_bytes();
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out,
+            opcode: 0x14,
+            sub: 1,
+            payload: &payload,
+            decoded: &[],
+            env: ServerEnv::none(),
+        };
+
+        handle_talk(&mut ctx).await;
+        assert!(conn.session.battle_id > 0, "battle must be started for registered challenger");
+
+        lock_online_sessions().remove(&4102);
+    }
+}
+
+#[tokio::test]
+async fn test_40_npc_wave_escalation_and_quest_step_progression() {
+    let data = GameData::default();
+
+    // Verify build_40_npc_waves produces exactly 40 escalating waves
+    let waves = ts_dream::server::handlers::event_npcs::build_40_npc_waves(&data);
+    assert_eq!(waves.len(), 40, "must generate exactly 40 waves");
+
+    // Verify wave escalation in level and HP
+    for i in 0..39 {
+        let hp_current = waves[i][0].0.hp;
+        let hp_next = waves[i + 1][0].0.hp;
+        assert!(hp_next > hp_current, "wave {} HP ({}) must be strictly higher than wave {} HP ({})", i + 2, hp_next, i + 1, hp_current);
+    }
+
+    // In-engine wave escalation & QuestStep(218) advancement
+    let mut session = Session::default();
+    session.id = 4201;
+    session.hp = 5000;
+    session.sp = 1000;
+    session.quest_tasks.insert(218, (0, 1));
+    ts_dream::server::session::registry_register_for_login(&session);
+
+    let mut battle = Battle::new(888, 112);
+    battle.challenger_id = 4201;
+    battle.is_40_npc = true;
+    battle.add_player(&session, 4201, 3, 2);
+
+    let initial_wave = waves[0].clone();
+    for (idx, (npc, row, col)) in initial_wave.iter().enumerate() {
+        battle.add_npc(npc, (idx + 1) as i64, *row, *col, 3);
+    }
+    battle.set_waves(waves);
+    assert_eq!(battle.current_wave, 0);
+
+    // Defeat waves 1 through 39 sequentially
+    for wave_num in 1..=39 {
+        // Clear enemies in current wave
+        for row in 0..2u8 {
+            for col in 0..5u8 {
+                if let Some(cell) = battle.cell_mut(row, col) {
+                    if cell.team == 2 {
+                        cell.hp = 0;
+                    }
+                }
+            }
+        }
+        assert!(battle.all_enemies_dead());
+
+        let mut out = Vec::new();
+        let advanced = battle.advance_wave(&mut out);
+        assert!(advanced, "wave must advance from wave {}", wave_num);
+        assert_eq!(battle.current_wave, wave_num as usize);
+
+        // Verify QuestStep(218) advanced to N + 1
+        let online = lock_online_sessions();
+        let current_step = online.get(&4201).unwrap().quest_tasks.get(&218).map(|&(_, s)| s);
+        assert_eq!(current_step, Some((wave_num + 1) as u8), "QuestStep(218) must advance to {}", wave_num + 1);
+
+        // Verify no battle_trailer emitted between waves
+        let has_trailer = out.iter().any(|o| match o {
+            ts_dream::battle::runner::Out::Broadcast(s) => s.contains("0B0A01") || s.contains("0504") || s.contains("1408"),
+            _ => false,
+        });
+        assert!(!has_trailer, "battle_trailer must NOT be emitted between waves");
+    }
+
+    lock_online_sessions().remove(&4201);
+}
+
+#[test]
+fn test_40_npc_wave_40_victory_and_milestone_rewards() {
+    let data = GameData::default();
+    let mut session = Session::default();
+    session.id = 4301;
+    session.map_id = 10851;
+    session.map_x = 400;
+    session.map_y = 400;
+    session.texp = 5000;
+    session.quest_tasks.insert(218, (0, 40));
+
+    // Preload inventory with existing items in slot 1 and slot 2
+    session.homdo.push(InventoryItem {
+        slot: 1,
+        id: 10001,
+        count: 5,
+        ..Default::default()
+    });
+    session.homdo.push(InventoryItem {
+        slot: 2,
+        id: 10002,
+        count: 3,
+        ..Default::default()
+    });
+
+    // Resolve wave 40 victory completion
+    let frames = ts_dream::server::handlers::event_npcs::resolve_40_npc_victory(&mut session, &data);
+
+    // 1. Verify existing inventory slots 1 and 2 are untouched (slot integrity preserved)
+    let slot1 = session.homdo.iter().find(|i| i.slot == 1).expect("slot 1 must exist");
+    assert_eq!(slot1.id, 10001);
+    assert_eq!(slot1.count, 5);
+
+    let slot2 = session.homdo.iter().find(|i| i.slot == 2).expect("slot 2 must exist");
+    assert_eq!(slot2.id, 10002);
+    assert_eq!(slot2.count, 3);
+
+    // 2. Verify milestone rewards granted: 26051 (Đậu Dũng Khí), 23086 (Lông Vũ), 10,000 EXP
+    let has_bean = session.homdo.iter().any(|i| i.id == 26051 && i.count == 1);
+    let has_feather = session.homdo.iter().any(|i| i.id == 23086 && i.count == 1);
+    assert!(has_bean, "must award 26051 Đậu Dũng Khí");
+    assert!(has_feather, "must award 23086 Lông Vũ");
+    assert_eq!(session.texp, 15000, "must award 10,000 EXP (5,000 -> 15,000)");
+
+    // 3. Verify QuestStep(218) reset to 0
+    let quest_step = session.quest_tasks.get(&218).map(|&(_, s)| s);
+    assert_eq!(quest_step, Some(0), "QuestStep(218) must be reset to 0");
+
+    // 4. Verify relocated back to lobby map 12001
+    assert_eq!(session.map_id, 12001, "must warp to lobby map 12001");
+    assert_eq!(session.map_x, 400);
+    assert_eq!(session.map_y, 400);
+
+    // 5. Verify frames emitted: dump_homdo, relocate packet, 14 07, sys_msg_frame
+    assert!(frames.iter().any(|f| f.starts_with("F444") && f.contains("1407")));
+    assert!(frames.iter().any(|f| f.contains(&ts_dream::server::spawn::sys_msg_frame("Chuc mung da vuot qua 40 NPC Loi Dai!"))));
+}
+
+// =========================================================================
+// Ticket 13: Continuous Dungeon 2K & Cửu Thiên Stage Progression & Chest Gating
+// =========================================================================
+
+#[tokio::test]
+async fn test_floor_chest_20001_gating_rejection() {
+    let mut data = GameData::default();
+    data.items.insert(23086, Item { id: 23086, name: b"Feather".to_vec(), ..Default::default() });
+    data.items.insert(26051, Item { id: 26051, name: b"Bean".to_vec(), ..Default::default() });
+    let service = BattleService::default();
+
+    // 1. 2K Floor 12927 requires QuestStep(212) >= 17; test with step 16 -> rejected
+    {
+        let mut conn = Conn::default();
+        conn.session.id = 9001;
+        conn.session.map_id = 12927;
+        conn.session.map_x = 400;
+        conn.session.map_y = 400;
+        conn.session.quest_tasks.insert(212, (0, 16));
+
+        let mut out = HandleOutcome::default();
+        let payload = (20001u16).to_le_bytes();
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out,
+            opcode: 0x14,
+            sub: 1,
+            payload: &payload,
+            decoded: &[],
+            env: ServerEnv::none(),
+        };
+
+        handle_talk(&mut ctx).await;
+        let expected = ts_dream::server::spawn::sys_msg_frame("Chua du dieu kien mo ruong tang nay!");
+        assert!(out.outgoing.iter().any(|f| f == &expected || f.contains(&expected)), "chest must reject opening when step < 17");
+        assert!(conn.session.homdo.is_empty(), "no rewards should be granted");
+    }
+
+    // 2. Cửu Thiên Floor 49965 (Stage 6) requires QuestStep(12309) >= 6; test with step 5 -> rejected
+    {
+        let mut conn = Conn::default();
+        conn.session.id = 9002;
+        conn.session.map_id = 49965;
+        conn.session.map_x = 400;
+        conn.session.map_y = 400;
+        conn.session.quest_tasks.insert(12309, (0, 5));
+
+        let mut out = HandleOutcome::default();
+        let payload = (20001u16).to_le_bytes();
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out,
+            opcode: 0x14,
+            sub: 1,
+            payload: &payload,
+            decoded: &[],
+            env: ServerEnv::none(),
+        };
+
+        handle_talk(&mut ctx).await;
+        let expected = ts_dream::server::spawn::sys_msg_frame("Chua du dieu kien mo ruong tang nay!");
+        assert!(out.outgoing.iter().any(|f| f == &expected || f.contains(&expected)), "chest must reject opening when step < 6");
+        assert!(conn.session.homdo.is_empty(), "no rewards should be granted");
+    }
+}
+
+#[tokio::test]
+async fn test_2k_deterministic_floor_transition_npc_15313() {
+    let data = GameData::default();
+    let service = BattleService::default();
+
+    // 1. Out-of-order attempt (step mismatch) -> rejected
+    {
+        let mut conn = Conn::default();
+        conn.session.id = 9101;
+        conn.session.map_id = 12911; // Stage 1
+        conn.session.map_x = 400;
+        conn.session.map_y = 400;
+        conn.session.quest_tasks.insert(212, (0, 0)); // Mismatch (expected 1)
+
+        let mut out = HandleOutcome::default();
+        let payload = (15313u16).to_le_bytes();
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out,
+            opcode: 0x14,
+            sub: 1,
+            payload: &payload,
+            decoded: &[],
+            env: ServerEnv::none(),
+        };
+
+        handle_talk(&mut ctx).await;
+        assert_eq!(conn.session.map_id, 12911, "must remain on map 12911 on mismatch");
+        let expected = ts_dream::server::spawn::sys_msg_frame("Chua hoan thanh thu thach tang nay!");
+        assert!(out.outgoing.iter().any(|f| f == &expected || f.contains(&expected)));
+    }
+
+    // 2. Successful floor transition with party members
+    {
+        let mut conn = Conn::default();
+        conn.session.id = 9102;
+        conn.session.id_leader = 9102;
+        conn.session.map_id = 12911;
+        conn.session.map_x = 400;
+        conn.session.map_y = 400;
+        conn.session.quest_tasks.insert(212, (0, 1)); // Matches Stage 1
+        conn.session.id_mem = [9102, 9103, 0, 0];
+
+        let mut member_sess = Session::default();
+        member_sess.id = 9103;
+        member_sess.map_id = 12911;
+        member_sess.map_x = 400;
+        member_sess.map_y = 400;
+        member_sess.id_leader = 9102;
+        member_sess.quest_tasks.insert(212, (0, 1));
+
+        ts_dream::server::session::registry_register_for_login(&conn.session);
+        ts_dream::server::session::registry_register_for_login(&member_sess);
+
+        let mut out = HandleOutcome::default();
+        let payload = (15313u16).to_le_bytes();
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out,
+            opcode: 0x14,
+            sub: 1,
+            payload: &payload,
+            decoded: &[],
+            env: ServerEnv::none(),
+        };
+
+        handle_talk(&mut ctx).await;
+
+        // Leader warped to 12912 and quest step incremented to 2
+        assert_eq!(conn.session.map_id, 12912, "leader must warp to next floor 12912");
+        assert_eq!(conn.session.quest_tasks.get(&212).map(|&(_, s)| s), Some(2), "leader step must advance to 2");
+
+        // Party member warped to 12912 and quest step incremented to 2
+        {
+            let online = lock_online_sessions();
+            let mem = online.get(&9103).expect("member online");
+            assert_eq!(mem.map_id, 12912, "member must warp to next floor 12912");
+            assert_eq!(mem.quest_tasks.get(&212).map(|&(_, s)| s), Some(2), "member step must advance to 2");
+        }
+
+        let mut online = lock_online_sessions();
+        online.remove(&9102);
+        online.remove(&9103);
+    }
+}
+
+#[tokio::test]
+async fn test_cuu_thien_deterministic_floor_transition_npc_61210() {
+    let data = GameData::default();
+    let service = BattleService::default();
+
+    // 1. Out-of-order attempt (step mismatch) -> rejected
+    {
+        let mut conn = Conn::default();
+        conn.session.id = 9201;
+        conn.session.map_id = 49960; // Stage 1
+        conn.session.map_x = 400;
+        conn.session.map_y = 400;
+        conn.session.quest_tasks.insert(12309, (0, 0)); // Mismatch
+
+        let mut out = HandleOutcome::default();
+        let payload = (61210u16).to_le_bytes();
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out,
+            opcode: 0x14,
+            sub: 1,
+            payload: &payload,
+            decoded: &[],
+            env: ServerEnv::none(),
+        };
+
+        handle_talk(&mut ctx).await;
+        assert_eq!(conn.session.map_id, 49960, "must remain on map 49960 on mismatch");
+        let expected = ts_dream::server::spawn::sys_msg_frame("Chua hoan thanh thu thach tang nay!");
+        assert!(out.outgoing.iter().any(|f| f == &expected || f.contains(&expected)));
+    }
+
+    // 2. Successful floor transition
+    {
+        let mut conn = Conn::default();
+        conn.session.id = 9202;
+        conn.session.map_id = 49960; // Stage 1
+        conn.session.map_x = 400;
+        conn.session.map_y = 400;
+        conn.session.quest_tasks.insert(12309, (0, 1)); // Matches Stage 1
+        ts_dream::server::session::registry_register_for_login(&conn.session);
+
+        let mut out = HandleOutcome::default();
+        let payload = (61210u16).to_le_bytes();
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out,
+            opcode: 0x14,
+            sub: 1,
+            payload: &payload,
+            decoded: &[],
+            env: ServerEnv::none(),
+        };
+
+        handle_talk(&mut ctx).await;
+        assert_eq!(conn.session.map_id, 49961, "must warp to next floor 49961");
+        assert_eq!(conn.session.quest_tasks.get(&12309).map(|&(_, s)| s), Some(2), "step must advance to 2");
+
+        lock_online_sessions().remove(&9202);
+    }
+}
+
+#[test]
+fn test_dungeon_eve_emg_scene_resolution_priority() {
+    let mut data = GameData::default();
+    let mut scene = ts_dream::data::loaders::SceneEveData::default();
+
+    let mut npc_eve = ts_dream::data::loaders::EveNpcPlacement::default();
+    npc_eve.id = 15313;
+    npc_eve.npc_id = 15313;
+    npc_eve.x = 400;
+    npc_eve.y = 400;
+    npc_eve.events = vec![1];
+    scene.npcs.insert(15313, npc_eve);
+
+    let condition = ts_dream::data::loaders::EveCondition {
+        condition_no: 1,
+        condition_class: 0,
+        results: vec![ts_dream::data::loaders::EveResult {
+            result_no: 1,
+            result_type: 1,
+            parameter: 100,
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+
+    scene.npc_events.insert(1, ts_dream::data::loaders::NpcEventData {
+        eve_no: 1,
+        when_happen: [true, false, false, false],
+        conditions: vec![condition],
+    });
+
+    data.scene_eve_data.insert(12911, scene);
+
+    let session = Session {
+        id: 9301,
+        map_id: 12911,
+        map_x: 400,
+        map_y: 400,
+        ..Default::default()
+    };
+
+    let mut rng = ts_dream::battle::rng::DotNetRandom::new(12345);
+    // On dungeon maps, resolve_npc_event succeeds even when global TS_EVE_EVENTS is unset
+    let resolved = ts_dream::server::handlers::npc_event::resolve_npc_event(
+        &session,
+        &data,
+        ts_dream::server::handlers::npc_event::NpcTrigger::ClickNpc(15313),
+        &mut rng,
+    );
+    assert!(resolved.is_some(), "dungeon maps must resolve through Eve engine when scene_eve_data is present");
 }

@@ -282,7 +282,7 @@ impl ServerControl {
         // 1. S->C 10 02 02 Failure dialog
         self.send_to(leader_id, &res.result_frame).await;
         // 2. Leader HP = 1
-        self.send_to(leader_id, &crate::battle::packets::status_update(1, 1)).await;
+        self.send_to(leader_id, &crate::battle::packets::status_update(0x19, 1)).await;
         // 3. S->C 18 08 [playerId][01 00][01]
         self.send_to(leader_id, &crate::server::spawn::state_sync_frame(leader_id, 1, 1)).await;
         // 4. battle_trailer
@@ -324,9 +324,16 @@ impl ServerControl {
         if let Some(pool) = self.pool.as_ref() {
             let mut dummy = crate::server::session::Session::default();
             dummy.id = leader_id;
+            dummy.db_character_id = res.db_character_id;
             dummy.hp = 1;
             dummy.ghost = 1;
             let _ = crate::db::persist::persist_sessions_transaction(Some(pool), &[&dummy], &["hp", "ghost"]).await;
+            if res.db_character_id > 0 {
+                let _ = sqlx::query("UPDATE characters SET curhp = 1, ghost = 1 WHERE playerid = ?")
+                    .bind(res.db_character_id)
+                    .execute(&pool.write)
+                    .await;
+            }
         }
     }
 

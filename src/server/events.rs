@@ -85,6 +85,7 @@ pub struct NorthStarQuestion {
 pub struct ActiveQuiz {
     pub battle_id: i32,
     pub leader_id: u32,
+    pub db_character_id: i64,
     pub question: NorthStarQuestion,
     pub started_at: Instant,
     pub timeout: Duration,
@@ -95,6 +96,7 @@ pub struct ActiveQuiz {
 pub struct QuizAnswerResult {
     pub battle_id: i32,
     pub leader_id: u32,
+    pub db_character_id: i64,
     pub is_correct: bool,
     pub result_frame: String,
 }
@@ -143,6 +145,7 @@ pub struct EventLifecycleManager {
     active_quizzes: Arc<RwLock<HashMap<i32, ActiveQuiz>>>,
     player_to_battle: Arc<RwLock<HashMap<u32, i32>>>,
     question_bank: Arc<Vec<NorthStarQuestion>>,
+    north_star_allowed_maps: Arc<RwLock<Vec<u16>>>,
     default_quiz_timeout: Duration,
     max_active_duration: Duration,
 }
@@ -192,6 +195,7 @@ impl EventLifecycleManager {
             } else {
                 questions
             }),
+            north_star_allowed_maps: Arc::new(RwLock::new(Vec::new())),
             default_quiz_timeout: Duration::from_secs(45),
             max_active_duration: Duration::from_secs(120 * 60), // 120 minutes ceiling
         }
@@ -332,6 +336,39 @@ impl EventLifecycleManager {
             if let Some(event) = events.get_mut(EVENT_NORTH_STAR) {
                 event.encounter_rate = clamped;
             }
+        }
+    }
+
+    /// Set North Star allowed map scope.
+    pub fn set_north_star_maps(&self, maps: Vec<u16>) {
+        if let Ok(mut allowed) = self.north_star_allowed_maps.write() {
+            *allowed = maps;
+        }
+    }
+
+    /// Get current North Star allowed map scope.
+    pub fn get_north_star_maps(&self) -> Vec<u16> {
+        self.north_star_allowed_maps
+            .read()
+            .map(|m| m.clone())
+            .unwrap_or_default()
+    }
+
+    /// Check if North Star encounter is allowed on map `map_id`.
+    /// Excludes special dungeon and event maps (10851..=10852, 12911..=12928, 49960..=49969, 60510..=60521).
+    /// If allowlist is non-empty, requires map_id to be in allowlist.
+    pub fn is_north_star_map_allowed(&self, map_id: u16) -> bool {
+        if matches!(
+            map_id,
+            10851..=10852 | 12911..=12928 | 49960..=49969 | 60510..=60521
+        ) {
+            return false;
+        }
+        let allowed = self.get_north_star_maps();
+        if allowed.is_empty() {
+            true
+        } else {
+            allowed.contains(&map_id)
         }
     }
 
@@ -550,6 +587,11 @@ impl EventLifecycleManager {
         leader_id: u32,
         custom_question: Option<NorthStarQuestion>,
     ) -> (NorthStarQuestion, String) {
+        let db_character_id = crate::server::session::lock_online_sessions()
+            .get(&leader_id)
+            .map(|s| s.db_character_id)
+            .unwrap_or(leader_id as i64);
+
         let question = match custom_question {
             Some(q) => q,
             None => {
@@ -568,6 +610,7 @@ impl EventLifecycleManager {
         let active = ActiveQuiz {
             battle_id,
             leader_id,
+            db_character_id,
             question: question.clone(),
             started_at: Instant::now(),
             timeout: self.default_quiz_timeout,
@@ -594,6 +637,7 @@ impl EventLifecycleManager {
         Some(QuizAnswerResult {
             battle_id,
             leader_id,
+            db_character_id: quiz.db_character_id,
             is_correct,
             result_frame,
         })
@@ -612,6 +656,7 @@ impl EventLifecycleManager {
             Some(QuizAnswerResult {
                 battle_id,
                 leader_id: quiz.leader_id,
+                db_character_id: quiz.db_character_id,
                 is_correct: false,
                 result_frame: "F4440300100202".to_string(),
             })

@@ -207,7 +207,8 @@ pub fn resolve_npc_event(
     trigger: NpcTrigger,
     rng: &mut DotNetRandom,
 ) -> Option<EventSession> {
-    if !eve_events_enabled() {
+    let is_dungeon_event_map = matches!(session.map_id, 12911..=12928 | 49960..=49969);
+    if !eve_events_enabled() && !is_dungeon_event_map {
         return None;
     }
     let scene = scene_for(data, session.map_id)?;
