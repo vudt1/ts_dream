@@ -386,3 +386,29 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 - **Ràng buộc (Invariants)**:
   - Khởi tạo qua `S→C 17 64` khi vào bản đồ Thủy Chiến (cấp đạn dược thủy chiến mặc định để khai hỏa Hải Pháo `0x40 0x01`) và xóa sạch hoàn toàn qua `S→C 17 65` khi rời Thủy Chiến hoặc khi sự kiện dừng khẩn cấp.
   - Tách biệt hoàn toàn với 5 Container Vật phẩm vĩnh viễn của Nhân vật; không bao giờ lưu trữ lâu dài sang túi đồ thường.
+
+### Kịch bản Eve (Eve Script Engine — `Data/eve.emg`)
+- **Định nghĩa**: Hệ thống sự kiện và nhiệm vụ chính thống duy nhất của game (`Data/eve.emg`, `3,901` bản đồ/scene), điều khiển hội thoại NPC (`ClickNpc`), cửa chuyển cảnh (`ClickDoor` / `MeetDoor`), menu lựa chọn (`Surface`), chuỗi tự nối (`AutoChain`) và trận chiến nhiệm vụ qua `0x14` / `0x18` / `0x0B` / `0x0C`.
+- **Ràng buộc (Invariants)**:
+  - **Single Source of Truth**: `Data/eve.emg` là nguồn sự thật duy nhất (bật mặc định ở production); mọi file `.ini` quest legacy không được ghi đè lên kịch bản Eve.
+  - **Định danh theo Scene (`scene_id`, `eve_no`)**: Chỉ số `eve_no` và bộ đếm hoàn thành (`character_completed_events`) mang phạm vi cục bộ trong từng `scene_id`, tuyệt đối không đánh khóa toàn cục theo `eventid`.
+  - **Định dạng nhị phân `eve.emg`**: Phần `FightData` dùng `win_cond = 13` byte và `fight_limit = 0` byte (không có trường `u32`); mỗi bản ghi `EveResult` trong `eve.emg` dài `14` byte (wire `0x14 01` chèn thêm byte padding khi gửi).
+  - **Fail-closed với mã chưa giải mã**: Mọi `condition_class`, `result_type`, `result_class` chưa hỗ trợ bắt buộc đánh giá `false` / bỏ qua có ghi log telemetry; cấm rơi về `0 == 0 -> true`.
+- **Tránh dùng các từ mơ hồ**: *Data_Talks*, *Quest INI override* (không còn là nguồn chuẩn).
+
+### Nhật ký Nhiệm vụ (Quest Ledger — Opcode `0x18`) & Cờ Bit `Mark.dat`
+- **Định nghĩa**: Hệ thống đồng bộ trạng thái nhiệm vụ hai lớp của Client (`LocalActor`), hoàn toàn tách biệt với 5 Container Vật phẩm:
+  1. **Danh sách Nhiệm vụ Đang làm (Active Quest Log — `0x18 Sub 01/02/04/06`)**: Mảng 200 ô (`slot 1..=200`) tại `LocalActor + 0x654`, mỗi ô lưu `{quest_id: u16, mark_step: u8}` với `quest_id` tra cứu từ **`Data/Mark.dat`** (`10001..12461`), **không** tra cứu `Item.dat`.
+  2. **Mảng Bit Cờ Hoàn thành (`quest_dont` — `0x18 Sub 05/07`)**: Mảng 300 byte bitmask (`2,400` bit) tại `LocalActor + 0x8b2`, ánh xạ theo trường `position` (`bit_id 1..=2400`) trong `Mark.dat`.
+- **Ràng buộc (Invariants)**:
+  - **Không tồn tại túi vật phẩm `0x18` (`quest_items`)**: 100% vật phẩm `Item.dat` (bao gồm đạo cụ nhiệm vụ từ `result_class = 1`) đều đi qua `homdo` (`0x17`, 25 ô) với kiểm tra All-or-Nothing trước khi thực thi. Trên `0x14 01`, `result_type=0, result_class=1` chỉ hiển thị toast từ `Item.dat`, không thêm đồ vào túi.
+  - **Bit-packing `0x18 05` vs `0x18 07`**: `S→C 0x18 05` mang `bit_id` (`1..=2400`) để client bật/tắt bit `(bit_id - 1) % 8` tại byte `(bit_id - 1) / 8 + 1`; `S→C 0x18 07` gửi hàng loạt `[byte_idx (1..=300): u16][bitmask: u8]`. Cờ `quest_dont` chỉ được đánh dấu khi nhiệm vụ hoàn tất thực sự (hoặc lệnh đánh dấu tường minh), không đánh dấu ở bước trung gian.
+  - **Toàn vẹn ô 1..200**: Cấp phát slot từ `quest_sync` (`1..=200`), tuyệt đối cấm dùng `slot = 0`. Khi đủ 200 ô thì từ chối All-or-Nothing và phát `S→C 0x18 03`.
+  - **Chặn tuyệt đối `C→S 0x18 01/02`**: Gói này sinh từ form debug/dev `TMissionForm`; server từ chối hoàn toàn đối với mọi tài khoản kể cả GM.
+- **Tránh dùng các từ mơ hồ**: *Kho vật phẩm nhiệm vụ (`quest_items`)*, *Túi quest 200 ô* (dễ gây nhầm với `homdo 0x17`).
+
+### Giao diện Lựa chọn Eve (`0x14 Surface`) vs Vấn đáp Tinh quân (`0x10 Quiz`)
+- **Định nghĩa**: Hai cơ chế hiển thị lựa chọn độc lập trên client:
+  - **`0x14 Surface` (`result_type = 6`, chọn qua `C→S 0x14 09`)**: Bảng nút chọn hoặc lưới `TInterForm` nằm trong chuỗi hội thoại Eve (bao gồm cả các nhiệm vụ vấn đáp như Giản Ung / Tống Nhân). Handler `0x14 09` bắt buộc lọc chain bằng `ConditionClass::DialogChoice(surface_id, choice_code)`.
+  - **`0x10 Quiz` (`TAC_Question` / `TKC_Question`)**: Khung câu hỏi trắc nghiệm đếm ngược 45 giây của sự kiện dã ngoại (như Vấn Đáp Bắc Tinh Quân).
+- **Tránh dùng các từ mơ hồ**: Gọi chung là *Quiz* hoặc *Menu* mà không phân biệt kênh `0x14` hay `0x10`.
