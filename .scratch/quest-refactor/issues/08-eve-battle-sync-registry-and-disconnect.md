@@ -6,7 +6,7 @@
 
 **Status:** ready-for-agent
 
-- [ ] Khởi tạo trận chiến Eve nạp đầy đủ `EveFightData` (`left` + `right_enemies`, `fight_type`, terrain/`DiaHinh` từ scene info hoặc fallback); đảm bảo giao diện hội thoại đang mở được đóng/mở khóa sạch trước khi chuyển vào trận.
+- [ ] Khởi tạo trận chiến Eve nạp đầy đủ `EveFightData` (`left` + `right_enemies`, `fight_type`, terrain từ `SceneInfo.background_no` hoặc fallback `112` — đã xác nhận `aLogin.exe` không đọc `.ini` hay `[TEAMDEF] Diahinh`, chỉ tra `TFight.BKMusic` và đọc `TWinCondition.wc_type ∈ {3,4,8}` cho UI `[alt+W]`, còn logic trận đấu là 100% server-only); đảm bảo giao diện hội thoại đang mở được đóng/mở khóa sạch trước khi chuyển vào trận.
 - [ ] Trong `BattleService::battle_ended`: thu thập ID người tham gia đã sắp xếp và giữ `lock_player_operations` trước khi đụng session; thực thi nhánh thắng/thua/chạy (`resume_eve_after_battle` / `battle_quest_win` / `quest_lose_frames`), gọi `registry_update_if_online` cho mọi người chơi còn online, và làm mới session handle trong `register_sender`.
 - [ ] Bảo toàn và phát đầy đủ `direct_messages` lẫn `map_broadcast` từ `resume_eve_after_battle`, đồng thời kích hoạt write-through SQLite nguyên tử ngay tại checkpoint `Battle End` (cả thắng, thua và chạy).
 - [ ] Xử lý ngắt kết nối giữa trận Eve: khi trận đấu kết thúc mà người chơi đã offline, `battle_ended` vẫn chạy đầy đủ `resume_eve_after_battle` (theo kết quả thắng/thua/chạy) và ghi kết quả trực tiếp xuống SQLite cho tài khoản offline đó.

@@ -17,6 +17,7 @@ use ts_dream::db::pool::{bootstrap, DbPool};
 pub const TEST_DB_URL_ENV: &str = "TS_TEST_DB_URL";
 
 const SCHEMA: &str = include_str!("../../migrations/0001_init.sql");
+const MIGRATION_0002: &str = include_str!("../../migrations/0002_eve_quest_persistence.sql");
 
 fn db_lock() -> Arc<Mutex<()>> {
     static LOCK: OnceLock<Arc<Mutex<()>>> = OnceLock::new();
@@ -95,4 +96,9 @@ async fn reset_schema(pool: &DbPool) {
         .execute(&pool.write)
         .await
         .expect("execute 0001_init.sql migration");
+
+    sqlx::raw_sql(MIGRATION_0002)
+        .execute(&pool.write)
+        .await
+        .expect("execute 0002_eve_quest_persistence.sql migration");
 }

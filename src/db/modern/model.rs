@@ -105,8 +105,9 @@ impl StorageType {
 }
 
 /// General (vo tuong) storage selector (`character_pets.storage_type`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum PetStorageType {
+    #[default]
     Carried = 1,
     Cart = 2,
     Hotel = 3,

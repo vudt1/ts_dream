@@ -28,6 +28,21 @@ pub struct ChainResolveResult {
 /// passes (e.g. "chain must contain conditionClass=8" after a battle).
 pub type ChainFilter<'a> = &'a dyn Fn(&[EveCondition]) -> bool;
 
+/// Returns `true` if `chain` contains a `conditionClass=10` (DialogChoice)
+/// condition matching `(surface_id, choice_code)`.
+#[must_use]
+pub fn chain_has_dialog_choice(
+    chain: &[EveCondition],
+    surface_id: i32,
+    choice_code: i32,
+) -> bool {
+    chain.iter().any(|c| {
+        c.condition_class == 10
+            && i32::from(c.condition_parameter) == surface_id
+            && i32::from(c.condition_parameter_style) == choice_code
+    })
+}
+
 /// Group a condition list into AND chains.
 ///
 /// `andNum` is the total length of the chain including the leading condition:

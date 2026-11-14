@@ -44,14 +44,35 @@ pub fn fingerprint(s: &Session) -> u64 {
     mix(&mut h, u64::from(s.gold));
     mix(&mut h, u64::from(s.bank_gold));
     mix(&mut h, u64::from(s.hp));
+    mix(&mut h, u64::from(s.hp_max));
     mix(&mut h, u64::from(s.sp));
+    mix(&mut h, u64::from(s.sp_max));
     mix(&mut h, u64::from(s.texp));
     mix(&mut h, u64::from(s.level));
+    mix(&mut h, u64::from(s.job));
+    mix(&mut h, u64::from(s.sex));
+    mix(&mut h, u64::from(s.hair));
+    mix(&mut h, u64::from(s.thuoctinh));
+    mix(&mut h, u64::from(s.reborn));
     mix(&mut h, u64::from(s.point));
     mix(&mut h, u64::from(s.skill_point));
+    mix(&mut h, u64::from(s.int1));
+    mix(&mut h, u64::from(s.atk));
+    mix(&mut h, u64::from(s.def));
+    mix(&mut h, u64::from(s.hpx));
+    mix(&mut h, u64::from(s.spx));
+    mix(&mut h, u64::from(s.agi));
+    mix(&mut h, u64::from(s.tiengtam));
+    mix(&mut h, u64::from(s.pk));
+    mix(&mut h, u64::from(s.newbie));
+    mix(&mut h, u64::from(s.ghost));
     mix(&mut h, u64::from(s.god));
+    mix(&mut h, u64::from(s.guild_id));
     mix(&mut h, u64::from(s.shop_point));
     mix(&mut h, u64::from(s.savemap));
+    mix(&mut h, u64::from(s.savemap_x));
+    mix(&mut h, u64::from(s.savemap_y));
+    mix(&mut h, u64::from(s.active_pet_stt));
     for (stype, container) in s.containers() {
         mix_i64(&mut h, i64::from(stype as u8));
         for item in container {
@@ -72,22 +93,47 @@ pub fn fingerprint(s: &Session) -> u64 {
         if pet.id == 0 {
             continue;
         }
+        mix_i64(&mut h, i64::from(pet.storage_type.value()));
         mix_i64(&mut h, i64::from(pet.stt));
         mix_i64(&mut h, i64::from(pet.id));
+        for &b in &pet.name {
+            mix(&mut h, u64::from(b));
+        }
         mix_i64(&mut h, i64::from(pet.level));
-        mix(&mut h, u64::from(pet.hp));
-        mix(&mut h, u64::from(pet.texp));
+        mix_i64(&mut h, i64::from(pet.thuoctinh));
         mix_i64(&mut h, i64::from(pet.reborn));
+        mix(&mut h, u64::from(pet.hp));
+        mix(&mut h, u64::from(pet.hp_max));
+        mix(&mut h, u64::from(pet.sp));
+        mix(&mut h, u64::from(pet.sp_max));
+        mix(&mut h, u64::from(pet.int1));
+        mix(&mut h, u64::from(pet.atk));
+        mix(&mut h, u64::from(pet.def));
+        mix(&mut h, u64::from(pet.hpx));
+        mix(&mut h, u64::from(pet.spx));
+        mix(&mut h, u64::from(pet.agi));
+        mix(&mut h, u64::from(pet.fai));
+        mix(&mut h, u64::from(pet.thd));
+        mix(&mut h, u64::from(pet.texp));
+        mix(&mut h, u64::from(pet.skill_point));
+        mix(&mut h, u64::from(pet.quest));
+        for &(skill_id, skill_lv) in &pet.skills {
+            mix(&mut h, u64::from(skill_id));
+            mix(&mut h, u64::from(skill_lv));
+        }
     }
     for skill in &s.skills {
         mix_i64(&mut h, i64::from(skill.0));
         mix_i64(&mut h, i64::from(skill.1));
     }
-    for (npc, step) in &s.quest_steps {
-        mix_i64(&mut h, *npc);
-        mix_i64(&mut h, *step);
+    for (slot, entry) in s.hotkeys.iter().enumerate().skip(1) {
+        if entry.kind > 0 && entry.id > 0 {
+            mix(&mut h, slot as u64);
+            mix(&mut h, u64::from(entry.kind));
+            mix(&mut h, u64::from(entry.id));
+        }
     }
-    // CP6: Eve/quest-log state persisted by `save_eve_state`. HashMap/HashSet
+    // Eve/quest-log state persisted by `save_eve_state_tx`. HashMap/HashSet
     // iteration order is unstable, so every collection is sorted by key first
     // — otherwise an unchanged session would fingerprint differently every pass.
     let mut quest_tasks: Vec<(u16, (u8, u8))> =
@@ -103,20 +149,19 @@ pub fn fingerprint(s: &Session) -> u64 {
     for mark in quest_dont {
         mix_i64(&mut h, i64::from(mark));
     }
-    let mut quest_items = s.quest_items.clone();
-    quest_items.sort_by_key(|item| item.slot);
-    for item in quest_items.iter().filter(|i| i.id > 0) {
-        mix_i64(&mut h, i64::from(item.slot));
-        mix_i64(&mut h, i64::from(item.id));
-        mix_i64(&mut h, i64::from(item.count));
+    let mut bit_flags: Vec<u32> = s.bit_flags.iter().copied().collect();
+    bit_flags.sort_unstable();
+    for flag in bit_flags {
+        mix(&mut h, u64::from(flag));
     }
-    let mut eve_counts: Vec<(i32, i32)> = s
+    let mut eve_counts: Vec<((u16, i32), i32)> = s
         .completed_eve_counts
         .iter()
-        .map(|(&eve_no, &count)| (eve_no, count))
+        .map(|(&key, &count)| (key, count))
         .collect();
     eve_counts.sort_unstable();
-    for (eve_no, count) in eve_counts {
+    for ((scene_id, eve_no), count) in eve_counts {
+        mix(&mut h, u64::from(scene_id));
         mix_i64(&mut h, i64::from(eve_no));
         mix_i64(&mut h, i64::from(count));
     }

@@ -242,7 +242,7 @@ async fn test_movement_triggers_random_encounter_for_party() {
             },
         ],
         right_enemies: Vec::new(),
-        fight_limit: 0,
+        bk_music: 0,
     };
     scene.fight_datas.insert(501, fight);
 
@@ -411,7 +411,7 @@ async fn test_party_member_concurrency_lock_retry() {
             ai: 0,
         }],
         right_enemies: Vec::new(),
-        fight_limit: 0,
+        bk_music: 0,
     };
 
     let service = BattleService::new(Arc::new(data.clone()));
@@ -532,7 +532,7 @@ async fn test_player_flee_synchronization_and_cooldown() {
             ai: 0,
         }],
         right_enemies: Vec::new(),
-        fight_limit: 0,
+        bk_music: 0,
     };
 
     let mut service = BattleService::new(Arc::new(data.clone()));
@@ -688,7 +688,7 @@ async fn test_party_member_individual_flee() {
             ai: 0,
         }],
         right_enemies: Vec::new(),
-        fight_limit: 0,
+        bk_music: 0,
     };
 
     let mut service = BattleService::new(Arc::new(data.clone()));
@@ -859,7 +859,7 @@ async fn test_battle_rewards_and_drops_synchronize_to_online_sessions() {
             },
         ],
         right_enemies: Vec::new(),
-        fight_limit: 0,
+        bk_music: 0,
     };
 
     let mut service = BattleService::new(Arc::new(data));
@@ -1068,7 +1068,7 @@ async fn test_party_member_already_in_battle_not_pulled_into_new_encounter() {
             ai: 0,
         }],
         right_enemies: Vec::new(),
-        fight_limit: 0,
+        bk_music: 0,
     };
 
     let service = BattleService::new(Arc::new(data));

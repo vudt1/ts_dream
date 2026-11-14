@@ -369,7 +369,11 @@ pub async fn try_handle_event_npc(
                             mem.map_id = next_map;
                             mem.map_x = 400;
                             mem.map_y = 400;
-                            mem.quest_tasks.insert(212, (0, next_step));
+                            let _ = crate::server::handlers::quest_sync::upsert_quest_task_slot(
+                                mem,
+                                212,
+                                next_step,
+                            );
                             m_old
                         } else {
                             old_map
@@ -443,7 +447,11 @@ pub async fn try_handle_event_npc(
                             mem.map_id = next_map;
                             mem.map_x = 400;
                             mem.map_y = 400;
-                            mem.quest_tasks.insert(12309, (0, next_step));
+                            let _ = crate::server::handlers::quest_sync::upsert_quest_task_slot(
+                                mem,
+                                12309,
+                                next_step,
+                            );
                             m_old
                         } else {
                             old_map
@@ -562,7 +570,7 @@ pub fn resolve_40_npc_victory(session: &mut crate::server::session::Session, dat
     session.texp = session.texp.saturating_add(10_000);
 
     // 2. Reset QuestStep(218 = 0)
-    session.quest_tasks.insert(218, (0, 0));
+    let _ = crate::server::handlers::quest_sync::upsert_quest_task_slot(session, 218, 0);
 
     // 3. Warp back to lobby map 12001
     let _old_map = session.map_id;

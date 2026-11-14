@@ -213,14 +213,20 @@ impl EveAutoChainEngine {
     }
 
     /// Guard #4: the new queue hands out an item the completed one already
-    /// granted (`resultClass=1 pStyle=1`).
+    /// granted (`resultType=0 resultClass=1 pStyle in {0, 1} result_value > 0`).
+    /// Negative `result_value` (item take/deduction) is excluded.
     #[must_use]
     pub fn detect_duplicate_items(new_session: &EventSession, completed: &EventSession) -> bool {
         let give_items =
             |results: &[crate::data::loaders::EveResult]| -> std::collections::HashSet<u16> {
                 results
                     .iter()
-                    .filter(|r| r.result_class == 1 && r.parameter_style == 1)
+                    .filter(|r| {
+                        r.result_type == 0
+                            && r.result_class == 1
+                            && matches!(r.parameter_style, 0 | 1)
+                            && r.result_value > 0
+                    })
                     .map(|r| r.parameter)
                     .collect()
             };

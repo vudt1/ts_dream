@@ -35,17 +35,18 @@ fn reset_talk_context(session: &mut Session) {
     session.select_menu = 0;
     session.talk_count = 0;
     session.warp_finish = false;
+    session.talk_locked = false;
     session.current_event_session = None;
 }
 
 /// EndTalk packet + reset the whole talk context, over a bare [`Session`].
 ///
-/// When an Eve event session is active the client expects the actor-unlock
-/// frame (`0x14 Sub 0x2C`, mode 0x02) before the close-dialog frame
+/// When an Eve event session or talk lock is active the client expects the
+/// actor-unlock frame (`0x14 Sub 0x2C`, mode 0x02) before the close-dialog frame
 /// (Bear `processStep` end-of-chain order). Legacy talk paths keep the
 /// bare `F44402001408` for golden parity.
 pub fn end_talk_session(session: &mut Session, out: &mut HandleOutcome) {
-    if session.current_event_session.is_some() {
+    if session.current_event_session.is_some() || session.talk_locked {
         let char_id = session.id;
         out.send(NpcTalkCodec::build_talk_lock_hex(char_id, TalkLockMode::Unlock));
     }
@@ -156,6 +157,106 @@ fn resolve_npc(data: &GameData, conn: &Conn, map_object_id: i32) -> Option<(i32,
 ///
 /// Takes `&mut Session` (not `&mut Conn`) because the post-battle resume in
 /// `battle::service::battle_ended` reaches it through a session guard only.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PreFlightError {
+    HomdoFull { item_id: u16 },
+    QuestLedgerFull { quest_id: u16 },
+}
+
+/// All-or-Nothing pre-flight probe over the contiguous non-blocking
+/// `DomainEffect` batch starting at `effects[0]`.
+///
+/// Simulates `homdo (0x17)` item mutations (both deductions and additions) and
+/// `Quest Ledger (0x18)` 200-slot allocations on cloned scratch state before any
+/// real mutation occurs.
+fn preflight_probe_batch(
+    session: &Session,
+    data: &GameData,
+    effects: &[crate::eve::planner::DomainEffect],
+) -> Result<(), PreFlightError> {
+    use crate::eve::planner::DomainEffect;
+
+    let mut trial_homdo = session.homdo.clone();
+    let mut trial_quests = session.quest_tasks.clone();
+
+    for effect in effects {
+        if effect.is_blocking_or_terminal() {
+            break;
+        }
+        match effect {
+            DomainEffect::MutateItem {
+                item_id,
+                p_style: _,
+                delta,
+            } => {
+                if *delta < 0 {
+                    crate::server::inventory::remove_item(
+                        &mut trial_homdo,
+                        *item_id,
+                        delta.unsigned_abs(),
+                    );
+                } else if *delta > 0 {
+                    let mut rem = *delta as u32;
+                    while rem > 0 {
+                        let chunk = rem.min(crate::server::inventory::STACK_CAP as u32) as u8;
+                        let item = crate::server::inventory::from_template(data, *item_id, chunk);
+                        if !crate::server::inventory::can_add_item(&trial_homdo, &item) {
+                            return Err(PreFlightError::HomdoFull { item_id: *item_id });
+                        }
+                        crate::server::inventory::add_item(&mut trial_homdo, item);
+                        rem -= u32::from(chunk);
+                    }
+                }
+            }
+            DomainEffect::UpdateQuest {
+                quest_id,
+                p_style,
+                result_value,
+            } => {
+                if *p_style == 3 && *result_value == 0 {
+                    trial_quests.remove(quest_id);
+                } else if ((*p_style == 1 && *result_value >= 0) || matches!(*p_style, 2 | 4))
+                    && *quest_id != 0
+                {
+                    if !trial_quests.contains_key(quest_id) {
+                        let used: std::collections::HashSet<u8> = trial_quests
+                            .values()
+                            .map(|(s, _)| *s)
+                            .filter(|&s| (1..=crate::server::handlers::quest_sync::QUEST_SLOT_MAX).contains(&s))
+                            .collect();
+                        let Some(free_slot) = (1..=crate::server::handlers::quest_sync::QUEST_SLOT_MAX)
+                            .find(|s| !used.contains(s))
+                        else {
+                            return Err(PreFlightError::QuestLedgerFull {
+                                quest_id: *quest_id,
+                            });
+                        };
+                        trial_quests.insert(*quest_id, (free_slot, 1));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+fn emit_preflight_rejection(session: &mut Session, out: &mut HandleOutcome, err: PreFlightError) {
+    match err {
+        PreFlightError::QuestLedgerFull { quest_id } => {
+            tracing::debug!(quest_id, "pre-flight rejected: Quest Ledger (200 slots) full");
+            out.send(crate::protocol::codecs::quest_sync::QuestSyncCodec::build_quest_full_hex());
+        }
+        PreFlightError::HomdoFull { item_id } => {
+            tracing::debug!(item_id, "pre-flight rejected: homdo (25 slots) full");
+            out.send(crate::server::spawn::sys_msg_frame(
+                "Túi đồ đã đầy, không thể nhận thêm vật phẩm.",
+            ));
+        }
+    }
+    end_talk_session(session, out);
+}
+
 #[derive(Debug)]
 pub enum StepOutcome {
     Halt,
@@ -194,73 +295,72 @@ fn apply_skill_reward_to_session(
     crate::server::session::registry_update_if_online(session);
 }
 
-fn process_single_event_result(
+fn process_single_domain_effect(
     session: &mut Session,
     data: &GameData,
     out: &mut HandleOutcome,
-    result: &EveResult,
+    effect: &crate::eve::planner::DomainEffect,
+    raw_result: &EveResult,
 ) -> StepOutcome {
-    match result.result_type {
+    use crate::eve::planner::DomainEffect;
+
+    match effect {
         // Talk: deliver the step and wait for the client's Sub 6.
-        1 => {
-            out.send(NpcTalkCodec::build_talk_step_hex(result));
+        DomainEffect::TalkStep(res) => {
+            out.send(NpcTalkCodec::build_talk_step_hex(res));
             StepOutcome::Halt
         }
         // Surface/menu: remember the surface id (conditionClass=10 key),
         // wait for the client's Sub 9 choice.
-        6 => {
+        DomainEffect::AwaitMenuChoice { surface_id, result } => {
             if let Some(ev) = session.current_event_session.as_mut() {
-                ev.last_surface_id = i32::from(result.result_mean_no);
+                ev.last_surface_id = *surface_id;
                 ev.phase = EventPhase::AwaitingChoice;
             }
             out.send(NpcTalkCodec::build_talk_step_hex(result));
             StepOutcome::Halt
         }
-        // Action: apply non-blocking state changes, keep walking.
-        0 => {
-            if result.result_class == 4 {
-                // EveResultClass::Skill (4): parameter=skill_id, result_value=target_level.
-                let skill_id = result.parameter;
-                let target_level = if result.result_value <= 0 {
-                    1
-                } else {
-                    result.result_value.min(255) as u8
-                };
-                if let Some(skill) = data.skills.get(&i64::from(skill_id)) {
-                    let already_has = session
-                        .skills
-                        .iter()
-                        .any(|(id, lv)| *id == skill_id && *lv >= target_level);
-                    if !already_has {
-                        return StepOutcome::SkillReward {
-                            skill_id,
-                            target_level,
-                            sp: skill.sp.min(255) as u8,
-                            name: skill.name.clone(),
-                        };
-                    }
-                } else {
-                    tracing::warn!(skill_id, "Eve script skill reward references unknown skill");
+        // Skill reward (free of skill_point): persist + sync `08 01 6E`.
+        DomainEffect::LearnSkill {
+            skill_id,
+            target_level,
+        } => {
+            if let Some(skill) = data.skills.get(&i64::from(*skill_id)) {
+                let already_has = session
+                    .skills
+                    .iter()
+                    .any(|(id, lv)| *id == *skill_id && *lv >= *target_level);
+                if !already_has {
+                    return StepOutcome::SkillReward {
+                        skill_id: *skill_id,
+                        target_level: *target_level,
+                        sp: skill.sp.min(255) as u8,
+                        name: skill.name.clone(),
+                    };
                 }
-                StepOutcome::Continue
             } else {
-                execute_action_result_non_skill(session, data, out, result);
-                StepOutcome::Continue
+                tracing::warn!(skill_id, "Eve script skill reward references unknown skill");
             }
+            StepOutcome::Continue
+        }
+        DomainEffect::MutateItem { .. }
+        | DomainEffect::UpdateQuest { .. }
+        | DomainEffect::MutateMoney { .. }
+        | DomainEffect::PlayerEffect { .. } => {
+            execute_action_result_non_skill(session, data, out, raw_result);
+            StepOutcome::Continue
         }
         // Door: relocate to the scripted destination, then finish.
-        2 => {
-            let warp_key = (i64::from(session.map_id), i64::from(result.parameter));
+        DomainEffect::Warp { warp_id } => {
+            let warp_key = (i64::from(session.map_id), i64::from(*warp_id));
             let Some(warp) = data.warps.get(&warp_key) else {
                 tracing::debug!(
                     map_id = session.map_id,
-                    warp_id = result.parameter,
+                    warp_id,
                     "Eve Door result has no Warps.dat row; skipping"
                 );
                 return StepOutcome::Continue;
             };
-            // Party followers cannot relocate on their own (legacy parity
-            // with `handle_warp_confirm`): close the talk instead.
             if session.id_leader > 0 && session.id_leader != session.id {
                 tracing::debug!("Eve Door warp refused: member follows a party leader");
                 end_talk_session(session, out);
@@ -271,13 +371,12 @@ fn process_single_event_result(
             session.current_event_session = None;
             StepOutcome::Halt
         }
-        // Battle: park the session; the connection loop starts the fight
-        // once this outcome's frames have been flushed.
-        3 => {
-            let fight_id = result.result_mean_no;
+        // Battle: cleanly close/unlock any open talk UI first, then park the
+        // session in AwaitingBattle for BattleService.
+        DomainEffect::StartBattle { fight_id } => {
             let scene = data.scene_eve_data.get(&u32::from(session.map_id));
             let has_fight = scene
-                .map(|s| s.fight_datas.contains_key(&fight_id))
+                .map(|s| s.fight_datas.contains_key(fight_id))
                 .unwrap_or(false);
             if !has_fight {
                 tracing::debug!(
@@ -287,6 +386,14 @@ fn process_single_event_result(
                 );
                 return StepOutcome::Continue;
             }
+            if session.talk_locked {
+                out.send(NpcTalkCodec::build_talk_lock_hex(
+                    session.id,
+                    TalkLockMode::Unlock,
+                ));
+                out.send(NpcTalkCodec::build_end_talk_hex());
+                session.talk_locked = false;
+            }
             let diahinh = scene
                 .and_then(|s| s.scene_infos.get(&1))
                 .map(|info| i32::from(info.background_no))
@@ -294,30 +401,63 @@ fn process_single_event_result(
             if let Some(ev) = session.current_event_session.as_mut() {
                 ev.phase = EventPhase::AwaitingBattle;
             }
-            out.eve_battle = Some((fight_id, diahinh));
+            out.eve_battle = Some((*fight_id, diahinh));
             StepOutcome::Halt
         }
-        other => {
-            tracing::debug!(other, "unhandled Eve result type; skipping");
+        DomainEffect::MoveEntity(_)
+        | DomainEffect::PlayMovie(_)
+        | DomainEffect::NpcAction(_)
+        | DomainEffect::NpcTeam(_)
+        | DomainEffect::RewardPet(_) => {
+            tracing::debug!(
+                result_type = raw_result.result_type,
+                result_class = raw_result.result_class,
+                "Eve effect executor deferred to Ticket 06; skipping"
+            );
+            StepOutcome::Continue
+        }
+        DomainEffect::Unsupported {
+            result_type,
+            result_class,
+        } => {
+            tracing::warn!(
+                result_type,
+                result_class,
+                "unsupported/unknown Eve result (fail-closed, never sent raw via 0x14)"
+            );
             StepOutcome::Continue
         }
     }
 }
 
 pub fn execute_event_step(session: &mut Session, data: &GameData, out: &mut HandleOutcome) {
+    let mut batch_probed = false;
     loop {
-        let next = session
+        let remaining: Option<Vec<EveResult>> = session
             .current_event_session
             .as_ref()
-            .and_then(|ev| ev.results.get(ev.current_index).cloned());
-        let Some(result) = next else {
-            if session.current_event_session.is_some() {
-                finish_event_session(session, data, out);
-            }
+            .and_then(|ev| ev.results.get(ev.current_index..).map(|s| s.to_vec()));
+        let Some(rem) = remaining else {
             return;
         };
+        if rem.is_empty() {
+            if !finish_event_session_iter(session, data, out) {
+                return;
+            }
+            batch_probed = false;
+            continue;
+        }
 
-        match process_single_event_result(session, data, out, &result) {
+        let effects = crate::eve::planner::plan_results(&rem);
+        if !batch_probed {
+            if let Err(err) = preflight_probe_batch(session, data, &effects) {
+                emit_preflight_rejection(session, out, err);
+                return;
+            }
+            batch_probed = true;
+        }
+
+        match process_single_domain_effect(session, data, out, &effects[0], &rem[0]) {
             StepOutcome::Halt => return,
             StepOutcome::Continue => {
                 if let Some(ev) = session.current_event_session.as_mut() {
@@ -345,20 +485,50 @@ pub async fn execute_event_step_with_pool(
     pool: Option<&DbPool>,
     out: &mut HandleOutcome,
 ) {
+    let mut batch_probed = false;
     loop {
-        let next = session
+        let remaining: Option<Vec<EveResult>> = session
             .current_event_session
             .as_ref()
-            .and_then(|ev| ev.results.get(ev.current_index).cloned());
-        let Some(result) = next else {
-            if session.current_event_session.is_some() {
-                finish_event_session_with_pool(session, data, pool, out).await;
-            }
+            .and_then(|ev| ev.results.get(ev.current_index..).map(|s| s.to_vec()));
+        let Some(rem) = remaining else {
             return;
         };
+        if rem.is_empty() {
+            if !finish_event_session_with_pool_iter(session, data, pool, out).await {
+                return;
+            }
+            batch_probed = false;
+            continue;
+        }
 
-        match process_single_event_result(session, data, out, &result) {
-            StepOutcome::Halt => return,
+        let effects = crate::eve::planner::plan_results(&rem);
+        if !batch_probed {
+            if let Err(err) = preflight_probe_batch(session, data, &effects) {
+                emit_preflight_rejection(session, out, err);
+                return;
+            }
+            batch_probed = true;
+        }
+
+        match process_single_domain_effect(session, data, out, &effects[0], &rem[0]) {
+            StepOutcome::Halt => {
+                if out.eve_battle.is_some() && session.db_character_id > 0 {
+                    if !crate::db::persist::persist_sessions_transaction(
+                        pool,
+                        &[session],
+                        &[],
+                    )
+                    .await
+                    {
+                        tracing::warn!(
+                            player_id = session.id,
+                            "StartBattle DB checkpoint failed"
+                        );
+                    }
+                }
+                return;
+            }
             StepOutcome::Continue => {
                 if let Some(ev) = session.current_event_session.as_mut() {
                     ev.current_index = ev.current_index.saturating_add(1);
@@ -403,74 +573,81 @@ pub async fn execute_event_step_with_pool(
     }
 }
 
-/// Close an exhausted event session: unlock the actor, emit the close-dialog
-/// frame, record the completion count when the session actually mutated state,
-/// then either auto-chain into the next matching event (re-opening the
-/// dialog) or reset the whole talk context.
-fn finish_event_session(session: &mut Session, data: &GameData, out: &mut HandleOutcome) {
+/// Finish an exhausted event session (`FinishChain`):
+/// 1. Increment `(scene_id, eve_no)` when state-changing.
+/// 2. Try `AutoChain`: if matched, keep `talk_locked` intact (no flicker!) and
+///    return `true` so the `EventRunner` loop continues.
+/// 3. If `NoMatch`: emit `Unlock` + `EndTalk` once, reset talk context, and
+///    return `false`.
+fn finish_event_session_iter(
+    session: &mut Session,
+    data: &GameData,
+    out: &mut HandleOutcome,
+) -> bool {
     let char_id = session.id;
-    out.send(NpcTalkCodec::build_talk_lock_hex(char_id, TalkLockMode::Unlock));
-    out.send(NpcTalkCodec::build_end_talk_hex());
-
     let Some(completed) = session.current_event_session.take() else {
-        return;
+        return false;
     };
-    // CP6 #7: a session counts as completed only when it carried an Action or
-    // a Battle result — pure Talk/Surface chains must not bump the counter
-    // (the auto-chain watermark `should_skip_event` keys off it).
     if completed.has_state_changing_results() {
+        let scene_id = u16::try_from(completed.map_id).unwrap_or(session.map_id);
         *session
             .completed_eve_counts
-            .entry(completed.eve_no)
+            .entry((scene_id, completed.eve_no))
             .or_insert(0) += 1;
     }
     let mut rng = DotNetRandom::new(eve_rng_seed());
     match npc_event::auto_chain_after(&completed, session, data, &mut rng) {
         AutoChainResult::Chained(new_ev) => {
             session.current_event_session = Some(new_ev);
-            out.send("F44402000602");
-            out.send(NpcTalkCodec::build_talk_lock_hex(char_id, TalkLockMode::Lock));
-            // Bounded recursion: EveAutoChainEngine::MAX_CHAIN_DEPTH caps the
-            // chain depth, so a chained session cannot recurse forever.
-            execute_event_step(session, data, out);
+            true
         }
         AutoChainResult::NoMatch => {
-            // Frames already sent above — reset only the context (the same
-            // field set `end_talk` clears).
+            out.send(NpcTalkCodec::build_talk_lock_hex(char_id, TalkLockMode::Unlock));
+            out.send(NpcTalkCodec::build_end_talk_hex());
             reset_talk_context(session);
+            crate::server::session::registry_update_if_online(session);
+            false
         }
     }
 }
 
-async fn finish_event_session_with_pool(
+async fn finish_event_session_with_pool_iter(
     session: &mut Session,
     data: &GameData,
     pool: Option<&DbPool>,
     out: &mut HandleOutcome,
-) {
+) -> bool {
     let char_id = session.id;
-    out.send(NpcTalkCodec::build_talk_lock_hex(char_id, TalkLockMode::Unlock));
-    out.send(NpcTalkCodec::build_end_talk_hex());
-
     let Some(completed) = session.current_event_session.take() else {
-        return;
+        return false;
     };
     if completed.has_state_changing_results() {
+        let scene_id = u16::try_from(completed.map_id).unwrap_or(session.map_id);
         *session
             .completed_eve_counts
-            .entry(completed.eve_no)
+            .entry((scene_id, completed.eve_no))
             .or_insert(0) += 1;
     }
     let mut rng = DotNetRandom::new(eve_rng_seed());
     match npc_event::auto_chain_after(&completed, session, data, &mut rng) {
         AutoChainResult::Chained(new_ev) => {
             session.current_event_session = Some(new_ev);
-            out.send("F44402000602");
-            out.send(NpcTalkCodec::build_talk_lock_hex(char_id, TalkLockMode::Lock));
-            Box::pin(execute_event_step_with_pool(session, data, pool, out)).await;
+            true
         }
         AutoChainResult::NoMatch => {
+            out.send(NpcTalkCodec::build_talk_lock_hex(char_id, TalkLockMode::Unlock));
+            out.send(NpcTalkCodec::build_end_talk_hex());
             reset_talk_context(session);
+            crate::server::session::registry_update_if_online(session);
+            if session.db_character_id > 0
+                && !crate::db::persist::persist_sessions_transaction(pool, &[session], &[]).await
+            {
+                tracing::warn!(
+                    player_id = session.id,
+                    "FinishChain DB write-through failed"
+                );
+            }
+            false
         }
     }
 }
@@ -568,78 +745,126 @@ fn execute_action_result_non_skill(
     result: &EveResult,
 ) {
     match result.result_class {
-        // Item: parameter=itemId, result_value=signed quantity.
+        // Item: parameter=itemId, result_value=signed quantity (homdo 0x17 only).
         1 => {
             let qty = result.result_value;
             if qty < 0 {
                 session.remove_homdo_item(result.parameter, qty.unsigned_abs());
             } else if qty > 0 {
-                let count = u8::try_from(qty).unwrap_or(u8::MAX);
-                let item = crate::server::inventory::from_template(data, result.parameter, count);
-                session.add_homdo_item(item);
+                let mut rem = qty as u32;
+                while rem > 0 {
+                    let chunk = rem.min(crate::server::inventory::STACK_CAP as u32) as u8;
+                    let item = crate::server::inventory::from_template(data, result.parameter, chunk);
+                    session.add_homdo_item(item);
+                    rem -= u32::from(chunk);
+                }
             }
             if qty != 0 {
-                // Sync the mutated bag to the client (legacy H6 gift flow).
+                // Sync the mutated bag to the client (homdo 0x17).
                 out.send(session.dump_homdo());
             }
         }
-        // Quest-log row (Bear `QuestSaveHandler`, CP6 #5): parameter=questId,
-        // parameter_style=pStyle, result_value's low byte the step written at
-        // `packageToSend[8]`.
+        // Quest-log row (`0x18 04/05/06`): parameter=questId,
+        // parameter_style=pStyle, result_value=signed step/mark.
+        // Bear's hardcoded save-gate is removed; all real p_styles (1..=5) are
+        // supported and `quest_dont` (`0x18 05`) is set ONLY on true completion
+        // (p_style=1 step=1) or explicit mark commands (p_style=3 val>0, p_style=5).
         2 => {
             let quest_id = result.parameter;
             let p_style = result.parameter_style;
-            let step = (result.result_value & 0xFF) as u8;
-
-            if p_style == 3 && step == 0 {
-                // pStyle 3 + step 0 = drop the quest from the log. The client
-                // clears the shared quest row by id (`0x18 Sub 0x04`) — the
-                // frame Bear's `removerTask` sends.
-                remove_quest_task(session, out, quest_id);
-                return;
-            }
-            // Bear only persists when the (pStyle, step) pair is in its save
-            // set; anything else is a no-op with a debug trace.
-            let save = (p_style == 1 && matches!(step, 1 | 2 | 3 | 10 | 30 | 50 | 70))
-                || p_style == 4
-                || (p_style == 2 && matches!(step, 1 | 9));
-            if !save {
-                tracing::debug!(
-                    quest_id,
-                    p_style,
-                    step,
-                    "Eve quest-save result outside Bear's save set; skipped"
-                );
-                return;
-            }
-            // `resBattle` equivalent: the active event session's battle
-            // outcome (0=none 1=win 2=lose 3=flee).
             let battle_result = session
                 .current_event_session
                 .as_ref()
                 .map(|ev| ev.battle_result)
                 .unwrap_or(0);
-            let next_step = match session.quest_tasks.get(&quest_id) {
-                // New quest: the payload's step, floored at 1.
-                None => step.max(1),
-                // Existing quest: current + delta — except after a lost/fled
-                // battle (Bear `resBattle` 2/3), where the step backs up one.
-                Some((_slot, current)) => {
-                    if matches!(battle_result, 2 | 3) {
-                        current.saturating_sub(1)
-                    } else {
-                        current.saturating_add(step)
+
+            match p_style {
+                1 => {
+                    if result.result_value < 0 {
+                        let dec = (result.result_value.unsigned_abs().min(255)) as u8;
+                        if let Some((_slot, current)) = session.quest_tasks.get(&quest_id).copied() {
+                            let next_step = current.saturating_sub(dec);
+                            set_quest_task(session, out, quest_id, next_step);
+                        }
+                        return;
+                    }
+                    let step = (result.result_value & 0xFF) as u8;
+                    let next_step = match session.quest_tasks.get(&quest_id) {
+                        None => step.max(1),
+                        Some((_slot, current)) => {
+                            if matches!(battle_result, 2 | 3) {
+                                current.saturating_sub(1)
+                            } else {
+                                current.saturating_add(step)
+                            }
+                        }
+                    };
+                    set_quest_task(session, out, quest_id, next_step);
+                    // Only mark `quest_dont` when completing (step == 1) and battle was not lost/fled.
+                    if step == 1 && !matches!(battle_result, 2 | 3) {
+                        if let Some(&mark) = data.quest_marks.get(&quest_id) {
+                            if mark > 0 {
+                                set_quest_dont(session, out, mark, 1);
+                            }
+                        }
                     }
                 }
-            };
-            set_quest_task(session, out, quest_id, next_step);
-            // Task 3.2: If quest has a mark position > 0 in Mark.Dat, record quest_dont and emit frame 18 05.
-            // Only award completion when the battle was not lost or fled.
-            if !matches!(battle_result, 2 | 3) {
-                if let Some(&mark) = data.quest_marks.get(&quest_id) {
-                    if mark > 0 {
-                        set_quest_dont(session, out, mark, 1);
+                2 => {
+                    let step = (result.result_value & 0xFF) as u8;
+                    let next_step = match session.quest_tasks.get(&quest_id) {
+                        None => 0,
+                        Some((_slot, current)) => current.saturating_sub(step),
+                    };
+                    set_quest_task(session, out, quest_id, next_step);
+                }
+                3 => {
+                    if result.result_value == 0 {
+                        // pStyle 3 + val 0 = drop the quest from the log (`0x18 Sub 0x04`).
+                        remove_quest_task(session, out, quest_id);
+                    } else if !matches!(battle_result, 2 | 3) {
+                        // Explicit completion mark (`pStyle=3, val>0`).
+                        let target_qid = if quest_id == 2 && result.result_value >= 10000 {
+                            result.result_value as u16
+                        } else {
+                            quest_id
+                        };
+                        if let Some(&mark) = data.quest_marks.get(&target_qid) {
+                            if mark > 0 {
+                                set_quest_dont(session, out, mark, 1);
+                            }
+                        }
                     }
+                }
+                4 => {
+                    let step = (result.result_value & 0xFF) as u8;
+                    let next_step = match session.quest_tasks.get(&quest_id) {
+                        None => step.max(1),
+                        Some((_slot, current)) => {
+                            if matches!(battle_result, 2 | 3) {
+                                current.saturating_sub(1)
+                            } else {
+                                current.saturating_add(step)
+                            }
+                        }
+                    };
+                    set_quest_task(session, out, quest_id, next_step);
+                }
+                5 => {
+                    if !matches!(battle_result, 2 | 3) {
+                        if let Some(&mark) = data.quest_marks.get(&quest_id) {
+                            if mark > 0 {
+                                set_quest_dont(session, out, mark, 1);
+                            }
+                        }
+                    }
+                }
+                other => {
+                    tracing::warn!(
+                        quest_id,
+                        p_style = other,
+                        val = result.result_value,
+                        "unmapped result_class=2 p_style; skipped"
+                    );
                 }
             }
         }
@@ -815,7 +1040,7 @@ async fn handle_talk_start(
         end_talk(conn, out);
         return;
     }
-    // Eve Engine event bridge (ticket 04/05 / Checkpoint 2).
+    // Eve Engine event bridge (Pure Planner + EventRunner).
     let mut rng = DotNetRandom::new(eve_rng_seed());
     if let Some(event_session) = npc_event::resolve_npc_event(
         &conn.session,
@@ -823,48 +1048,25 @@ async fn handle_talk_start(
         NpcTrigger::ClickNpc(map_object_id),
         &mut rng,
     ) {
-        // Wire order (Bear `ClickkNpc`/`processStep`): open dialog frame,
-        // then actor lock, then the first talk step when it is a Talk result.
-        let char_id = conn.session.id;
-        let first_talk = event_session
+        // Do NOT emit `06 02` + `14 2C Lock` if the first non-Action step is
+        // `StartBattle` (`rt=3`) or `Warp` (`rt=2`), avoiding dangling talk UI.
+        let first_non_action = event_session
             .results
-            .first()
-            .filter(|r| r.result_type == 1)
-            .map(NpcTalkCodec::build_talk_step_hex);
+            .iter()
+            .find(|r| r.result_type != 0);
+        let should_lock_ui = !matches!(first_non_action.map(|r| r.result_type), Some(2 | 3));
+        let char_id = conn.session.id;
         conn.session.current_event_session = Some(event_session);
-        out.send("F44402000602");
-        out.send(NpcTalkCodec::build_talk_lock_hex(char_id, TalkLockMode::Lock));
-        match first_talk {
-            Some(step) => out.send(step),
-            // CP4/CP6: a non-Talk head result goes through the central walker —
-            // Action results run to completion inline, a Surface awaits the
-            // Sub 9 choice, and Door/Battle warp or park the session.
-            None => execute_event_step_with_pool(&mut conn.session, data, pool, out).await,
+        if should_lock_ui {
+            conn.session.talk_locked = true;
+            out.send("F44402000602");
+            out.send(NpcTalkCodec::build_talk_lock_hex(char_id, TalkLockMode::Lock));
         }
+        execute_event_step_with_pool(&mut conn.session, data, pool, out).await;
         return;
     }
 
-    let key = crate::server::handlers::quest::quest_key(
-        i64::from(conn.session.map_id),
-        "NPC",
-        i64::from(map_object_id),
-        crate::server::handlers::quest::current_step(conn),
-    );
-    if let Some(talk) = data.talks.get(&key) {
-        out.send("F44402000602");
-        let sum: i64 = talk.teamdef.iter().sum();
-        if talk.dialogs.is_empty() && sum > 0 {
-            crate::server::handlers::quest::trigger_teamdef(conn, &talk.teamdef, out);
-            return;
-        }
-        talk_messages(conn, &talk.dialogs, out);
-    } else {
-        out.send("F44402000602");
-        out.send(format!(
-            "F44411001401000000010103{:02X}000000000000C830",
-            map_object_id
-        ));
-    }
+    end_talk(conn, out);
 }
 
 async fn handle_talk_continue(
@@ -1010,10 +1212,7 @@ async fn handle_talk_continue(
         return;
     }
 
-    // Generic data-driven quest path.
-    if !crate::server::handlers::quest::try_quest_h6(conn, data, out) {
-        end_talk(conn, out);
-    }
+    end_talk(conn, out);
 }
 
 async fn handle_talk_warp(
@@ -1065,10 +1264,20 @@ async fn handle_talk_select_menu(
             tracing::debug!("ignoring menu select with default ChoiceCode 0");
             return;
         }
+        // Valid TSurface choice codes from aLogin.exe callback:
+        // 20 (0x14 close), 21 (0x15 confirm), 40 (0x28 cancel), 30..=39 (opt 0..9), 61.. (opt >= 10).
+        if !matches!(choice, 20 | 21 | 40 | 30..=39 | 61..=u8::MAX) {
+            tracing::warn!(
+                choice,
+                "invalid TSurface choice code in 0x14 09; closing talk safely"
+            );
+            end_talk(conn, out);
+            return;
+        }
         // Record the choice on the active session: `snapshot_state` reads it
         // back for the conditionClass=10 branch re-evaluation, and the queue
         // index skips the already-delivered Surface result.
-        let trigger = conn
+        let trigger_and_surface = conn
             .session
             .current_event_session
             .as_mut()
@@ -1076,25 +1285,40 @@ async fn handle_talk_select_menu(
                 ev.last_choice_code = i32::from(choice);
                 ev.phase = EventPhase::Executing;
                 ev.current_index = ev.current_index.saturating_add(1);
-                match ev.trigger_kind {
-                    1 => Some(NpcTrigger::ClickNpc(ev.npc_click_id)),
-                    4 => Some(NpcTrigger::ClickDoor(ev.npc_click_id)),
-                    8 => Some(NpcTrigger::MeetDoor(ev.npc_click_id)),
-                    _ => None,
-                }
+                let trigger = match ev.trigger_kind {
+                    1 => NpcTrigger::ClickNpc(ev.npc_click_id),
+                    4 => NpcTrigger::ClickDoor(ev.npc_click_id),
+                    8 => NpcTrigger::MeetDoor(ev.npc_click_id),
+                    _ => return None,
+                };
+                Some((trigger, ev.last_surface_id))
             });
         conn.session.select_menu = i32::from(choice);
 
-        let Some(trigger) = trigger else {
+        let Some((trigger, surface_id)) = trigger_and_surface else {
             tracing::debug!("unsupported Eve trigger kind for menu select; ending talk");
             end_talk(conn, out);
             return;
         };
-        // Re-resolve the NPC's event list against the updated snapshot: the
-        // conditionClass=10 chain matching (surfaceId, choiceCode) wins and
-        // becomes the branch session (research CP4 §2.3).
+        // Re-resolve the NPC's event list against the updated snapshot with a
+        // strict DialogChoice chain filter: only chains containing
+        // conditionClass=10 matching (surface_id, choice) may win, preventing
+        // unconditional/normal chains from overriding the player's menu choice.
         let mut rng = DotNetRandom::new(eve_rng_seed());
-        match npc_event::resolve_npc_event(&conn.session, data, trigger, &mut rng) {
+        let filter = |chain: &[crate::data::loaders::EveCondition]| {
+            crate::eve::resolver::chain_has_dialog_choice(
+                chain,
+                surface_id,
+                i32::from(choice),
+            )
+        };
+        match npc_event::resolve_npc_event_with_filter(
+            &conn.session,
+            data,
+            trigger,
+            &mut rng,
+            Some(&filter),
+        ) {
             Some(mut branch) => {
                 // Carry the answered Surface context into the branch session:
                 // later snapshot reads (and auto-chain guard #2, "no Surface
@@ -1108,7 +1332,7 @@ async fn handle_talk_select_menu(
                 conn.session.current_event_session = Some(branch);
                 execute_event_step_with_pool(&mut conn.session, data, pool, out).await;
             }
-            // No branch matches this choice: close safely (unlock + 1408).
+            // No branch matches this choice (e.g. 40 cancel): close safely (unlock + 1408).
             None => end_talk(conn, out),
         }
         return;

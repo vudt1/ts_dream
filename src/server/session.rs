@@ -2,7 +2,7 @@
 //! and holds per-connection player state.
 
 use crate::battle::engine::{get_hp_max, get_sp_max};
-use crate::db::modern::model::{EntryLayout, StorageType};
+use crate::db::modern::model::{EntryLayout, PetStorageType, StorageType};
 use crate::protocol::encoder;
 use crate::protocol::frame::Decoder;
 
@@ -101,6 +101,7 @@ impl HotkeySlot {
 #[derive(Debug, Clone, Default)]
 pub struct PetState {
     pub stt: u8, // 1..4 (active list), 5..8 (stable)
+    pub storage_type: PetStorageType,
     pub id: u16,
     pub name: Vec<u8>,
     pub level: u8,
@@ -264,6 +265,8 @@ pub struct Session {
     pub newbie: u32,
     /// Respawn-map flag (`savemap`), set by inn-keepers (H6 SM33).
     pub savemap: u16,
+    pub savemap_x: u16,
+    pub savemap_y: u16,
     /// Equipped-colour hex string (`_My_Color`), e.g. `"0000000000000000"`.
     pub color: String,
 
@@ -288,15 +291,17 @@ pub struct Session {
     /// the client's shared quest-entry array (`LocalActor + 0x654 + slot * 3`,
     /// 1..=200) and is allocated by `handlers::quest_sync`.
     pub quest_tasks: std::collections::HashMap<u16, (u8, u8)>,
-    /// Quest "dont" marks (non-repeatable quests): mark ids 1..=300. The wire
-    /// carries `(mark, flag)`; a mark present here is flag `1`, absent = `0`.
+    /// Quest "dont" marks (non-repeatable quests): bit_ids `1..=2400` from `Mark.dat`.
     pub quest_dont: std::collections::HashSet<u16>,
-    /// Quest-only item bag (`0x18 Sub 0x01..0x04`), separate from `homdo` and
-    /// stacked per quest rules (200 rows, stack <= 255 — not the homdo 25/50).
-    pub quest_items: Vec<InventoryItem>,
-    /// Per-event completion counters (`eveid -> count`), incremented by
+    /// Permanent bit flags (`character_bit_flags`), persisted in `SqliteSessionRepository::save`.
+    pub bit_flags: std::collections::HashSet<u32>,
+    /// Per-event completion counters (`(scene_id, eve_no) -> count`), incremented by
     /// `finish_event_session` when the session produced state-changing results.
-    pub completed_eve_counts: std::collections::HashMap<i32, i32>,
+    pub completed_eve_counts: std::collections::HashMap<(u16, i32), i32>,
+    /// RoleCount statistic counters (`conditionClass=14`, e.g. 100=capture, 101=death).
+    pub role_count_values: std::collections::HashMap<i32, i32>,
+    /// Whether `0x14 Sub 0x2C` (`TalkLockMode::Lock`) is currently active on the client.
+    pub talk_locked: bool,
 
     pub pets: Vec<PetState>,
     pub active_pet_stt: u8,
@@ -421,6 +426,8 @@ impl Default for Session {
             sp_store: 10000,
             newbie: 0,
             savemap: 0,
+            savemap_x: 0,
+            savemap_y: 0,
             color: "0000000000000000".to_string(),
 
             skills: Vec::new(),
@@ -437,8 +444,10 @@ impl Default for Session {
 
             quest_tasks: std::collections::HashMap::new(),
             quest_dont: std::collections::HashSet::new(),
-            quest_items: Vec::new(),
+            bit_flags: std::collections::HashSet::new(),
             completed_eve_counts: std::collections::HashMap::new(),
+            role_count_values: std::collections::HashMap::new(),
+            talk_locked: false,
 
             pets: Vec::new(),
             active_pet_stt: 0,

@@ -17,6 +17,7 @@
 pub mod auto_chain;
 pub mod evaluator;
 pub mod group;
+pub mod planner;
 pub mod resolver;
 pub mod state;
 
@@ -25,5 +26,6 @@ pub use auto_chain::{
 };
 pub use evaluator::{compare_step, evaluate};
 pub use group::apply_group_data;
+pub use planner::{plan_chain, plan_result, plan_results, DomainEffect, EveTrigger, PlannedChain};
 pub use resolver::{build_chains, resolve, resolve_event, ChainResolveResult};
 pub use state::{EveStateBuilder, PlayerEventState, PlayerStateInputs};

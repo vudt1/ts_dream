@@ -79,13 +79,14 @@ pub fn trigger_teamdef(conn: &mut Conn, teamdef: &[i64], out: &mut HandleOutcome
 }
 
 /// `savemap` canonical seam: refresh the session's respawn point from the
-/// current map. Deferred drift: the `savemap` column is not persisted (in-memory
-/// only), so a server restart loses the saved respawn point.
+/// current map and coordinates.
 ///
 /// Takes `&mut Session` so the Eve action walkers (which also run from the
 /// post-battle resume path, where only a session guard is available) can call it.
 pub fn save_map(session: &mut Session) {
     session.savemap = session.map_id;
+    session.savemap_x = session.map_x;
+    session.savemap_y = session.map_y;
 }
 
 /// Attempt the data-driven quest path for H6 continue.

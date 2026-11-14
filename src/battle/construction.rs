@@ -160,7 +160,11 @@ impl Battle {
                 let ch_id = self.challenger_id;
                 let mut online = crate::server::session::lock_online_sessions();
                 if let Some(session) = online.get_mut(&ch_id) {
-                    session.quest_tasks.insert(218, (0, next_step));
+                    let _ = crate::server::handlers::quest_sync::upsert_quest_task_slot(
+                        session,
+                        218,
+                        next_step,
+                    );
                 }
             }
             true

@@ -20,7 +20,7 @@ use crate::battle::rng::DotNetRandom;
 use crate::data::loader::GameData;
 use crate::data::loaders::SceneEveData;
 use crate::eve::auto_chain::{AutoChainResult, EveAutoChainEngine, EventSession};
-use crate::eve::resolver::resolve_event;
+use crate::eve::resolver::{resolve_event, ChainFilter};
 use crate::eve::state::{EveStateBuilder, PlayerEventState, PlayerStateInputs};
 use crate::server::dispatcher::OpcodeCtx;
 use crate::server::session::Session;
@@ -81,9 +81,9 @@ pub async fn handle_pc_talk(ctx: &mut OpcodeCtx<'_>) {
     );
 }
 
-static EVE_EVENTS_ENABLED: AtomicBool = AtomicBool::new(false);
+static EVE_EVENTS_ENABLED: AtomicBool = AtomicBool::new(true);
 
-/// Enable/disable live Eve-event resolution. Off by default (golden parity).
+/// Enable/disable live Eve-event resolution. Enabled by default in production.
 pub fn set_eve_events_enabled(on: bool) {
     EVE_EVENTS_ENABLED.store(on, Ordering::Relaxed);
 }
@@ -139,8 +139,9 @@ fn scene_for(data: &GameData, map_id: u16) -> Option<&SceneEveData> {
 /// - **`mark_defs`** (missionId → bitId) stays empty (CP6 decision #6): no
 ///   consumer exists yet, and inventing a projection would make up a mapping
 ///   the data files do not define.
-pub fn snapshot_state_with_context(
+pub fn snapshot_state_with_data(
     session: &Session,
+    data: Option<&GameData>,
     active: Option<&EventSession>,
 ) -> PlayerEventState {
     let bag_slots: Vec<(i32, i32)> = session
@@ -161,6 +162,43 @@ pub fn snapshot_state_with_context(
         .iter()
         .map(|(&quest_id, &(_slot, step))| (i32::from(quest_id), i32::from(step)))
         .collect();
+    let mut follow_npc_ids = Vec::new();
+    let mut inn_npc_ids = Vec::new();
+    let mut cart_npc_ids = Vec::new();
+    for pet in &session.pets {
+        if pet.id == 0 {
+            continue;
+        }
+        let npc_id = i32::from(pet.id);
+        match pet.storage_type {
+            crate::db::modern::model::PetStorageType::Cart => cart_npc_ids.push(npc_id),
+            crate::db::modern::model::PetStorageType::Hotel => inn_npc_ids.push(npc_id),
+            crate::db::modern::model::PetStorageType::Carried if pet.stt >= 5 => {
+                inn_npc_ids.push(npc_id);
+            }
+            crate::db::modern::model::PetStorageType::Carried => follow_npc_ids.push(npc_id),
+            crate::db::modern::model::PetStorageType::Warehouse => {}
+        }
+    }
+    let role_count_values: Vec<(i32, i32)> = session
+        .role_count_values
+        .iter()
+        .map(|(&idx, &val)| (idx, val))
+        .collect();
+    let bit_flags: Vec<u32> = session.bit_flags.iter().copied().collect();
+    let raw_flags: Vec<(i32, i32)> = session
+        .quest_dont
+        .iter()
+        .map(|&bit_id| (i32::from(bit_id), 1))
+        .collect();
+    let mark_defs: std::collections::HashMap<i32, i32> = data
+        .map(|d| {
+            d.quest_marks
+                .iter()
+                .map(|(&qid, &bit_id)| (i32::from(qid), i32::from(bit_id)))
+                .collect()
+        })
+        .unwrap_or_default();
     // Surface/choice/battle context of the active or completed event session feeds
     // conditionClass=10 (dialog choice) and =8 (battle result); a session
     // without one keeps the "no dialogue seen yet" -1 / "no battle" 0
@@ -169,10 +207,21 @@ pub fn snapshot_state_with_context(
         .or(session.current_event_session.as_ref())
         .map(|ev| (ev.last_surface_id, ev.last_choice_code, ev.battle_result))
         .unwrap_or((-1, -1, 0));
+    let target_scene = active
+        .or(session.current_event_session.as_ref())
+        .and_then(|ev| u16::try_from(ev.map_id).ok())
+        .unwrap_or(session.map_id);
+    let scene_counts: std::collections::HashMap<i32, i32> = session
+        .completed_eve_counts
+        .iter()
+        .filter_map(|(&(scene_id, eve_no), &count)| {
+            (scene_id == target_scene).then_some((eve_no, count))
+        })
+        .collect();
     let mut state = EveStateBuilder::build_player_state(&PlayerStateInputs {
         missions: &missions,
-        raw_flags: &[],
-        mark_defs: &std::collections::HashMap::new(),
+        raw_flags: &raw_flags,
+        mark_defs: &mark_defs,
         bag_slots: &bag_slots,
         equips: &equips,
         level: i32::from(session.level),
@@ -180,26 +229,57 @@ pub fn snapshot_state_with_context(
         last_surface_id,
         last_choice_code,
         battle_result,
-        completed_eve_counts: session.completed_eve_counts.clone(),
-        follow_npc_ids: &[],
-        inn_npc_ids: &[],
-        cart_npc_ids: &[],
+        completed_eve_counts: scene_counts,
+        follow_npc_ids: &follow_npc_ids,
+        inn_npc_ids: &inn_npc_ids,
+        cart_npc_ids: &cart_npc_ids,
+        role_count_values: &role_count_values,
+        bit_flags: &bit_flags,
     });
-    for &mark in session.quest_dont.iter() {
-        state.mission_flags.insert(i32::from(mark), 1);
+    if data.is_none() {
+        for &mark in session.quest_dont.iter() {
+            state.mission_flags.insert(i32::from(mark), 1);
+        }
     }
     state
 }
 
-pub fn snapshot_state(session: &Session) -> PlayerEventState {
-    snapshot_state_with_context(session, None)
+pub fn snapshot_state_with_context(
+    session: &Session,
+    active: Option<&EventSession>,
+) -> PlayerEventState {
+    snapshot_state_with_data(session, None, active)
 }
 
-/// Resolve one NPC/door interaction against the scene's event list.
+pub fn snapshot_state(session: &Session) -> PlayerEventState {
+    snapshot_state_with_data(session, None, None)
+}
+
+/// Resolve one NPC/door interaction against the scene's event list, optionally
+/// restricting matching chains via `chain_filter` (e.g. `DialogChoice` on
+/// `0x14 09`).
 ///
 /// Returns an activated [`EventSession`] (results queued at index 0) when an
 /// event matched; `None` when the feature is off, the map has no Eve scene, or
 /// no chain matched (caller falls back to legacy talk tables).
+#[must_use]
+pub fn resolve_npc_event_with_filter(
+    session: &Session,
+    data: &GameData,
+    trigger: NpcTrigger,
+    rng: &mut DotNetRandom,
+    chain_filter: Option<ChainFilter<'_>>,
+) -> Option<EventSession> {
+    let is_dungeon_event_map = matches!(session.map_id, 12911..=12928 | 49960..=49969);
+    if !eve_events_enabled() && !is_dungeon_event_map {
+        return None;
+    }
+    let scene = scene_for(data, session.map_id)?;
+    let state = snapshot_state_with_data(session, Some(data), None);
+    activate(scene, i32::from(session.map_id), trigger, &state, rng, chain_filter)
+}
+
+/// Resolve one NPC/door interaction against the scene's event list.
 #[must_use]
 pub fn resolve_npc_event(
     session: &Session,
@@ -207,13 +287,7 @@ pub fn resolve_npc_event(
     trigger: NpcTrigger,
     rng: &mut DotNetRandom,
 ) -> Option<EventSession> {
-    let is_dungeon_event_map = matches!(session.map_id, 12911..=12928 | 49960..=49969);
-    if !eve_events_enabled() && !is_dungeon_event_map {
-        return None;
-    }
-    let scene = scene_for(data, session.map_id)?;
-    let state = snapshot_state(session);
-    activate(scene, i32::from(session.map_id), trigger, &state, rng)
+    resolve_npc_event_with_filter(session, data, trigger, rng, None)
 }
 
 fn activate(
@@ -222,6 +296,7 @@ fn activate(
     trigger: NpcTrigger,
     state: &PlayerEventState,
     rng: &mut DotNetRandom,
+    chain_filter: Option<ChainFilter<'_>>,
 ) -> Option<EventSession> {
     let click = trigger.click_id() as u16;
     let events: &[u8] = match trigger.kind() {
@@ -236,7 +311,9 @@ fn activate(
         if EveAutoChainEngine::should_skip_event(events, eve_no, event_data, state) {
             continue;
         }
-        let Some(resolved) = resolve_event(event_data, state, &scene.group_datas, rng, None) else {
+        let Some(resolved) =
+            resolve_event(event_data, state, &scene.group_datas, rng, chain_filter)
+        else {
             continue;
         };
         return Some(EventSession {
@@ -275,6 +352,6 @@ pub fn auto_chain_after(
     if i32::from(session.map_id) != completed.map_id {
         return AutoChainResult::NoMatch;
     }
-    let state = snapshot_state_with_context(session, Some(completed));
+    let state = snapshot_state_with_data(session, Some(data), Some(completed));
     EveAutoChainEngine::try_auto_chain(scene, completed, &state, rng)
 }

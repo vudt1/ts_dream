@@ -251,11 +251,11 @@ async fn test_dispatch_click_npc_bridges_to_eve_session() {
         "NPC 3 with empty bag must not activate Eve session"
     );
     assert!(
-        !outcome_npc3_unmet
+        outcome_npc3_unmet
             .outgoing
             .iter()
             .any(|f| f.frame == "F44402001408"),
-        "Unmet NPC without Eve match falls back to generic/quest talk instead of crash"
+        "Unmet NPC without Eve match must emit EndTalk (F44402001408) instead of legacy fake fallback"
     );
 
     // Now give item 32012 to player

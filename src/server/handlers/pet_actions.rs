@@ -16,6 +16,7 @@
 //! scoped by `player_id`.
 
 use crate::db;
+use crate::db::modern::model::PetStorageType;
 use crate::db::pool::DbPool;
 use crate::protocol::encoder;
 use crate::server::dispatcher::OpcodeCtx;
@@ -33,11 +34,20 @@ pub fn find_free(pets: &[PetState], lo: u8, hi: u8) -> Option<u8> {
     (lo..=hi).find(|s| !used.contains(s))
 }
 
+fn storage_for_slot(stt: u8) -> PetStorageType {
+    if is_roster(stt) {
+        PetStorageType::Carried
+    } else {
+        PetStorageType::Hotel
+    }
+}
+
 /// Move one pet row + its six equipment slots to another slot (a pet only on
 /// the source side moves; two present rows swap instead).
 fn move_pet_slot(conn: &mut Conn, from: u8, to: u8) {
     if let Some(pos) = conn.session.pets.iter().position(|p| p.stt == from) {
         conn.session.pets[pos].stt = to;
+        conn.session.pets[pos].storage_type = storage_for_slot(to);
     }
     for sub in 1..=6u16 {
         let src_slot = from as u16 * 10 + sub;
@@ -69,11 +79,20 @@ fn swap_pet_slots(conn: &mut Conn, a: u8, b: u8) {
     match (pa, pb) {
         (Some(i), Some(j)) => {
             let sa = conn.session.pets[i].stt;
-            conn.session.pets[i].stt = conn.session.pets[j].stt;
+            let sb = conn.session.pets[j].stt;
+            conn.session.pets[i].stt = sb;
+            conn.session.pets[i].storage_type = storage_for_slot(sb);
             conn.session.pets[j].stt = sa;
+            conn.session.pets[j].storage_type = storage_for_slot(sa);
         }
-        (Some(i), None) => conn.session.pets[i].stt = b,
-        (None, Some(j)) => conn.session.pets[j].stt = a,
+        (Some(i), None) => {
+            conn.session.pets[i].stt = b;
+            conn.session.pets[i].storage_type = storage_for_slot(b);
+        }
+        (None, Some(j)) => {
+            conn.session.pets[j].stt = a;
+            conn.session.pets[j].storage_type = storage_for_slot(a);
+        }
         (None, None) => {}
     }
     for sub in 1..=6u16 {

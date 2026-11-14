@@ -42,7 +42,7 @@ use ts_dream::server::handlers::npc_event::snapshot_state;
 use ts_dream::server::handlers::shops::gold_frame;
 use ts_dream::server::handlers::stats::build_stat_update;
 use ts_dream::server::handlers::talk::{execute_event_step, resume_eve_after_battle_sync as resume_eve_after_battle};
-use ts_dream::server::session::{lock_online_sessions, Conn, InventoryItem, Session};
+use ts_dream::server::session::{lock_online_sessions, Conn, Session};
 use ts_dream::server::spawn;
 
 const SOURCE_MAP: u16 = 9001; // scene + warp + fight 7 (scene_info background 55)))
@@ -250,7 +250,7 @@ fn action_class2_new_quest_writes_task_row_and_counts_completion() {
         "exhausted queue finishes the session"
     );
     // has_state_changing_results() = true (carried an Action) -> counted.
-    assert_eq!(session.completed_eve_counts.get(&5), Some(&1));
+    assert_eq!(session.completed_eve_counts.get(&(SOURCE_MAP, 5)), Some(&1));
 }
 
 #[test]
@@ -280,23 +280,31 @@ fn action_class2_existing_quest_increments_or_backs_up() {
 }
 
 #[test]
-fn action_class2_save_gate_skips_outside_bear_set() {
-    let data = synthetic_data();
-    // pStyle 1 with step 5 is NOT in Bear's save set {1,2,3,10,30,50,70}.
+fn action_class2_saves_intermediate_step_without_marking_quest_dont() {
+    let mut data = synthetic_data();
+    data.quest_marks.insert(703, 42);
+    // Ticket 05: Bear's save-gate is removed, so pStyle 1 step 5 IS written to
+    // quest_tasks, while `quest_dont` must NOT be set on intermediate steps.
     let mut session = session_with_event(SOURCE_MAP, vec![quest_action(703, 1, 5)]);
     let mut out = HandleOutcome::default();
 
     execute_event_step(&mut session, &data, &mut out);
 
-    assert!(
-        session.quest_tasks.is_empty(),
-        "step outside the save set must not write the log"
+    assert_eq!(
+        session.quest_tasks.get(&703),
+        Some(&(1, 5)),
+        "intermediate pStyle 1 step must be saved without Bear save-gate"
     );
-    assert!(op18_frames(&frame_list(&out)).is_empty(), "no 0x18 frame on skip");
-    // The walker still finishes: only the two closing frames.
-    assert_eq!(out.outgoing.len(), 2);
-    assert_eq!(out.outgoing[0].frame, unlock_frame(session.id));
-    assert_eq!(out.outgoing[1].frame, "F44402001408");
+    assert!(
+        !session.quest_dont.contains(&42),
+        "intermediate step 5 must NOT mark quest_dont"
+    );
+    assert_eq!(
+        op18_frames(&frame_list(&out)),
+        vec![QuestSyncCodec::build_task_entry_hex(1, 703, 5).as_str()]
+    );
+    assert_eq!(out.outgoing[1].frame, unlock_frame(session.id));
+    assert_eq!(out.outgoing[2].frame, "F44402001408");
 }
 
 #[test]
@@ -452,7 +460,7 @@ fn door_warps_then_finishes_session() {
     // Door carries neither Action nor Battle -> the completion watermark is
     // NOT bumped (CP6 #7).
     assert!(
-        !session.completed_eve_counts.contains_key(&5),
+        !session.completed_eve_counts.contains_key(&(SOURCE_MAP, 5)),
         "pure Door sessions must not count as completed"
     );
     assert_eq!(out.map_broadcast.len(), 1);
@@ -647,7 +655,7 @@ fn resume_win_continues_walk_and_records_quest() {
     assert!(next_battle.is_none(), "no chained battle in this queue");
     assert!(session.current_event_session.is_none(), "queue exhausted -> finished");
     assert_eq!(
-        session.completed_eve_counts.get(&5),
+        session.completed_eve_counts.get(&(SOURCE_MAP, 5)),
         Some(&1),
         "Battle + Action session counts as completed (CP6 #7)"
     );
@@ -721,7 +729,7 @@ fn snapshot_state_wires_quest_and_event_context() {
     session.level = 7;
     session.quest_tasks.insert(900, (1, 4));
     session.quest_dont.insert(12);
-    session.completed_eve_counts.insert(5, 2);
+    session.completed_eve_counts.insert((SOURCE_MAP, 5), 2);
 
     let state = snapshot_state(&session);
     assert_eq!(state.mission_steps.get(&900), Some(&4), "quest log doubles as mission store");
@@ -782,13 +790,7 @@ fn eve_state_session(account_id: i64) -> Session {
     session.quest_tasks.insert(701, (2, 9));
     session.quest_dont.insert(5);
     session.quest_dont.insert(7);
-    session.quest_items.push(InventoryItem {
-        slot: 3,
-        id: 46016,
-        count: 2,
-        ..Default::default()
-    });
-    session.completed_eve_counts.insert(5, 2);
+    session.completed_eve_counts.insert((SOURCE_MAP, 5), 2);
     session
 }
 
@@ -808,9 +810,10 @@ async fn persistence_round_trip_eve_state() {
     // The `completioncount` column (merged into the 0001 baseline) is directly
     // readable.
     let count: i64 = sqlx::query_scalar(
-        "SELECT completioncount FROM character_completed_events WHERE playerid = ? AND eventid = 5",
+        "SELECT completioncount FROM character_completed_events WHERE playerid = ? AND scene_id = ? AND eventid = 5",
     )
     .bind(account_id)
+    .bind(i64::from(SOURCE_MAP))
     .fetch_one(&pool.read)
     .await
     .expect("completioncount column");
@@ -828,68 +831,52 @@ async fn persistence_round_trip_eve_state() {
     assert_eq!(loaded.quest_tasks.get(&701), Some(&(2, 9)));
     assert_eq!(loaded.quest_dont.len(), 2);
     assert!(loaded.quest_dont.contains(&5) && loaded.quest_dont.contains(&7));
-    assert_eq!(loaded.quest_items.len(), 1);
-    assert_eq!(
-        (
-            loaded.quest_items[0].slot,
-            loaded.quest_items[0].id,
-            loaded.quest_items[0].count
-        ),
-        (3, 46016, 2)
-    );
-    assert_eq!(loaded.completed_eve_counts.get(&5), Some(&2));
+    assert_eq!(loaded.completed_eve_counts.get(&(SOURCE_MAP, 5)), Some(&2));
 }
 
 #[tokio::test]
-async fn persistence_degrades_when_quest_tables_are_missing() {
-    // Shared test DB (freshly reset with 0001) then *re-create a pre-CP6
-    // baseline* — drop the Eve/quest tables and the `completioncount` column.
-    // Models a database created before Checkpoint 6 (ADR 0004: `pool::migrate`
-    // is a no-op, so a live DB only gets new tables by applying the script) —
-    // save/load must degrade, never fail. The next `setup_test_db` resets it.
+async fn persistence_rolls_back_all_tables_on_sql_error() {
     let pool = setup_test_db().await;
-    sqlx::raw_sql(
-        "DROP TABLE IF EXISTS character_quest_tasks;
-         DROP TABLE IF EXISTS character_quest_dont;
-         DROP TABLE IF EXISTS character_quest_items;
-         CREATE TABLE character_completed_events_pre_cp6 AS
-             SELECT playerid, eventid, completedat FROM character_completed_events;
-         DROP TABLE character_completed_events;
-         ALTER TABLE character_completed_events_pre_cp6
-             RENAME TO character_completed_events;",
-    )
-    .execute(&pool.write)
-    .await
-    .expect("re-create pre-CP6 baseline schema");
     seed_character(&pool, 8001).await;
 
     let repos = SqliteRepositories::new(pool.clone());
-    let mut session = Session::new();
-    session.id = 8001;
-    session.db_character_id = 8001;
-    session.quest_tasks.insert(700, (1, 3));
-    session.completed_eve_counts.insert(5, 2);
+    let mut initial = Session::new();
+    initial.id = 8001;
+    initial.db_character_id = 8001;
+    initial.level = 10;
+    initial.gold = 500;
+    repos.sessions().save(&initial).await.expect("initial save");
+
+    // Force an error in the Eve/quest phase of `save()` after `characters`
+    // and `character_money` have already been updated inside the transaction.
+    sqlx::raw_sql("DROP TABLE character_completed_events;")
+        .execute(&pool.write)
+        .await
+        .expect("drop character_completed_events");
+
+    let mut dirty = initial.clone();
+    dirty.level = 99;
+    dirty.gold = 99999;
+    dirty.completed_eve_counts.insert((SOURCE_MAP, 5), 2);
 
     repos
         .sessions()
-        .save(&session)
+        .save(&dirty)
         .await
-        .expect("save() must degrade (debug log), not fail, without quest tables");
+        .expect_err("save() must propagate SQL error and never swallow it");
 
-    let mut loaded = Session::new();
-    let found = repos
-        .sessions()
-        .load(8001, &mut loaded)
+    // Verify full transaction rollback: `characters.level` and `character_money.gold`
+    // must remain at their pre-save values.
+    let level: i64 = sqlx::query_scalar("SELECT level FROM characters WHERE playerid = 8001")
+        .fetch_one(&pool.read)
         .await
-        .expect("load() must degrade (debug log), not fail, without quest tables");
-    assert!(found, "the 0001 character row still loads");
-    assert!(
-        loaded.quest_tasks.is_empty(),
-        "missing quest tables -> empty quest state"
-    );
-    assert!(loaded.quest_dont.is_empty());
-    assert!(loaded.quest_items.is_empty());
-    assert!(loaded.completed_eve_counts.is_empty());
+        .expect("read level");
+    let gold: i64 = sqlx::query_scalar("SELECT gold FROM character_money WHERE playerid = 8001")
+        .fetch_one(&pool.read)
+        .await
+        .expect("read gold");
+    assert_eq!(level, 10, "characters update must roll back on quest save error");
+    assert_eq!(gold, 500, "character_money update must roll back on quest save error");
 }
 
 #[test]
@@ -917,22 +904,10 @@ fn fingerprint_tracks_eve_state() {
         auto_save::fingerprint(&with_dont),
         "quest-dont insert"
     );
-    let mut with_item = with_dont.clone();
-    with_item.quest_items.push(InventoryItem {
-        slot: 1,
-        id: 46016,
-        count: 1,
-        ..Default::default()
-    });
+    let mut with_count = with_dont.clone();
+    with_count.completed_eve_counts.insert((SOURCE_MAP, 5), 1);
     assert_ne!(
         auto_save::fingerprint(&with_dont),
-        auto_save::fingerprint(&with_item),
-        "quest item insert"
-    );
-    let mut with_count = with_item.clone();
-    with_count.completed_eve_counts.insert(5, 1);
-    assert_ne!(
-        auto_save::fingerprint(&with_item),
         auto_save::fingerprint(&with_count),
         "completion count insert"
     );

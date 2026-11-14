@@ -226,10 +226,10 @@ impl EveFightEnemy {
 pub struct EveFightData {
     pub eve_no: u16,
     pub fight_type: u8,
+    pub bk_music: u8,
     pub link_to_result: u8,
     pub left_enemies: Vec<EveFightEnemy>,
     pub right_enemies: Vec<EveFightEnemy>,
-    pub fight_limit: u32,
 }
 
 /// Wild encounter zone placement on scene map (Section 4 — Encounter/Mine Data).
@@ -295,6 +295,49 @@ pub struct SceneEveData {
     pub surface_datas: HashMap<u16, EveSurfaceData>,
     pub group_datas: HashMap<u16, EveGroupData>,
     pub encounters: Vec<EveEncounterPlacement>,
+    /// Read-only index: `npc_place_id -> Vec<eve_no>`.
+    pub npc_events_by_npc: HashMap<u16, Vec<u16>>,
+    /// Read-only index: `door_id -> Vec<eve_no>`.
+    pub door_events_by_door: HashMap<u16, Vec<u16>>,
+    /// Read-only index: `encounter_id -> index in encounters`.
+    pub encounter_by_id: HashMap<u16, usize>,
+    /// Read-only index: `encounter_id -> Vec<eve_no>`.
+    pub encounter_events_by_id: HashMap<u16, Vec<u16>>,
+}
+
+impl SceneEveData {
+    /// Build read-only lookup indices for NPC, Door, and Encounter events.
+    pub fn build_indices(&mut self) {
+        self.npc_events_by_npc.clear();
+        for (&place_id, npc) in &self.npcs {
+            let evs: Vec<u16> = npc.events.iter().map(|&e| u16::from(e)).collect();
+            self.npc_events_by_npc.insert(place_id, evs);
+        }
+
+        self.door_events_by_door.clear();
+        for (&door_id, door) in &self.doors {
+            let evs: Vec<u16> = door.events.iter().map(|&e| u16::from(e)).collect();
+            self.door_events_by_door.insert(door_id, evs);
+        }
+
+        self.encounter_by_id.clear();
+        self.encounter_events_by_id.clear();
+        for (idx, enc) in self.encounters.iter().enumerate() {
+            self.encounter_by_id.insert(enc.id, idx);
+            let evs: Vec<u16> = enc.events.iter().map(|&e| u16::from(e)).collect();
+            self.encounter_events_by_id.insert(enc.id, evs);
+        }
+    }
+
+    pub fn event(&self, eve_no: u16) -> Option<&NpcEventData> {
+        self.npc_events.get(&eve_no)
+    }
+
+    pub fn encounter(&self, encounter_id: u16) -> Option<&EveEncounterPlacement> {
+        self.encounter_by_id
+            .get(&encounter_id)
+            .and_then(|&idx| self.encounters.get(idx))
+    }
 }
 
 /// Directory entry header inside `eve.emg` container.
@@ -312,8 +355,14 @@ pub struct EveDataLoader;
 impl EveDataLoader {
     /// Load `eve.emg` binary buffer into `scene_id -> SceneEveData` map.
     pub fn load(data: &[u8]) -> Result<HashMap<u32, SceneEveData>> {
+        if data.len() < 2 {
+            return Err(TsError::Data("eve.emg too short for header".into()));
+        }
         let mut reader = DatReader::new(data.to_vec());
         let scene_count = reader.read_u16() as usize;
+        if scene_count * 32 > reader.remaining() {
+            return Err(TsError::Data("eve.emg directory truncated".into()));
+        }
 
         let mut entries = Vec::with_capacity(scene_count);
         for _ in 0..scene_count {
@@ -345,21 +394,28 @@ impl EveDataLoader {
         let mut result = HashMap::with_capacity(entries.len());
         for entry in entries {
             if entry.position + 103 >= data.len() {
-                continue;
+                return Err(TsError::Data(format!(
+                    "scene {} offset {} out of bounds (len={})",
+                    entry.scene_id,
+                    entry.position + 103,
+                    data.len()
+                )));
             }
             // DataManager.lua line 773: position = ReadInt32() + 103
             reader.seek(entry.position + 103);
-            if let Ok(scene_data) = Self::parse_scene_data(&mut reader) {
-                if !scene_data.npcs.is_empty()
-                    || !scene_data.doors.is_empty()
-                    || !scene_data.npc_events.is_empty()
-                    || !scene_data.scene_infos.is_empty()
-                    || !scene_data.fight_datas.is_empty()
-                    || !scene_data.surface_datas.is_empty()
-                    || !scene_data.group_datas.is_empty()
-                {
-                    result.insert(entry.scene_id, scene_data);
-                }
+            let scene_data = Self::parse_scene_data(&mut reader).map_err(|e| {
+                TsError::Data(format!("failed to parse scene {}: {}", entry.scene_id, e))
+            })?;
+            if !scene_data.npcs.is_empty()
+                || !scene_data.doors.is_empty()
+                || !scene_data.npc_events.is_empty()
+                || !scene_data.scene_infos.is_empty()
+                || !scene_data.fight_datas.is_empty()
+                || !scene_data.surface_datas.is_empty()
+                || !scene_data.group_datas.is_empty()
+                || !scene_data.encounters.is_empty()
+            {
+                result.insert(entry.scene_id, scene_data);
             }
         }
 
@@ -378,7 +434,7 @@ impl EveDataLoader {
         let npc_events = Self::parse_npc_event_section(reader)?;
         let fight_datas = Self::parse_fight_data_section(reader)?;
 
-        Ok(SceneEveData {
+        let mut scene = SceneEveData {
             npcs,
             doors,
             npc_events,
@@ -387,7 +443,10 @@ impl EveDataLoader {
             surface_datas,
             group_datas,
             encounters,
-        })
+            ..Default::default()
+        };
+        scene.build_indices();
+        Ok(scene)
     }
 
     /// Section 1: NpcData (Eve_NpcData.lua)
@@ -794,7 +853,7 @@ impl EveDataLoader {
                 let condition_sub_item = reader.read_u16();
 
                 let result_count = reader.read_u8() as usize;
-                if result_count * 15 > reader.remaining() {
+                if result_count * 14 > reader.remaining() {
                     return Err(TsError::Data("invalid result_count in condition".into()));
                 }
                 let mut results = Vec::with_capacity(result_count);
@@ -864,7 +923,7 @@ impl EveDataLoader {
         for _ in 0..count {
             let eve_no = reader.read_u16();
             let fight_type = reader.read_u8();
-            reader.skip(1); // BKMusic
+            let bk_music = reader.read_u8();
             let link_to_result = reader.read_u8();
 
             let left_count = reader.read_u16() as usize;
@@ -904,20 +963,18 @@ impl EveDataLoader {
             }
 
             let fight_event_count = reader.read_u16() as usize;
-            if fight_event_count * 11 > reader.remaining() {
+            if fight_event_count * 12 > reader.remaining() {
                 return Err(TsError::Data("invalid fight_event_count in fight".into()));
             }
             for _ in 0..fight_event_count {
                 reader.skip(2); // EventNo
                 reader.skip(9); // EventName[9]
                 let win_cond_count = reader.read_u8() as usize;
-                if win_cond_count * 12 > reader.remaining() {
+                if win_cond_count * 13 > reader.remaining() {
                     return Err(TsError::Data("invalid win_cond_count in fight".into()));
                 }
-                reader.skip(win_cond_count * 12);
+                reader.skip(win_cond_count * 13);
             }
-
-            let fight_limit = reader.read_u32();
 
             if eve_no > 0 && (!left_enemies.is_empty() || !right_enemies.is_empty()) {
                 result.insert(
@@ -925,10 +982,10 @@ impl EveDataLoader {
                     EveFightData {
                         eve_no,
                         fight_type,
+                        bk_music,
                         link_to_result,
                         left_enemies,
                         right_enemies,
-                        fight_limit,
                     },
                 );
             }

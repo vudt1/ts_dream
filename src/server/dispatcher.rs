@@ -406,12 +406,14 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         // OP_GM_MANAGE (0x10) — North Star Quiz answers
         OP_GM_MANAGE => battle::handle_quiz_answer(ctx).await,
 
+        // OP_ITEM_INFO (0x18) — Quest Ledger / quest_dont is S->C only; reject C->S 0x18 (TMissionForm)
+        OP_ITEM_INFO => crate::server::handlers::quest_sync::handle_client_quest_sync(ctx),
+
         // Documented client opcodes whose full semantics are being ported from
         // the Kotlin/mobile reference. They are deliberately routed through a
         // bounded unimplemented boundary rather than silently discarded.
         OP_FRIEND_INVITE
         | OP_WORLD_OBJECT
-        | OP_ITEM_INFO
         | OP_EXP_LEVEL
         | OP_COMPOUND
         | OP_REBORN

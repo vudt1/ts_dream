@@ -1,25 +1,12 @@
-//! Integration tests for Checkpoint 5: quest & actor-state synchronization
-//! (Opcode `0x18`).
-//!
-//! Scope (per `.scratch/op-working/research-checkpoint-5-quest-sync.md`):
-//! 1. Builder hex parity for all 8 sub-opcodes (§4 of the research).
-//! 2. Session-facing mutations — quest item add/merge/remove/clear, quest-dont
-//!    flags, quest-log rows — each mirroring exactly one frame, including the
-//!    client's refusal rules read out of the decompile:
-//!    - `FUN_00720ca8` refuses a merge that would carry a stack past 255,
-//!    - `FUN_00720df0` refuses `count > owned`,
-//!    - slots are `1..=200` and marks `1..=300` (`_BoundErr` outside),
-//!    - quest items and quest task rows share **one** 200-row pool
-//!      (`0x654 + slot * 3` is written by both `FUN_00720ca8` and
-//!      `FUN_0072bb6c`), so a task row can never claim an item's row.
-//! 3. The `Logined1` login sequence carries the bulk sync (research §2:
-//!    task log -> quest dont -> quest items) **only** when the session holds
-//!    quest state, so a fresh character's byte stream keeps golden parity.
+//! Integration tests for Opcode `0x18` (Quest Ledger `Mark.dat` 200 slots,
+//! `quest_dont` bitmask `1..=2400`, actor state `0x18 08`, and `C→S 0x18` rejection).
 
+use ts_dream::battle::service::BattleService;
+use ts_dream::data::loader::GameData;
 use ts_dream::protocol::codecs::quest_sync::QuestSyncCodec;
-use ts_dream::server::dispatcher::HandleOutcome;
+use ts_dream::server::dispatcher::{dispatch, HandleOutcome, ServerEnv};
 use ts_dream::server::handlers::quest_sync;
-use ts_dream::server::session::{Conn, InventoryItem, Session};
+use ts_dream::server::session::{Conn, Session};
 
 /// Frames whose main opcode (byte 4 of `F4 44 lenLE <op>`) is `0x18`.
 fn op18_frames(frames: &[String]) -> Vec<&str> {
@@ -35,52 +22,43 @@ fn op18_frames(frames: &[String]) -> Vec<&str> {
 }
 
 // ============================================================================
-// §4 research builder parity (all 8 sub-opcodes)
+// Wire codec parity for Opcode 0x18
 // ============================================================================
 
 #[test]
 fn test_research_builder_hexes_match_wire() {
-    // Sub 0x01 / 0x02: quest item add / remove (5-byte payload).
-    assert_eq!(
-        QuestSyncCodec::build_item_add_hex(10001, 2),
-        "F44405001801112702"
-    );
-    assert_eq!(
-        QuestSyncCodec::build_item_remove_hex(10001, 1),
-        "F44405001802112701"
-    );
-
-    // Sub 0x03: capacity-full toast; Sub 0x04: clear quest item.
     assert_eq!(QuestSyncCodec::build_quest_full_hex(), "F44402001803");
     assert_eq!(
         QuestSyncCodec::build_item_clear_hex(10001),
         "F444040018041127"
     );
 
-    // Sub 0x05: quest-dont single; Sub 0x07: quest-dont bulk (3 B/entry).
+    // Sub 0x05: quest-dont single (supports bit_id 1..=2400, e.g. 1673 = 0x0689 -> 8906)
     assert_eq!(
         QuestSyncCodec::build_dont_single_hex(101, 1),
         "F44405001805650001"
     );
     assert_eq!(
-        QuestSyncCodec::build_dont_bulk_hex(&[
-            ts_dream::protocol::codecs::quest_sync::QuestDontEntry {
-                mark: 101,
-                flag: 1
-            },
-            ts_dream::protocol::codecs::quest_sync::QuestDontEntry {
-                mark: 102,
-                flag: 1
-            },
-        ]),
-        "F44408001807650001660001"
+        QuestSyncCodec::build_dont_single_hex(1673, 1),
+        "F44405001805890601"
     );
 
-    // Sub 0x06: quest task, single entry. NOTE(research): §4 line 115 writes
-    // `F4440500...` (length 5) but the entry is 4 bytes after the 2-byte
-    // `[18][06]` prefix -> payload 6 -> `0600`. The decompile
-    // (`FUN_0072bb6c`, 4-byte stride) and `tests/wire_codec_14_18_test.rs`
-    // both confirm `0600`; the research hex is a typo.
+    // Sub 0x07: quest-dont bulk ([byte_idx: u16 LE][bitmask: u8])
+    assert_eq!(
+        QuestSyncCodec::build_dont_bulk_hex(&[
+            ts_dream::protocol::codecs::quest_sync::QuestDontEntry {
+                mark: 13,
+                flag: 0x10,
+            },
+            ts_dream::protocol::codecs::quest_sync::QuestDontEntry {
+                mark: 210,
+                flag: 0x01,
+            },
+        ]),
+        "F444080018070D0010D20001"
+    );
+
+    // Sub 0x06: quest task, single & bulk (4 bytes per entry)
     assert_eq!(
         QuestSyncCodec::build_task_entry_hex(1, 10801, 3),
         "F4440600180601312A03"
@@ -101,7 +79,7 @@ fn test_research_builder_hexes_match_wire() {
         "F4440A00180601312A0302322A01"
     );
 
-    // Sub 0x08: actor state flag (Thần xui leaves -> flag 0).
+    // Sub 0x08: actor state flag (Ghost=1, God=2)
     assert_eq!(
         QuestSyncCodec::build_state_flag_hex(1001, 1, 0),
         "F44409001808E9030000010000"
@@ -109,191 +87,124 @@ fn test_research_builder_hexes_match_wire() {
 }
 
 // ============================================================================
-// Session-facing quest item mutations (Sub 0x01 / 0x02 / 0x04)
+// Quest-dont flags (Sub 0x05, 1..=2400) and actor state flag (Sub 0x08)
 // ============================================================================
 
 #[test]
-fn test_add_merge_remove_clear_quest_item() {
+fn test_quest_dont_marks_1_to_2400_bounds() {
     let mut conn = Conn::default();
     let mut out = HandleOutcome::default();
 
-    // New item takes shared row 1 and emits Sub 0x01.
-    assert!(quest_sync::add_quest_item(&mut conn.session, &mut out, 10001, 2));
-    assert_eq!(out.outgoing[0].frame, "F44405001801112702");
-    assert_eq!(conn.session.quest_items.len(), 1);
-    assert_eq!(conn.session.quest_items[0].slot, 1);
-    assert_eq!(conn.session.quest_items[0].count, 2);
-
-    // Same id merges into the same row (client `FUN_00720ca8` merge path).
-    assert!(quest_sync::add_quest_item(&mut conn.session, &mut out, 10001, 3));
-    assert_eq!(
-        conn.session.quest_items.len(),
-        1,
-        "merge must not open a second row"
-    );
-    assert_eq!(conn.session.quest_items[0].count, 5);
-    assert_eq!(out.outgoing[1].frame, "F44405001801112703");
-
-    // Successful removal emits Sub 0x02 with the requested count.
-    assert_eq!(quest_sync::remove_quest_item(&mut conn.session, &mut out, 10001, 2), 2);
-    assert_eq!(out.outgoing[2].frame, "F44405001802112702");
-    assert_eq!(conn.session.quest_items[0].count, 3);
-
-    // Client parity: `FUN_00720df0` requires count <= owned -> refuse both
-    // the write and the frame (a sent frame the client rejects would toast
-    // "failed" while the server bag keeps the item).
-    assert_eq!(quest_sync::remove_quest_item(&mut conn.session, &mut out, 10001, 9), 0);
-    assert_eq!(conn.session.quest_items[0].count, 3);
-    assert_eq!(
-        out.outgoing.len(),
-        3,
-        "a refused removal must not emit a frame"
-    );
-
-    // Removing the last of a stack frees the row.
-    assert_eq!(quest_sync::remove_quest_item(&mut conn.session, &mut out, 10001, 3), 3);
-    assert!(conn.session.quest_items.is_empty());
-    assert_eq!(out.outgoing.len(), 4);
-
-    // Sub 0x04 clears everything for an id, once.
-    assert!(quest_sync::add_quest_item(&mut conn.session, &mut out, 26012, 1));
-    assert!(quest_sync::clear_quest_item(&mut conn.session, &mut out, 26012));
-    // 26012 = 0x659C -> LE `9C65`.
-    assert_eq!(out.outgoing[5].frame, "F444040018049C65");
-    assert!(conn.session.quest_items.is_empty());
-    assert!(!quest_sync::clear_quest_item(&mut conn.session, &mut out, 26012));
-    assert_eq!(
-        out.outgoing.len(),
-        6,
-        "clearing an absent id must not emit a frame"
-    );
-}
-
-#[test]
-fn test_quest_item_capacity_refuses_with_full_toast() {
-    let mut conn = Conn::default();
-    let mut out = HandleOutcome::default();
-
-    // Stack cap: a merge past 255 is refused wholesale (client returns 0 and
-    // writes nothing), and the client's only signal is Sub 0x03.
-    assert!(quest_sync::add_quest_item(&mut conn.session, &mut out, 10001, 255));
-    assert!(!quest_sync::add_quest_item(&mut conn.session, &mut out, 10001, 1));
-    assert_eq!(conn.session.quest_items[0].count, 255, "refused merge must not write");
-    assert_eq!(out.outgoing.last().unwrap().frame, "F44402001803");
-
-    // Row cap: the shared quest array holds 200 rows (row 1 is 10001 above,
-    // rows 2..=200 take ids 10002..=10200).
-    for id in 10002..=10200 {
-        assert!(
-            quest_sync::add_quest_item(&mut conn.session, &mut out, id, 1),
-            "id {id} must still fit before the 200-row cap"
-        );
-    }
-    assert_eq!(conn.session.quest_items.len(), quest_sync::QUEST_SLOT_MAX as usize);
-
-    let before = out.outgoing.len();
-    assert!(!quest_sync::add_quest_item(&mut conn.session, &mut out, 20001, 1));
-    assert_eq!(conn.session.quest_items.len(), 200, "full bag must not grow");
-    assert_eq!(
-        out.outgoing[before].frame,
-        "F44402001803",
-        "row exhaustion must surface as the capacity-full toast"
-    );
-    assert_eq!(out.outgoing.len(), before + 1, "no add frame may follow the toast");
-
-    // A zero-count add is a no-op (nothing on the wire, nothing in state).
-    assert!(!quest_sync::add_quest_item(&mut conn.session, &mut out, 30001, 0));
-    assert_eq!(out.outgoing.len(), before + 1);
-}
-
-// ============================================================================
-// Quest-dont flags (Sub 0x05) and actor state flag (Sub 0x08)
-// ============================================================================
-
-#[test]
-fn test_quest_dont_marks_and_client_bounds() {
-    let mut conn = Conn::default();
-    let mut out = HandleOutcome::default();
-
-    // Set: mark 101 = 0x0065 LE -> `6500`, flag 1.
+    // Valid bit_id <= 300
     assert!(quest_sync::set_quest_dont(&mut conn.session, &mut out, 101, 1));
     assert!(conn.session.quest_dont.contains(&101));
     assert_eq!(out.outgoing[0].frame, "F44405001805650001");
 
-    // Bounds: the client computes `mark - 1` bounded to 299, so 0 underflows
-    // and 301 overflows into `_BoundErr` -> reject before the wire.
+    // Valid bit_id > 300 (e.g. 1673 = 0x0689 LE -> 8906) and upper bound 2400 (0x0960 -> 6009)
+    assert!(quest_sync::set_quest_dont(&mut conn.session, &mut out, 1673, 1));
+    assert!(conn.session.quest_dont.contains(&1673));
+    assert_eq!(out.outgoing[1].frame, "F44405001805890601");
+
+    assert!(quest_sync::set_quest_dont(&mut conn.session, &mut out, 2400, 1));
+    assert!(conn.session.quest_dont.contains(&2400));
+    assert_eq!(out.outgoing[2].frame, "F44405001805600901");
+
+    // Out-of-range: 0 and 2401 must be rejected before the wire
     assert!(!quest_sync::set_quest_dont(&mut conn.session, &mut out, 0, 1));
-    assert!(!quest_sync::set_quest_dont(&mut conn.session, &mut out, 301, 1));
+    assert!(!quest_sync::set_quest_dont(&mut conn.session, &mut out, 2401, 1));
     assert_eq!(
         out.outgoing.len(),
-        1,
-        "out-of-range marks must not reach the wire"
+        3,
+        "out-of-range bit_ids must not reach the wire"
     );
 
-    // Upper edge 300 = 0x012C LE -> `2C01` is still accepted.
-    assert!(quest_sync::set_quest_dont(&mut conn.session, &mut out, 300, 1));
-    assert_eq!(out.outgoing[1].frame, "F444050018052C0101");
-
-    // Clearing emits flag 0 and drops the mark.
-    assert!(quest_sync::set_quest_dont(&mut conn.session, &mut out, 101, 0));
-    assert!(!conn.session.quest_dont.contains(&101));
-    assert_eq!(out.outgoing[2].frame, "F44405001805650000");
+    // Clearing emits flag 0 and drops the bit_id
+    assert!(quest_sync::set_quest_dont(&mut conn.session, &mut out, 1673, 0));
+    assert!(!conn.session.quest_dont.contains(&1673));
+    assert_eq!(out.outgoing[3].frame, "F44405001805890600");
 }
 
 #[test]
 fn test_actor_state_flag_frame() {
     let mut conn = Conn::default();
     let mut out = HandleOutcome::default();
-    conn.session.id = 1001; // 0x000003E9 -> LE `E9030000`
+    conn.session.id = 1001; // 0x000003E9 -> LE E9030000
 
-    // Kind 1 (Bad-Luck-God), flag 0 = expiry (client plays WA0006.wav).
     quest_sync::send_actor_state_flag(&conn.session, &mut out, 1, 0);
     assert_eq!(out.outgoing[0].frame, "F44409001808E9030000010000");
 }
 
 // ============================================================================
-// Shared quest-entry pool: quest items and quest log rows (Sub 0x06)
+// Quest Ledger (Sub 0x06): strict 1..=200 slots, 200-slot overflow -> 0x18 03,
+// and adjacent slot preservation
 // ============================================================================
 
 #[test]
-fn test_quest_task_rows_share_pool_with_items() {
+fn test_quest_ledger_slots_1_to_200_and_overflow_refusal() {
     let mut conn = Conn::default();
     let mut out = HandleOutcome::default();
 
-    // Item takes row 1 -> the first quest task must land on row 2, proving
-    // both collections draw from the client's single `0x654 + slot * 3` array
-    // (Bear's `TaskQuest.Count + 1` numbering would have collided here).
-    assert!(quest_sync::add_quest_item(&mut conn.session, &mut out, 10001, 1));
-    assert!(quest_sync::set_quest_task(&mut conn.session, &mut out, 10801, 3));
+    // Fill slots 1..=200
+    for i in 1u16..=200 {
+        let qid = 10000 + i;
+        assert!(
+            quest_sync::set_quest_task(&mut conn.session, &mut out, qid, 1),
+            "quest {qid} must fit in slot {i}"
+        );
+        assert_eq!(conn.session.quest_tasks[&qid], (i as u8, 1));
+    }
+    assert_eq!(conn.session.quest_tasks.len(), 200);
+
+    // Updating an existing quest keeps its slot and preserves adjacent slots
+    let before_len = out.outgoing.len();
+    assert!(quest_sync::set_quest_task(&mut conn.session, &mut out, 10002, 5));
+    assert_eq!(conn.session.quest_tasks[&10001], (1, 1), "adjacent slot 1 must stay intact");
+    assert_eq!(conn.session.quest_tasks[&10002], (2, 5));
+    assert_eq!(conn.session.quest_tasks[&10003], (3, 1), "adjacent slot 3 must stay intact");
+    assert_eq!(out.outgoing.len(), before_len + 1);
+
+    // Negative test: adding a 201st quest must fail All-or-Nothing and emit S->C 0x18 03
+    let before_overflow = out.outgoing.len();
+    assert!(!quest_sync::set_quest_task(&mut conn.session, &mut out, 20001, 1));
+    assert_eq!(conn.session.quest_tasks.len(), 200, "ledger must not exceed 200");
+    assert!(!conn.session.quest_tasks.contains_key(&20001));
     assert_eq!(
-        out.outgoing[1].frame,
-        "F4440600180602312A03",
-        "quest 10801 must take slot 2 (slot 1 belongs to the item)"
+        out.outgoing[before_overflow].frame,
+        "F44402001803",
+        "overflow must emit S->C 0x18 03"
     );
-    assert_eq!(conn.session.quest_tasks[&10801], (2, 3));
+    assert_eq!(out.outgoing.len(), before_overflow + 1);
 
-    // Re-saving the same quest keeps its row and only advances the step.
-    assert!(quest_sync::set_quest_task(&mut conn.session, &mut out, 10801, 4));
-    assert_eq!(out.outgoing[2].frame, "F4440600180602312A04");
-    assert_eq!(conn.session.quest_tasks.len(), 1);
+    // Removing slot 2 frees slot 2 without disturbing slot 1 or slot 3; next quest reuses slot 2
+    assert!(quest_sync::remove_quest_task(&mut conn.session, &mut out, 10002));
+    assert_eq!(conn.session.quest_tasks[&10001], (1, 1));
+    assert_eq!(conn.session.quest_tasks[&10003], (3, 1));
+    assert!(quest_sync::set_quest_task(&mut conn.session, &mut out, 20001, 2));
+    assert_eq!(conn.session.quest_tasks[&20001], (2, 2));
 
-    // The next quest takes row 3.
-    assert!(quest_sync::set_quest_task(&mut conn.session, &mut out, 10802, 1));
-    assert_eq!(out.outgoing[3].frame, "F4440600180603322A01");
-
-    // quest_id 0 is the client's free-row marker -> rejected, no frame.
+    // quest_id 0 is rejected
+    let before_zero = out.outgoing.len();
     assert!(!quest_sync::set_quest_task(&mut conn.session, &mut out, 0, 1));
-    assert_eq!(out.outgoing.len(), 4);
+    assert_eq!(out.outgoing.len(), before_zero);
+}
+
+#[test]
+fn test_upsert_quest_task_slot_never_assigns_slot_zero() {
+    let mut s = Session::new();
+    // Even if a legacy entry had slot 0, upsert_quest_task_slot repairs it to 1..=200
+    s.quest_tasks.insert(218, (0, 1));
+    let slot = quest_sync::upsert_quest_task_slot(&mut s, 218, 2).expect("must allocate valid slot");
+    assert!((1..=200).contains(&slot), "slot must be in 1..=200, got {slot}");
+    assert_eq!(s.quest_tasks[&218], (slot, 2));
 }
 
 // ============================================================================
-// Login bulk sync (research §2): task log -> quest dont -> quest items
+// Login bulk sync (Logined1): 0x18 06 -> 0x18 07 bitmask -> 0x18 08 actor state
 // ============================================================================
 
 #[test]
-fn test_login_sequence_syncs_quest_state_only_when_present() {
-    // Fresh character: no quest state -> not a single 0x18 frame, so the
-    // golden Logined1 byte stream is untouched.
+fn test_login_sequence_syncs_quest_ledger_bitmask_and_actor_state() {
+    // Fresh character: no quest state -> no 0x18 frames
     let fresh = Session::new();
     let frames = ts_dream::server::spawn::build_logined_sequence_session(&fresh);
     assert!(
@@ -301,30 +212,70 @@ fn test_login_sequence_syncs_quest_state_only_when_present() {
         "an empty quest state must add no opcode-0x18 frames"
     );
 
-    // Populated state -> bulk task log, bulk quest dont, then the item adds.
+    // Populated state with bit_id > 300 (1673) + bit_id 101 + two tasks + ghost/god actor flags
     let mut s = Session::new();
+    s.id = 1001;
     s.quest_tasks.insert(10801, (1, 3));
-    s.quest_dont.insert(101);
-    s.quest_items.push(InventoryItem {
-        slot: 1,
-        id: 10001,
-        count: 2,
-        ..Default::default()
-    });
-    // A second task proves the bulk frame carries slot-ordered entries.
     s.quest_tasks.insert(10802, (2, 1));
+    // bit_id 101 -> byte_idx = (100 / 8) + 1 = 13 (0x000D -> 0D00), bit = 100 % 8 = 4 -> 0x10
+    s.quest_dont.insert(101);
+    // bit_id 1673 -> byte_idx = (1672 / 8) + 1 = 210 (0x00D2 -> D200), bit = 1672 % 8 = 0 -> 0x01
+    s.quest_dont.insert(1673);
+    s.ghost = 1;
+    s.god = 5;
 
     let frames = ts_dream::server::spawn::build_logined_sequence_session(&s);
     assert_eq!(
         op18_frames(&frames),
         vec![
-            // 0x18 Sub 0x06 bulk: 2 entries x 4 bytes (slot order 1, 2).
+            // 0x18 06 bulk: 2 entries x 4 bytes (slot order 1, 2)
             "F4440A00180601312A0302322A01",
-            // 0x18 Sub 0x07 bulk: mark 101 flag 1.
-            "F44405001807650001",
-            // 0x18 Sub 0x01: quest item 10001 x2.
-            "F44405001801112702",
+            // 0x18 07 bulk: byte 13 mask 0x10, byte 210 mask 0x01
+            "F444080018070D0010D20001",
+            // 0x18 08: ghost=1, god=1
+            "F44409001808E9030000010001",
+            "F44409001808E9030000020001",
         ],
-        "login must sync quest log, then quest dont, then quest items"
+        "login must sync Quest Ledger (0x18 06), quest_dont bitmask (0x18 07), and actor state (0x18 08)"
     );
+}
+
+// ============================================================================
+// Reject C->S 0x18 01/02 (TMissionForm debug packets) for all accounts incl. GM
+// ============================================================================
+
+#[tokio::test]
+async fn test_dispatch_rejects_client_to_server_0x18_even_for_gm() {
+    let data = GameData::default();
+    let service = BattleService::default();
+    let env = ServerEnv::none();
+
+    for gm_level in [0i32, 1i32] {
+        let mut conn = Conn::default();
+        conn.session.id = 9001;
+        conn.session.gm_level = gm_level;
+        conn.session.in_world = true;
+        conn.session.quest_tasks.insert(10801, (1, 3));
+        conn.session.quest_dont.insert(101);
+
+        // C->S 0x18 01 (add) and C->S 0x18 02 (remove)
+        let c2s_add = [0xF4, 0x44, 0x05, 0x00, 0x18, 0x01, 0x11, 0x27, 0x02];
+        let c2s_rem = [0xF4, 0x44, 0x05, 0x00, 0x18, 0x02, 0x11, 0x27, 0x01];
+
+        let out_add = dispatch(&mut conn, &c2s_add, &data, &service, &env).await;
+        assert!(
+            out_add.outgoing.is_empty(),
+            "C->S 0x18 01 must emit no frames (gm_level={gm_level})"
+        );
+        let out_rem = dispatch(&mut conn, &c2s_rem, &data, &service, &env).await;
+        assert!(
+            out_rem.outgoing.is_empty(),
+            "C->S 0x18 02 must emit no frames (gm_level={gm_level})"
+        );
+
+        // Session quest state must remain untouched
+        assert_eq!(conn.session.quest_tasks.len(), 1);
+        assert_eq!(conn.session.quest_tasks[&10801], (1, 3));
+        assert!(conn.session.quest_dont.contains(&101));
+    }
 }

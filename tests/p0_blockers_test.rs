@@ -249,7 +249,7 @@ fn test_auto_chain_after_preserves_battle_result_for_next_event() {
     session.id = 5555;
     session.map_id = TEST_MAP;
     // finish_event_session records completion count before calling auto_chain_after
-    session.completed_eve_counts.insert(1, 1);
+    session.completed_eve_counts.insert((TEST_MAP, 1), 1);
     // session.current_event_session is None (simulating post-take() in finish_event_session)
     assert!(session.current_event_session.is_none());
 
@@ -348,7 +348,7 @@ fn test_resume_after_battle_loss_executes_quest_backup() {
     assert!(next_battle.is_none());
     assert!(session.current_event_session.is_none(), "Queue exhausted -> finished");
     assert_eq!(
-        session.completed_eve_counts.get(&10),
+        session.completed_eve_counts.get(&(TEST_MAP, 10)),
         None,
         "Failed encounter must NOT be marked as completed (Fix Vấn đề 2)"
     );
@@ -385,7 +385,7 @@ fn test_resume_after_battle_fled_executes_quest_backup() {
     assert!(next_battle.is_none());
     assert!(session.current_event_session.is_none());
     assert_eq!(
-        session.completed_eve_counts.get(&10),
+        session.completed_eve_counts.get(&(TEST_MAP, 10)),
         None,
         "Fled encounter must NOT be marked as completed (Fix Vấn đề 2)"
     );
@@ -531,7 +531,7 @@ fn test_battle_loss_does_not_mark_completed_and_permits_retry() {
     assert_eq!(session.quest_tasks.get(&702), Some(&(1, 4)));
     // CRITICAL: Completed count must NOT be incremented for event 1!
     assert_eq!(
-        session.completed_eve_counts.get(&1),
+        session.completed_eve_counts.get(&(TEST_MAP, 1)),
         None,
         "Event 1 must NOT be marked completed on battle loss"
     );
@@ -555,7 +555,7 @@ fn test_battle_loss_does_not_mark_completed_and_permits_retry() {
     assert_eq!(session.quest_tasks.get(&702), Some(&(1, 7)));
     // CRITICAL: Completed count MUST be incremented on battle win!
     assert_eq!(
-        session.completed_eve_counts.get(&1),
+        session.completed_eve_counts.get(&(TEST_MAP, 1)),
         Some(&1),
         "Event 1 MUST be marked completed on battle win"
     );
@@ -620,7 +620,7 @@ fn test_battle_flee_does_not_mark_completed_and_permits_retry() {
     assert!(next.is_none());
     assert!(session.current_event_session.is_none());
     assert_eq!(
-        session.completed_eve_counts.get(&3),
+        session.completed_eve_counts.get(&(TEST_MAP, 3)),
         None,
         "Event 3 must NOT be marked completed on flee"
     );

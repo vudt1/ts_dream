@@ -4,10 +4,14 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Bộ nạp nhị phân `Data/eve.emg` đọc mỗi `win_cond` đúng `13` byte, loại bỏ đọc `fight_limit` (`0` byte), sửa bounds check bản ghi `EveResult` thành `14` byte, và lan truyền lỗi đọc scene thay vì bỏ qua âm thầm để nạp đủ toàn bộ `3,901` mục từ (`3,897` scene có nội dung).
-- [ ] Xây dựng chỉ mục tra cứu nhanh chỉ-đọc theo khóa `(scene_id, eve_no)` cùng các chỉ mục theo NPC, Door và Encounter cho mỗi scene.
-- [ ] Động cơ Eve bật mặc định trong môi trường production (`EVE_EVENTS_ENABLED` mặc định `true`) và gỡ bỏ hoàn toàn cơ chế ghi đè `.ini` legacy cũng như fallback phản hồi giả cũ.
-- [ ] Kiểm thử tích hợp ở seam `GameData::load` xác nhận nạp thành công đủ `3,901` mục từ / `3,897` scene có dữ liệu và số lượng trận chiến của các scene tiêu biểu (như `12001` có 9 trận, `10951`, `10954`) khớp với nhị phân gốc.
-- [ ] Kiểm thử tích hợp ở seam `dispatcher::dispatch` xác nhận tương tác NPC trên scene trước đây bị rơi (như `10951`) phản hồi hội thoại Eve thật, và trường hợp lỗi định dạng nhị phân giả lập bị từ chối rõ ràng thay vì nuốt lỗi.
+- [x] Bộ nạp nhị phân `Data/eve.emg` đọc mỗi `win_cond` đúng `13` byte (khớp layout `TWinCondition` `+0x04..+0x16` trong `FUN_005efee8`), giữ `BKMusic` (`+0x07`), loại bỏ đọc `fight_limit` (`0` byte), sửa bounds check bản ghi `EveResult` thành `14` byte, và lan truyền lỗi đọc scene thay vì bỏ qua âm thầm để nạp đủ toàn bộ `3,901` mục từ (`3,897` scene có nội dung). *(Lưu ý: `62007.eve` parse sạch tới `TFight cnt=0` nhưng còn `64` byte dư ở cuối — parser dừng sau Section 9 như `FUN_005efee8`, không báo lỗi byte dư EOF trên `62007.eve`.)*
+- [x] Xây dựng chỉ mục tra cứu nhanh chỉ-đọc theo khóa `(scene_id, eve_no)` cùng các chỉ mục theo NPC, Door và Encounter cho mỗi scene.
+- [x] Động cơ Eve bật mặc định trong môi trường production (`EVE_EVENTS_ENABLED` mặc định `true`) và gỡ bỏ hoàn toàn cơ chế ghi đè `.ini` legacy cũng như fallback phản hồi giả cũ.
+- [x] Kiểm thử tích hợp ở seam `GameData::load` xác nhận nạp thành công đủ `3,901` mục từ / `3,897` scene có dữ liệu và số lượng trận chiến của các scene tiêu biểu (như `12001` có 9 trận, `10951`, `10954`) khớp với nhị phân gốc.
+- [x] Kiểm thử tích hợp ở seam `dispatcher::dispatch` xác nhận tương tác NPC trên scene trước đây bị rơi (như `10951`) phản hồi hội thoại Eve thật, và trường hợp lỗi định dạng nhị phân giả lập bị từ chối rõ ràng thay vì nuốt lỗi.
+
+## Comments
+
+- Hoàn thành toàn bộ thay đổi ở `src/data/loaders/eve.rs`, `src/data/loader.rs`, `src/server/handlers/npc_event.rs`, `src/server/handlers/talk.rs`, `tests/random_encounter_test.rs`, và `tests/eve_loader_and_default_on_test.rs`.

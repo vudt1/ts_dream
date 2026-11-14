@@ -40,6 +40,8 @@ pub struct PlayerEventState {
     pub current_eve_no: i32,
     /// Follow-slot general NPC IDs (`conditionClass=9`, class=7 param=6 pStyle=1).
     pub follow_npc_ids: HashSet<i32>,
+    /// Number of carried pets in follow slots (`conditionClass=7` param=5).
+    pub follow_pet_count: usize,
     /// Inn general NPC IDs (class=7 param=6 pStyle=3).
     pub inn_npc_ids: HashSet<i32>,
     /// Cart general NPC IDs (class=7 param=6 pStyle=2).
@@ -47,6 +49,8 @@ pub struct PlayerEventState {
     /// RoleCount statistic counters (`conditionClass=14`; e.g. 100=capture,
     /// 101=death, 108=consecutive login).
     pub role_count_values: HashMap<i32, i32>,
+    /// Permanent character bit flags (`character_bit_flags`).
+    pub bit_flags: HashSet<u32>,
 }
 
 impl Default for PlayerEventState {
@@ -64,9 +68,11 @@ impl Default for PlayerEventState {
             completed_eve_counts: HashMap::new(),
             current_eve_no: 0,
             follow_npc_ids: HashSet::new(),
+            follow_pet_count: 0,
             inn_npc_ids: HashSet::new(),
             cart_npc_ids: HashSet::new(),
             role_count_values: HashMap::new(),
+            bit_flags: HashSet::new(),
         }
     }
 }
@@ -102,6 +108,10 @@ pub struct PlayerStateInputs<'a> {
     pub inn_npc_ids: &'a [i32],
     /// Cart general NPC IDs.
     pub cart_npc_ids: &'a [i32],
+    /// RoleCount statistic `(index, value)` pairs.
+    pub role_count_values: &'a [(i32, i32)],
+    /// Permanent character bit flags (`character_bit_flags`).
+    pub bit_flags: &'a [u32],
 }
 
 /// Builds player state snapshots and resolves fallback dialogue.
@@ -146,8 +156,13 @@ impl EveStateBuilder {
 
         state.equip_items = inputs.equips.iter().copied().collect();
         state.follow_npc_ids = inputs.follow_npc_ids.iter().copied().collect();
+        state.follow_pet_count = inputs.follow_npc_ids.len();
         state.inn_npc_ids = inputs.inn_npc_ids.iter().copied().collect();
         state.cart_npc_ids = inputs.cart_npc_ids.iter().copied().collect();
+        for &(index, value) in inputs.role_count_values {
+            state.role_count_values.insert(index, value);
+        }
+        state.bit_flags = inputs.bit_flags.iter().copied().collect();
 
         state
     }

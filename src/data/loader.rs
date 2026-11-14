@@ -271,12 +271,7 @@ impl GameData {
         if let Some(p) = resolve_data_file(data_dir, "ItemOnMap.txt") {
             d.load_item_on_map(&p)?;
         }
-        let quests_dir = data_dir.join("Quests");
-        if quests_dir.is_dir() {
-            d.load_talks(&quests_dir)?;
-        }
-
-        // 12. eve.emg (binary quest and scene events container)
+        // 12. eve.emg (binary quest and scene events container — Single Source of Truth)
         if let Some(p) = resolve_data_file(data_dir, "eve.emg") {
             let bytes = std::fs::read(&p)
                 .map_err(|e| TsError::Data(format!("read {}: {}", p.display(), e)))?;
@@ -396,6 +391,41 @@ impl GameData {
             .into_iter()
             .map(|asset| asset.source_file)
             .collect())
+    }
+
+    /// Read-only lookup for an Eve event by `(scene_id, eve_no)`.
+    pub fn eve_event(
+        &self,
+        scene_id: u32,
+        eve_no: u16,
+    ) -> Option<&crate::data::loaders::NpcEventData> {
+        self.scene_eve_data
+            .get(&scene_id)
+            .and_then(|s| s.npc_events.get(&eve_no))
+    }
+
+    /// Read-only lookup for an NPC's event numbers on a scene.
+    pub fn eve_npc_events(&self, scene_id: u32, place_id: u16) -> Option<&[u16]> {
+        self.scene_eve_data
+            .get(&scene_id)
+            .and_then(|s| s.npc_events_by_npc.get(&place_id))
+            .map(Vec::as_slice)
+    }
+
+    /// Read-only lookup for a Door's event numbers on a scene.
+    pub fn eve_door_events(&self, scene_id: u32, door_id: u16) -> Option<&[u16]> {
+        self.scene_eve_data
+            .get(&scene_id)
+            .and_then(|s| s.door_events_by_door.get(&door_id))
+            .map(Vec::as_slice)
+    }
+
+    /// Read-only lookup for an Encounter's event numbers on a scene.
+    pub fn eve_encounter_events(&self, scene_id: u32, encounter_id: u16) -> Option<&[u16]> {
+        self.scene_eve_data
+            .get(&scene_id)
+            .and_then(|s| s.encounter_events_by_id.get(&encounter_id))
+            .map(Vec::as_slice)
     }
 
     /// Compute sorted SHA-256 metadata for accepted root-level binary assets.
@@ -899,7 +929,8 @@ impl GameData {
         )
     }
 
-    /// Quests/*.ini — 813 files, Win32 INI semantics.
+    /// Quests/*.ini — legacy, no longer loaded at boot (eve.emg is Single Source of Truth).
+    #[allow(dead_code)]
     fn load_talks(&mut self, quest_dir: &Path) -> Result<()> {
         if !quest_dir.is_dir() {
             return Ok(());

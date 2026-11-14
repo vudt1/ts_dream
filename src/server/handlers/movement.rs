@@ -158,7 +158,8 @@ fn try_trigger_random_encounter(ctx: &mut OpcodeCtx) {
     }
 
     // Resolve battle from encounter's event list
-    let state = crate::server::handlers::npc_event::snapshot_state(&conn.session);
+    let state =
+        crate::server::handlers::npc_event::snapshot_state_with_data(&conn.session, Some(ctx.data), None);
     let mut chosen_fight_id: Option<u16> = None;
 
     for &eve_no in &encounter.events {

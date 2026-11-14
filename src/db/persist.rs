@@ -4,7 +4,7 @@
 //! targets the normalized 0001 tables. `player_id` is the shared PK
 //! `accounts.player_id = characters.character_id` (1:1).
 
-use crate::db::modern::model::StorageType;
+use crate::db::modern::model::{PetStorageType, StorageType};
 use crate::db::pool::DbPool;
 use crate::server::session::{InventoryItem, PetState, Session};
 use sqlx::{Sqlite, Transaction};
@@ -434,14 +434,24 @@ pub async fn delete_system_skills(pool: Option<&DbPool>, player_id: u32) {
     }
 }
 
+pub(crate) fn pet_storage_and_slot(pet: &PetState) -> (u8, u8) {
+    match pet.storage_type {
+        PetStorageType::Carried if pet.stt <= 4 => (PetStorageType::Carried.value(), pet.stt),
+        PetStorageType::Carried => (PetStorageType::Hotel.value(), pet.stt.saturating_sub(4)),
+        other => (
+            other.value(),
+            if pet.stt > 4 {
+                pet.stt.saturating_sub(4)
+            } else {
+                pet.stt
+            },
+        ),
+    }
+}
+
 pub async fn upsert_pet(pool: Option<&DbPool>, player_id: u32, pet: &PetState) {
     let Some(pool) = pool else { return };
-    let storage = if pet.stt <= 4 { 1u8 } else { 3u8 };
-    let slot = if pet.stt <= 4 {
-        pet.stt
-    } else {
-        pet.stt.saturating_sub(4)
-    };
+    let (storage, slot) = pet_storage_and_slot(pet);
     let [s1, s2, s3, s4] = pet.skills;
     let result = sqlx::query("INSERT INTO character_pets (playerid, storagetype, slot, petid, name, level, element, rebornstage, curhp, maxhp, cursp, maxsp, baseint, baseatk, basedef, basehpx, basespx, baseagi, fai, thd, texp, skillpoint, quest, skill1_id, skill1_level, skill2_id, skill2_level, skill3_id, skill3_level, skill4_id, skill4_level) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(playerid, storagetype, slot) DO UPDATE SET petid=excluded.petid, name=excluded.name, level=excluded.level, element=excluded.element, rebornstage=excluded.rebornstage, curhp=excluded.curhp, maxhp=excluded.maxhp, cursp=excluded.cursp, maxsp=excluded.maxsp, baseint=excluded.baseint, baseatk=excluded.baseatk, basedef=excluded.basedef, basehpx=excluded.basehpx, basespx=excluded.basespx, baseagi=excluded.baseagi, fai=excluded.fai, thd=excluded.thd, texp=excluded.texp, skillpoint=excluded.skillpoint, quest=excluded.quest, skill1_id=excluded.skill1_id, skill1_level=excluded.skill1_level, skill2_id=excluded.skill2_id, skill2_level=excluded.skill2_level, skill3_id=excluded.skill3_id, skill3_level=excluded.skill3_level, skill4_id=excluded.skill4_id, skill4_level=excluded.skill4_level")
         .bind(i64::from(player_id)).bind(storage).bind(i64::from(slot)).bind(i64::from(pet.id)).bind(&pet.name).bind(i64::from(pet.level)).bind(i64::from(pet.thuoctinh)).bind(i64::from(pet.reborn)).bind(i64::from(pet.hp)).bind(i64::from(pet.hp_max)).bind(i64::from(pet.sp)).bind(i64::from(pet.sp_max)).bind(i64::from(pet.int1)).bind(i64::from(pet.atk)).bind(i64::from(pet.def)).bind(i64::from(pet.hpx)).bind(i64::from(pet.spx)).bind(i64::from(pet.agi)).bind(i64::from(pet.fai)).bind(i64::from(pet.thd)).bind(i64::from(pet.texp)).bind(i64::from(pet.skill_point)).bind(i64::from(pet.quest)).bind(i64::from(s1.0)).bind(i64::from(s1.1)).bind(i64::from(s2.0)).bind(i64::from(s2.1)).bind(i64::from(s3.0)).bind(i64::from(s3.1)).bind(i64::from(s4.0)).bind(i64::from(s4.1)).execute(&pool.write).await;
