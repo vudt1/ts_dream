@@ -105,12 +105,15 @@ pub enum NpcTrigger {
 }
 
 impl NpcTrigger {
-    fn kind(self) -> i32 {
+    fn kind(self) -> crate::eve::auto_chain::EventTriggerKind {
+        use crate::eve::auto_chain::EventTriggerKind;
         match self {
-            NpcTrigger::ClickNpc(_) => 1,
-            NpcTrigger::ClickDoor(_) => 4,
-            NpcTrigger::MeetDoor(_) => 8,
-            NpcTrigger::WalkStep { .. } | NpcTrigger::WalkStepEncounter(_) => 16,
+            NpcTrigger::ClickNpc(_) => EventTriggerKind::ClickNpc,
+            NpcTrigger::ClickDoor(_) => EventTriggerKind::ClickDoor,
+            NpcTrigger::MeetDoor(_) => EventTriggerKind::MeetDoor,
+            NpcTrigger::WalkStep { .. } | NpcTrigger::WalkStepEncounter(_) => {
+                EventTriggerKind::WalkStep
+            }
         }
     }
 

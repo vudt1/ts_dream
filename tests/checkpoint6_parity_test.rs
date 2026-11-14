@@ -12,7 +12,7 @@ use ts_dream::data::loader::GameData;
 use ts_dream::data::loaders::mark::MarkDatLoader;
 use ts_dream::data::loaders::{EveResult, EveSceneInfo, SceneEveData};
 use ts_dream::data::tables::Warp;
-use ts_dream::eve::auto_chain::{EventPhase, EventSession};
+use ts_dream::eve::auto_chain::{EventPhase, EventSession, EventTriggerKind};
 use ts_dream::protocol::codecs::npc_talk::NpcTalkCodec;
 use ts_dream::server::dispatcher::HandleOutcome;
 use ts_dream::server::handlers::npc_event::{resolve_npc_event, set_eve_events_enabled, NpcTrigger};
@@ -69,7 +69,7 @@ fn session_with_action(results: Vec<EveResult>) -> Session {
         map_id: i32::from(TEST_MAP),
         eve_no: 1,
         npc_click_id: 1,
-        trigger_kind: 1,
+        trigger_kind: EventTriggerKind::ClickNpc,
         chain_depth: 0,
         results,
         current_index: 0,

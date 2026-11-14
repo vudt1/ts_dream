@@ -165,7 +165,7 @@ fn create_test_event_session(results: Vec<ts_dream::data::loaders::EveResult>) -
         map_id: 1,
         eve_no: 1,
         npc_click_id: 0,
-        trigger_kind: 1,
+        trigger_kind: ts_dream::eve::EventTriggerKind::ClickNpc,
         chain_depth: 0,
         results,
         current_index: 0,

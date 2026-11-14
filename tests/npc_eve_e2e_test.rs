@@ -33,7 +33,7 @@ use ts_dream::data::loaders::{EveFightData, EveResult, EveSceneInfo, SceneEveDat
 use ts_dream::data::tables::Warp;
 use ts_dream::db::modern::sqlite::SqliteRepositories;
 use ts_dream::db::pool::DbPool;
-use ts_dream::eve::auto_chain::{EventPhase, EventSession};
+use ts_dream::eve::auto_chain::{EventPhase, EventSession, EventTriggerKind};
 use ts_dream::protocol::codecs::npc_talk::{NpcTalkCodec, TalkLockMode};
 use ts_dream::protocol::codecs::quest_sync::QuestSyncCodec;
 use ts_dream::server::auto_save;
@@ -125,7 +125,7 @@ fn session_with_event(map_id: u16, results: Vec<EveResult>) -> Session {
         map_id: i32::from(map_id),
         eve_no: 5,
         npc_click_id: 1,
-        trigger_kind: 1,
+        trigger_kind: EventTriggerKind::ClickNpc,
         chain_depth: 0,
         results,
         current_index: 0,
@@ -529,7 +529,7 @@ async fn battle_parks_after_talk_and_stray_inputs_are_ignored() {
         map_id: i32::from(SOURCE_MAP),
         eve_no: 5,
         npc_click_id: 1,
-        trigger_kind: 1,
+        trigger_kind: EventTriggerKind::ClickNpc,
         chain_depth: 0,
         results,
         current_index: 0,

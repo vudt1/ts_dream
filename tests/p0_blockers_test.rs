@@ -11,7 +11,7 @@ use ts_dream::data::loaders::{
     SceneEveData,
 };
 use ts_dream::data::tables::Warp;
-use ts_dream::eve::auto_chain::{AutoChainResult, EventPhase, EventSession};
+use ts_dream::eve::auto_chain::{AutoChainResult, EventPhase, EventSession, EventTriggerKind};
 use ts_dream::protocol::codecs::npc_talk::{NpcTalkCodec, TalkLockMode};
 use ts_dream::protocol::codecs::quest_sync::QuestSyncCodec;
 use ts_dream::server::dispatcher::HandleOutcome;
@@ -109,7 +109,7 @@ fn session_with_event(map_id: u16, results: Vec<EveResult>) -> Session {
         map_id: i32::from(map_id),
         eve_no: 10,
         npc_click_id: 1,
-        trigger_kind: 1,
+        trigger_kind: EventTriggerKind::ClickNpc,
         chain_depth: 0,
         results,
         current_index: 0,
@@ -147,7 +147,7 @@ fn test_snapshot_state_with_context_preserves_completed_session_context() {
         map_id: 10817,
         eve_no: 10,
         npc_click_id: 1,
-        trigger_kind: 1,
+        trigger_kind: EventTriggerKind::ClickNpc,
         chain_depth: 0,
         results: Vec::new(),
         current_index: 0,
@@ -175,7 +175,7 @@ fn test_snapshot_state_with_context_fallback_to_current_event_session() {
         map_id: 10817,
         eve_no: 10,
         npc_click_id: 1,
-        trigger_kind: 1,
+        trigger_kind: EventTriggerKind::ClickNpc,
         chain_depth: 0,
         results: Vec::new(),
         current_index: 0,
@@ -257,7 +257,7 @@ fn test_auto_chain_after_preserves_battle_result_for_next_event() {
         map_id: i32::from(TEST_MAP),
         eve_no: 1,
         npc_click_id: 1,
-        trigger_kind: 1,
+        trigger_kind: EventTriggerKind::ClickNpc,
         chain_depth: 0,
         results: vec![fight_result(FIGHT_ID)],
         current_index: 1,
@@ -290,7 +290,7 @@ fn test_auto_chain_after_preserves_battle_result_for_next_event() {
         map_id: i32::from(TEST_MAP),
         eve_no: 1,
         npc_click_id: 1,
-        trigger_kind: 1,
+        trigger_kind: EventTriggerKind::ClickNpc,
         chain_depth: 0,
         results: vec![fight_result(FIGHT_ID)],
         current_index: 1,

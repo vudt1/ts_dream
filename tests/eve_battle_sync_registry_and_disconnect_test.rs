@@ -24,7 +24,7 @@ use ts_dream::data::tables::Npc;
 use ts_dream::db::modern::sqlite::SqliteRepositories;
 use ts_dream::db::modern::traits::CharacterSeed;
 use ts_dream::db::pool::DbPool;
-use ts_dream::eve::{EventPhase, EventSession};
+use ts_dream::eve::{EventPhase, EventSession, EventTriggerKind};
 use ts_dream::server::dispatcher::{dispatch, ServerEnv};
 use ts_dream::server::handlers::npc_event::set_eve_events_enabled;
 use ts_dream::server::session::{
@@ -413,7 +413,7 @@ async fn e2e_eve_battle_party_member_preserves_standard_eve_quest_progress() {
         map_id: 12001,
         eve_no: 1,
         npc_click_id: 1,
-        trigger_kind: 1,
+        trigger_kind: EventTriggerKind::ClickNpc,
         chain_depth: 0,
         results: vec![EveResult {
             result_group_no: 1,
@@ -631,7 +631,7 @@ async fn eve_fight_data_loads_right_enemies_diahinh_fallback_and_direct_map_broa
         map_id: 12001,
         eve_no: 1,
         npc_click_id: 1,
-        trigger_kind: 1,
+        trigger_kind: EventTriggerKind::ClickNpc,
         chain_depth: 0,
         results: vec![
             EveResult {

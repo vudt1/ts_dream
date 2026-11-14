@@ -22,7 +22,9 @@ use ts_dream::db::modern::model::PetStorageType;
 use ts_dream::db::modern::sqlite::SqliteRepositories;
 use ts_dream::db::modern::traits::CharacterSeed;
 use ts_dream::db::pool::DbPool;
-use ts_dream::eve::auto_chain::{EveAutoChainEngine, EventPhase, EventSession};
+use ts_dream::eve::auto_chain::{
+    EveAutoChainEngine, EventPhase, EventSession, EventTriggerKind,
+};
 use ts_dream::eve::planner::{plan_results, DomainEffect};
 use ts_dream::protocol::codecs::npc_talk::{NpcTalkCodec, TalkLockMode};
 use ts_dream::protocol::codecs::quest_sync::QuestSyncCodec;
@@ -153,7 +155,7 @@ fn pure_planner_never_emits_0x14_for_rt_ge_7_and_handles_autochain_negative_psty
         map_id: 12001,
         eve_no: 1,
         npc_click_id: 1,
-        trigger_kind: 1,
+        trigger_kind: EventTriggerKind::ClickNpc,
         chain_depth: 0,
         results: raw_results[..3].to_vec(),
         current_index: 0,
@@ -176,7 +178,7 @@ fn pure_planner_never_emits_0x14_for_rt_ge_7_and_handles_autochain_negative_psty
         map_id: 1,
         eve_no: 1,
         npc_click_id: 1,
-        trigger_kind: 1,
+        trigger_kind: EventTriggerKind::ClickNpc,
         chain_depth: 0,
         results: vec![EveResult {
             result_type: 0,

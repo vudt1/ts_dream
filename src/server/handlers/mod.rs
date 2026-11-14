@@ -5,6 +5,7 @@ pub mod battle;
 pub mod character;
 pub mod chat;
 pub mod crafting;
+pub mod eve_runner;
 pub mod event_npcs;
 pub mod expressions;
 pub mod festival;

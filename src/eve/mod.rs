@@ -22,10 +22,14 @@ pub mod resolver;
 pub mod state;
 
 pub use auto_chain::{
-    AutoChainResult, EveAutoChainEngine, EventPhase, EventSession, MAX_CHAIN_DEPTH,
+    AutoChainResult, EveAutoChainEngine, EventPhase, EventSession, EventTriggerKind,
+    MAX_CHAIN_DEPTH,
 };
 pub use evaluator::{compare_step, evaluate};
 pub use group::apply_group_data;
-pub use planner::{plan_chain, plan_result, plan_results, DomainEffect, EveTrigger, PlannedChain};
+pub use planner::{
+    plan_chain, plan_result, plan_results, DomainEffect, EveTrigger, MoneyOp, PetOp, PlannedChain,
+    PlayerOp, QuestOp,
+};
 pub use resolver::{build_chains, resolve, resolve_event, ChainResolveResult};
 pub use state::{EveStateBuilder, PlayerEventState, PlayerStateInputs};

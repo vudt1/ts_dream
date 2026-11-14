@@ -164,9 +164,20 @@
 
 ---
 
+### Ticket 10 (`10-smell-03-04-structural-refactor.md`) — `resolved`
+1. **Type-Safe `DomainEffect` Sub-Enums & Removal of `raw_result: &EveResult` (`src/eve/planner.rs`, `src/eve/mod.rs`, `src/server/handlers/eve_runner.rs`)**:
+   - Added `MoneyOp`, `QuestOp`, `PlayerOp`, and `PetOp` in `planner.rs`; `plan_result` parses `result_class` / `parameter_style` once so `preflight_probe_batch` and executors dispatch directly on typed `DomainEffect` variants without `execute_action_result_non_skill(raw_result: &EveResult)`.
+2. **Typed `EventTriggerKind` (`src/eve/auto_chain.rs`, `src/server/handlers/npc_event.rs`, `src/server/handlers/talk.rs`)**:
+   - Replaced `EventSession.trigger_kind: i32` with `EventTriggerKind` (`ClickNpc = 1`, `ClickDoor = 4`, `MeetDoor = 8`, `WalkStep = 16`), eliminating catch-all branches across `auto_chain.rs`, `npc_event.rs`, `talk.rs`, and all Eve test suites.
+3. **Separated `eve_runner.rs` & Unified `execute_event_step_core` (`src/server/handlers/eve_runner.rs`, `src/server/handlers/talk.rs`, `src/server/handlers/mod.rs`)**:
+   - Extracted `EventRunner`, `PreFlightError`, `preflight_probe_batch`, and `DomainEffect` executors into `src/server/handlers/eve_runner.rs`.
+   - Slimmed `src/server/handlers/talk.rs` to `0x14` transport/sub-opcode handlers with `pub use super::eve_runner::{...};` backward-compatible re-exports.
+   - Unified the duplicate sync/async `execute_event_step` loops into a single `async fn execute_event_step_core`, with `run_sync_future` (`std::thread::scope` + `current_thread` runtime) backing the thin sync wrappers `execute_event_step` and `resume_eve_after_battle_sync_full`.
+
+---
+
 ## Next Tickets for Continuation
 
-All tickets `01` through `09` in `.scratch/quest-refactor/issues/` are now `resolved`.
-- **Deferred structural refactors (optional):** `Smell-03` (dispatching `DomainEffect` directly without passing `&EveResult`) and `Smell-04` (splitting `talk.rs` into `eve_runner.rs`) were intentionally deferred to avoid wide churn.
+All tickets `01` through `10` in `.scratch/quest-refactor/issues/` are now `resolved`.
 - **Runtime / live client checks remaining:** Live `aLogin.exe` rendering of `0x14 01` on `MutateItem` and `0x1A 05/06` without `0x1A 03`, plus a dedicated 40-NPC multi-wave `advance_wave` + `battle_ended` test asserting `quest_tasks[218]` preservation in `sess_arc`.
 - **Important note for production DB:** Existing `DB/ts_dream.db` files created from `0001_init.sql` must have `migrations/0002_eve_quest_persistence.sql` applied before running the updated binary (since `db::pool::migrate` is a no-op per ADR 0004).

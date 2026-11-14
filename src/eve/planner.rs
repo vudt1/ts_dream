@@ -22,11 +22,82 @@ pub enum EveTrigger {
     BattleEnd { eve_no: i32, fight_eve_no: i32, outcome: i32 },
 }
 
+/// Typed money/point mutation parsed from `rt = 0, rc = 5`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MoneyOp {
+    AddStatPoints(u32),
+    AddGold(u32),
+    DeductGold(u32),
+    AddShopPoints(u32),
+    DeductShopPoints(u32),
+    NoOp,
+    Unsupported { p_style: u8, amount: i32 },
+}
+
+/// Typed quest log / `quest_dont` operation parsed from `rt = 0, rc = 2`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QuestOp {
+    Decrement {
+        quest_id: u16,
+        dec: u8,
+    },
+    Advance {
+        quest_id: u16,
+        step: u8,
+        mark_dont_on_step1: bool,
+    },
+    Subtract {
+        quest_id: u16,
+        step: u8,
+    },
+    Drop {
+        quest_id: u16,
+    },
+    ExplicitMark {
+        quest_id: u16,
+        result_value: i32,
+    },
+    MarkDont {
+        quest_id: u16,
+    },
+    Unsupported {
+        quest_id: u16,
+        p_style: u8,
+        result_value: i32,
+    },
+}
+
+/// Typed player attribute / savemap / EXP / shop operation parsed from `rt = 0, rc = 7`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlayerOp {
+    SaveMap,
+    AddSkillPoint(u16),
+    AddStatPoint(u16),
+    AddExp(u32),
+    GetArmy { p_style: u8, value: i32 },
+    OpenNpcShop { save_map: bool },
+    Unsupported {
+        parameter: u16,
+        p_style: u8,
+        result_value: i32,
+    },
+}
+
+/// Typed pet grant/revoke operation parsed from `rt = 0, rc = 8`.
+#[derive(Debug, Clone, PartialEq)]
+pub enum PetOp {
+    Grant { pet_id: u16, wire_result: EveResult },
+    Revoke { pet_id: u16, wire_result: EveResult },
+    NoOp,
+}
+
 /// Pure domain effect produced from an `EveResult`.
 ///
-/// Only `TalkStep` (`rt=1`) and `AwaitMenuChoice` (`rt=6`) emit `S→C 0x14 01`.
-/// `result_type >= 7` (except `rt=9` server-side `NpcAction`) are never sent
-/// raw via `0x14` and instead become [`DomainEffect::Unsupported`].
+/// Only `TalkStep` (`rt=1`) and `AwaitMenuChoice` (`rt=6`) emit `S→C 0x14 01`
+/// dialogue/menu prompts; `MoveEntity`, `PlayMovie`, `NpcTeam`, `MutateItem`,
+/// and `RewardPet` carry `EveResult` only when needed for `0x14 01` client
+/// display notifications. `result_type >= 7` (except `rt=9` server-side
+/// `NpcAction`) are never sent raw via `0x14` and become [`DomainEffect::Unsupported`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum DomainEffect {
     /// `rt = 1`: Deliver a dialogue step (`0x14 01`) and wait for `0x14 06`.
@@ -46,29 +117,21 @@ pub enum DomainEffect {
     /// `rt = 0, rc = 1`: Add or remove `Item.dat` item in `homdo (0x17)`.
     MutateItem {
         item_id: u16,
-        p_style: u8,
         delta: i32,
+        wire_result: EveResult,
     },
     /// `rt = 0, rc = 2`: Update `Quest Ledger (0x18)` or `quest_dont (0x18 05)`.
-    UpdateQuest {
-        quest_id: u16,
-        p_style: u8,
-        result_value: i32,
-    },
+    UpdateQuest(QuestOp),
     /// `rt = 0, rc = 3`: NpcTeam action (Ticket 06).
     NpcTeam(EveResult),
     /// `rt = 0, rc = 4`: Grant skill free of `skill_point` + `08 01 6E` sync.
     LearnSkill { skill_id: u16, target_level: u8 },
-    /// `rt = 0, rc = 5`: Gold / stat-point reward or deduction.
-    MutateMoney { p_style: u8, amount: i32 },
+    /// `rt = 0, rc = 5`: Gold / stat-point / shop-point reward or deduction.
+    MutateMoney(MoneyOp),
     /// `rt = 0, rc = 7`: Player attribute / `savemap` / `texp` / shop open.
-    PlayerEffect {
-        parameter: u16,
-        p_style: u8,
-        result_value: i32,
-    },
+    PlayerEffect(PlayerOp),
     /// `rt = 0, rc = 8`: Add or remove pet (Ticket 06).
-    RewardPet(EveResult),
+    RewardPet(PetOp),
     /// Unverified or server-only unknown `result_type` / `result_class` (fail-closed no-op).
     Unsupported { result_type: u8, result_class: u8 },
 }
@@ -117,14 +180,14 @@ pub fn plan_result(result: &EveResult) -> DomainEffect {
         0 => match result.result_class {
             1 => DomainEffect::MutateItem {
                 item_id: result.parameter,
-                p_style: result.parameter_style,
                 delta: result.result_value,
+                wire_result: result.clone(),
             },
-            2 => DomainEffect::UpdateQuest {
-                quest_id: result.parameter,
-                p_style: result.parameter_style,
-                result_value: result.result_value,
-            },
+            2 => DomainEffect::UpdateQuest(plan_quest_op(
+                result.parameter,
+                result.parameter_style,
+                result.result_value,
+            )),
             3 => DomainEffect::NpcTeam(result.clone()),
             4 => {
                 let target_level = if result.result_value <= 0 {
@@ -137,16 +200,26 @@ pub fn plan_result(result: &EveResult) -> DomainEffect {
                     target_level,
                 }
             }
-            5 => DomainEffect::MutateMoney {
-                p_style: result.parameter_style,
-                amount: result.result_value,
-            },
-            7 => DomainEffect::PlayerEffect {
-                parameter: result.parameter,
-                p_style: result.parameter_style,
-                result_value: result.result_value,
-            },
-            8 => DomainEffect::RewardPet(result.clone()),
+            5 => DomainEffect::MutateMoney(plan_money_op(
+                result.parameter_style,
+                result.result_value,
+            )),
+            7 => DomainEffect::PlayerEffect(plan_player_op(
+                result.parameter,
+                result.parameter_style,
+                result.result_value,
+            )),
+            8 => DomainEffect::RewardPet(match result.parameter_style {
+                1 if result.parameter > 0 => PetOp::Grant {
+                    pet_id: result.parameter,
+                    wire_result: result.clone(),
+                },
+                2 if result.parameter > 0 => PetOp::Revoke {
+                    pet_id: result.parameter,
+                    wire_result: result.clone(),
+                },
+                _ => PetOp::NoOp,
+            }),
             other => DomainEffect::Unsupported {
                 result_type: 0,
                 result_class: other,
@@ -183,4 +256,127 @@ pub fn plan_chain(
         results: resolved.results,
         effects,
     })
+}
+
+fn plan_money_op(p_style: u8, amount: i32) -> MoneyOp {
+    match p_style {
+        1 => {
+            if amount > 0 {
+                if amount < 1000 {
+                    MoneyOp::AddStatPoints(u32::from(amount as u16).saturating_mul(20))
+                } else {
+                    MoneyOp::AddGold(amount as u32)
+                }
+            } else if amount < 0 {
+                MoneyOp::DeductGold(amount.unsigned_abs())
+            } else {
+                MoneyOp::NoOp
+            }
+        }
+        2 => {
+            if amount > 0 {
+                MoneyOp::DeductGold(amount as u32)
+            } else {
+                MoneyOp::NoOp
+            }
+        }
+        3 => {
+            if amount > 0 {
+                MoneyOp::AddShopPoints(amount as u32)
+            } else {
+                MoneyOp::NoOp
+            }
+        }
+        4 => {
+            if amount > 0 {
+                MoneyOp::DeductShopPoints(amount as u32)
+            } else {
+                MoneyOp::NoOp
+            }
+        }
+        _ => MoneyOp::Unsupported { p_style, amount },
+    }
+}
+
+fn plan_quest_op(quest_id: u16, p_style: u8, result_value: i32) -> QuestOp {
+    match p_style {
+        1 => {
+            if result_value < 0 {
+                QuestOp::Decrement {
+                    quest_id,
+                    dec: result_value.unsigned_abs().min(255) as u8,
+                }
+            } else {
+                QuestOp::Advance {
+                    quest_id,
+                    step: (result_value & 0xFF) as u8,
+                    mark_dont_on_step1: true,
+                }
+            }
+        }
+        2 => QuestOp::Subtract {
+            quest_id,
+            step: (result_value & 0xFF) as u8,
+        },
+        3 => {
+            if result_value == 0 {
+                QuestOp::Drop { quest_id }
+            } else {
+                QuestOp::ExplicitMark {
+                    quest_id,
+                    result_value,
+                }
+            }
+        }
+        4 => QuestOp::Advance {
+            quest_id,
+            step: (result_value & 0xFF) as u8,
+            mark_dont_on_step1: false,
+        },
+        5 => QuestOp::MarkDont { quest_id },
+        _ => QuestOp::Unsupported {
+            quest_id,
+            p_style,
+            result_value,
+        },
+    }
+}
+
+fn plan_player_op(parameter: u16, p_style: u8, result_value: i32) -> PlayerOp {
+    match parameter {
+        0 | 5 => {
+            if p_style == 1 {
+                PlayerOp::SaveMap
+            } else {
+                PlayerOp::Unsupported {
+                    parameter,
+                    p_style,
+                    result_value,
+                }
+            }
+        }
+        1 => match p_style {
+            1 => PlayerOp::SaveMap,
+            2 => PlayerOp::AddSkillPoint((result_value & 0xFFFF) as u16),
+            3 => PlayerOp::AddStatPoint((result_value & 0xFFFF) as u16),
+            4 => PlayerOp::AddExp(result_value.max(0) as u32),
+            _ => PlayerOp::Unsupported {
+                parameter,
+                p_style,
+                result_value,
+            },
+        },
+        2 => PlayerOp::GetArmy {
+            p_style,
+            value: result_value,
+        },
+        3 => PlayerOp::OpenNpcShop {
+            save_map: p_style == 1,
+        },
+        _ => PlayerOp::Unsupported {
+            parameter,
+            p_style,
+            result_value,
+        },
+    }
 }

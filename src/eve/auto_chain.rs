@@ -29,6 +29,36 @@ pub enum EventPhase {
     Completed,
 }
 
+/// Typed trigger source for an [`EventSession`], replacing raw `i32` codes (`1, 4, 8, 16`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(i32)]
+pub enum EventTriggerKind {
+    ClickNpc = 1,
+    ClickDoor = 4,
+    MeetDoor = 8,
+    WalkStep = 16,
+}
+
+impl EventTriggerKind {
+    /// Convert a raw Eve trigger code (`1`, `4`, `8`, `16`) into [`EventTriggerKind`].
+    #[must_use]
+    pub const fn from_eve_code(code: i32) -> Option<Self> {
+        match code {
+            1 => Some(Self::ClickNpc),
+            4 => Some(Self::ClickDoor),
+            8 => Some(Self::MeetDoor),
+            16 => Some(Self::WalkStep),
+            _ => None,
+        }
+    }
+
+    /// Raw Eve trigger code (`1`, `4`, `8`, `16`).
+    #[must_use]
+    pub const fn as_eve_code(self) -> i32 {
+        self as i32
+    }
+}
+
 /// An in-flight event session (immutable by convention; callers replace it).
 #[derive(Debug, Clone, PartialEq)]
 pub struct EventSession {
@@ -38,8 +68,8 @@ pub struct EventSession {
     pub eve_no: i32,
     /// Click ID of the triggering NPC or door.
     pub npc_click_id: i32,
-    /// Trigger kind (1=ClickNpc, 4=ClickDoor, 8=MeetDoor, ...).
-    pub trigger_kind: i32,
+    /// Typed trigger kind (`ClickNpc`, `ClickDoor`, `MeetDoor`, `WalkStep`).
+    pub trigger_kind: EventTriggerKind,
     /// Auto-chain depth guard against infinite loops.
     pub chain_depth: i32,
     /// Result queue for this event.
@@ -283,8 +313,13 @@ impl EveAutoChainEngine {
 /// Maximum auto-chain depth before giving up.
 pub const MAX_CHAIN_DEPTH: i32 = 10;
 
-/// Trigger kinds eligible for auto-chain: ClickNpc=1, ClickDoor=4, MeetDoor=8, WalkStep=16.
-const AUTO_CHAIN_TRIGGER_KINDS: [i32; 4] = [1, 4, 8, 16];
+/// Trigger kinds eligible for auto-chain.
+const AUTO_CHAIN_TRIGGER_KINDS: [EventTriggerKind; 4] = [
+    EventTriggerKind::ClickNpc,
+    EventTriggerKind::ClickDoor,
+    EventTriggerKind::MeetDoor,
+    EventTriggerKind::WalkStep,
+];
 
 fn has_later_completed_event(events: &[u8], current_eve_no: u8, state: &PlayerEventState) -> bool {
     let mut found_current = false;
@@ -309,25 +344,24 @@ fn has_later_completed_event(events: &[u8], current_eve_no: u8, state: &PlayerEv
 
 fn event_list_for<'a>(scene: &'a SceneEveData, session: &EventSession) -> Option<&'a [u8]> {
     match session.trigger_kind {
-        1 => Some(
+        EventTriggerKind::ClickNpc => Some(
             scene
                 .npcs
                 .get(&(session.npc_click_id as u16))?
                 .events
                 .as_slice(),
         ),
-        4 | 8 => Some(
+        EventTriggerKind::ClickDoor | EventTriggerKind::MeetDoor => Some(
             scene
                 .doors
                 .get(&(session.npc_click_id as u16))?
                 .events
                 .as_slice(),
         ),
-        16 => scene
+        EventTriggerKind::WalkStep => scene
             .encounters
             .iter()
             .find(|enc| i32::from(enc.id) == session.npc_click_id)
             .map(|enc| enc.events.as_slice()),
-        _ => None,
     }
 }

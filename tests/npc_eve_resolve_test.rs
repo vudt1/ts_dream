@@ -56,7 +56,7 @@ fn test_resolve_npc_eve_trac_quan_newbie() {
     assert_eq!(ev.map_id, 10817);
     assert_eq!(ev.eve_no, 1);
     assert_eq!(ev.npc_click_id, 1);
-    assert_eq!(ev.trigger_kind, 1); // 1 = ClickNpc
+    assert_eq!(ev.trigger_kind, ts_dream::eve::EventTriggerKind::ClickNpc); // 1 = ClickNpc
     assert_eq!(ev.results.len(), 7, "NPC 1 has 7 results");
 
     // Check first result: Talk (result_type = 1), mean_no = 10364

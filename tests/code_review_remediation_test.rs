@@ -20,7 +20,9 @@ use ts_dream::data::loaders::{
 use ts_dream::db::modern::model::PetStorageType;
 use ts_dream::db::persist::persist_sessions_transaction;
 use ts_dream::db::pool::DbPool;
-use ts_dream::eve::auto_chain::{AutoChainResult, EveAutoChainEngine, EventPhase, EventSession};
+use ts_dream::eve::auto_chain::{
+    AutoChainResult, EveAutoChainEngine, EventPhase, EventSession, EventTriggerKind,
+};
 use ts_dream::eve::evaluator::evaluate;
 use ts_dream::eve::state::PlayerEventState;
 use ts_dream::protocol::codecs::npc_talk::NpcTalkCodec;
@@ -126,7 +128,7 @@ fn test_preflight_walks_through_talk_step_and_checks_item_sufficiency() {
         map_id: 12001,
         eve_no: 1,
         npc_click_id: 1,
-        trigger_kind: 1,
+        trigger_kind: EventTriggerKind::ClickNpc,
         chain_depth: 0,
         results: vec![
             make_mut_item(50001, -1),
@@ -158,7 +160,7 @@ fn test_preflight_walks_through_talk_step_and_checks_item_sufficiency() {
         map_id: 12001,
         eve_no: 2,
         npc_click_id: 1,
-        trigger_kind: 1,
+        trigger_kind: EventTriggerKind::ClickNpc,
         chain_depth: 0,
         results: vec![
             make_mut_item(50001, -5),
@@ -195,7 +197,7 @@ fn test_point_cap_wire_0x1a_05_06_and_item_0x14_01() {
         map_id: 12001,
         eve_no: 3,
         npc_click_id: 1,
-        trigger_kind: 1,
+        trigger_kind: EventTriggerKind::ClickNpc,
         chain_depth: 0,
         results: vec![add_res, sub_res, item_res.clone()],
         current_index: 0,
@@ -231,7 +233,7 @@ fn test_point_cap_wire_0x1a_05_06_and_item_0x14_01() {
         map_id: 12001,
         eve_no: 4,
         npc_click_id: 1,
-        trigger_kind: 1,
+        trigger_kind: EventTriggerKind::ClickNpc,
         chain_depth: 0,
         results: vec![make_money_result(3, 200)],
         current_index: 0,
@@ -305,7 +307,7 @@ async fn test_pet_storage_type_isolation_in_actions_and_reward_pet() {
         map_id: 12001,
         eve_no: 5,
         npc_click_id: 1,
-        trigger_kind: 1,
+        trigger_kind: EventTriggerKind::ClickNpc,
         chain_depth: 0,
         results: vec![EveResult {
             result_type: 0,
@@ -357,7 +359,7 @@ async fn test_registry_sync_atomic_party_tx_and_warp_rollback() {
         map_id: 12001,
         eve_no: 6,
         npc_click_id: 1,
-        trigger_kind: 1,
+        trigger_kind: EventTriggerKind::ClickNpc,
         chain_depth: 0,
         results: vec![
             make_mut_item(26041, 2),
@@ -485,7 +487,7 @@ async fn test_warp_event_count_and_walkstep_autochain_and_menu() {
         map_id: 12001,
         eve_no: 10,
         npc_click_id: 77,
-        trigger_kind: 16,
+        trigger_kind: EventTriggerKind::WalkStep,
         chain_depth: 0,
         results: vec![make_mut_item(26041, 1)],
         current_index: 1,
@@ -511,7 +513,7 @@ async fn test_warp_event_count_and_walkstep_autochain_and_menu() {
         map_id: 12001,
         eve_no: 20,
         npc_click_id: 1,
-        trigger_kind: 4,
+        trigger_kind: EventTriggerKind::ClickDoor,
         chain_depth: 0,
         results: vec![make_mut_item(26041, 1), make_warp_result(1)],
         current_index: 0,
@@ -580,7 +582,7 @@ async fn test_warp_event_count_and_walkstep_autochain_and_menu() {
         map_id: 12001,
         eve_no: 2,
         npc_click_id: 2,
-        trigger_kind: 16,
+        trigger_kind: EventTriggerKind::WalkStep,
         chain_depth: 0,
         results: vec![EveResult {
             result_type: 6,
@@ -703,7 +705,7 @@ async fn test_battle_ended_offline_parked_warp_persistence() {
         map_id: 12001,
         eve_no: 50,
         npc_click_id: 1,
-        trigger_kind: 1,
+        trigger_kind: EventTriggerKind::ClickNpc,
         chain_depth: 0,
         results: vec![
             EveResult {
