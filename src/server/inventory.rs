@@ -13,7 +13,7 @@ pub const HOMDO_SLOTS: u8 = 25;
 pub const STACK_CAP: u16 = 50;
 
 /// Bias +100 theo giao thức (`TSItemContainer.sendItems`). Giá trị > 155
-/// sẽ tràn u8 — chặn ở nguồn thay vì đổi công thức wire (Bear cũng tràn).
+/// sẽ tràn u8 — chặn ở nguồn thay vì đổi công thức wire.
 pub const GIA_TRI_LONG_BIAS: u16 = 100;
 pub const GIA_TRI_LONG_MAX: u8 = 155;
 

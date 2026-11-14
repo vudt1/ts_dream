@@ -219,7 +219,7 @@ pub struct PlayerShopState {
 pub struct Session {
     /// Network/account identifier from the PC protocol.
     pub id: u32,
-    /// Mobile-aligned account display/login name. The PC wire still uses `id`.
+    /// Account display/login name stored for Web/DB; the PC wire still uses `id`.
     pub account_name: Vec<u8>,
     /// Server-authoritative GM level; zero is a normal player.
     pub gm_level: i32,
@@ -620,7 +620,7 @@ impl Session {
     /// Dump Trangbi equipment frame (`F444` + len + `170B` + entries).
     ///
     /// **10 byte/record, KHÔNG byte slot.** Client `FUN_0077CC2C` chia `IDIV 0xA`;
-    /// Bear `TSCharacter.sendEquip()` cũng ghi `add16+add8×4+add32` (10B).
+    /// wire layout cố định `add16+add8×4+add32` (10B).
     /// Thứ tự record **bắt buộc** theo `slot` tăng dần vì client định tuyến bằng
     /// body position trong `Item.dat`, không đọc byte slot.
     pub fn dump_trangbi(&self) -> String {

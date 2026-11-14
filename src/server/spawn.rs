@@ -44,14 +44,13 @@ fn now_banner() -> String {
 
 /// Login failure responses (op 0x01).
 pub const LOGIN_WRONG_PASS: &str = "F44402000106";
-/// No character on this account → create-char screen (Bear `Authentication`
-/// case 3: `[01][03][00]`).
+/// No character on this account → create-char screen (`[01][03][00]`).
 pub const LOGIN_CREATE_CHAR: &str = "F4440300010300";
 /// Alias of [`LOGIN_CREATE_CHAR`] for the op-0x03 enter-game path (same wire
 /// bytes; kept as a separate name so call sites read correctly).
 pub const ENTER_GAME_CREATE: &str = LOGIN_CREATE_CHAR;
-/// Double login: account already online elsewhere (Bear `Authentication`
-/// case 2: `[00][19]`). Identical to `SystemAlertReason::DuplicateLoginOtherLocation`
+/// Double login: account already online elsewhere (`[00][19]` legacy code).
+/// Identical to `SystemAlertReason::DuplicateLoginOtherLocation`
 /// (`F44402000013`); sent before disconnecting so the client shows the dialog
 /// instead of hanging.
 pub const DOUBLE_LOGIN: &str = "F44402000013";
@@ -363,7 +362,7 @@ pub fn announce_frame(msg: &str) -> String {
     text_banner(CHAT_SUB_SYSTEM, msg)
 }
 
-/// Build server name packet (op 0x27/OP_RANK_ANNOUNCE sub 0x09).
+/// Build server name packet (op 0x27/OP_GUILD sub 0x09).
 pub fn server_name_frame(id: u32, server_name: &str) -> String {
     let visc = crate::encoding::viscii_encode(server_name);
     let name_len = visc.len() as u8;
@@ -394,7 +393,7 @@ pub fn store_frame(point: u32) -> String {
 /// Client-verified S→C notice frames (aLogin bus semantics, see
 /// `.scratch/client-pseudo-op-code/opcode_17.md` §3–§4 and `opcode_0b.md`
 /// §2–§3). These carry only static client-side text/effects, so they are
-/// safe for aLogin; Bear-dialect clients simply ignore unknown subs.
+/// safe for `aLogin.exe`.
 
 /// Item pickup failure toast (`[17][19]` — client shows
 /// "Vật phẩm này tạm thời không thể nhặt lên", 1200ms).
@@ -664,10 +663,9 @@ pub fn build_logined_sequence_session_ext(s: &Session) -> Vec<String> {
     frames.push(store_frame(s.sp_store));
 
     // 22. Step 22: Quest state sync (Opcode 0x18: bulk quest log `Sub 0x06`,
-    //     bulk quest-dont `Sub 0x07`, one `Sub 0x01` per quest item) — the
-    //     Bear `loginChar` order (tasks -> dont) after the inventory dumps.
-    //     Emitted only when the session carries quest state, so a fresh
-    //     character's Logined1 byte stream is unchanged (golden parity).
+    //     bulk quest-dont `Sub 0x07`) — emitted in `tasks -> dont` order
+    //     after the inventory dumps, and only when the session carries quest
+    //     state so a fresh character's Logined1 byte stream stays unchanged.
     frames.extend(crate::server::handlers::quest_sync::sync_frames(s));
 
     // 23. Step 23: Reborn 2 dragon balls (17 4D) & hero ball slots (17 4E)

@@ -23,64 +23,7 @@ use crate::eve::auto_chain::{AutoChainResult, EveAutoChainEngine, EventSession};
 use crate::eve::planner::plan_chain;
 use crate::eve::resolver::ChainFilter;
 use crate::eve::state::{EveStateBuilder, PlayerEventState, PlayerStateInputs};
-use crate::server::dispatcher::OpcodeCtx;
 use crate::server::session::Session;
-
-/// PC/aLogin 0x1A (OP_MONEY_SYNC per mobile-table: S->C money sync) request
-/// shapes proven by static payload analysis. The PC dialect carries
-/// talk-selector payloads instead; these are deliberately not named with
-/// mobile `mainKind` semantics: the selector meaning is still not proven
-/// by a live PC capture.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PcTalkRequest {
-    SelectorOnly(u8),
-    SelectorU8 { selector: u8, value: u8 },
-    SelectorU16 { selector: u8, value: u16 },
-    SelectorU32 { selector: u8, value: u32 },
-}
-
-/// Parse the PC 0x1A body (`ctx.payload`, after opcode and sub byte) using only
-/// the schemas present in `opcode_1A_full_payloads.md`.
-#[must_use]
-pub fn parse_pc_talk_request(payload: &[u8]) -> Option<PcTalkRequest> {
-    let selector = *payload.first()?;
-    match (selector, payload.len()) {
-        (0x00..=0x0A, 1) => Some(PcTalkRequest::SelectorOnly(selector)),
-        (0x09, 2) => Some(PcTalkRequest::SelectorU8 {
-            selector,
-            value: payload[1],
-        }),
-        (0x08 | 0x0A, 3) => Some(PcTalkRequest::SelectorU16 {
-            selector,
-            value: u16::from_le_bytes([payload[1], payload[2]]),
-        }),
-        (0x01 | 0x02 | 0x05 | 0x06, 5) => Some(PcTalkRequest::SelectorU32 {
-            selector,
-            value: u32::from_le_bytes([payload[1], payload[2], payload[3], payload[4]]),
-        }),
-        _ => None,
-    }
-}
-
-/// PC 0x1A (OP_MONEY_SYNC) / Talk boundary. The selector/value parser is live and strict, while
-/// Eve execution remains opt-in until a PC selector-to-trigger mapping,
-/// result serializer, and event-session persistence contract are verified.
-pub async fn handle_pc_talk(ctx: &mut OpcodeCtx<'_>) {
-    let Some(request) = parse_pc_talk_request(ctx.payload) else {
-        tracing::debug!(
-            "reject malformed PC 0x1A payload: {} bytes",
-            ctx.payload.len()
-        );
-        return;
-    };
-    if !eve_events_enabled() {
-        return;
-    }
-    tracing::warn!(
-        ?request,
-        "PC 0x1A selector accepted at typed boundary; Eve execution is disabled until selector semantics are verified"
-    );
-}
 
 static EVE_EVENTS_ENABLED: AtomicBool = AtomicBool::new(true);
 
@@ -143,8 +86,7 @@ fn scene_for(data: &GameData, map_id: u16) -> Option<&SceneEveData> {
 /// - **Completion counts** are the session's `completed_eve_counts`
 ///   (incremented by `finish_event_session`), feeding `conditionClass=12`.
 /// - **Quest-dont marks** are projected into `mission_flags` keyed by the
-///   mark id itself — an explicit key-space assumption (wire mark 1..=300 vs
-///   Bear's mission-id-keyed `QuestDont`). It stays inert until a condition
+///   mark id itself (`Mark.dat` bit-id space `1..=2400` vs mission-id keys). It stays inert until a condition
 ///   actually targets such a mission id, because nothing in the Eve flow
 ///   sets `quest_dont` today.
 /// - **`mark_defs`** (missionId → bitId) stays empty (CP6 decision #6): no

@@ -48,8 +48,8 @@ pub fn isometric_col_neighbors(col: u8) -> &'static [u8] {
 /// Resolve attack targets by `fight_area` values 1–8.
 ///
 /// For single/column/row/jump/cross/six/row-five, the positions are expanded
-/// exactly as the Kotlin grid helper (ported from `ts_mobile_server`). Area 8
-/// is the living opposing side, and invalid or empty positions are omitted.
+/// across the 4×5 isometric battle grid. Area 8 is the living opposing side,
+/// and invalid or empty positions are omitted.
 /// `is_heal` makes area 8 select the attacker's own side (heal targeting).
 pub fn get_pos_attack_by_fight_area(
     cells: &[CellInfo],

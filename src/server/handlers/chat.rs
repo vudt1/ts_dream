@@ -312,9 +312,9 @@ async fn handle_slash(
                 persist::upsert_pet(pool, player_id, pet).await;
             }
             out.send("F44403001F0100".to_string());
-            // T3.3: Bear-parity confirmation announce after a successful
-            // self-heal, before party-leader propagation. The battle_id>0
-            // guard above and leader-only propagation below are unchanged.
+            // Confirmation announce after a successful self-heal, before
+            // party-leader propagation. The battle_id>0 guard above and
+            // leader-only propagation below are unchanged.
             out.send(spawn::sys_msg_frame("Sleep command executed."));
             // Party-leader propagation: each online member gets the same
             // treatment through its own session snapshot in

@@ -1,9 +1,7 @@
 //! Ground map-terrain loader for `ground.mmg` (unencrypted).
 //!
-//! Port of `ts_mobile_server/.../data/loaders/GroundMmgLoader.kt`, itself a
-//! port of `ts_mobile_client/Logic/DataManager.lua::OnLoadMapData`.
-//! Source lives outside `Data/` (`CompreseData/Ground.mmg` on mobile, repo
-//! root `Data/ground.mmg` here); see `resolve_data_file`.
+//! Source lives in repo root `Data/ground.mmg` (or `CompreseData/Ground.mmg`
+//! in mobile distributions); see `resolve_data_file`.
 //!
 //! File layout:
 //! ```text
@@ -27,7 +25,7 @@ use crate::error::Result;
 use std::collections::HashMap;
 
 /// Loads `ground.mmg`, returning `map_id → geolBaseAtt` (entries with
-/// `geolBaseAtt == 0` are dropped, matching the Kotlin loader).
+/// `geolBaseAtt == 0` are dropped).
 pub struct GroundMmgLoader;
 
 impl GroundMmgLoader {
@@ -76,7 +74,7 @@ impl GroundMmgLoader {
         }
 
         // Walk each body for `geolBaseAtt`; malformed bodies are skipped
-        // (Kotlin parity: per-entry try/catch, `geolBaseAtt > 0` only).
+        // (per-entry guard, `geolBaseAtt > 0` only).
         for (map_id, position, size) in entries {
             if let Some(geol) = Self::read_geol_base_att(bytes, position, size) {
                 if geol > 0 {

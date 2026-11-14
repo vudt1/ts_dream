@@ -1,6 +1,6 @@
 //! Mobile `Skill_C.dat` loader (PC `Skill.Dat` parser lives in `skill_pc.rs`).
 //!
-//! The field order follows the Kotlin `SkillDatLoader`: count(Int32), then
+//! The field order in `Skill_C.dat` is: `count` (Int32), then
 //! Unicode name, primitive skill metadata, two prerequisite ids, and Unicode
 //! description. The PC wire layer still owns packet encoding; this module only
 //! produces the shared domain catalog.

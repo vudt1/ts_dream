@@ -52,7 +52,7 @@ pub struct WarInfo {
     pub agi: i64,
     pub reborn: i64,
     pub team: i64,
-    /// Mobile fly-out marker; intentionally excluded from the PC 23-byte cell packet.
+    /// Internal fly-out marker; intentionally excluded from the PC 23-byte cell packet.
     pub fly_out: bool,
     pub attacked: bool,
     pub random: i64,

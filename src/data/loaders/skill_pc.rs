@@ -1,7 +1,7 @@
 //! PC `Skill.Dat` loader (ADR 0002 follow-up #1).
 //!
-//! Reverse-engineered from the supplied PC source `SkillData.cs` and
-//! `SkillInfo.cs` (Pack=1, 86 bytes per record, after an 86-byte zero header).
+//! Fixed-record binary format (Pack=1, 86 bytes per record, after an 86-byte
+//! zero header).
 //!
 //! **Record layout** (Pack=1, little-endian):
 //!
@@ -50,7 +50,7 @@ use crate::encoding;
 use crate::error::{Result, TsError};
 use std::collections::HashMap;
 
-/// PC `Skill.Dat` raw record (matches the supplied `SkillInfo.cs`).
+/// PC `Skill.Dat` raw record (86-byte fixed layout).
 #[derive(Debug, Clone, Default)]
 pub struct PcSkillDef {
     pub namelength: u8,
@@ -136,10 +136,10 @@ impl SkillDatLoaderPc {
     }
 }
 
-// ── Decoders (mirror the C# `DecodeItem8/16/32` helpers) ──────────────
+// ── Decoders (`DecodeItem8/16/32`) ──────────────────────────────────────
 
 // ⚠ Thứ tự phép tính quan trọng: XOR và SUB **không** giao hoán.
-// `SkillData.cs` (Bear server, nguồn gốc) dùng `(val ^ K) - N` — KHÔNG phải
+// Định dạng `Skill.Dat` của PC dùng `(val ^ K) - N` — KHÔNG phải
 // `(val - N) ^ K`. Bản cũ ở đây dùng sai thứ tự ⇒ mọi field giải mã ra sai
 // (id/loại/level/điểm…), khiến `binary_skill_defs` là dữ liệu rác.
 #[inline]
@@ -157,7 +157,7 @@ fn decode_item32(val: u32) -> u32 {
     (val ^ 0x0BAEB716).wrapping_sub(2)
 }
 
-// ── Reverse-in-place helpers (mirror the C# name/des byte-swap loops) ──
+// ── Reverse-in-place helpers (name/des byte-swap loops) ─────────────────
 
 fn reverse_name(name: &mut [u8; 20]) {
     for i in 0..10 {
@@ -275,9 +275,9 @@ fn parse_record(rec: &[u8]) -> Result<PcSkillDef> {
 /// - `type_` (1 byte) → `kind`
 /// - `sp_cost` → `require_sp`
 /// - `elem` → `element`
-/// - `unk3` (u32) → `numerical` (raw; semantics differ from mobile `numerical`)
+/// - `unk3` (u32) → `numerical` (raw; semantics differ from `Skill_C.dat` `numerical`)
 /// - `skill_type` → `attribute` (best-effort — PC semantics for this byte
-///   aren't fully verified, but it lines up with mobile `attribute` byte)
+///   aren't fully verified, though it aligns with the `Skill_C.dat` `attribute` byte)
 /// - `round` is pinned to 0 — the PC layout has no round field; see `round:` below
 /// - `delay` → `spend_second`
 /// - `state` → (unused) PC `state` is the client's visual sprite animation ID

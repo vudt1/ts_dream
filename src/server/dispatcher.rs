@@ -12,19 +12,19 @@ use crate::battle::service::BattleService;
 use crate::data::loader::GameData;
 use crate::error::Result;
 use crate::protocol::{
-    encoder, OP_ACCOUNT, OP_ANTI_ADDICTION, OP_APPARATUS, OP_ARENA_WATERWAR, OP_AUTH, OP_BANK,
+    encoder, OP_ACCOUNT, OP_ANTI_ADDICTION, OP_ARENA_FESTIVAL, OP_ARENA_WATERWAR, OP_AUTH, OP_BANK,
     OP_BATTLE, OP_BATTLE_COMMAND, OP_BATTLE_PET, OP_BOAT_RACE, OP_CAFE_ID, OP_CHAT, OP_CHILD,
-    OP_COMPOUND, OP_CREATE_CHAR, OP_DICE_BIDAXIAO, OP_DOMINO, OP_EXP_LEVEL, OP_EXPRESS,
-    OP_FRIEND_INVITE, OP_GAME_POINTS, OP_GM_ANNOUNCE, OP_GM_MANAGE, OP_GROUP, OP_HOTKEY,
-    OP_ITEM, OP_ITEM_INFO, OP_ITEM_MALL, OP_JOB_CHANGE, OP_LOGIN_COMPLETE, OP_LOOK, OP_LOTTO,
+    OP_CITY_SIEGE, OP_CREATE_CHAR, OP_DICE_BIDAXIAO, OP_DOMINO, OP_ENTER_GAME, OP_EXP_LEVEL,
+    OP_EXPRESSION, OP_FRIEND_INVITE, OP_GAME_POINTS, OP_GM_ANNOUNCE, OP_GROUP, OP_GUILD,
+    OP_GUILD_ALLIANCE, OP_HOTKEY, OP_ITEM, OP_ITEM_MALL, OP_LOGIN_COMPLETE, OP_LOTTO,
     OP_MONEY_SYNC, OP_MOVE, OP_NAVAL_COMBAT, OP_NPC_EVENT, OP_NPC_SHOP, OP_PET, OP_PET_HOTEL,
-    OP_PK_SWITCH, OP_PLAYER_UPDATE, OP_QUEST, OP_RANK_ANNOUNCE, OP_REBORN, OP_REBORN_PET,
-    OP_RECOMMEND, OP_RELOCATE, OP_RESERVED_44, OP_RESET, OP_SERVER_STATUS, OP_SERVER_SWITCH, OP_SKILL_CS,
-    OP_SLOT_MACHINE, OP_SPORT_FORM, OP_STAT_UPDATE, OP_STORAGE, OP_SYSTEM_ALERT, OP_TRADE,
-    OP_WORLD_OBJECT, OP_ZM_CHESS,
+    OP_PK_SWITCH, OP_PLAYER_UPDATE, OP_QUEST_SYNC, OP_QUIZ, OP_RANK, OP_REBORN, OP_REBORN_PET,
+    OP_RECOMMEND, OP_RELOCATE, OP_RESERVED_44, OP_RESET, OP_SERVER_STATUS, OP_SERVER_SWITCH,
+    OP_SKILL_LEARN, OP_SLOT_MACHINE, OP_SPORT_FORM, OP_STAT_UPDATE, OP_STORAGE, OP_SYSTEM_ALERT,
+    OP_TRADE, OP_WORLD_OBJECT, OP_ZM_CHESS,
 };
 use crate::server::handlers::{
-    arena, battle, character, chat, expressions, festival, guild, inventory, login, movement, npc_event, party,
+    arena, battle, character, chat, expressions, festival, guild, inventory, login, movement, party,
     pet_actions, respec, shops, skills, stats, system, talk, trade_storage, unimplemented,
 };
 use crate::db::pool::DbPool;
@@ -264,14 +264,14 @@ pub async fn dispatch(
 
 async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
     match ctx.opcode {
-        // OP_AUTH (0x01), OP_LOOK (0x03) — Login, Enter game confirm
+        // OP_AUTH (0x01), OP_ENTER_GAME (0x03) — Login, Enter game confirm
         OP_AUTH => login::handle_login(ctx).await,
-        OP_LOOK => login::handle_enter_game(ctx).await,
+        OP_ENTER_GAME => login::handle_enter_game(ctx).await,
 
         // OP_CHAT (0x02) — Chat & slash commands
         OP_CHAT => chat::handle_chat(ctx).await,
 
-        // OP_PLAYER_UPDATE (0x05) — Player / state sync (non-movement)
+        // OP_PLAYER_UPDATE (0x05) — Player / state sync (sub 1 >= 5B routes to move)
         OP_PLAYER_UPDATE => movement::handle_player_update_dispatch(ctx).await,
 
         // OP_MOVE (0x06) — Move
@@ -299,25 +299,18 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         // OP_BATTLE_PET (0x13) — Pet summon / recall
         OP_BATTLE_PET => pet_actions::handle_pet_summon(ctx).await,
 
-        // OP_NPC_EVENT (0x14) — NpcEvent / NPC talk / gate / scene-script
+        // OP_NPC_EVENT (0x14) — NpcEvent / NPC talk / gate / scene-script / quest
         // (NOT sitting/standing emotions — those are 0x20).
         OP_NPC_EVENT => talk::handle_talk(ctx).await,
 
-        // OP_MONEY_SYNC (0x1A) — MoneySync per mobile-table/C# (S->C money sync from
-        // GoldBankHandler); the PC/aLogin payload dialect carries talk
-        // selectors instead (not mobile mainKind 20).
-        OP_MONEY_SYNC => npc_event::handle_pc_talk(ctx).await,
-
         // OP_ITEM (0x17) — Inventory family; Level-2 subcode routing lives in the
-        // handler module (base ops, use item, player shop, storage, reborn).
+        // handler module (base ops, use item, player shop, storage, compound 0x39,
+        // socket 0x3A, reborn 46, arena redeem 0x6E).
         OP_ITEM => inventory::handle_inventory(ctx).await,
 
-        // OP_TRADE (0x19) — Trade P2P items/pets (Bear TransferHandler/TradeItems /
-        // TradePet dialect). aLogin never initiates trade on 0x19 (its only
-        // C→S 0x19 is the ACK after S→C 0x19/0x29, which falls into the
-        // handler's guarded `_` arm), so this path serves Bear-dialect
-        // clients; S→C trade frames are Bear-dialect (aLogin would read them
-        // as its 0x19 toast/gift bus — see opcode_19.md).
+        // OP_TRADE (0x19) — Trade P2P items/pets. aLogin only emits C->S 0x19
+        // as an ACK after S->C 0x19/0x29 (falling into the handler's guarded
+        // `_` arm); full P2P trade flows serve legacy PC trade packets.
         OP_TRADE => trade_storage::handle_trade(ctx).await,
 
         // OP_NPC_SHOP (0x1B) — NPC shop buy/sell. Reverse engineering client aLogin.exe
@@ -326,8 +319,8 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         // result codes (1B 01/02 xx), 1A 01/02 money delta, and 1A 04 absolute balance.
         OP_NPC_SHOP => shops::handle_npc_shop(ctx).await,
 
-        // OP_SKILL_CS (0x1C) — Learn / upgrade skills
-        OP_SKILL_CS => skills::handle_skills(ctx).await,
+        // OP_SKILL_LEARN (0x1C) — Learn / upgrade skills
+        OP_SKILL_LEARN => skills::handle_skills(ctx).await,
 
         // OP_BANK (0x1D) — Bank gold
         OP_BANK => trade_storage::handle_bank_gold(ctx).await,
@@ -336,13 +329,12 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         OP_STORAGE => trade_storage::handle_storage_transfer(ctx).await,
 
         // OP_PET_HOTEL (0x1F) — Pet stable menu (subs 2/3/4 remap to the 0x0F sub 3/7/8
-        // flows in handle_pet_stable). aLogin never sends 0x1F (SendCommand
-        // case 0x1f is empty — opcode_1f.md §6), so C→S is Bear-dialect only;
-        // S→C stable frames (1F09/1F0C/1F06) are already client-aligned.
+        // flows in handle_pet_stable). aLogin SendCommand case 0x1f is empty
+        // (opcode_1f.md §6); S->C stable frames (1F09/1F0C/1F06) are client-aligned.
         OP_PET_HOTEL => pet_actions::handle_pet_stable(ctx).await,
 
-        // OP_EXPRESS (0x20) — Expressions
-        OP_EXPRESS => expressions::handle_expressions(ctx),
+        // OP_EXPRESSION (0x20) — Expressions & actions
+        OP_EXPRESSION => expressions::handle_expressions(ctx),
 
         // OP_SYSTEM_ALERT (0x00) — client liveness ACK (no response)
         OP_SYSTEM_ALERT => system::handle_system_alert(ctx),
@@ -350,16 +342,14 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         // OP_PK_SWITCH (0x21) — PK/Jam switch
         OP_PK_SWITCH => system::handle_pk_war(ctx).await,
 
-        // OP_GAME_POINTS (0x22) — Game points / God panel
+        // OP_GAME_POINTS (0x22) — Game points / God panel (currently returns session.gold via 23 04)
         OP_GAME_POINTS => system::handle_game_points(ctx),
 
-        // OP_ACCOUNT (0x23) — Account management (change pass / delete char / gift code).
-        // The "Guild" label in the PC opcode table is a misnomer; the C# server
-        // uses 0x23 subs 1/2/3 for account management (see the VISCII string
-        // report). handle_account_mgmt is the ported handler.
+        // OP_ACCOUNT (0x23) — Account management (change pass / delete char / gift code /
+        // SelectFeatherForm sub 3 fallback).
         OP_ACCOUNT => system::handle_account_mgmt(ctx).await,
 
-        // OP_LOGIN_COMPLETE (0x25) — Login Complete / Map Loaded
+        // OP_LOGIN_COMPLETE (0x25) — Login Complete / Map Loaded (sub 0x03 -> arena notice)
         OP_LOGIN_COMPLETE => {
             if ctx.sub == 0x03 {
                 arena::handle_arena(ctx).await;
@@ -377,14 +367,14 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         // OP_REBORN_PET (0x2C) — Pet reborn
         OP_REBORN_PET => skills::handle_pet_reborn(ctx).await,
 
-        // OP_APPARATUS (0x41) — Rank system
-        OP_APPARATUS => system::handle_rank(ctx),
+        // OP_RANK (0x41) — Rank system (stub sub 1/2)
+        OP_RANK => system::handle_rank(ctx),
 
         // OP_ITEM_MALL (0x42) — GM / Mall shop
         OP_ITEM_MALL => system::handle_gm_shop(ctx).await,
 
-        // OP_JOB_CHANGE (0x24) — Arena scoreboard or Festival trigger
-        OP_JOB_CHANGE => {
+        // OP_ARENA_FESTIVAL (0x24) — Arena scoreboard or Festival trigger
+        OP_ARENA_FESTIVAL => {
             if ctx.sub == 0x19 {
                 festival::handle_festival(ctx).await;
             } else {
@@ -392,8 +382,8 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
             }
         }
 
-        // OP_RANK_ANNOUNCE (0x27) — Guild operations
-        OP_RANK_ANNOUNCE => guild::handle_guild(ctx).await,
+        // OP_GUILD (0x27) — Guild operations
+        OP_GUILD => guild::handle_guild(ctx).await,
 
         // OP_NAVAL_COMBAT (0x40) — Naval bombardment
         OP_NAVAL_COMBAT => guild::handle_naval_combat(ctx).await,
@@ -404,22 +394,25 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         // OP_ARENA_WATERWAR (0x3F) — Water War temporary boat inventory lifecycle
         OP_ARENA_WATERWAR => guild::handle_water_war(ctx).await,
 
-        // OP_QUEST (0x29) — City Siege / Quest system
-        OP_QUEST => guild::handle_city_siege(ctx).await,
+        // OP_CITY_SIEGE (0x29) — City Siege operations
+        OP_CITY_SIEGE => guild::handle_city_siege(ctx).await,
 
-        // OP_GM_MANAGE (0x10) — North Star Quiz answers
-        OP_GM_MANAGE => battle::handle_quiz_answer(ctx).await,
+        // OP_QUIZ (0x10) — North Star Quiz answers
+        OP_QUIZ => battle::handle_quiz_answer(ctx).await,
 
-        // OP_ITEM_INFO (0x18) — Quest Ledger / quest_dont is S->C only; reject C->S 0x18 (TMissionForm)
-        OP_ITEM_INFO => crate::server::handlers::quest_sync::handle_client_quest_sync(ctx),
+        // OP_QUEST_SYNC (0x18) — Quest Ledger / quest_dont is S->C only; reject C->S 0x18 (TMissionForm)
+        OP_QUEST_SYNC => crate::server::handlers::quest_sync::handle_client_quest_sync(ctx),
 
-        // Documented client opcodes whose full semantics are being ported from
-        // the Kotlin/mobile reference. They are deliberately routed through a
+        // S->C-only opcodes (e.g. OP_MONEY_SYNC 0x1A has empty SendCommand in aLogin)
+        // and documented PC client opcodes not yet ported. Routed through a
         // bounded unimplemented boundary rather than silently discarded.
+        // Note: OP_GUILD_ALLIANCE (0x2B) and OP_REBORN (0x2D) are C->S unimplemented here;
+        // actual Compound/Socket (0x39/0x3A) and Reborn (46) execute via OP_ITEM (0x17).
         OP_FRIEND_INVITE
         | OP_WORLD_OBJECT
+        | OP_MONEY_SYNC
         | OP_EXP_LEVEL
-        | OP_COMPOUND
+        | OP_GUILD_ALLIANCE
         | OP_REBORN
         | OP_SERVER_SWITCH
         | OP_SERVER_STATUS

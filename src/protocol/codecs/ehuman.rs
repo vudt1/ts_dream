@@ -6,8 +6,8 @@
 //! the PC client (`01_battle_start_scene.md §2.4`).
 //!
 //! Note: this is a constant table only. The former 42-byte
-//! `BattleRoleData`/`BattleRoleSerializer` layout came from TS Mobile Kotlin
-//! and does **not** exist in the PC client — do not resurrect it.
+//! `BattleRoleData`/`BattleRoleSerializer` layout does **not** exist in the PC
+//! client — do not resurrect it.
 
 pub const NONE: u8 = 0;
 pub const PLAYER: u8 = 1;

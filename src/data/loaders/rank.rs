@@ -1,8 +1,5 @@
 //! Rank loader for `Rank.Dat` (PC fixed-record binary).
 //!
-//! Spec: `ts_mobile_client/Data/RankData.lua` (`RankData.New`) +
-//! `ts_mobile_client/Logic/DataManager.lua::OnLoadRankData`.
-//!
 //! Record layout (43 bytes, `DatReader` keys `offset=9, xor1=0xFD,
 //! `xor2=0xECEA`, `xor4=0x0B80F4B4` — the same key family as
 //! `Item.dat`/`BlissBag.Dat`):

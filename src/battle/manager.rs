@@ -2,8 +2,7 @@
 //!
 //! One battle runs on its own `tokio::spawn` task. Player commands (op 0x0B)
 //! arrive through a per-battle `mpsc` channel; the task collects them each turn
-//! (with a per-turn timeout, default 20 s, ported from the Kotlin/mobile
-//! `BattleConstants.COUNTDOWN_NORMAL`), runs `Battle::run_turn`, and dispatches
+//! (with a per-turn timeout, default 20 s), runs `Battle::run_turn`, and dispatches
 //! every `runner::Out` through a `BattleSink`. The grid + RNG live only inside
 //! the task, so battle state is race-free.
 
@@ -91,10 +90,8 @@ impl BattleManager {
         BattleManager {
             battles: RwLock::new(HashMap::new()),
             next_id: AtomicI32::new(1),
-            // Per-turn input timeout ported from the Kotlin/mobile
-            // `BattleConstants.COUNTDOWN_NORMAL`. Keep this as a business-rule
-            // timeout; custom timeouts remain available for deterministic
-            // tests and special battle modes.
+            // Per-turn input timeout (20 s business-rule countdown; custom timeouts
+            // remain available for deterministic tests and special battle modes).
             default_timeout: std::time::Duration::from_secs(20),
             handshake_timeout: std::time::Duration::from_millis(1500),
         }
@@ -325,8 +322,8 @@ async fn collect_commands(
     let mut commands = BattleCommands::new();
     let deadline = tokio::time::Instant::now() + timeout;
     loop {
-        // Every living player-controlled cell needs a command. This includes
-        // follow-NPC/pet cells (typ=4), matching the mobile battle state machine.
+        // Every living player-controlled cell needs a command, including
+        // follow-NPC/pet cells (typ=4).
         let waiting_cells: Vec<(u8, u8)> = (0..4u8)
             .flat_map(|r| (0..5u8).map(move |c| (r, c)))
             .filter(|&(r, c)| battle.cell(r, c).is_some_and(is_living_player_controlled))
@@ -362,7 +359,7 @@ fn fill_timeout_commands(
     battle: &Battle,
     waiting_cells: &[(u8, u8)],
 ) {
-    // Mobile auto-confirms a basic attack for every living, non-stunned
+    // Auto-confirm a basic attack for every living, non-stunned
     // player-controlled fighter that timed out. The command still uses the
     // unchanged grid source/target fields (op 0x0B sub 3/4).
     for &(row, col) in waiting_cells {

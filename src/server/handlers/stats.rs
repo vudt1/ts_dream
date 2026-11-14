@@ -130,14 +130,13 @@ pub async fn handle_stat_allocation(ctx: &mut OpcodeCtx<'_>) {
     }
 }
 
-/// Handle Opcode 0x28 — Hotkey / skill bar (Bear `HotkeyHandler` parity).
+/// Handle Opcode 0x28 — Hotkey / skill bar.
 ///
 /// Wire (payload = `data[2..]`): `payload[0]` = kind (`0` = clear slot,
 /// `2` = assign; other kinds ignored), `payload[1..3]` = LE u16 skill id,
-/// `payload[3]` = slot 1-based (1..10). Sub must be 1. aLogin never sends
-/// 0x28 (SendCommand case 0x28 is empty — opcode_28.md §6), so C→S is
-/// Bear-dialect only. Slot 0 is invalid (Bear would index -1 and crash),
-/// so it is rejected instead of touching `hotkeys[0]`.
+/// `payload[3]` = slot 1-based (`1..=10`). Sub must be 1. Slot `0` is invalid
+/// (out of bounds for 1-based wire indexing), so it is rejected instead of
+/// touching `hotkeys[0]`.
 /// No response frame — this only writes the DB row.
 pub async fn handle_hotkey(ctx: &mut OpcodeCtx<'_>) {
     let conn = &mut ctx.conn;
@@ -149,9 +148,8 @@ pub async fn handle_hotkey(ctx: &mut OpcodeCtx<'_>) {
     let kind = payload[0];
     let skill_id = encoder::u16_le(payload[1], payload[2]);
     let slot = payload[3];
-    // Bear hotkey[slot-1] with a 10-entry array; Rust keeps hotkeys[1..=10]
-    // (index 0 spare, used by the dump/load loops), so the valid range maps
-    // 1:1 onto the Rust array indices.
+    // Wire slot is 1-based (1..=10); Rust keeps hotkeys[1..=10] (index 0 spare,
+    // used by the dump/load loops), so the valid range maps 1:1 onto array indices.
     if !(1..=10).contains(&slot) {
         return;
     }

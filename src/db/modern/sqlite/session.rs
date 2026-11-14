@@ -531,18 +531,18 @@ impl SqliteSessionRepository<'_> {
     /// Create a character and seed its starter state in **one atomic
     /// transaction** (E3): the full `characters` row (stats from the aLogin
     /// packet; `hair` covers style/hair/face/color per the 0001 schema), the
-    /// `character_money` ledger, the `accounts` password overwrite (Bear
-    /// `initChar` parity: non-empty `pass1`/`pass2` from the packet replace
-    /// the dashboard passwords), and the starter `inventories` rows — all
-    /// commit or roll back together. A crash between the old two-transaction
-    /// steps can no longer leave a half-created row. UNIQUE(name) violation
-    /// rolls back the whole batch so the handler can toast `09 03 01`.
+    /// `character_money` ledger, the `accounts` password overwrite (non-empty
+    /// `pass1`/`pass2` from the packet replace the dashboard passwords), and the
+    /// starter `inventories` rows — all commit or roll back together. A crash
+    /// between the old two-transaction steps can no longer leave a half-created
+    /// row. UNIQUE(name) violation rolls back the whole batch so the handler can
+    /// toast `09 03 01`.
     ///
     /// `session` must already reflect the new character (via
     /// `apply_to_session`); on success `session.db_character_id` is set.
-    /// The 8-byte appearance color (`session.color`, Bear `color1`/`color2`)
-    /// travels in `session` RAM for `player_appear` and is covered by the
-    /// `hair` column — no separate DB columns.
+    /// The 8-byte appearance color (`session.color`) travels in `session` RAM
+    /// for `player_appear` and is covered by the `hair` column — no separate DB
+    /// columns.
     pub async fn create_and_seed(
         &self,
         account_id: i64,
@@ -584,7 +584,7 @@ impl SqliteSessionRepository<'_> {
             .bind(i64::from(session.bank_gold))
             .bind(i64::from(session.shop_point))
             .execute(&mut *tx).await?;
-        // 3. Password overwrite (Bear parity). Empty passwords are skipped so a
+        // 3. Password overwrite. Empty passwords are skipped so a
         //    password-less packet never wipes the dashboard credentials.
         //    BLOB-bound: VISCII-safe, no UTF-8 transcode.
         if !pass1.is_empty() {

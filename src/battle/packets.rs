@@ -198,9 +198,9 @@ pub fn move_cell(src_row: u8, src_col: u8, dst_row: u8, dst_col: u8) -> String {
 //      which jumps to `FUN_007952ab`.
 //    - (Note: Case Index 53 (`0x35`) belongs to Opcode `0x3C`, which was previously confused with 0x35).
 // 2. Sub-Opcode Handlers in `FUN_007952ab`:
-//    - Sub 0x01 (`FUN_0064cd74`): Purge / clear status effects (also used by Bear C#).
+//    - Sub 0x01 (`FUN_0064cd74`): Purge / clear status effects.
 //    - Sub 0x03 (`FUN_0064cfec`): Force animation state 7 (`force_state7`, attack preparation).
-//    - Sub 0x04 (`FUN_0064d128`): Battle drop animation (`giveDrop` in Bear C#).
+//    - Sub 0x04 (`FUN_0064d128`): Battle drop animation.
 //    - Sub 0x05 (`FUN_0064dfa4`): Unit acting indicator (`acting`).
 //    - Sub 0x07 (`FUN_0064e3e0`): Grid cell movement (`move_cell`).
 //    - Sub 0x0E (`FUN_0064fbd8`): Unit action: invokes unit vtable `(**(code **)(*unit + 0x1c))(unit, val, 1)`.
@@ -247,14 +247,13 @@ pub fn move_cell(src_row: u8, src_col: u8, dst_row: u8, dst_col: u8) -> String {
 // - `flag_or_turns == 0`: Clears/removes the status slot from HUD and shifts remaining icons.
 // - `flag_or_turns > 0`: Active duration in turns or stack counter displayed in client HUD.
 //
-// Comparison with Bear C# Server:
-// --------------------------------
-// - Bear (`TS_Server_Bear/TS_Server/Server/BattleClasses/BattleParticipant.cs`) tracks durations internally
-//   (`buff`, `debuff`, `disable`, `aura`) and clears them when reaching 0 via Opcode 53 sub 1 (`35 01`):
-//   `new byte[7] { 53, 1, row, col, purge_type, 0, 0 }` (where 1=disable, 2=buff, 3=debuff, 5=aura).
-// - Bear does NOT implement `35 0E` or `35 0F`. Consequently, in Bear the client never displays
-//   the visual HUD buff icons ('B'..'G') or their tooltips.
-// - Rust `ts_dream` supports both: `35 0F` for visual buff/debuff HUD parity and `35 01` for status purging!
+// Status Purge (`35 01`) vs Visual HUD Buff/Debuff (`35 0F`):
+// ----------------------------------------------------------
+// - When tracked durations (`buff`, `debuff`, `disable`, `aura`) reach 0,
+//   clear them on the client via `35 01`:
+//   `[0x35, 0x01, row, col, purge_type, 0, 0]` (1=disable, 2=buff, 3=debuff, 5=aura).
+// - `ts_dream` emits both `35 0F` for visual buff/debuff HUD icons ('B'..'G')
+//   and `35 01` for status purging.
 
 /// Status category: Defense stat modifier ('B', 0x42). Text: "Sức phòng ngự".
 pub const STATUS_DEF_MODIFIER: u8 = b'B';
@@ -368,8 +367,8 @@ pub fn clear_unit_status(row: u8, col: u8, status_char: u8) -> String {
 
 /// Purge status frame: `F44407003501` + row + col + purge_type + `0000`.
 ///
-/// Handled in client by `FUN_0064cd74` (`case 46 / sub 0x01`).
-/// Matches Bear C# server implementation (`[53, 1, row, col, purge_type, 0, 0]`):
+/// Handled in client by `FUN_0064cd74` (`case 46 / sub 0x01`),
+/// emitting `[0x35, 0x01, row, col, purge_type, 0, 0]`:
 /// - `purge_type = 1`: disable / control expired or cured
 /// - `purge_type = 2`: buff expired or dispelled
 /// - `purge_type = 3`: debuff expired or cleansed
@@ -453,9 +452,7 @@ pub fn battle_npc_talk(k: u8, actor_id: u32, tpl_id: u32) -> String {
     )
 }
 
-/// Helper wrapper for in-battle NPC dialogue toast following Bear C# convention.
-///
-/// Equivalent to Bear `PacketCreator(53, 6)` (`k = 1`, `actor_id = 0`, `tpl_id = dialog_id as u32`).
+/// Helper wrapper for in-battle NPC dialogue toast (`0x35 06`: `k = 1`, `actor_id = 0`, `tpl_id = dialog_id as u32`).
 pub fn battle_npc_dialog(dialog_id: u16) -> String {
     battle_npc_talk(1, 0, dialog_id as u32)
 }

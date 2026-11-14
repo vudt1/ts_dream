@@ -1,6 +1,6 @@
 //! Player card and friend extra information binary codecs.
 //!
-//! Matches `PlayerInfo.lua:readBaseInfo / readFriendData` and `PlayerInfoCodec.kt`.
+//! Matches `PlayerInfo.lua:readBaseInfo / readFriendData` wire field layout.
 //!
 //! Card wire format:
 //! - nameLen (1B) + name (VISCII string)

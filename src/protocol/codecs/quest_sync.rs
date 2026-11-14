@@ -14,10 +14,7 @@ use crate::error::Result;
 use crate::protocol::encoder;
 use crate::protocol::reader::PacketReader;
 use crate::protocol::writer::PacketWriter;
-use crate::protocol::OP_ITEM_INFO;
-
-/// Opcode 0x18 alias for quest sync.
-pub const OP_QUEST_SYNC: u8 = OP_ITEM_INFO;
+pub use crate::protocol::OP_QUEST_SYNC;
 
 /// Sub-opcodes for Opcode 0x18.
 pub const SUB_QUEST_ITEM_ADD: u8 = 0x01;

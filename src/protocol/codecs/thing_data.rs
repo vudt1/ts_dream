@@ -1,7 +1,7 @@
 //! Standardized 35-byte ThingData binary codec.
 //!
-//! Strictly matches `Item.lua:81-100` (read) and `Item.lua:138-158` (write),
-//! as well as `ThingDataCodec.kt` in the Kotlin TS Mobile reference architecture.
+//! Strictly matches `Item.lua:81-100` (read) and `Item.lua:138-158` (write)
+//! for the standardized 35-byte item record layout.
 //!
 //! Field order (35 bytes total, Little-Endian):
 //! - Id (2B u16 LE)

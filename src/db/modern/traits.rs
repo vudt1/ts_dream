@@ -27,8 +27,7 @@ pub trait AccountRepository {
     async fn update_pass2(&self, account_id: i64, pass2: &[u8]) -> RepoResult<()>;
 
     /// Update primary password (pass1). Overwrites the web-dashboard password
-    /// when the create-char packet carries a non-empty pass1 (Bear `initChar`
-    /// parity: `UPDATE account SET password=..., password2=...`). No-op when
+    /// when the create-char packet carries a non-empty `pass1`. No-op when
     /// `pass1` is empty so a packet without passwords never locks the account.
     async fn update_pass1(&self, account_id: i64, pass1: &[u8]) -> RepoResult<()>;
 }

@@ -1,8 +1,8 @@
 //! Server-authoritative GM commands for the PC chat path.
 //!
-//! The mobile reference exposes a broad command surface, but this module only
-//! enables commands whose state mutation can be persisted through the current
-//! modern repositories or whose PC response is an already-used safe frame.
+//! This module only enables GM commands whose state mutation can be persisted
+//! through the current modern repositories or whose PC response is an
+//! already-used safe frame.
 //! There is intentionally no self-promotion, packet-spam command, or implicit
 //! dashboard bootstrap.
 

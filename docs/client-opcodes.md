@@ -16,9 +16,9 @@ Tài liệu tra cứu nhanh ánh xạ các Opcode giữa Client Delphi và Serve
 | `0x08` | `9` | `0x0078D125` | `FUN_0078d125` | Điểm thuộc tính, Thủy binh, Tài bảo, Đạn dược |
 | `0x14` | `18` | `0x0078EC3F` | `FUN_0078ec3f` | Party, Hội thoại NPC (`14 01` mở mua, `14 09` mở kho) |
 | `0x17` | `20` | `0x007902FB` | `FUN_007902fb` | Túi đồ chính (`homdo`), Ba Đậu Yêu Balo (`tuideo`), Ba Đậu Yêu Lưu Lãng (`luulang`), Sạp hàng cá nhân |
-| `0x18` | `21` | `0x00790ED5` | `FUN_00790ed5` | Eve Script Action, Quest Sync, Quân Lương Thủy Binh |
-| `0x19` | `22` | `0x0079157C` | `FUN_0079157c` | Giao dịch trực tiếp P2P & Thú nuôi |
-| `0x1A` | `23` | `0x0079175F` | `FUN_0079175f` | Đồng bộ Vàng (`1A 04`, 6B), Điểm tích lũy (`1A 03`, 6B), Lỗi trần vàng (`1A 06`) |
+| `0x18` | `21` | `0x00790ED5` | `FUN_00790ed5` | `OP_QUEST_SYNC`: Eve Script Action, Quest Sync (`Mark.dat` 200 ô + `quest_dont` 300B), Quân Lương Thủy Binh (S→C only; chặn C→S `0x18`) |
+| `0x19` | `22` | `0x0079157C` | `FUN_0079157c` | `OP_TRADE`: Giao dịch trực tiếp P2P & Thú nuôi |
+| `0x1A` | `23` | `0x0079175F` | `FUN_0079175f` | `OP_MONEY_SYNC`: Đồng bộ Vàng (`1A 04`, 6B), Điểm tích lũy (`1A 03`, 6B), Lỗi trần vàng (`1A 06`) (S→C only; `SendCommand` C→S rỗng) |
 | `0x1B` | `24` | `0x00791D80` | `FUN_00791d80` | Mua/Bán Shop NPC (`1B 01` kết quả mua, `1B 02` kết quả bán) |
 | `0x1D` | `25` | `0x00791F76` | `FUN_00791f76` | Ngân hàng Vàng (`1D 04` sync, `1D 07` mở khóa Nộp, `1D 08` mở khóa Rút) |
 | `0x1E` | `26` | `0x007921A6` | `FUN_007921a6` | Các container Kho: Tiền Trang (`tientrang`), Kho Nhà Trọ, Kho Phụ |

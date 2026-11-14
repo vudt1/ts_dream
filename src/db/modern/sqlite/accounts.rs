@@ -44,7 +44,7 @@ impl SqliteAccountRepository<'_> {
         Ok(())
     }
 
-    /// BLOB-safe primary-password overwrite (Bear `initChar` parity).
+    /// BLOB-safe primary-password overwrite from create-character packets.
     /// No-op when empty.
     pub async fn update_pass1(&self, account_id: i64, pass1: &[u8]) -> RepoResult<()> {
         if pass1.is_empty() {

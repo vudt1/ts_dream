@@ -1,7 +1,7 @@
 //! Eve Script Engine — 4-tier NPC event / dialogue / quest scripting runtime.
 //!
-//! Replaces the legacy quest `.txt`/`.ini` system with the `eve.emg` script
-//! architecture ported from the Kotlin TS Mobile reference server:
+//! Replaces the legacy quest `.txt`/`.ini` system with the 4-tier `eve.emg`
+//! script engine architecture:
 //!
 //! - Tier 1 — NpcEvent / Door dispatch inputs: [`auto_chain::EveAutoChainEngine`]
 //!   walks an NPC or door event list and chains to the next matching event.

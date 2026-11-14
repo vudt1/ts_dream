@@ -852,13 +852,13 @@ async fn test_quiz_live_dispatcher_routing() {
     conn.session.god = 0;
 
     // Send C->S 10 01 through live Level-1 dispatcher
-    let mut packet = vec![0xF4, 0x44, 0x06, 0x00, ts_dream::protocol::OP_GM_MANAGE, 0x01];
+    let mut packet = vec![0xF4, 0x44, 0x06, 0x00, ts_dream::protocol::OP_QUIZ, 0x01];
     packet.extend_from_slice(&2u32.to_le_bytes()); // Correct answer B (2)
 
     let outcome = ts_dream::server::dispatcher::dispatch(&mut conn, &packet, &data, &service, &ServerEnv::none()).await;
 
     // Verify routed to quiz handler and answered correctly
-    assert!(outcome.outgoing.iter().any(|f| f.frame == "F4440300100201"), "dispatcher must route OP_GM_MANAGE to quiz handler");
+    assert!(outcome.outgoing.iter().any(|f| f.frame == "F4440300100201"), "dispatcher must route OP_QUIZ to quiz handler");
     assert_eq!(conn.session.god, 10, "god buff incremented on correct answer via dispatcher");
     assert_eq!(conn.session.battle_id, 0, "battle ended");
 }

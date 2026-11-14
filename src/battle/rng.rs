@@ -1,14 +1,10 @@
-//! .NET-compatible `System.Random` — time-seeded, three independent streams
+//! Subtractive 56-element PRNG — time-seeded, three independent streams
 //! for the battle engine (§6.0) plus fresh instances for quests/daily.
 //!
-//! The .NET `Random` PRNG uses a 56-element int array with a specific
-//! seeding and generation algorithm. We replicate its exact output sequence
-//! so that the server stays RNG-parity with the reference implementation.
+//! Uses a 56-element `i32` state array with deterministic seeding and generation
+//! so battle replays remain reproducible for a given seed.
 
-/// A .NET-compatible `System.Random` implementation.
-///
-/// Replicates the exact PRNG algorithm from .NET Framework / .NET Core
-/// (Knuth subtractive generator with a 56-element state array).
+/// A deterministic 56-element subtractive PRNG (Knuth subtractive generator).
 #[derive(Debug, Clone)]
 pub struct DotNetRandom {
     seed_array: [i32; 56],
@@ -17,14 +13,14 @@ pub struct DotNetRandom {
 }
 
 impl DotNetRandom {
-    /// Create a new RNG with the given seed (mirrors `new Random(seed)`).
+    /// Create a new RNG with the given seed.
     pub fn new(seed: i32) -> Self {
         let mut r = DotNetRandom {
             seed_array: [0i32; 56],
             inext: 0,
             inextp: 21,
         };
-        // .NET seed algorithm
+        // Subtractive seed expansion
         let subtraction = if seed == i32::MIN {
             i32::MAX
         } else {
@@ -53,10 +49,9 @@ impl DotNetRandom {
         r
     }
 
-    /// Create a time-seeded RNG (mirrors `new Random()` — uses system ticks).
+    /// Create a time-seeded RNG using the current millisecond tick count.
     pub fn time_seeded() -> Self {
-        // .NET uses Environment.TickCount as seed for the default constructor.
-        // We use the current time in milliseconds modulo i32::MAX.
+        // Seed with current UNIX epoch milliseconds modulo i32::MAX.
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default();

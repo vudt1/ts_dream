@@ -384,7 +384,7 @@ fn skill_level_for(session: &Session, skill_id: i64, row: u8) -> i64 {
         .unwrap_or(1)
 }
 
-/// Handle Opcode 0x10 (OP_GM_MANAGE) sub 1 — North Star Quiz Answer submission.
+/// Handle Opcode 0x10 (OP_QUIZ) sub 1 — North Star Quiz Answer submission.
 pub async fn handle_quiz_answer(ctx: &mut OpcodeCtx<'_>) {
     if ctx.sub != 1 || ctx.payload.len() < 4 {
         return;

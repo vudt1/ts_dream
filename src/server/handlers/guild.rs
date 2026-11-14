@@ -284,7 +284,7 @@ pub async fn handle_guild(ctx: &mut OpcodeCtx<'_>) {
             }
 
             // Build invite notification frame: S→C 27 02 [my_id: 4B LE][my_guild_id: 4B LE]
-            let mut invite_frame = vec![protocol::OP_RANK_ANNOUNCE, 0x02];
+            let mut invite_frame = vec![protocol::OP_GUILD, 0x02];
             invite_frame.extend_from_slice(&my_id.to_le_bytes());
             invite_frame.extend_from_slice(&my_guild_id.to_le_bytes());
             let flen = invite_frame.len() as u16;
@@ -331,7 +331,7 @@ pub async fn handle_guild(ctx: &mut OpcodeCtx<'_>) {
                     Ok(_) => {
                         ctx.conn.session.guild_id = guild_id;
                         registry_update_if_online(&ctx.conn.session);
-                        ctx.out.send(encoder::hex(&[0xF4, 0x44, 0x03, 0x00, protocol::OP_RANK_ANNOUNCE, 0x03, 0x01]));
+                        ctx.out.send(encoder::hex(&[0xF4, 0x44, 0x03, 0x00, protocol::OP_GUILD, 0x03, 0x01]));
                         ctx.out.send(sys_msg_frame("Gia nhap quan doan thanh cong!"));
                     }
                     Err(e) => {
@@ -342,7 +342,7 @@ pub async fn handle_guild(ctx: &mut OpcodeCtx<'_>) {
             } else {
                 ctx.conn.session.guild_id = guild_id;
                 registry_update_if_online(&ctx.conn.session);
-                ctx.out.send(encoder::hex(&[0xF4, 0x44, 0x03, 0x00, protocol::OP_RANK_ANNOUNCE, 0x03, 0x01]));
+                ctx.out.send(encoder::hex(&[0xF4, 0x44, 0x03, 0x00, protocol::OP_GUILD, 0x03, 0x01]));
                 ctx.out.send(sys_msg_frame("Gia nhap quan doan thanh cong!"));
             }
         }
@@ -479,7 +479,7 @@ pub async fn handle_guild(ctx: &mut OpcodeCtx<'_>) {
             if let Some(pool) = ctx.env.pool {
                 match crate::db::domain::update_guild_badge(pool, my_guild_id as i64, badge).await {
                     Ok(_) => {
-                        ctx.out.send(encoder::hex(&[0xF4, 0x44, 0x03, 0x00, protocol::OP_RANK_ANNOUNCE, 0x06, 0x00]));
+                        ctx.out.send(encoder::hex(&[0xF4, 0x44, 0x03, 0x00, protocol::OP_GUILD, 0x06, 0x00]));
                         ctx.out.send(sys_msg_frame("Cap nhat huy hieu quan doan thanh cong!"));
                     }
                     Err(e) => {
@@ -488,7 +488,7 @@ pub async fn handle_guild(ctx: &mut OpcodeCtx<'_>) {
                     }
                 }
             } else {
-                ctx.out.send(encoder::hex(&[0xF4, 0x44, 0x03, 0x00, protocol::OP_RANK_ANNOUNCE, 0x06, 0x00]));
+                ctx.out.send(encoder::hex(&[0xF4, 0x44, 0x03, 0x00, protocol::OP_GUILD, 0x06, 0x00]));
                 ctx.out.send(sys_msg_frame("Cap nhat huy hieu quan doan thanh cong!"));
             }
         }

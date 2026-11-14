@@ -3,7 +3,7 @@
 //! The PC wire authenticates with numeric `player_id` + plaintext `pass1`
 //! (login gate) and `pass2` (op 0x23 change/delete gate), compared byte-exact
 //! via `HEX(pass1) = HEX(?)`. The `accounts` table (migration 0001) carries no
-//! hashed-password column — plaintext parity with the C# server is intentional.
+//! hashed-password column — plaintext storage is intentional for PC wire parity.
 
 use crate::db::pool::DbPool;
 

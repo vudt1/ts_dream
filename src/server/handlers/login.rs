@@ -210,7 +210,7 @@ async fn login_db(
     conn.session.hydrate_templates(data);
 
     // Double-login guard: the check+register is one atomic lock so concurrent
-    // logins cannot race. The Bear `[00][19]` frame goes first so the client
+    // logins cannot race. The `00 13` / `00 19` frame goes first so the client
     // shows the "logged in elsewhere" dialog instead of hanging.
     if let (Some(hub), Some(sender)) = (hub, sender) {
         if !hub.login_register(conn.session.id, sender).await {

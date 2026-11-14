@@ -9,9 +9,8 @@ use std::collections::{HashMap, HashSet};
 
 /// Snapshot of every player fact the Eve condition evaluator may consult.
 ///
-/// Mirrors Kotlin `PlayerEventState`. Field defaults follow the wire
-/// semantics: no dialogue seen yet (`last_surface_id = -1`,
-/// `last_choice_code = -1`) and no battle in flight (`battle_result = 0`,
+/// Field defaults follow the wire semantics: no dialogue seen yet
+/// (`last_surface_id = -1`, `last_choice_code = -1`) and no battle in flight (`battle_result = 0`,
 /// `1=win 2=lose 3=flee`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PlayerEventState {

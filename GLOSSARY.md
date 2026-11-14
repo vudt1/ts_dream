@@ -29,9 +29,9 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 - **Định nghĩa**: Đơn vị thông điệp nghiệp vụ trao đổi giữa Client và Server. Mỗi Opcode đại diện cho một lệnh hoặc sự kiện nghiệp vụ (ví dụ: Chat `0x02`, Di chuyển `0x05`/`0x06`, Chiến đấu `0x32`).
 - **Tránh dùng các từ mơ hồ**: *Data Buffer*, *Payload*, *Raw Bytes* (trừ khi xử lý ở tầng mạng hạ tầng).
 
-### System Alert / OP_SYSTEM_ALERT (Cảnh báo Hệ thống)
-- **Định nghĩa**: Gói tin thông báo lỗi hệ thống, ngắt kết nối hoặc cảnh báo người chơi từ Server gửi xuống Client (Opcode `0x00`). Đây là gói tin **đơn hướng 100% (S → C)**; Client không bao giờ gửi Opcode này lên Server. Cấu trúc gồm Header `F4 44`, độ dài 2 byte, Opcode `0x00` và Sub-opcode (status 0..57) mang thông điệp tương ứng.
-- **Ràng buộc (Invariants)**: Chiều giao tiếp duy nhất là Server đến Client (S → C). Bất kỳ frame Opcode `0x00` nào từ Client gửi lên Server đều được coi là không hợp lệ và bị loại bỏ.
+### System Alert / OP_SYSTEM_ALERT (Cảnh báo Hệ thống & Liveness ACK)
+- **Định nghĩa**: Gói tin thông báo lỗi hệ thống, ngắt kết nối hoặc cảnh báo người chơi từ Server gửi xuống Client (Opcode `0x00`, cấu trúc `F4 44` + độ dài + `0x00` + status `0..57`). Riêng chiều Client → Server, khung payload rỗng `F4 44 01 00 00` được dùng làm **liveness ACK** (server chỉ làm mới `last_seen`, không phản hồi).
+- **Ràng buộc (Invariants)**: Mọi cảnh báo/ngắt kết nối chỉ đi một chiều Server → Client (S → C); ở chiều Client → Server chỉ chấp nhận liveness ACK không mang thông điệp nghiệp vụ.
 
 
 ### Dispatcher (Bộ điều phối nghiệp vụ)
@@ -85,7 +85,7 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 
 ### RNG battle / Luồng ngẫu nhiên trận đấu
 - **Định nghĩa**: Ba luồng ngẫu nhiên kiểu .NET (time-seeded, độc lập) của một trận: `random_0` (chọn drop/kỹ năng), `random_1` (tie-break thứ tự lượt + sai số sát thương), `random_2` (tọa độ respawn). Một luồng thứ tư `random_3` ở tầng thế giới lo việc di chuyển NPC tuần tra.
-- **Ràng buộc (Invariants)**: Các luồng không được trộn lẫn; thứ tự sử dụng phải khớp tham chiếu C# để replay deterministic.
+- **Ràng buộc (Invariants)**: Các luồng không được trộn lẫn; thứ tự sử dụng phải khớp thuật toán PRNG 56-phần-tử cố định để replay deterministic.
 
 ### Pet / Companion (Sủng vật / Đậu đậu)
 - **Định nghĩa**: Nhân vật phi người chơi (NPC) có thể thu phục hoặc chiêu mộ đồng hành cùng Nhân vật người chơi trong các trận đấu và di chuyển.
@@ -128,13 +128,13 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 - **Ràng buộc (Invariants)**:
   - Điều kiện gate: `Point >= points && points > 0`, ngoài chiến đấu.
   - Cap 400: chỉ áp dụng cho Int/Atk/Def/Agi/Hpx/Spx (id 27–32); Hpmax/Spmax (25/26) không tăng chỉ số và **không trừ Point**.
-  - Max HP/SP (Hpmax/Spmax): khi cập nhật trong phân bổ Hpx/Spx chỉ cập nhật in-memory — **không phát packet nào** cho Max (C# `PlayerUpdateDataId` nhánh `_Hpmax`/`_Spmax`).
+  - Max HP/SP (Hpmax/Spmax): khi cập nhật trong phân bổ Hpx/Spx chỉ cập nhật in-memory — **không phát packet nào** cho Max (`_Hpmax`/`_Spmax`).
 
 ### Point / Skill Point (Điểm chỉ số)
 - **Định nghĩa**: Điểm có thể phân bổ (allocatable) để tăng chỉ số; `Point` (query trong DB/game) phân biệt với `SkillPoint` (điểm học kỹ năng). Cả hai đều cập nhật dưới dạng opcode 0x08 packet type `0x26` (Point).
 
 ### Skill bar / Hotkey (Thanh kỹ năng) — opcode 0x28
-- **Định nghĩa**: Bản đồ slot 1..10 gán một kỹ năng vào thanh phím tắt của nhân vật. Nhận dữ liệu client → lưu `SkillSave`; **không phản hồi** (C# chỉ `SkillSaveUpdateId`). Slot 0 = clear (no-op).
+- **Định nghĩa**: Bản đồ slot 1..10 gán một kỹ năng vào thanh phím tắt của nhân vật. Nhận dữ liệu client → lưu `SkillSave`; **không phản hồi**. Slot 0 = clear (no-op).
 
 ### Learn / Upgrade Skill (Học / nâng cấp kỹ năng) — opcode 0x1C
 - **Định nghĩa**: Hành động chi `SkillPoint` để học mới hoặc nâng level một kỹ năng, áp dụng cho cả Nhân vật (sub 1) và Sủng vật (sub 2).
@@ -247,8 +247,8 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 - **Định nghĩa**: Bảng tra cứu metadata kỹ năng (`BinarySkillDef` trong `data/tables.rs:206`) load từ `Data/Skill.Dat` (PC binary, ưu tiên theo ADR 0002) hoặc `Data/Skill_C.dat` (mobile binary, fallback). Dùng cho: damage calculation (element, numerical, attribute, round, hit_status), targeting (fight_area), status infliction.
 - **Ràng buộc (Invariants)**:
   - Hai file **khác format hoàn toàn**:
-    - **PC `Skill.Dat`** (Pack=1, 86 bytes/record, 86-byte zero header): reverse-decoded name/des, `DecodeItem8/16/32` XOR obfuscation. Spec từ `SkillData.cs`/`SkillInfo.cs`. Parser ở `src/data/loaders/skill_pc.rs::SkillDatLoaderPc`.
-    - **Mobile `Skill_C.dat`** (count-prefix, variable-length UTF-16LE names): parser ở `src/data/loaders/skill.rs::SkillDatLoader` (tham khảo từ Kotlin `ts_mobile_server`).
+    - **PC `Skill.Dat`** (Pack=1, 86 bytes/record, 86-byte zero header): reverse-decoded name/des, `DecodeItem8/16/32` XOR obfuscation. Parser ở `src/data/loaders/skill_pc.rs::SkillDatLoaderPc`.
+    - **Mobile `Skill_C.dat`** (count-prefix, variable-length UTF-16LE names): parser ở `src/data/loaders/skill.rs::SkillDatLoader`.
   - Field `binary_skills: Option<&HashMap<u16, BinarySkillDef>>` trong `BattleData` được fill bởi `BattleService` từ `GameData::binary_skill_defs` (cùng một HashMap, không phân biệt PC/mobile sau load qua bridge `pc_to_binary`).
   - PC bridge (`skill_pc::pc_to_binary`): map PC fields sang `BinarySkillDef` theo best-effort (vd: `sp_cost` → `require_sp`, `elem` → `element`, `state` → `round`, `delay` → `spend_second`, `require_sk` → pre_skill_id1, `unk21` → pre_skill_id2). Unknown fields zero-fill.
   - VISCII decode: `decode_viscii` route qua `encoding::viscii_to_unicode` (bảng 102-entry VISCII 1.1 với extension `Đ` ở 0xD0/0xDD) — render đầy đủ ký tự tiếng Việt có dấu (ế, ộ, ặ, ẫ, ẩ, ằ, ắ, ọ, ợ, ử, ữ, ị, ể, ễ, ẽ...).
@@ -259,9 +259,9 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 - **Định nghĩa**: PC server chỉ phục vụ một dialect duy nhất — PC `aLogin.exe` port 6414. Không còn enum `ProtocolProfile` (`PcALogin` / `KotlinMobile`) — đã xóa theo ADR 0002. Mọi opcode đều dùng PC table semantic; opcode nào chưa implement thì rơi vào `unimplemented::handle` (chỉ log, không phản hồi).
 - **Ràng buộc (Invariants)**:
   - `FROZEN_PC_COLLISIONS` const đã xóa — khái niệm "collision" chỉ có nghĩa khi có 2 dialect, không áp dụng cho PC-only.
-  - 3 opcode (`0x19/0x1B/0x1F`) hiện rơi vào `unimplemented::handle` vì chưa port PC handler — không phải "compat", mà là "chưa viết". `0x23` **không** còn ở đây: nó là account-management (`OP_ACCOUNT`: đổi mật khẩu / xóa nhân vật / gift code), "Guild" trong bảng opcode PC chỉ là nhãn đặt sai. Cùng họ nhãn sai đã chốt rename: `0x24 OP_JOB_CHANGE`, `0x25 OP_LOGIN_COMPLETE`, `0x26 OP_EXP_LEVEL`, `0x27 OP_RANK_ANNOUNCE`, `0x2A OP_RESET` (xem `.scratch/opcode-rename/spec.md`).
+  - Các opcode `0x19 OP_TRADE`, `0x1B OP_NPC_SHOP`, `0x1F OP_PET_HOTEL` đã có handler đầy đủ trên đường dẫn PC; `0x23 OP_ACCOUNT` xử lý account-management (đổi mật khẩu / xóa nhân vật / gift code / `SelectFeatherForm`), `0x1A OP_MONEY_SYNC` là kênh S→C thuần. Các hằng số đã chuẩn hóa theo handler thực tế gồm: `0x03 OP_ENTER_GAME`, `0x10 OP_QUIZ`, `0x18 OP_QUEST_SYNC`, `0x1C OP_SKILL_LEARN`, `0x20 OP_EXPRESSION`, `0x24 OP_ARENA_FESTIVAL`, `0x27 OP_GUILD`, `0x29 OP_CITY_SIEGE`, `0x2B OP_GUILD_ALLIANCE`, `0x41 OP_RANK`.
 - **Tránh dùng các từ mơ hồ**: *Protocol Profile*, *Kotlin dialect*, *PC dialect* (sau refactor không còn khái niệm này).
-- **Phạm vi hiện tại**: Kotlin `ts_mobile_server/` chỉ là source tham chiếu để port logic, không bao giờ được dịch ra wire từ Rust server.
+- **Phạm vi hiện tại**: Server chỉ phát và tiếp nhận wire protocol chuẩn PC `aLogin.exe`.
 
 ### Quân hàm (Rank)
 - **Định nghĩa**: Cấp bậc quân sự của Nhân vật (Giáp binh → … → Đại tướng quân, 42 bậc), xác định bởi điểm chiến công (honor) tích lũy. Mỗi bậc cho bộ 4 bonus thuộc tính `(kind, value)` tra cứu theo kiểu `RankData.GetAttribute(honor, kind)` (ví dụ cộng EquipMaxHp/EquipMaxSp).
@@ -369,14 +369,14 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
   - Đồng bộ thời gian thực qua gói `S→C 18 08` (`kind = 1`, `val = 1` hoặc `0`; khi về `0` client phát âm thanh `WA0006.wav` và thông báo *"Thần xui đã rời xa bạn!"*) và truyền tại byte 5 của gói `player_appear` (`0x03`).
   - Lưu bền vững qua các lần đăng nhập và chuyển bản đồ.
 
-### Vấn Đáp Bắc Tinh Quân (North Star Quiz Encounter)
-- **Định nghĩa**: Trận chiến PvE đặc biệt kích hoạt ngẫu nhiên khi di chuyển trên bản đồ dã ngoại trong thời gian sự kiện mở, đối diện Bắc Tinh Quân (`1643`) hoặc Nam Tinh Quân (`1644`) với hộp thoại trắc nghiệm 4 đáp án (`Opcode 0x10`) trong 45 giây.
+### Vấn Đáp Bắc Tinh Quân (North Star Quiz Encounter) — `OP_QUIZ` (`0x10`)
+- **Định nghĩa**: Trận chiến PvE đặc biệt kích hoạt ngẫu nhiên khi di chuyển trên bản đồ dã ngoại trong thời gian sự kiện mở, đối diện Bắc Tinh Quân (`1643`) hoặc Nam Tinh Quân (`1644`) với hộp thoại trắc nghiệm 4 đáp án (`OP_QUIZ` `0x10`) trong 45 giây.
 - **Ràng buộc (Invariants)**:
   - Cấm tuyệt đối người chơi ngoài trận vào quan chiến (từ chối bằng `S→C 21 01 03`).
   - Khóa toàn bộ thao tác chiến đấu thường; chỉ Đội trưởng nhận câu hỏi, trả lời và chịu phần thưởng (`+10` trận Thần Tài) hoặc hình phạt (rút máu hiện tại về `1` qua thuộc tính `0x19` và gán Con Ma). Các thành viên tổ đội đi cùng giữ nguyên trạng thái độc lập.
 
-### Quân Đoàn (Guild — Opcode `0x27`)
-- **Định nghĩa**: Tổ chức liên minh người chơi có Quân Chủ đứng đầu, danh sách thành viên, phân cấp chức vụ, huy hiệu nhị phân 288-byte và quyền tham gia Công Thành Chiến (`0x29`) / Thủy Chiến (`0x3F`, `0x40`).
+### Quân Đoàn (`OP_GUILD` `0x27`) & Công Thành Chiến (`OP_CITY_SIEGE` `0x29`)
+- **Định nghĩa**: Tổ chức liên minh người chơi có Quân Chủ đứng đầu, danh sách thành viên, phân cấp chức vụ, huy hiệu nhị phân 288-byte và quyền tham gia Công Thành Chiến (`OP_CITY_SIEGE` `0x29`) / Thủy Chiến (`0x3F`, `0x40`).
 - **Ràng buộc (Invariants)**:
   - Gia nhập Quân Đoàn bắt buộc qua quy trình 2 bước có sự đồng thuận: người mời gửi lời mời (`0x27 0x02`), người được mời phải phản hồi chấp thuận (`0x27 0x03`) mới trở thành thành viên chính thức.
   - Chỉ Quân Chủ mới có quyền trục xuất thành viên hoặc chuyển nhượng chức vị Quân Chủ. Mọi tương tác giữa 2 người chơi đều phải khóa đồng bộ hai pha.
@@ -396,7 +396,7 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
   - **Fail-closed với mã chưa giải mã**: Mọi `condition_class`, `result_type`, `result_class` chưa hỗ trợ bắt buộc đánh giá `false` / bỏ qua có ghi log telemetry; cấm rơi về `0 == 0 -> true`.
 - **Tránh dùng các từ mơ hồ**: *Data_Talks*, *Quest INI override* (không còn là nguồn chuẩn).
 
-### Nhật ký Nhiệm vụ (Quest Ledger — Opcode `0x18`) & Cờ Bit `Mark.dat`
+### Nhật ký Nhiệm vụ (`OP_QUEST_SYNC` — Opcode `0x18`) & Cờ Bit `Mark.dat`
 - **Định nghĩa**: Hệ thống đồng bộ trạng thái nhiệm vụ hai lớp của Client (`LocalActor`), hoàn toàn tách biệt với 5 Container Vật phẩm:
   1. **Danh sách Nhiệm vụ Đang làm (Active Quest Log — `0x18 Sub 01/02/04/06`)**: Mảng 200 ô (`slot 1..=200`) tại `LocalActor + 0x654`, mỗi ô lưu `{quest_id: u16, mark_step: u8}` với `quest_id` tra cứu từ **`Data/Mark.dat`** (`10001..12461`), **không** tra cứu `Item.dat`.
   2. **Mảng Bit Cờ Hoàn thành (`quest_dont` — `0x18 Sub 05/07`)**: Mảng 300 byte bitmask (`2,400` bit) tại `LocalActor + 0x8b2`, ánh xạ theo trường `position` (`bit_id 1..=2400`) trong `Mark.dat`.

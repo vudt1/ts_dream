@@ -3,9 +3,8 @@
 //! Sub 1 (create): parse the client layout, then in **one atomic transaction**
 //! INSERT the full `characters` row (stats computed via the TEXP/HP formula,
 //! `hair` covers style/hair/face/color) + the money ledger + the `accounts`
-//! password overwrite (Bear `initChar` parity: non-empty `pass1`/`pass2` from
-//! the packet replace the dashboard passwords) + the starter `inventories`
-//! rows (Homdo/bag type 1: item 32012×4; Trangbi type 8 slot 2: 19737).
+//! password overwrite (non-empty `pass1`/`pass2` from the packet replace the
+//! dashboard passwords) + the starter `inventories` rows (Homdo/bag type 1:
 //! Any failure → `09 03 01` toast (e.g. name race duplicate). Sub 2 checks
 //! the candidate name against `characters.name`. Without a pool (golden
 //! replay) it degrades to the in-memory stub.
@@ -137,7 +136,7 @@ pub async fn handle_character(ctx: &mut OpcodeCtx<'_>) {
         // Sub 1: Create character
         1 => {
             if payload.is_empty() {
-                // Client confirmed entering game via 09 01 (Bear C# compatibility)
+                // Client confirmed entering game via 09 01
                 crate::server::handlers::login::handle_enter_game(ctx).await;
                 return;
             }
