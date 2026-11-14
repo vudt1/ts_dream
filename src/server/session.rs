@@ -132,6 +132,38 @@ pub struct PetState {
 }
 
 impl PetState {
+    /// True when this pet is carried in the active fight roster (`Carried` and `stt in 1..=4`).
+    #[must_use]
+    pub fn is_carried(&self) -> bool {
+        self.storage_type == PetStorageType::Carried && (1..=4).contains(&self.stt)
+    }
+
+    /// Canonical storage type (normalizes legacy `Carried` with `stt >= 5` to `Hotel`).
+    #[must_use]
+    pub fn effective_storage_type(&self) -> PetStorageType {
+        match self.storage_type {
+            PetStorageType::Carried if self.stt >= 5 => PetStorageType::Hotel,
+            other => other,
+        }
+    }
+
+    /// Canonical `(storagetype_u8, slot_1_based)` for DB persistence and container lookup.
+    #[must_use]
+    pub fn effective_storage_and_slot(&self) -> (u8, u8) {
+        match self.storage_type {
+            PetStorageType::Carried if self.stt <= 4 => (PetStorageType::Carried.value(), self.stt),
+            PetStorageType::Carried => (PetStorageType::Hotel.value(), self.stt.saturating_sub(4)),
+            other => (
+                other.value(),
+                if self.stt > 4 {
+                    self.stt.saturating_sub(4)
+                } else {
+                    self.stt
+                },
+            ),
+        }
+    }
+
     /// Recompute bonus stats (`int2..agi2`, `hp_max`, `sp_max`) from equipped gear.
     pub fn recompute_stats(&mut self, trangbi: &[InventoryItem]) {
         let sheet = crate::server::character_sheet::PetSheet::recompute(

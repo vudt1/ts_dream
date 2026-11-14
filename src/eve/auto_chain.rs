@@ -283,8 +283,8 @@ impl EveAutoChainEngine {
 /// Maximum auto-chain depth before giving up.
 pub const MAX_CHAIN_DEPTH: i32 = 10;
 
-/// Trigger kinds eligible for auto-chain: ClickNpc=1, ClickDoor=4, MeetDoor=8.
-const AUTO_CHAIN_TRIGGER_KINDS: [i32; 3] = [1, 4, 8];
+/// Trigger kinds eligible for auto-chain: ClickNpc=1, ClickDoor=4, MeetDoor=8, WalkStep=16.
+const AUTO_CHAIN_TRIGGER_KINDS: [i32; 4] = [1, 4, 8, 16];
 
 fn has_later_completed_event(events: &[u8], current_eve_no: u8, state: &PlayerEventState) -> bool {
     let mut found_current = false;
@@ -323,6 +323,11 @@ fn event_list_for<'a>(scene: &'a SceneEveData, session: &EventSession) -> Option
                 .events
                 .as_slice(),
         ),
+        16 => scene
+            .encounters
+            .iter()
+            .find(|enc| i32::from(enc.id) == session.npc_click_id)
+            .map(|enc| enc.events.as_slice()),
         _ => None,
     }
 }

@@ -20,7 +20,8 @@ use crate::battle::rng::DotNetRandom;
 use crate::data::loader::GameData;
 use crate::data::loaders::SceneEveData;
 use crate::eve::auto_chain::{AutoChainResult, EveAutoChainEngine, EventSession};
-use crate::eve::resolver::{resolve_event, ChainFilter};
+use crate::eve::planner::plan_chain;
+use crate::eve::resolver::ChainFilter;
 use crate::eve::state::{EveStateBuilder, PlayerEventState, PlayerStateInputs};
 use crate::server::dispatcher::OpcodeCtx;
 use crate::server::session::Session;
@@ -100,6 +101,7 @@ pub enum NpcTrigger {
     ClickDoor(i32),
     MeetDoor(i32),
     WalkStep { x: u16, y: u16 },
+    WalkStepEncounter(i32),
 }
 
 impl NpcTrigger {
@@ -108,13 +110,16 @@ impl NpcTrigger {
             NpcTrigger::ClickNpc(_) => 1,
             NpcTrigger::ClickDoor(_) => 4,
             NpcTrigger::MeetDoor(_) => 8,
-            NpcTrigger::WalkStep { .. } => 16,
+            NpcTrigger::WalkStep { .. } | NpcTrigger::WalkStepEncounter(_) => 16,
         }
     }
 
     fn click_id(self) -> i32 {
         match self {
-            NpcTrigger::ClickNpc(id) | NpcTrigger::ClickDoor(id) | NpcTrigger::MeetDoor(id) => id,
+            NpcTrigger::ClickNpc(id)
+            | NpcTrigger::ClickDoor(id)
+            | NpcTrigger::MeetDoor(id)
+            | NpcTrigger::WalkStepEncounter(id) => id,
             NpcTrigger::WalkStep { .. } => 0,
         }
     }
@@ -173,12 +178,9 @@ pub fn snapshot_state_with_data(
             continue;
         }
         let npc_id = i32::from(pet.id);
-        match pet.storage_type {
+        match pet.effective_storage_type() {
             crate::db::modern::model::PetStorageType::Cart => cart_npc_ids.push(npc_id),
             crate::db::modern::model::PetStorageType::Hotel => inn_npc_ids.push(npc_id),
-            crate::db::modern::model::PetStorageType::Carried if pet.stt >= 5 => {
-                inn_npc_ids.push(npc_id);
-            }
             crate::db::modern::model::PetStorageType::Carried => follow_npc_ids.push(npc_id),
             crate::db::modern::model::PetStorageType::Warehouse => {}
         }
@@ -310,14 +312,14 @@ fn activate(
                 if EveAutoChainEngine::should_skip_event(&enc.events, eve_no, event_data, state) {
                     continue;
                 }
-                let Some(resolved) =
-                    resolve_event(event_data, state, &scene.group_datas, rng, chain_filter)
+                let Some(planned) =
+                    plan_chain(event_data, state, &scene.group_datas, rng, chain_filter)
                 else {
                     continue;
                 };
                 // Pure random-encounter battles (all results rt=3) are governed by
                 // the step-counter in `try_trigger_random_encounter`, not WalkStep.
-                if resolved.results.iter().all(|r| r.result_type == 3) {
+                if planned.results.iter().all(|r| r.result_type == 3) {
                     continue;
                 }
                 return Some(EventSession {
@@ -326,13 +328,13 @@ fn activate(
                     npc_click_id: i32::from(enc.id),
                     trigger_kind: trigger.kind(),
                     chain_depth: 0,
-                    results: resolved.results,
+                    results: planned.results,
                     current_index: 0,
                     phase: crate::eve::auto_chain::EventPhase::Executing,
                     last_surface_id: -1,
                     last_choice_code: -1,
                     battle_result: 0,
-                    matched_condition_no: resolved.matched_condition_no,
+                    matched_condition_no: planned.matched_condition_no,
                 });
             }
         }
@@ -340,20 +342,47 @@ fn activate(
     }
 
     let click = trigger.click_id() as u16;
-    let events: &[u8] = match trigger.kind() {
-        1 => &scene.npcs.get(&click)?.events,
-        4 | 8 => &scene.doors.get(&click)?.events,
-        _ => return None,
+    let indexed_events: Vec<u8> = match trigger {
+        NpcTrigger::ClickNpc(_) => scene
+            .npc_events_by_npc
+            .get(&click)
+            .map(|v| v.iter().filter_map(|&e| u8::try_from(e).ok()).collect())
+            .unwrap_or_default(),
+        NpcTrigger::ClickDoor(_) | NpcTrigger::MeetDoor(_) => scene
+            .door_events_by_door
+            .get(&click)
+            .map(|v| v.iter().filter_map(|&e| u8::try_from(e).ok()).collect())
+            .unwrap_or_default(),
+        NpcTrigger::WalkStepEncounter(_) => scene
+            .encounter_events_by_id
+            .get(&click)
+            .map(|v| v.iter().filter_map(|&e| u8::try_from(e).ok()).collect())
+            .unwrap_or_default(),
+        NpcTrigger::WalkStep { .. } => Vec::new(),
     };
-    for &eve_no in events {
+    let fallback_events: &[u8] = if indexed_events.is_empty() {
+        match trigger {
+            NpcTrigger::ClickNpc(_) => &scene.npcs.get(&click)?.events,
+            NpcTrigger::ClickDoor(_) | NpcTrigger::MeetDoor(_) => &scene.doors.get(&click)?.events,
+            NpcTrigger::WalkStepEncounter(_) => scene
+                .encounters
+                .iter()
+                .find(|enc| enc.id == click)
+                .map(|enc| enc.events.as_slice())?,
+            NpcTrigger::WalkStep { .. } => return None,
+        }
+    } else {
+        indexed_events.as_slice()
+    };
+    for &eve_no in fallback_events {
         let Some(event_data) = scene.npc_events.get(&u16::from(eve_no)) else {
             continue;
         };
-        if EveAutoChainEngine::should_skip_event(events, eve_no, event_data, state) {
+        if EveAutoChainEngine::should_skip_event(fallback_events, eve_no, event_data, state) {
             continue;
         }
-        let Some(resolved) =
-            resolve_event(event_data, state, &scene.group_datas, rng, chain_filter)
+        let Some(planned) =
+            plan_chain(event_data, state, &scene.group_datas, rng, chain_filter)
         else {
             continue;
         };
@@ -363,13 +392,13 @@ fn activate(
             npc_click_id: trigger.click_id(),
             trigger_kind: trigger.kind(),
             chain_depth: 0,
-            results: resolved.results,
+            results: planned.results,
             current_index: 0,
             phase: crate::eve::auto_chain::EventPhase::Executing,
             last_surface_id: -1,
             last_choice_code: -1,
             battle_result: 0,
-            matched_condition_no: resolved.matched_condition_no,
+            matched_condition_no: planned.matched_condition_no,
         });
     }
     None

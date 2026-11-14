@@ -57,22 +57,12 @@ pub async fn handle_move_dispatch(ctx: &mut OpcodeCtx<'_>) {
                 crate::server::handlers::npc_event::NpcTrigger::MeetDoor(i32::from(door_id)),
                 &mut rng,
             ) {
-                let first_non_action = event_session.results.iter().find(|r| r.result_type != 0);
-                let should_lock_ui = !matches!(first_non_action.map(|r| r.result_type), Some(2 | 3));
                 ctx.conn.session.idtalking = i32::from(door_id);
                 ctx.conn.session.talk_type = "DOOR".to_string();
                 ctx.conn.session.talk_count = 0;
-                ctx.conn.session.current_event_session = Some(event_session);
-                if should_lock_ui {
-                    ctx.conn.session.talk_locked = true;
-                    ctx.out.send("F44402000602");
-                    ctx.out.send(crate::protocol::codecs::npc_talk::NpcTalkCodec::build_talk_lock_hex(
-                        id,
-                        crate::protocol::codecs::npc_talk::TalkLockMode::Lock,
-                    ));
-                }
-                crate::server::handlers::talk::execute_event_step_with_pool(
+                crate::server::handlers::talk::activate_event_session(
                     &mut ctx.conn.session,
+                    event_session,
                     ctx.data,
                     ctx.env.pool,
                     &mut ctx.out,
@@ -90,19 +80,9 @@ pub async fn handle_move_dispatch(ctx: &mut OpcodeCtx<'_>) {
         crate::server::handlers::npc_event::NpcTrigger::WalkStep { x: px, y: py },
         &mut rng,
     ) {
-        let first_non_action = event_session.results.iter().find(|r| r.result_type != 0);
-        let should_lock_ui = !matches!(first_non_action.map(|r| r.result_type), Some(2 | 3));
-        ctx.conn.session.current_event_session = Some(event_session);
-        if should_lock_ui {
-            ctx.conn.session.talk_locked = true;
-            ctx.out.send("F44402000602");
-            ctx.out.send(crate::protocol::codecs::npc_talk::NpcTalkCodec::build_talk_lock_hex(
-                id,
-                crate::protocol::codecs::npc_talk::TalkLockMode::Lock,
-            ));
-        }
-        crate::server::handlers::talk::execute_event_step_with_pool(
+        crate::server::handlers::talk::activate_event_session(
             &mut ctx.conn.session,
+            event_session,
             ctx.data,
             ctx.env.pool,
             &mut ctx.out,

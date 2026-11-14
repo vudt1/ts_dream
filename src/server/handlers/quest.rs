@@ -961,26 +961,65 @@ pub async fn perform_party_warp_and_persist(
     }
 
     // Phase 1: Deterministic RAM Lock BEFORE reading any partner from registry.
-    let _guards = crate::server::session::lock_player_operations(participant_ids.clone()).await;
-
-    let old_map = session.map_id;
+    let _guards = crate::server::session::lock_player_operations(participant_ids).await;
     let dest_map = warp.map2 as u16;
     let dest_x = warp.x as u16;
     let dest_y = warp.y as u16;
     let wire_warp_id = (warp.warpid & 0xFF) as u8;
+    perform_party_warp_locked(session, dest_map, dest_x, dest_y, wire_warp_id, pool, out).await
+}
+
+/// Execute party warp + atomic DB persistence while the caller already holds
+/// `lock_player_operations` for the leader and all party members.
+pub async fn perform_party_warp_for_locked_session(
+    session: &mut Session,
+    data: &GameData,
+    pool: Option<&crate::db::pool::DbPool>,
+    warp_id: u16,
+    out: &mut HandleOutcome,
+) -> bool {
+    let Some(warp) = data
+        .warps
+        .get(&(i64::from(session.map_id), i64::from(warp_id)))
+    else {
+        tracing::debug!(
+            map_id = session.map_id,
+            warp_id,
+            "Door Warp refused: warp_id not found in Warps.dat"
+        );
+        return false;
+    };
+    if warp.map2 <= 0 {
+        return false;
+    }
+    if session.id_leader > 0 && session.id_leader != session.id {
+        return false;
+    }
+    let dest_map = warp.map2 as u16;
+    let dest_x = warp.x as u16;
+    let dest_y = warp.y as u16;
+    let wire_warp_id = (warp.warpid & 0xFF) as u8;
+    perform_party_warp_locked(session, dest_map, dest_x, dest_y, wire_warp_id, pool, out).await
+}
+
+async fn perform_party_warp_locked(
+    session: &mut Session,
+    dest_map: u16,
+    dest_x: u16,
+    dest_y: u16,
+    wire_warp_id: u8,
+    pool: Option<&crate::db::pool::DbPool>,
+    out: &mut HandleOutcome,
+) -> bool {
+    let id = session.id;
+    let id_leader = session.id_leader;
+    let before_leader = (session.map_id, session.map_x, session.map_y);
 
     session.map_id = dest_map;
     session.map_x = dest_x;
     session.map_y = dest_y;
-    crate::server::session::registry_update_if_online(session);
 
-    out.send("F44402001407");
-    out.send(crate::server::spawn::build_relocate_packet(
-        id, dest_map, dest_x, dest_y, wire_warp_id,
-    ));
-    out.broadcast_to_map(id, old_map, crate::battle::packets::hide_from_map(id));
-
-    let mut warped_members: Vec<Session> = Vec::new();
+    let mut warped_members: Vec<(u16, Session)> = Vec::new();
     if id_leader == id && id > 0 {
         for member_id in session.id_mem {
             if member_id > 0 && member_id != id {
@@ -991,29 +1030,18 @@ pub async fn perform_party_warp_and_persist(
                 mem_session.map_id = dest_map;
                 mem_session.map_x = dest_x;
                 mem_session.map_y = dest_y;
-                crate::server::session::registry_update_if_online(&mem_session);
-
-                let member_pkt = crate::server::spawn::build_relocate_packet(
-                    member_id, dest_map, dest_x, dest_y, wire_warp_id,
-                );
-                out.send_to(member_id, "F44402001407");
-                out.send_to(member_id, member_pkt);
-                out.broadcast_to_map(
-                    member_id,
-                    member_old_map,
-                    crate::battle::packets::hide_from_map(member_id),
-                );
-                warped_members.push(mem_session);
+                warped_members.push((member_old_map, mem_session));
             }
         }
     }
 
-    // Phase 2: Atomic SQLite write-through checkpoint for leader + all warped members.
+    // Phase 2: Atomic SQLite write-through checkpoint for leader + all warped members
+    // BEFORE updating registry or emitting wire relocation frames.
     let mut to_persist: Vec<&Session> = Vec::new();
     if session.db_character_id > 0 {
         to_persist.push(session);
     }
-    for m in &warped_members {
+    for (_, m) in &warped_members {
         if m.db_character_id > 0 {
             to_persist.push(m);
         }
@@ -1024,7 +1052,40 @@ pub async fn perform_party_warp_and_persist(
         tracing::warn!(
             leader_id = session.id,
             dest_map,
-            "Door Warp DB write-through failed"
+            "Door Warp DB write-through failed; rolling back RAM state"
+        );
+        session.map_id = before_leader.0;
+        session.map_x = before_leader.1;
+        session.map_y = before_leader.2;
+        return false;
+    }
+
+    crate::server::session::registry_update_if_online(session);
+    out.send(crate::protocol::codecs::npc_talk::NpcTalkCodec::build_warp_ack_hex());
+    out.send(crate::server::spawn::build_relocate_packet(
+        id, dest_map, dest_x, dest_y, wire_warp_id,
+    ));
+    out.broadcast_to_map(
+        id,
+        before_leader.0,
+        crate::battle::packets::hide_from_map(id),
+    );
+
+    for (member_old_map, mem_session) in &warped_members {
+        let member_id = mem_session.id;
+        crate::server::session::registry_update_if_online(mem_session);
+        let member_pkt = crate::server::spawn::build_relocate_packet(
+            member_id, dest_map, dest_x, dest_y, wire_warp_id,
+        );
+        out.send_to(
+            member_id,
+            crate::protocol::codecs::npc_talk::NpcTalkCodec::build_warp_ack_hex(),
+        );
+        out.send_to(member_id, member_pkt);
+        out.broadcast_to_map(
+            member_id,
+            *member_old_map,
+            crate::battle::packets::hide_from_map(member_id),
         );
     }
 

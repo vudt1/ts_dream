@@ -28,8 +28,8 @@ pub const MAX_LEVEL: i64 = 200;
 /// Maximum gold capacity on player / bank (9,999,999).
 pub const GOLD_CAP: u32 = 9_999_999;
 
-/// Maximum shop-point capacity on player (9,999,999).
-pub const POINT_CAP: u32 = 9_999_999;
+/// Maximum shop-point capacity on player (`player+0x1300`, 2,000,000,000 per `GLOSSARY.md`).
+pub const POINT_CAP: u32 = 2_000_000_000;
 
 // Canonical hex string opcodes for Logined1 and storage containers
 pub const OPCODE_APPEAR: &str = "03";

@@ -1183,7 +1183,7 @@ fn test_8_combo_damage_130_percent_multiplier() {
     // Battle A: No Combo (Attacker 2 targets a different enemy, so Attacker 1 attacks solo)
     let hp_lost_solo;
     {
-        let mut battle = Battle::new(100, 12345);
+        let mut battle = Battle::with_seeds(100, 12345, 42, 42, 42);
         {
             let c = battle.cell_mut(2, 2).unwrap();
             c.id = 101;
@@ -1256,10 +1256,10 @@ fn test_8_combo_damage_130_percent_multiplier() {
     }
 
     // Battle B: Combo (both fighters target (0, 2), Agi 50 and 48)
-    // Same battle seed (12345) and same stats.
+    // Same deterministic RNG seeds and same stats.
     let hp_lost_combo;
     {
-        let mut battle = Battle::new(100, 12345);
+        let mut battle = Battle::with_seeds(100, 12345, 42, 42, 42);
         {
             let c = battle.cell_mut(2, 2).unwrap();
             c.id = 101;

@@ -28,10 +28,25 @@ pub fn is_roster(stt: u8) -> bool {
     ACTIVE_SLOTS.contains(&stt)
 }
 
+/// The next free slot in `[lo..=hi]` for the given storage type (first-fit scan).
+pub fn find_free_in_storage(
+    pets: &[PetState],
+    storage: PetStorageType,
+    lo: u8,
+    hi: u8,
+) -> Option<u8> {
+    let used: Vec<u8> = pets
+        .iter()
+        .filter(|p| p.effective_storage_type() == storage)
+        .map(|p| p.stt)
+        .collect();
+    (lo..=hi).find(|s| !used.contains(s))
+}
+
 /// The next free slot in `[lo..=hi]` (first-fit scan).
 pub fn find_free(pets: &[PetState], lo: u8, hi: u8) -> Option<u8> {
-    let used: Vec<u8> = pets.iter().map(|p| p.stt).collect();
-    (lo..=hi).find(|s| !used.contains(s))
+    let storage = storage_for_slot(lo);
+    find_free_in_storage(pets, storage, lo, hi)
 }
 
 fn storage_for_slot(stt: u8) -> PetStorageType {
@@ -42,12 +57,22 @@ fn storage_for_slot(stt: u8) -> PetStorageType {
     }
 }
 
-/// Move one pet row + its six equipment slots to another slot (a pet only on
-/// the source side moves; two present rows swap instead).
-fn move_pet_slot(conn: &mut Conn, from: u8, to: u8) {
-    if let Some(pos) = conn.session.pets.iter().position(|p| p.stt == from) {
+/// Move one pet row + its six equipment slots to another slot/storage.
+fn move_pet_slot(
+    conn: &mut Conn,
+    from_storage: PetStorageType,
+    from: u8,
+    to_storage: PetStorageType,
+    to: u8,
+) {
+    if let Some(pos) = conn
+        .session
+        .pets
+        .iter()
+        .position(|p| p.stt == from && p.effective_storage_type() == from_storage)
+    {
         conn.session.pets[pos].stt = to;
-        conn.session.pets[pos].storage_type = storage_for_slot(to);
+        conn.session.pets[pos].storage_type = to_storage;
     }
     for sub in 1..=6u16 {
         let src_slot = from as u16 * 10 + sub;
@@ -64,34 +89,41 @@ fn move_pet_slot(conn: &mut Conn, from: u8, to: u8) {
     }
 }
 
-/// Swap two pet slots + their pet equipment atomically.
-///
-/// When both slots hold a pet the two composite `(player_id, stt)` identities
-/// exchange (a one-way move would leave two pets sharing one `stt`); when only
-/// one side is populated the pet moves to the other slot. The six `trangbi`
-/// slots (`stt*10+1..6`) relocate along with their owner.
-fn swap_pet_slots(conn: &mut Conn, a: u8, b: u8) {
-    if a == b {
+/// Swap two pet slots + their pet equipment atomically across `storage_a` and `storage_b`.
+fn swap_pet_slots(
+    conn: &mut Conn,
+    storage_a: PetStorageType,
+    a: u8,
+    storage_b: PetStorageType,
+    b: u8,
+) {
+    if a == b && storage_a == storage_b {
         return;
     }
-    let pa = conn.session.pets.iter().position(|p| p.stt == a);
-    let pb = conn.session.pets.iter().position(|p| p.stt == b);
+    let pa = conn
+        .session
+        .pets
+        .iter()
+        .position(|p| p.stt == a && p.effective_storage_type() == storage_a);
+    let pb = conn
+        .session
+        .pets
+        .iter()
+        .position(|p| p.stt == b && p.effective_storage_type() == storage_b);
     match (pa, pb) {
         (Some(i), Some(j)) => {
-            let sa = conn.session.pets[i].stt;
-            let sb = conn.session.pets[j].stt;
-            conn.session.pets[i].stt = sb;
-            conn.session.pets[i].storage_type = storage_for_slot(sb);
-            conn.session.pets[j].stt = sa;
-            conn.session.pets[j].storage_type = storage_for_slot(sa);
+            conn.session.pets[i].stt = b;
+            conn.session.pets[i].storage_type = storage_b;
+            conn.session.pets[j].stt = a;
+            conn.session.pets[j].storage_type = storage_a;
         }
         (Some(i), None) => {
             conn.session.pets[i].stt = b;
-            conn.session.pets[i].storage_type = storage_for_slot(b);
+            conn.session.pets[i].storage_type = storage_b;
         }
         (None, Some(j)) => {
             conn.session.pets[j].stt = a;
-            conn.session.pets[j].storage_type = storage_for_slot(a);
+            conn.session.pets[j].storage_type = storage_a;
         }
         (None, None) => {}
     }
@@ -153,42 +185,54 @@ pub async fn handle_pet_actions(ctx: &mut OpcodeCtx<'_>) {
         // Sub 2: Release pet (delete row + equipment + broadcast).
         2 => {
             let stt = payload[0];
-            if ctx.conn.session.active_pet_stt == stt {
+            let target_storage = storage_for_slot(stt);
+            if ctx.conn.session.active_pet_stt == stt && target_storage == PetStorageType::Carried {
                 ctx.conn.session.active_pet_stt = 0;
             }
-            ctx.conn.session.pets.retain(|p| p.stt != stt);
+            ctx.conn
+                .session
+                .pets
+                .retain(|p| !(p.stt == stt && p.effective_storage_type() == target_storage));
             let lo = stt as u16 * 10 + 1;
             let hi = stt as u16 * 10 + 6;
             ctx.conn
                 .session
                 .trangbi
                 .retain(|i| !(lo..=hi).contains(&u16::from(i.slot)));
+            crate::server::session::registry_update_if_online(&ctx.conn.session);
             persist_pet_state(ctx.env.pool, ctx.conn).await;
             let id4 = encoder::le32(ctx.conn.session.id);
             let frame = format!("F44407000F02{}{:02X}", id4, stt);
             ctx.out.send(frame.clone());
             ctx.out.broadcast(ctx.conn.session.id, frame);
         }
-        // Sub 3: Stable → Roster.
+        // Sub 3: Stable (Hotel) → Roster (Carried).
         3 => {
             let src_stable = payload[0];
             let source_stt = src_stable + 4; // stable slot (client index + 4)
-            let Some(free) = find_free(
+            let Some(free) = find_free_in_storage(
                 &ctx.conn.session.pets,
+                PetStorageType::Carried,
                 *ACTIVE_SLOTS.start(),
                 *ACTIVE_SLOTS.end(),
             ) else {
                 ctx.out.send("F44402001F09"); // roster full -> close menu
                 return;
             };
-            move_pet_slot(ctx.conn, source_stt, free);
+            move_pet_slot(
+                ctx.conn,
+                PetStorageType::Hotel,
+                source_stt,
+                PetStorageType::Carried,
+                free,
+            );
             ctx.out.send(format!("F44405001F06{:02X}0000", src_stable));
             let pet_id = ctx
                 .conn
                 .session
                 .pets
                 .iter()
-                .find(|p| p.stt == free)
+                .find(|p| p.stt == free && p.is_carried())
                 .map(|p| p.id)
                 .unwrap_or(0);
             if pet_id > 0 {
@@ -203,9 +247,10 @@ pub async fn handle_pet_actions(ctx: &mut OpcodeCtx<'_>) {
                 ctx.out.broadcast(ctx.conn.session.id, frame);
             }
             ctx.out.send("F44402001F0C");
+            crate::server::session::registry_update_if_online(&ctx.conn.session);
             persist_pet_state(ctx.env.pool, ctx.conn).await;
         }
-        // Sub 7: Roster → Stable.
+        // Sub 7: Roster (Carried) → Stable (Hotel).
         7 => {
             let stt = payload[0];
             if ctx.conn.session.active_pet_stt == stt {
@@ -215,23 +260,31 @@ pub async fn handle_pet_actions(ctx: &mut OpcodeCtx<'_>) {
                 ctx.out.send("F44402001F09");
                 return;
             }
-            let Some(free) = find_free(
+            let Some(free) = find_free_in_storage(
                 &ctx.conn.session.pets,
+                PetStorageType::Hotel,
                 *STABLE_SLOTS.start(),
                 *STABLE_SLOTS.end(),
             ) else {
                 ctx.out.send("F44402001F09"); // stable full
                 return;
             };
-            move_pet_slot(ctx.conn, stt, free);
+            move_pet_slot(
+                ctx.conn,
+                PetStorageType::Carried,
+                stt,
+                PetStorageType::Hotel,
+                free,
+            );
             let id4 = encoder::le32(ctx.conn.session.id);
             let frame = format!("F44407000F02{}{:02X}", id4, stt);
             ctx.out.send(frame.clone());
             ctx.out.broadcast(ctx.conn.session.id, frame);
             ctx.out.send("F44402001F09");
+            crate::server::session::registry_update_if_online(&ctx.conn.session);
             persist_pet_state(ctx.env.pool, ctx.conn).await;
         }
-        // Sub 8: Swap stable ↔ roster.
+        // Sub 8: Swap stable (Hotel) ↔ roster (Carried).
         8 => {
             if payload.len() < 2 {
                 return;
@@ -246,13 +299,19 @@ pub async fn handle_pet_actions(ctx: &mut OpcodeCtx<'_>) {
                 return;
             }
             let stable_stt = stable_idx + 4;
-            swap_pet_slots(ctx.conn, stable_stt, roster_stt);
+            swap_pet_slots(
+                ctx.conn,
+                PetStorageType::Hotel,
+                stable_stt,
+                PetStorageType::Carried,
+                roster_stt,
+            );
             let pet_id = ctx
                 .conn
                 .session
                 .pets
                 .iter()
-                .find(|p| p.stt == roster_stt)
+                .find(|p| p.stt == roster_stt && p.is_carried())
                 .map(|p| p.id)
                 .unwrap_or(0);
             if pet_id > 0 {
@@ -267,6 +326,7 @@ pub async fn handle_pet_actions(ctx: &mut OpcodeCtx<'_>) {
                 ctx.out.broadcast(ctx.conn.session.id, frame);
             }
             ctx.out.send("F44402001F09F44402001F0C");
+            crate::server::session::registry_update_if_online(&ctx.conn.session);
             persist_pet_state(ctx.env.pool, ctx.conn).await;
         }
         // Sub 4 (mount horse): LE16 pet id, 18000 < id < 19000.
@@ -283,7 +343,7 @@ pub async fn handle_pet_actions(ctx: &mut OpcodeCtx<'_>) {
                 .session
                 .pets
                 .iter()
-                .any(|p| p.id == pet_id && is_roster(p.stt));
+                .any(|p| p.id == pet_id && p.is_carried());
             if !owned || ctx.conn.session.horse_pet_id == pet_id {
                 return;
             }
@@ -364,12 +424,15 @@ pub async fn handle_pet_summon(ctx: &mut OpcodeCtx<'_>) {
             if ctx.conn.session.horse_pet_id == pet_id {
                 return;
             }
-            let Some(pet) = ctx.conn.session.pets.iter().find(|p| p.id == pet_id) else {
+            let Some(pet) = ctx
+                .conn
+                .session
+                .pets
+                .iter()
+                .find(|p| p.id == pet_id && p.is_carried())
+            else {
                 return;
             };
-            if !is_roster(pet.stt) {
-                return;
-            }
             if ctx.conn.session.battle_id == 0 {
                 ctx.conn.session.active_pet_stt = pet.stt;
                 ctx.out

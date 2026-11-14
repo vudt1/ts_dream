@@ -440,7 +440,6 @@ impl BattleSink for BattleSinkImpl {
                 u16,
                 Option<Arc<tokio::sync::RwLock<Session>>>,
                 Option<mpsc::Sender<String>>,
-                Session,
             )> = Vec::new();
 
             // Snapshot online session handles once for legacy `battle_quest_win`
@@ -464,6 +463,18 @@ impl BattleSink for BattleSinkImpl {
                     s.last_battle_end_ms = now_ms;
                     s.encounter_steps = 0;
 
+                    if arena_40_challenger == Some(pid as u32) {
+                        if let Some(reg) = crate::server::session::registry_get(pid as u32) {
+                            if let Some(&(_, reg_step)) = reg.quest_tasks.get(&218) {
+                                let _ = crate::server::handlers::quest_sync::upsert_quest_task_slot(
+                                    &mut s,
+                                    218,
+                                    reg_step,
+                                );
+                            }
+                        }
+                    }
+
                     if outcome == Outcome::PlayerWin && arena_40_challenger == Some(pid as u32) {
                         let victory_frames = crate::server::handlers::event_npcs::resolve_40_npc_victory(
                             &mut s,
@@ -474,47 +485,17 @@ impl BattleSink for BattleSinkImpl {
                         }
                     }
 
-                    let is_eve_leader = s.id_leader == 0 || s.id_leader == s.id;
-                    if is_eve_leader {
-                        let eve_out = crate::server::handlers::talk::resume_eve_after_battle_deferred_warp(
-                            &mut s,
-                            outcome,
-                            self.data.as_ref(),
-                            pool_opt.as_ref(),
-                        )
+                    let (outgoing, eve_battle, eve_warp) = self
+                        .resume_eve_for_participant(pid, &mut s, outcome, pool_opt.as_ref())
                         .await;
-                        for f in eve_out.outgoing {
-                            let _ = tx.try_send(f.frame);
-                        }
-                        for (target_id, frame) in eve_out.direct_messages {
-                            self.send_to(i64::from(target_id), frame);
-                        }
-                        for mb in eve_out.map_broadcast {
-                            if let Some(target_map) = mb.map_id {
-                                send_to_map(&self.online, i64::from(target_map), mb.frame);
-                            } else {
-                                let exclude = if mb.subject > 0 { i64::from(mb.subject) } else { pid };
-                                self.send_map(exclude, mb.frame);
-                            }
-                        }
-                        if let Some((fight_id, diahinh)) = eve_out.eve_battle {
-                            eve_followups.push((pid, s.clone(), fight_id, diahinh));
-                        }
-                        if let Some(warp_id) = eve_out.eve_warp {
-                            eve_warps.push((
-                                pid,
-                                warp_id,
-                                Some(Arc::clone(sess_arc)),
-                                Some(tx.clone()),
-                                s.clone(),
-                            ));
-                        }
-                    } else if s
-                        .current_event_session
-                        .as_ref()
-                        .is_some_and(|ev| ev.phase == crate::eve::EventPhase::AwaitingBattle)
-                    {
-                        s.current_event_session = None;
+                    for f in outgoing {
+                        let _ = tx.try_send(f);
+                    }
+                    if let Some((fight_id, diahinh)) = eve_battle {
+                        eve_followups.push((pid, s.clone(), fight_id, diahinh));
+                    }
+                    if let Some(warp_id) = eve_warp {
+                        eve_warps.push((pid, warp_id, Some(Arc::clone(sess_arc)), Some(tx.clone())));
                     }
 
                     if s.talking_battle > 0 {
@@ -545,44 +526,37 @@ impl BattleSink for BattleSinkImpl {
                     s.battle_id = 0;
                     s.last_battle_end_ms = now_ms;
                     s.encounter_steps = 0;
+                    if arena_40_challenger == Some(pid as u32) {
+                        if let Some(reg) = crate::server::session::registry_get(pid as u32) {
+                            if let Some(&(_, reg_step)) = reg.quest_tasks.get(&218) {
+                                let _ = crate::server::handlers::quest_sync::upsert_quest_task_slot(
+                                    &mut s,
+                                    218,
+                                    reg_step,
+                                );
+                            }
+                        }
+                    }
                     if outcome == Outcome::PlayerWin && arena_40_challenger == Some(pid as u32) {
                         let _ = crate::server::handlers::event_npcs::resolve_40_npc_victory(
                             &mut s,
                             self.data.as_ref(),
                         );
                     }
-                    let is_eve_leader = s.id_leader == 0 || s.id_leader == s.id;
-                    if is_eve_leader {
-                        let eve_out = crate::server::handlers::talk::resume_eve_after_battle_deferred_warp(
-                            &mut s,
-                            outcome,
-                            self.data.as_ref(),
-                            pool_opt.as_ref(),
-                        )
+                    let (_outgoing, eve_battle, eve_warp) = self
+                        .resume_eve_for_participant(pid, &mut s, outcome, pool_opt.as_ref())
                         .await;
-                        for (target_id, frame) in eve_out.direct_messages {
-                            self.send_to(i64::from(target_id), frame);
-                        }
-                        for mb in eve_out.map_broadcast {
-                            if let Some(target_map) = mb.map_id {
-                                send_to_map(&self.online, i64::from(target_map), mb.frame);
-                            } else {
-                                let exclude = if mb.subject > 0 { i64::from(mb.subject) } else { pid };
-                                self.send_map(exclude, mb.frame);
+                    if let Some((fight_id, diahinh)) = eve_battle {
+                        eve_followups.push((pid, s.clone(), fight_id, diahinh));
+                    }
+                    if let Some(warp_id) = eve_warp {
+                        if let Some(warp) = self.data.warps.get(&(i64::from(s.map_id), i64::from(warp_id))) {
+                            if warp.map2 > 0 {
+                                s.map_id = warp.map2 as u16;
+                                s.map_x = warp.x as u16;
+                                s.map_y = warp.y as u16;
                             }
                         }
-                        if let Some((fight_id, diahinh)) = eve_out.eve_battle {
-                            eve_followups.push((pid, s.clone(), fight_id, diahinh));
-                        }
-                        if let Some(warp_id) = eve_out.eve_warp {
-                            eve_warps.push((pid, warp_id, None, None, s.clone()));
-                        }
-                    } else if s
-                        .current_event_session
-                        .as_ref()
-                        .is_some_and(|ev| ev.phase == crate::eve::EventPhase::AwaitingBattle)
-                    {
-                        s.current_event_session = None;
                     }
                     crate::server::session::registry_update_if_online(&s);
                     ended_sessions.push(s);
@@ -590,35 +564,17 @@ impl BattleSink for BattleSinkImpl {
                     offline_s.battle_id = 0;
                     offline_s.last_battle_end_ms = now_ms;
                     offline_s.encounter_steps = 0;
-                    let is_eve_leader = offline_s.id_leader == 0 || offline_s.id_leader == offline_s.id;
-                    if is_eve_leader {
-                        let eve_out = crate::server::handlers::talk::resume_eve_after_battle_deferred_warp(
-                            &mut offline_s,
-                            outcome,
-                            self.data.as_ref(),
-                            pool_opt.as_ref(),
-                        )
+                    let (_outgoing, _eve_battle, eve_warp) = self
+                        .resume_eve_for_participant(pid, &mut offline_s, outcome, pool_opt.as_ref())
                         .await;
-                        for (target_id, frame) in eve_out.direct_messages {
-                            self.send_to(i64::from(target_id), frame);
-                        }
-                        for mb in eve_out.map_broadcast {
-                            if let Some(target_map) = mb.map_id {
-                                send_to_map(&self.online, i64::from(target_map), mb.frame);
-                            } else {
-                                let exclude = if mb.subject > 0 { i64::from(mb.subject) } else { pid };
-                                self.send_map(exclude, mb.frame);
+                    if let Some(warp_id) = eve_warp {
+                        if let Some(warp) = self.data.warps.get(&(i64::from(offline_s.map_id), i64::from(warp_id))) {
+                            if warp.map2 > 0 {
+                                offline_s.map_id = warp.map2 as u16;
+                                offline_s.map_x = warp.x as u16;
+                                offline_s.map_y = warp.y as u16;
                             }
                         }
-                        if let Some(warp_id) = eve_out.eve_warp {
-                            eve_warps.push((pid, warp_id, None, None, offline_s.clone()));
-                        }
-                    } else if offline_s
-                        .current_event_session
-                        .as_ref()
-                        .is_some_and(|ev| ev.phase == crate::eve::EventPhase::AwaitingBattle)
-                    {
-                        offline_s.current_event_session = None;
                     }
                     ended_sessions.push(offline_s);
                 }
@@ -639,43 +595,59 @@ impl BattleSink for BattleSinkImpl {
                 }
             }
 
-            drop(_op_guards);
-
-            for (pid, warp_id, sess_arc_opt, tx_opt, mut warp_sess) in eve_warps {
-                let mut warp_out = crate::server::dispatcher::HandleOutcome::default();
-                if crate::server::handlers::quest::perform_party_warp_and_persist(
-                    &mut warp_sess,
-                    self.data.as_ref(),
-                    pool_opt.as_ref(),
-                    warp_id,
-                    &mut warp_out,
-                )
-                .await
-                {
-                    if let Some(sess_arc) = sess_arc_opt {
+            for (pid, warp_id, sess_arc_opt, tx_opt) in eve_warps {
+                if let Some(sess_arc) = sess_arc_opt {
+                    let mut warp_out = crate::server::dispatcher::HandleOutcome::default();
+                    let (warped, leader_coords, member_ids) = {
                         let mut s = sess_arc.write().await;
-                        s.map_id = warp_sess.map_id;
-                        s.map_x = warp_sess.map_x;
-                        s.map_y = warp_sess.map_y;
-                    }
-                    if let Some(tx) = tx_opt {
-                        for f in warp_out.outgoing {
-                            let _ = tx.try_send(f.frame);
-                        }
-                    }
-                    for (target_id, frame) in warp_out.direct_messages {
-                        self.send_to(i64::from(target_id), frame);
-                    }
-                    for mb in warp_out.map_broadcast {
-                        if let Some(target_map) = mb.map_id {
-                            send_to_map(&self.online, i64::from(target_map), mb.frame);
+                        let ok = crate::server::handlers::quest::perform_party_warp_for_locked_session(
+                            &mut s,
+                            self.data.as_ref(),
+                            pool_opt.as_ref(),
+                            warp_id,
+                            &mut warp_out,
+                        )
+                        .await;
+                        let coords = (s.map_id, s.map_x, s.map_y);
+                        let members = if s.id_leader == s.id && s.id > 0 {
+                            s.id_mem
                         } else {
-                            let exclude = if mb.subject > 0 { i64::from(mb.subject) } else { pid };
-                            self.send_map(exclude, mb.frame);
+                            [0; 4]
+                        };
+                        (ok, coords, members)
+                    };
+                    if warped {
+                        for mem_id in member_ids {
+                            if mem_id > 0 && i64::from(mem_id) != pid {
+                                if let Some((mem_arc, _)) = online_entries.get(&i64::from(mem_id)) {
+                                    let mut ms = mem_arc.write().await;
+                                    ms.map_id = leader_coords.0;
+                                    ms.map_x = leader_coords.1;
+                                    ms.map_y = leader_coords.2;
+                                }
+                            }
+                        }
+                        if let Some(tx) = tx_opt {
+                            for f in warp_out.outgoing {
+                                let _ = tx.try_send(f.frame);
+                            }
+                        }
+                        for (target_id, frame) in warp_out.direct_messages {
+                            self.send_to(i64::from(target_id), frame);
+                        }
+                        for mb in warp_out.map_broadcast {
+                            if let Some(target_map) = mb.map_id {
+                                send_to_map(&self.online, i64::from(target_map), mb.frame);
+                            } else {
+                                let exclude = if mb.subject > 0 { i64::from(mb.subject) } else { pid };
+                                self.send_map(exclude, mb.frame);
+                            }
                         }
                     }
                 }
             }
+
+            drop(_op_guards);
 
             eve_followups
         };
@@ -703,6 +675,49 @@ impl BattleSink for BattleSinkImpl {
                 continue;
             };
             service.start_eve_encounter(&mut session, fight_id, diahinh);
+        }
+    }
+}
+
+impl BattleSinkImpl {
+    async fn resume_eve_for_participant(
+        &self,
+        pid: i64,
+        session: &mut Session,
+        outcome: Outcome,
+        pool: Option<&crate::db::pool::DbPool>,
+    ) -> (Vec<String>, Option<(u16, i32)>, Option<u16>) {
+        let is_eve_leader = session.id_leader == 0 || session.id_leader == session.id;
+        if is_eve_leader {
+            let eve_out = crate::server::handlers::talk::resume_eve_after_battle_deferred_warp(
+                session,
+                outcome,
+                self.data.as_ref(),
+                pool,
+            )
+            .await;
+            for (target_id, frame) in eve_out.direct_messages {
+                self.send_to(i64::from(target_id), frame);
+            }
+            for mb in eve_out.map_broadcast {
+                if let Some(target_map) = mb.map_id {
+                    send_to_map(&self.online, i64::from(target_map), mb.frame);
+                } else {
+                    let exclude = if mb.subject > 0 { i64::from(mb.subject) } else { pid };
+                    self.send_map(exclude, mb.frame);
+                }
+            }
+            let outgoing = eve_out.outgoing.into_iter().map(|f| f.frame).collect();
+            (outgoing, eve_out.eve_battle, eve_out.eve_warp)
+        } else {
+            if session
+                .current_event_session
+                .as_ref()
+                .is_some_and(|ev| ev.phase == crate::eve::EventPhase::AwaitingBattle)
+            {
+                session.current_event_session = None;
+            }
+            (Vec::new(), None, None)
         }
     }
 }
@@ -1748,8 +1763,11 @@ impl BattleService {
 
     fn pet_slots(&self, session: &Session) -> [i64; 4] {
         let mut slots = [0i64; 4];
-        for (i, pet) in session.pets.iter().take(4).enumerate() {
-            slots[i] = i64::from(pet.id);
+        for pet in session.pets.iter().filter(|p| p.id > 0 && p.is_carried()) {
+            let idx = usize::from(pet.stt - 1);
+            if idx < 4 {
+                slots[idx] = i64::from(pet.id);
+            }
         }
         slots
     }

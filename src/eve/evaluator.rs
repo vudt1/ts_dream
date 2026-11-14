@@ -36,6 +36,23 @@ pub fn compare_step(actual: i32, ops: u8, expected: i32) -> bool {
     }
 }
 
+/// Invert a `conditionOps` operator for `Data/eve.emg` classes (`cc = 1` BagItem
+/// and `cc = 7, param = 0 | 2` Level/Reborn) whose script rows encode
+/// `expected <op> actual` instead of `actual <op> expected`.
+///
+/// Preserves 100% of the `Data/eve.emg` truth table while keeping every
+/// `compare_step(actual, ops, expected)` call in canonical `(actual, expected)` order.
+#[must_use]
+fn invert_emg_ops(ops: u8) -> u8 {
+    match ops {
+        2 => 4, // expected < actual  <=> actual > expected
+        3 => 5, // expected <= actual <=> actual >= expected
+        4 => 2, // expected > actual  <=> actual < expected
+        5 => 3, // expected >= actual <=> actual <= expected
+        other => other,
+    }
+}
+
 /// Evaluate a single condition against the player state snapshot.
 #[must_use]
 pub fn evaluate(cond: &EveCondition, state: &PlayerEventState) -> bool {
@@ -46,12 +63,11 @@ pub fn evaluate(cond: &EveCondition, state: &PlayerEventState) -> bool {
         // Unconditional — always matches.
         0 => true,
 
-        // Bag item possession, reversed comparison:
-        //   val=0 ops=2 → 0 < qty → has the item
-        //   val=0 ops=5 → 0 >= qty → does not have the item
+        // Bag item possession (`Data/eve.emg` encodes `expected <op> qty`,
+        // e.g. val=0 ops=2 -> `0 < qty` -> `qty > 0`).
         1 => {
             let qty = state.bag_items.get(&param).copied().unwrap_or(0);
-            let result = compare_step(cond.condition_value, cond.condition_ops, qty);
+            let result = compare_step(qty, invert_emg_ops(cond.condition_ops), cond.condition_value);
             debug!(
                 class = 1,
                 item_id = param,
@@ -103,10 +119,12 @@ pub fn evaluate(cond: &EveCondition, state: &PlayerEventState) -> bool {
         }
 
         // Generic attribute; `param` selects the sub-type.
+        // Note: `param = 0` (Level) and `param = 2` (Reborn) in `Data/eve.emg`
+        // encode `expected <op> actual`, so `invert_emg_ops` normalizes them.
         7 => {
             let result = match cond.condition_parameter {
-                0 => compare_step(cond.condition_value, cond.condition_ops, state.level),
-                2 => compare_step(cond.condition_value, cond.condition_ops, state.reborn_count),
+                0 => compare_step(state.level, invert_emg_ops(cond.condition_ops), cond.condition_value),
+                2 => compare_step(state.reborn_count, invert_emg_ops(cond.condition_ops), cond.condition_value),
                 // Equipment possession: value is the itemId when worn, else 0.
                 3 => {
                     let actual = if state.equip_items.contains(&cond.condition_value) {

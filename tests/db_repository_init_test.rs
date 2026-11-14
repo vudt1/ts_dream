@@ -1,5 +1,5 @@
 use ts_dream::db::modern::sqlite::SqliteRepositories;
-use ts_dream::db::modern::traits::{CharacterRepository, CharacterSeed, QuestRepository};
+use ts_dream::db::modern::traits::{CharacterRepository, CharacterSeed};
 use ts_dream::server::dispatcher::{HandleOutcome, OpcodeCtx, ServerEnv};
 use ts_dream::server::handlers::login::handle_login;
 use ts_dream::server::session::{Conn, HotkeySlot, InventoryItem, PetState, Session};
@@ -518,63 +518,30 @@ async fn test_quest_repository_and_deletion() {
         .await
         .expect("create character");
 
-    // Missions
-    let mission = ts_dream::db::modern::model::MissionRow {
-        mission_id: 101,
-        step: 2,
-        state: 1,
-        updated_at: 1234567,
-    };
-    repos
-        .quests()
-        .upsert_mission(account_id, &mission)
-        .await
-        .expect("upsert mission");
-    let missions = repos
-        .quests()
-        .list_missions(account_id)
-        .await
-        .expect("list missions");
-    assert_eq!(missions.len(), 1);
-    assert_eq!(missions[0].mission_id, 101);
-    assert_eq!(missions[0].step, 2);
-    assert_eq!(missions[0].state, 1);
+    // Persist quest tasks, bit flags, and completed events via SqliteSessionRepository
+    let mut session = ts_dream::server::session::Session::new();
+    session.id = account_id as u32;
+    session.db_character_id = account_id;
+    session.name = b"QuestChar".to_vec();
+    session.quest_tasks.insert(101, (1, 2));
+    session.quest_dont.insert(55);
+    session.bit_flags.insert(42);
+    session.completed_eve_counts.insert((10817, 999), 1);
+    repos.sessions().save(&session).await.expect("save session");
 
-    // Bit flags
-    assert!(!repos
-        .quests()
-        .has_bit_flag(account_id, 42)
+    let mut loaded = ts_dream::server::session::Session::new();
+    let found = repos
+        .sessions()
+        .load(account_id, &mut loaded)
         .await
-        .expect("has flag"));
-    repos
-        .quests()
-        .set_bit_flag(account_id, 42, 1000)
-        .await
-        .expect("set flag");
-    assert!(repos
-        .quests()
-        .has_bit_flag(account_id, 42)
-        .await
-        .expect("has flag"));
+        .expect("load session");
+    assert!(found, "session exists");
+    assert_eq!(loaded.quest_tasks.get(&101), Some(&(1, 2)));
+    assert!(loaded.quest_dont.contains(&55));
+    assert!(loaded.bit_flags.contains(&42));
+    assert_eq!(loaded.completed_eve_counts.get(&(10817, 999)), Some(&1));
 
-    // Completed events
-    assert!(!repos
-        .quests()
-        .has_completed_event(account_id, 999)
-        .await
-        .expect("has event"));
-    repos
-        .quests()
-        .mark_event_completed(account_id, 999, 2000)
-        .await
-        .expect("mark event");
-    assert!(repos
-        .quests()
-        .has_completed_event(account_id, 999)
-        .await
-        .expect("has event"));
-
-    // Delete character cascades
+    // Delete character cascades across all quest/event tables
     repos
         .characters()
         .delete(account_id)
@@ -586,15 +553,22 @@ async fn test_quest_repository_and_deletion() {
         .await
         .expect("list characters");
     assert!(list.is_empty(), "character should be deleted");
-    let missions_after = repos
-        .quests()
-        .list_missions(account_id)
-        .await
-        .expect("list missions after delete");
-    assert!(
-        missions_after.is_empty(),
-        "missions should be cleaned up on delete"
-    );
+    let remaining_tasks: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM character_quest_tasks WHERE playerid = ?",
+    )
+    .bind(account_id)
+    .fetch_one(&pool.read)
+    .await
+    .expect("count quest tasks");
+    assert_eq!(remaining_tasks, 0, "quest tasks should be cleaned up on delete");
+    let remaining_events: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM character_completed_events WHERE playerid = ?",
+    )
+    .bind(account_id)
+    .fetch_one(&pool.read)
+    .await
+    .expect("count completed events");
+    assert_eq!(remaining_events, 0, "completed events should be cleaned up on delete");
 }
 
 #[tokio::test]

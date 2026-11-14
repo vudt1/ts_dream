@@ -620,7 +620,7 @@ async fn preflight_allows_negative_pstyle1_on_full_ledger_and_finish_chain_syncs
             .quest_tasks
             .insert(20000 + u16::from(slot), (slot, 1));
     }
-    ts_dream::server::session::lock_online_sessions().insert(77099, conn.session.clone());
+    ts_dream::server::session::registry_register_for_login(&conn.session);
 
     let out = dispatch(&mut conn, &click_npc_frame(1), &data, &service, &env).await;
     assert!(

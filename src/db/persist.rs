@@ -4,7 +4,7 @@
 //! targets the normalized 0001 tables. `player_id` is the shared PK
 //! `accounts.player_id = characters.character_id` (1:1).
 
-use crate::db::modern::model::{PetStorageType, StorageType};
+use crate::db::modern::model::StorageType;
 use crate::db::pool::DbPool;
 use crate::server::session::{InventoryItem, PetState, Session};
 use sqlx::{Sqlite, Transaction};
@@ -301,14 +301,31 @@ pub async fn persist_sessions_transaction(
     _tables: &[&str],
 ) -> bool {
     let Some(pool) = pool else { return true };
+    if sessions.is_empty() {
+        return true;
+    }
     let repo = crate::db::modern::sqlite::session::SqliteSessionRepository { pool };
+    let mut tx = match pool.write.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            tracing::warn!("modern session transaction begin failed: {e}");
+            return false;
+        }
+    };
     for session in sessions {
-        if let Err(e) = repo.save(session).await {
+        if let Err(e) = repo.save_in_tx(&mut tx, session).await {
             tracing::warn!("modern session save for player {} failed: {e}", session.id);
+            let _ = tx.rollback().await;
             return false;
         }
     }
-    true
+    match tx.commit().await {
+        Ok(()) => true,
+        Err(e) => {
+            tracing::warn!("modern session transaction commit failed: {e}");
+            false
+        }
+    }
 }
 
 async fn replace_inventory_tx(
@@ -435,18 +452,7 @@ pub async fn delete_system_skills(pool: Option<&DbPool>, player_id: u32) {
 }
 
 pub(crate) fn pet_storage_and_slot(pet: &PetState) -> (u8, u8) {
-    match pet.storage_type {
-        PetStorageType::Carried if pet.stt <= 4 => (PetStorageType::Carried.value(), pet.stt),
-        PetStorageType::Carried => (PetStorageType::Hotel.value(), pet.stt.saturating_sub(4)),
-        other => (
-            other.value(),
-            if pet.stt > 4 {
-                pet.stt.saturating_sub(4)
-            } else {
-                pet.stt
-            },
-        ),
-    }
+    pet.effective_storage_and_slot()
 }
 
 pub async fn upsert_pet(pool: Option<&DbPool>, player_id: u32, pet: &PetState) {

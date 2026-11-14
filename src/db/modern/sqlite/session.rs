@@ -288,13 +288,27 @@ impl SqliteSessionRepository<'_> {
         Ok(pets)
     }
 
-    /// Save all mutable Session state in one InnoDB transaction.
+    /// Save all mutable Session state in one SQLite transaction.
     pub async fn save(&self, session: &Session) -> Result<(), sqlx::Error> {
+        if session.db_character_id <= 0 {
+            return Ok(());
+        }
+        let mut tx = self.pool.write.begin().await?;
+        self.save_in_tx(&mut tx, session).await?;
+        tx.commit().await
+    }
+
+    /// Save all mutable Session state inside an existing SQLite transaction
+    /// (enables multi-session atomic saves across party members).
+    pub async fn save_in_tx(
+        &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+        session: &Session,
+    ) -> Result<(), sqlx::Error> {
         let character_id = session.db_character_id;
         if character_id <= 0 {
             return Ok(());
         }
-        let mut tx = self.pool.write.begin().await?;
         sqlx::query(
             "UPDATE characters SET level=?, jobtype=?, gender=?, hair=?, element=?, rebornstage=?, curhp=?, maxhp=?, cursp=?, maxsp=?,
              freepoints=?, skillpoint=?, baseint=?, baseatk=?, basedef=?, basehpx=?, basespx=?, baseagi=?, reputation=?, mapid=?, mapx=?, mapy=?,
@@ -308,13 +322,13 @@ impl SqliteSessionRepository<'_> {
         .bind(i64::from(session.map_y)).bind(i64::from(session.pk)).bind(i64::from(session.texp)).bind(i64::from(session.newbie))
         .bind(i64::from(session.ghost)).bind(i64::from(session.god)).bind(i64::from(session.guild_id))
         .bind(i64::from(session.savemap)).bind(i64::from(session.savemap_x)).bind(i64::from(session.savemap_y))
-        .bind(character_id).execute(&mut *tx).await?;
+        .bind(character_id).execute(&mut **tx).await?;
         sqlx::query("INSERT INTO character_money (playerid, gold, bankgold, shoppoint) VALUES (?, ?, ?, ?) ON CONFLICT(playerid) DO UPDATE SET gold=excluded.gold, bankgold=excluded.bankgold, shoppoint=excluded.shoppoint")
-            .bind(character_id).bind(i64::from(session.gold)).bind(i64::from(session.bank_gold)).bind(i64::from(session.shop_point)).execute(&mut *tx).await?;
+            .bind(character_id).bind(i64::from(session.gold)).bind(i64::from(session.bank_gold)).bind(i64::from(session.shop_point)).execute(&mut **tx).await?;
 
         sqlx::query("DELETE FROM inventories WHERE playerid = ?")
             .bind(character_id)
-            .execute(&mut *tx)
+            .execute(&mut **tx)
             .await?;
         let insert_inventory_sql = format!(
             "INSERT INTO inventories ({}) VALUES ({})",
@@ -347,13 +361,13 @@ impl SqliteSessionRepository<'_> {
                     .bind(0i64) // affix2
                     .bind(0i64) // affix3
                     .bind(0i64) // stylelevel
-                    .execute(&mut *tx)
+                    .execute(&mut **tx)
                     .await?;
             }
         }
         sqlx::query("DELETE FROM character_pets WHERE playerid = ?")
             .bind(character_id)
-            .execute(&mut *tx)
+            .execute(&mut **tx)
             .await?;
         for pet in session.pets.iter().filter(|p| p.id > 0) {
             let (storage, slot) = crate::db::persist::pet_storage_and_slot(pet);
@@ -364,19 +378,19 @@ impl SqliteSessionRepository<'_> {
             };
             let [s1, s2, s3, s4] = pet.skills;
             sqlx::query("INSERT INTO character_pets (playerid, storagetype, slot, petid, name, level, element, rebornstage, curhp, maxhp, cursp, maxsp, baseint, baseatk, basedef, basehpx, basespx, baseagi, fai, thd, texp, skillpoint, quest, skill1_id, skill1_level, skill2_id, skill2_level, skill3_id, skill3_level, skill4_id, skill4_level, isactive) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-                .bind(character_id).bind(storage).bind(i64::from(slot)).bind(i64::from(pet.id)).bind(&pet.name).bind(i64::from(pet.level)).bind(i64::from(pet.thuoctinh)).bind(i64::from(pet.reborn)).bind(i64::from(pet.hp)).bind(i64::from(pet.hp_max)).bind(i64::from(pet.sp)).bind(i64::from(pet.sp_max)).bind(i64::from(pet.int1)).bind(i64::from(pet.atk)).bind(i64::from(pet.def)).bind(i64::from(pet.hpx)).bind(i64::from(pet.spx)).bind(i64::from(pet.agi)).bind(i64::from(pet.fai)).bind(i64::from(pet.thd)).bind(i64::from(pet.texp)).bind(i64::from(pet.skill_point)).bind(i64::from(pet.quest)).bind(i64::from(s1.0)).bind(i64::from(s1.1)).bind(i64::from(s2.0)).bind(i64::from(s2.1)).bind(i64::from(s3.0)).bind(i64::from(s3.1)).bind(i64::from(s4.0)).bind(i64::from(s4.1)).bind(is_active).execute(&mut *tx).await?;
+                .bind(character_id).bind(storage).bind(i64::from(slot)).bind(i64::from(pet.id)).bind(&pet.name).bind(i64::from(pet.level)).bind(i64::from(pet.thuoctinh)).bind(i64::from(pet.reborn)).bind(i64::from(pet.hp)).bind(i64::from(pet.hp_max)).bind(i64::from(pet.sp)).bind(i64::from(pet.sp_max)).bind(i64::from(pet.int1)).bind(i64::from(pet.atk)).bind(i64::from(pet.def)).bind(i64::from(pet.hpx)).bind(i64::from(pet.spx)).bind(i64::from(pet.agi)).bind(i64::from(pet.fai)).bind(i64::from(pet.thd)).bind(i64::from(pet.texp)).bind(i64::from(pet.skill_point)).bind(i64::from(pet.quest)).bind(i64::from(s1.0)).bind(i64::from(s1.1)).bind(i64::from(s2.0)).bind(i64::from(s2.1)).bind(i64::from(s3.0)).bind(i64::from(s3.1)).bind(i64::from(s4.0)).bind(i64::from(s4.1)).bind(is_active).execute(&mut **tx).await?;
         }
         sqlx::query("DELETE FROM character_skills WHERE playerid = ?")
             .bind(character_id)
-            .execute(&mut *tx)
+            .execute(&mut **tx)
             .await?;
         for (id, level) in &session.skills {
             sqlx::query("INSERT INTO character_skills (playerid, skillid, level, sp, saveflag) VALUES (?, ?, ?, 0, 0)")
-                .bind(character_id).bind(i64::from(*id)).bind(i64::from(*level)).execute(&mut *tx).await?;
+                .bind(character_id).bind(i64::from(*id)).bind(i64::from(*level)).execute(&mut **tx).await?;
         }
         sqlx::query("DELETE FROM character_hotkeys WHERE playerid = ?")
             .bind(character_id)
-            .execute(&mut *tx)
+            .execute(&mut **tx)
             .await?;
         for (slot, entry) in session.hotkeys.iter().enumerate().skip(1) {
             if entry.kind > 0 && entry.id > 0 {
@@ -387,12 +401,11 @@ impl SqliteSessionRepository<'_> {
                 .bind(slot as i64)
                 .bind(i64::from(entry.kind))
                 .bind(i64::from(entry.id))
-                .execute(&mut *tx)
+                .execute(&mut **tx)
                 .await?;
             }
         }
-        self.save_eve_state_tx(&mut tx, session, character_id).await?;
-        tx.commit().await
+        self.save_eve_state_tx(tx, session, character_id).await
     }
 
     /// Persist the Eve/quest-log collections (`quest_tasks`, `quest_dont`,

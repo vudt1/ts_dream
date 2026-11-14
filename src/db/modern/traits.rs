@@ -8,7 +8,7 @@
 #![allow(async_fn_in_trait)]
 
 use crate::db::modern::model::{
-    InventorySlot, MissionRow, Money, PetRecord, PetStorageType, SkillRow, StorageType,
+    InventorySlot, Money, PetRecord, PetStorageType, StorageType,
 };
 
 /// Result alias shared by every repository method.
@@ -157,34 +157,5 @@ pub trait PetRepository {
         character_id: i64,
         storage_type: PetStorageType,
         slot: u16,
-    ) -> RepoResult<()>;
-}
-
-/// Mission and event progress tracking.
-pub trait QuestRepository {
-    async fn upsert_mission(&self, character_id: i64, mission: &MissionRow) -> RepoResult<()>;
-
-    async fn list_missions(&self, character_id: i64) -> RepoResult<Vec<MissionRow>>;
-
-    async fn set_bit_flag(&self, character_id: i64, flag_index: u32, now: i64) -> RepoResult<()>;
-
-    async fn has_bit_flag(&self, character_id: i64, flag_index: u32) -> RepoResult<bool>;
-
-    async fn mark_event_completed(
-        &self,
-        character_id: i64,
-        event_id: i64,
-        completed_at: i64,
-    ) -> RepoResult<()>;
-
-    async fn has_completed_event(&self, character_id: i64, event_id: i64) -> RepoResult<bool>;
-
-    /// Replaces the learned-skill set atomically inside the caller's
-    /// transaction (reborn / respec).
-    async fn replace_skills(
-        &self,
-        character_id: i64,
-        skills: &[SkillRow],
-        tx: &mut sqlx::SqliteConnection,
     ) -> RepoResult<()>;
 }

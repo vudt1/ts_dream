@@ -118,8 +118,60 @@ impl NpcTalkCodec {
     }
 
     /// Builds the hex string representation of the talk step frame.
+    /// Builds the hex string representation of the talk step frame (`0x14 01`).
     pub fn build_talk_step_hex(result: &EveResult) -> String {
         encoder::hex(&Self::build_talk_step_frame(result))
+    }
+
+    /// Builds the hex string representation of an Eve result frame (`0x14 01`).
+    pub fn build_eve_result_hex(result: &EveResult) -> String {
+        Self::build_talk_step_hex(result)
+    }
+
+    /// Hex string representation of the warp acknowledgement frame (`0x14 07`).
+    pub fn build_warp_ack_hex() -> &'static str {
+        "F44402001407"
+    }
+
+    /// Hex string representation of the actor movement-stop frame (`0x06 02`).
+    pub fn build_move_stop_hex() -> &'static str {
+        "F44402000602"
+    }
+
+    /// Builds `0x0F 01` (pet appear/added to roster) hex frame.
+    pub fn build_pet_appear_hex(char_id: u32, stt: u8, pet_id: u16, kind: u8) -> String {
+        format!(
+            "F4440C000F01{}{:02X}{}{:02X}",
+            encoder::le32(char_id),
+            stt,
+            encoder::le32(u32::from(pet_id)),
+            kind
+        )
+    }
+
+    /// Builds `0x0F 02` (pet remove/disappear from roster) hex frame.
+    pub fn build_pet_remove_hex(char_id: u32, stt: u8) -> String {
+        format!("F44407000F02{}{:02X}", encoder::le32(char_id), stt)
+    }
+
+    /// Builds `0x1A 01` (add gold) hex frame.
+    pub fn build_gold_add_hex(add: u32) -> String {
+        format!("F44406001A01{}", encoder::le32(add))
+    }
+
+    /// Builds `0x1A 02` (subtract gold) hex frame.
+    pub fn build_gold_sub_hex(sub: u32) -> String {
+        format!("F44406001A02{}", encoder::le32(sub))
+    }
+
+    /// Builds `0x1A 05` (add shop points) hex frame.
+    pub fn build_shop_point_add_hex(add: u32) -> String {
+        format!("F44406001A05{}", encoder::le32(add))
+    }
+
+    /// Builds `0x1A 06` (subtract shop points) hex frame.
+    pub fn build_shop_point_sub_hex(sub: u32) -> String {
+        format!("F44406001A06{}", encoder::le32(sub))
     }
 
     /// Builds the decoded 11-byte frame for lock/unlock actor:

@@ -163,48 +163,6 @@ impl CharacterRepository for SqliteCharacterRepository<'_> {
     }
 
     async fn delete(&self, character_id: i64) -> RepoResult<()> {
-        let mut tx = self.pool.write.begin().await?;
-
-        // Order does not matter without FKs, but every dependent table must be
-        // covered — this list is the authoritative "what belongs to a
-        // character" set from the 0001 schema.
-        for table in [
-            "character_money",
-            "inventories",
-            "character_pets",
-            "character_skills",
-            "character_hotkeys",
-            "character_missions",
-            "character_mission_flags",
-            "character_quest_tasks",
-            "character_quest_dont",
-            "character_bit_flags",
-            "character_completed_events",
-            "friends",
-        ] {
-            let sql = format!("DELETE FROM {table} WHERE playerid = ?");
-            sqlx::query(&sql)
-                .bind(character_id)
-                .execute(&mut *tx)
-                .await?;
-        }
-        // mails/friends key the counterpart side too.
-        sqlx::query("DELETE FROM friends WHERE friendid = ?")
-            .bind(character_id)
-            .execute(&mut *tx)
-            .await?;
-        sqlx::query("DELETE FROM mails WHERE receiverid = ? OR senderid = ?")
-            .bind(character_id)
-            .bind(character_id)
-            .execute(&mut *tx)
-            .await?;
-
-        sqlx::query("DELETE FROM characters WHERE playerid = ?")
-            .bind(character_id)
-            .execute(&mut *tx)
-            .await?;
-
-        tx.commit().await?;
-        Ok(())
+        Self::delete(self, character_id).await
     }
 }

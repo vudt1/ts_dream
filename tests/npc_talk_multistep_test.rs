@@ -47,12 +47,17 @@ fn frame_pos(outgoing: &[OutFrame], needle: &str) -> Option<usize> {
     outgoing.iter().position(|f| f.frame == needle)
 }
 
-/// All `0x14 Sub 0x01` talk/Surface step frames (`F4 44 11 00 14 01 00 ..`).
+/// All `0x14 Sub 0x01` talk/Surface step frames (`F4 44 11 00 14 01 00 ..`)
+/// with `result_type` in `{1 (Talk), 6 (Surface)}` (excludes `rt=0` action notifications).
 fn talk_step_frames(outgoing: &[OutFrame]) -> Vec<&str> {
     outgoing
         .iter()
         .map(|f| f.frame.as_str())
-        .filter(|f| f.starts_with("F4441100140100"))
+        .filter(|f| {
+            f.starts_with("F4441100140100")
+                && f.len() == 42
+                && matches!(&f[20..22], "01" | "06")
+        })
         .collect()
 }
 

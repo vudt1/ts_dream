@@ -7,10 +7,9 @@ pub mod accounts;
 pub mod characters;
 pub mod inventories;
 pub mod pets;
-pub mod quests;
 pub mod session;
 
-use crate::db::modern::traits::{InventoryRepository, PetRepository, QuestRepository};
+use crate::db::modern::traits::{InventoryRepository, PetRepository};
 use crate::db::pool::DbPool;
 
 /// Bundles the concrete pool-backed implementations behind the trait objects
@@ -40,10 +39,6 @@ impl SqliteRepositories {
 
     pub fn pets(&self) -> impl PetRepository + '_ {
         pets::SqlitePetRepository { pool: &self.pool }
-    }
-
-    pub fn quests(&self) -> impl QuestRepository + '_ {
-        quests::SqliteQuestRepository { pool: &self.pool }
     }
 
     pub fn sessions(&self) -> session::SqliteSessionRepository<'_> {

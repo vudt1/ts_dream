@@ -1,6 +1,7 @@
 //! Pet roster rules: slot (`stt`) assignment — active 1..4, stable 5..10 — and
 //! ownership invariants (one entry per pet id).
 
+use crate::db::modern::model::PetStorageType;
 use crate::server::session::PetState;
 
 /// Active (fight) pet slots.
@@ -10,14 +11,22 @@ pub const STABLE_SLOTS: std::ops::RangeInclusive<u8> = 5..=10;
 
 /// The next free active slot, or `None` when all four are taken.
 pub fn next_active_slot(pets: &[PetState]) -> Option<u8> {
-    let used: Vec<u8> = pets.iter().map(|p| p.stt).collect();
+    let used: Vec<u8> = pets
+        .iter()
+        .filter(|p| p.is_carried())
+        .map(|p| p.stt)
+        .collect();
     let mut slots = ACTIVE_SLOTS;
     slots.find(|s| !used.contains(s))
 }
 
 /// The next free stable slot, or `None` when the stable is full.
 pub fn next_stable_slot(pets: &[PetState]) -> Option<u8> {
-    let used: Vec<u8> = pets.iter().map(|p| p.stt).collect();
+    let used: Vec<u8> = pets
+        .iter()
+        .filter(|p| p.effective_storage_type() == PetStorageType::Hotel)
+        .map(|p| p.stt)
+        .collect();
     let mut slots = STABLE_SLOTS;
     slots.find(|s| !used.contains(s))
 }

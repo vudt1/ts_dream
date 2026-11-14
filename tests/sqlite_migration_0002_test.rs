@@ -219,7 +219,7 @@ async fn negative_mid_tx_sql_error_rolls_back_and_preserves_save_ledger() {
 
     // Clean out any leftover sessions from other tests in the shared registry.
     lock_online_sessions().clear();
-    lock_online_sessions().insert(session.id, session.clone());
+    ts_dream::server::session::registry_register_for_login(&session);
 
     let wrote = auto_save::run_cycle(Some(&pool), &ledger).await;
     assert_eq!(wrote, 1, "initial auto-save must succeed");
@@ -245,7 +245,7 @@ async fn negative_mid_tx_sql_error_rolls_back_and_preserves_save_ledger() {
     session.savemap = 10817;
     session.bit_flags.insert(88);
     session.completed_eve_counts.insert((12001, 9), 1);
-    lock_online_sessions().insert(session.id, session.clone());
+    ts_dream::server::session::registry_update_if_online(&session);
 
     let wrote_failed = auto_save::run_cycle(Some(&pool), &ledger).await;
     assert_eq!(wrote_failed, 0, "failed transaction must report 0 saved");

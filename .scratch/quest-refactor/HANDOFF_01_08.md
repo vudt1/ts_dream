@@ -139,7 +139,34 @@
 
 ---
 
+### Ticket 09 (`09-code-review-remediation.md`) — `resolved`
+1. **Pre-Flight Probe All-or-Nothing & Item Sufficiency (`src/server/handlers/talk.rs`)**:
+   - `preflight_probe_batch` continues through `DomainEffect::TalkStep` (`rt = 1`) instead of breaking early, checking all resource mutations (`MutateItem`, `UpdateQuest`, `RewardPet`, `MutateMoney`, `PlayerEffect`) until the chain ends or hits a real branch/transition (`OpenSurface`, `StartBattle`, `Warp`).
+   - Validates `trial_homdo` has sufficient quantity for `MutateItem` removals (`delta < 0`) and filters `RewardPet` (`p_style = 2`) by `is_carried()` before mutating any state or emitting dialogue.
+2. **Wire Protocol `0x1A`, `POINT_CAP` & `0x14 01` Notification (`src/protocol/mod.rs`, `src/server/handlers/talk.rs`)**:
+   - Updated `POINT_CAP` to `2_000_000_000` (`GLOSSARY.md` parity).
+   - Fixed `MutateMoney` (`rc = 5`): `p_style = 3` emits `0x1A 05 <add_u32_LE>` and `p_style = 4` emits `0x1A 06 <sub_u32_LE>` (no erroneous `0x1A 03` gold-cap alert).
+   - `MutateItem` (`rt = 0, rc = 1, qty != 0`) emits `0x14 01` (`NpcTalkCodec::build_eve_result_hex`) alongside `dump_homdo()` (`0x17 05`).
+3. **`PetStorageType` Isolation (`src/server/session.rs`, `src/server/handlers/pet_actions.rs`, `src/battle/service.rs`, `src/server/handlers/talk.rs`)**:
+   - Added `PetState` storage helpers (`is_carried()`, `effective_storage_and_slot()`), restricted `BattleService::pet_slots` to `PetStorageType::Carried` (`stt` `1..=4`), and filtered `pet_actions` (`0x0F 03`/`0x1F 02`, `0x0F 07`/`0x1F 03`) and `execute_reward_pet` (`p_style = 2`) by `storage_type` while updating `pet.storage_type` on transfers.
+4. **Two-Phase State Lock, `registry_update_if_online` & Atomic Multi-Session SQLite Tx (`src/server/handlers/talk.rs`, `src/battle/service.rs`, `src/db/persist.rs`, `src/server/handlers/quest.rs`)**:
+   - Added `registry_update_if_online` calls after `rc == 1` (`homdo`), `rc == 2` (`quest_tasks`/`quest_dont`), and `BattleService` wave `218` updates.
+   - Refactored `persist_sessions_transaction` to save all passed sessions inside a single SQLite transaction (`pool.write.begin()` -> save all -> `tx.commit()`).
+   - Refactored `quest::perform_party_warp_and_persist` to hold `_guards` across SQLite commit, capture `before_state`, rollback leader RAM on DB failure, and only update registry / emit `14 07` + `0x0C` on commit success.
+5. **Post-Warp Event Completion, Disconnect Warp Persistence & `WalkStep` `AutoChain` (`src/server/handlers/talk.rs`, `src/battle/service.rs`, `src/eve/auto_chain.rs`)**:
+   - Both sync and async `execute_event_step` loops run trailing non-blocking effects and increment `completed_eve_counts[(scene_id, eve_no)]` when `DomainEffect::Warp` executes.
+   - `BattleService::battle_ended` holds `_op_guards` across post-battle warp handling, syncs party members' `online_entries` `sess_arc` coordinates, and persists post-battle `Warp` coordinates for `offline_parked` sessions in the battle-end SQLite transaction.
+   - Added `trigger_kind = 16` (`WalkStep`) to `AUTO_CHAIN_TRIGGER_KINDS`, `EveAutoChainEngine::event_list_for` (`scene.encounters`), and `talk::handle_talk_select_menu` (`0x14 09`).
+6. **Cleanup, Codec Helpers, Evaluator Clarity & Deterministic Test Fixes (`src/db/modern/`, `src/eve/evaluator.rs`, `src/protocol/codecs/npc_talk.rs`, `tests/code_review_remediation_test.rs`, `tests/battle_combo_rules_test.rs`)**:
+   - Removed dead `SqliteQuestRepository` (`src/db/modern/sqlite/quests.rs`, `QuestRepository` in `traits.rs` & `mod.rs`) and untracked `.agents/plugins/rea/{mcp_config_sample,plugin}.json`.
+   - Replaced raw hex literals with named codec/helper functions, replaced `lock_online_sessions().insert(...)` in `tests/pure_planner_event_runner_and_preflight_test.rs` & `tests/sqlite_migration_0002_test.rs`, clarified reversed `Data/eve.emg` comparison helpers in `evaluator.rs`, and deduplicated repeated logic in `talk.rs` / `characters.rs`.
+   - Added 7 integration tests in `tests/code_review_remediation_test.rs` (including async `BattleService` offline-warp persistence), updated `rt=0` frame filtering in `tests/npc_talk_multistep_test.rs`, and pinned `Battle::with_seeds(100, 12345, 42, 42, 42)` in `tests/battle_combo_rules_test.rs::test_8_combo_damage_130_percent_multiplier` to eliminate RNG flakiness.
+
+---
+
 ## Next Tickets for Continuation
 
-All tickets `01` through `08` in `.scratch/quest-refactor/issues/` are now `resolved`.
+All tickets `01` through `09` in `.scratch/quest-refactor/issues/` are now `resolved`.
+- **Deferred structural refactors (optional):** `Smell-03` (dispatching `DomainEffect` directly without passing `&EveResult`) and `Smell-04` (splitting `talk.rs` into `eve_runner.rs`) were intentionally deferred to avoid wide churn.
+- **Runtime / live client checks remaining:** Live `aLogin.exe` rendering of `0x14 01` on `MutateItem` and `0x1A 05/06` without `0x1A 03`, plus a dedicated 40-NPC multi-wave `advance_wave` + `battle_ended` test asserting `quest_tasks[218]` preservation in `sess_arc`.
 - **Important note for production DB:** Existing `DB/ts_dream.db` files created from `0001_init.sql` must have `migrations/0002_eve_quest_persistence.sql` applied before running the updated binary (since `db::pool::migrate` is a no-op per ADR 0004).
