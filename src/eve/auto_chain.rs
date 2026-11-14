@@ -11,8 +11,8 @@
 //! 4. Duplicate Item Prevention - never hand out the same item twice.
 
 use crate::battle::rng::DotNetRandom;
-use crate::data::loaders::{NpcEventData, SceneEveData};
-use crate::eve::resolver::resolve_event;
+use crate::data::loaders::{EveCondition, NpcEventData, SceneEveData};
+use crate::eve::resolver::{resolve_event, ChainFilter};
 use crate::eve::state::PlayerEventState;
 use tracing::{debug, info};
 
@@ -124,63 +124,76 @@ impl EveAutoChainEngine {
 
         let new_depth = completed.chain_depth + 1;
 
-        for &eve_no in event_list {
-            let Some(event_data) = scene.npc_events.get(&u16::from(eve_no)) else {
-                continue;
-            };
-            if Self::should_skip_event(event_list, eve_no, event_data, state) {
-                debug!(eve_no, "auto-chain skip: completed or progress surpassed");
-                continue;
+        let battle_filter: ChainFilter<'_> =
+            &|chain: &[EveCondition]| chain.iter().any(|c| c.condition_class == 8);
+        let filter_passes: &[Option<ChainFilter<'_>>] = if completed.battle_result != 0 {
+            &[Some(battle_filter), None]
+        } else {
+            &[None]
+        };
+
+        for filter in filter_passes {
+            for &eve_no in event_list {
+                let Some(event_data) = scene.npc_events.get(&u16::from(eve_no)) else {
+                    continue;
+                };
+                let skip_for_completion = !(filter.is_some() && i32::from(eve_no) == completed.eve_no)
+                    && Self::should_skip_event(event_list, eve_no, event_data, state);
+                if skip_for_completion {
+                    debug!(eve_no, "auto-chain skip: completed or progress surpassed");
+                    continue;
+                }
+
+                let Some(resolved) =
+                    resolve_event(event_data, state, &scene.group_datas, rng, *filter)
+                else {
+                    continue;
+                };
+
+                let candidate = EventSession {
+                    map_id: completed.map_id,
+                    eve_no: i32::from(event_data.eve_no),
+                    npc_click_id: completed.npc_click_id,
+                    trigger_kind: completed.trigger_kind,
+                    chain_depth: new_depth,
+                    results: resolved.results,
+                    current_index: 0,
+                    phase: EventPhase::Executing,
+                    last_surface_id: -1,
+                    last_choice_code: -1,
+                    battle_result: 0,
+                    matched_condition_no: resolved.matched_condition_no,
+                };
+
+                if i32::from(eve_no) == completed.eve_no {
+                    // Guard #1: same condition chain means unchanged player state.
+                    if Self::detect_same_chain(&candidate, completed) {
+                        debug!(
+                            eve_no,
+                            cond_no = candidate.matched_condition_no,
+                            "auto-chain same chain detected; terminating"
+                        );
+                        return AutoChainResult::NoMatch;
+                    }
+                    // Guard #2: question asked again right after answering.
+                    if Self::detect_re_question(&candidate, completed) {
+                        debug!(eve_no, "auto-chain surface re-question; skipping");
+                        continue;
+                    }
+                    // Guard #3: battle/interaction repeated right after battle.
+                    if Self::detect_re_battle(&candidate, completed) {
+                        debug!(eve_no, "auto-chain re-battle; skipping");
+                        continue;
+                    }
+                    // Guard #4: same item handed out twice.
+                    if Self::detect_duplicate_items(&candidate, completed) {
+                        info!(eve_no, "auto-chain duplicate item; skipping");
+                        continue;
+                    }
+                }
+
+                return AutoChainResult::Chained(candidate);
             }
-
-            let Some(resolved) = resolve_event(event_data, state, &scene.group_datas, rng, None)
-            else {
-                continue;
-            };
-
-            let candidate = EventSession {
-                map_id: completed.map_id,
-                eve_no: i32::from(event_data.eve_no),
-                npc_click_id: completed.npc_click_id,
-                trigger_kind: completed.trigger_kind,
-                chain_depth: new_depth,
-                results: resolved.results,
-                current_index: 0,
-                phase: EventPhase::Executing,
-                last_surface_id: -1,
-                last_choice_code: -1,
-                battle_result: 0,
-                matched_condition_no: resolved.matched_condition_no,
-            };
-
-            if i32::from(eve_no) == completed.eve_no {
-                // Guard #1: same condition chain means unchanged player state.
-                if Self::detect_same_chain(&candidate, completed) {
-                    debug!(
-                        eve_no,
-                        cond_no = candidate.matched_condition_no,
-                        "auto-chain same chain detected; terminating"
-                    );
-                    return AutoChainResult::NoMatch;
-                }
-                // Guard #2: question asked again right after answering.
-                if Self::detect_re_question(&candidate, completed) {
-                    debug!(eve_no, "auto-chain surface re-question; skipping");
-                    continue;
-                }
-                // Guard #3: battle/interaction repeated right after battle.
-                if Self::detect_re_battle(&candidate, completed) {
-                    debug!(eve_no, "auto-chain re-battle; skipping");
-                    continue;
-                }
-                // Guard #4: same item handed out twice.
-                if Self::detect_duplicate_items(&candidate, completed) {
-                    info!(eve_no, "auto-chain duplicate item; skipping");
-                    continue;
-                }
-            }
-
-            return AutoChainResult::Chained(candidate);
         }
 
         debug!(depth = new_depth, "auto-chain: no match");

@@ -151,6 +151,10 @@ pub struct HandleOutcome {
     /// own frames flush: `(fight_id, diahinh)`. The continuation resumes in
     /// `battle_ended` via `current_event_session` (`phase == AwaitingBattle`).
     pub eve_battle: Option<(u16, i32)>,
+    /// If set when Eve execution defers `DomainEffect::Warp` (e.g. inside
+    /// `BattleService::battle_ended` while `lock_player_operations` is held),
+    /// the caller runs `perform_party_warp_and_persist` after releasing its locks.
+    pub eve_warp: Option<u16>,
     pub map_broadcast: Vec<MapBroadcast>,
     pub direct_messages: Vec<(u32, String)>,
 }
@@ -268,10 +272,10 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
         OP_CHAT => chat::handle_chat(ctx).await,
 
         // OP_PLAYER_UPDATE (0x05) — Player / state sync (non-movement)
-        OP_PLAYER_UPDATE => movement::handle_player_update(ctx),
+        OP_PLAYER_UPDATE => movement::handle_player_update_dispatch(ctx).await,
 
         // OP_MOVE (0x06) — Move
-        OP_MOVE => movement::handle_move(ctx),
+        OP_MOVE => movement::handle_move_dispatch(ctx).await,
 
         // OP_STAT_UPDATE (0x08) — Stat allocation
         OP_STAT_UPDATE => stats::handle_stat_allocation(ctx).await,

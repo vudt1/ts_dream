@@ -135,7 +135,7 @@ fn test_class5_gold_type1_and_type2_deduction() {
     assert_eq!(session.gold, 700);
     assert_eq!(out.outgoing[0].frame, gold_frame(700));
 
-    // Type 2: deduct gold more than owned -> saturates at 0 without panic or overflow
+    // Type 2: deduct gold more than owned -> rejected All-or-Nothing by Pre-Flight Probe (Ticket 06)
     let action_sub_overflow = EveResult {
         result_type: 0,
         result_class: 5,
@@ -147,8 +147,11 @@ fn test_class5_gold_type1_and_type2_deduction() {
     session.gold = 100;
     let mut out = HandleOutcome::default();
     execute_event_step(&mut session, &data, &mut out);
-    assert_eq!(session.gold, 0);
-    assert_eq!(out.outgoing[0].frame, gold_frame(0));
+    assert_eq!(session.gold, 100);
+    assert!(
+        !out.outgoing.iter().any(|f| f.frame.starts_with("F44406001A")),
+        "All-or-Nothing pre-flight rejection must not emit 0x1A gold frames"
+    );
 }
 
 #[test]

@@ -103,6 +103,30 @@ struct BattleSinkImpl {
     /// the chained request is logged and skipped, never left parked.
     eve_service: std::sync::OnceLock<std::sync::Weak<BattleService>>,
     pub active_40_npc: Arc<Mutex<HashMap<i32, u32>>>,
+    /// Participant player IDs recorded per `battle_id` at spawn/join so
+    /// `battle_ended` still knows who participated even if a player disconnects.
+    battle_participants: Arc<Mutex<HashMap<i32, Vec<i64>>>>,
+    /// Parked Eve sessions (`phase == AwaitingBattle`) snapshotted when a player
+    /// disconnects or unregisters mid-battle, keyed by `(battle_id, player_id)`.
+    offline_eve_sessions: Arc<Mutex<HashMap<(i32, i64), Session>>>,
+}
+
+impl BattleSinkImpl {
+    fn snapshot_offline_eve_session(&self, session: &Session) {
+        if session.battle_id <= 0 {
+            return;
+        }
+        let is_parked_eve = session
+            .current_event_session
+            .as_ref()
+            .is_some_and(|ev| ev.phase == crate::eve::EventPhase::AwaitingBattle);
+        if !is_parked_eve {
+            return;
+        }
+        if let Ok(mut map) = self.offline_eve_sessions.lock() {
+            map.insert((session.battle_id, i64::from(session.id)), session.clone());
+        }
+    }
 }
 
 impl BattleSink for BattleSinkImpl {
@@ -336,120 +360,340 @@ impl BattleSink for BattleSinkImpl {
     }
 
     fn battle_ended(&self, id: i32, outcome: Outcome) {
-        // Clear battle state for every participant (battle is over) and
-        // snapshot their sessions for post-battle persistence.
         let now_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0);
-        let mut ended_sessions: Vec<Session> = Vec::new();
         let arena_40_challenger = self.active_40_npc.lock().unwrap().remove(&id);
-        // CP6 #4: a battle started from an Eve script parks its session in
-        // `AwaitingBattle`; collect the resume here. A battle hit *during*
-        // the resumed walk needs the spawn machinery (`members` lock still
-        // held below), so it is deferred to right after this block.
-        let mut eve_followups: Vec<(i64, Session, u16, i32)> = Vec::new();
-        if let Ok(mut members) = self.members.lock() {
-            let ids: Vec<i64> = members.iter().copied().collect();
-            members.clear();
 
-            let online_opt = try_read_online_with_retry(&self.online, 10, std::time::Duration::from_millis(2));
-            for id in &ids {
-                let mut session_updated = false;
-                if let Some(ref online) = online_opt {
-                    if let Some(p) = online.get(id) {
-                        if let Some(mut s) = try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2)) {
-                            s.battle_id = 0;
-                            s.last_battle_end_ms = now_ms;
-                            s.encounter_steps = 0;
-                            if outcome == Outcome::PlayerWin && arena_40_challenger == Some(*id as u32) {
-                                let victory_frames = crate::server::handlers::event_npcs::resolve_40_npc_victory(&mut s, self.data.as_ref());
-                                for f in victory_frames {
-                                    let _ = p.frames.try_send(f);
-                                }
-                            }
-                            // CP6 #4 — resume the parked Eve session (frames
-                            // go out on the same channel the battle just
-                            // used, so they land after the battle's own end
-                            // frames). Runs before the snapshot below so the
-                            // resumed stat writes persist too.
-                            let pool_opt = self.pool.try_read().ok().and_then(|p| p.clone());
-                            let pool_ref = pool_opt.as_ref();
-                            let (eve_frames, next_battle) = if let Ok(handle) = tokio::runtime::Handle::try_current() {
-                                match handle.runtime_flavor() {
-                                    tokio::runtime::RuntimeFlavor::CurrentThread => {
-                                        crate::server::handlers::talk::resume_eve_after_battle_sync(
-                                            &mut s,
-                                            outcome,
-                                            self.data.as_ref(),
-                                        )
-                                    }
-                                    _ => {
-                                        tokio::task::block_in_place(|| {
-                                            handle.block_on(crate::server::handlers::talk::resume_eve_after_battle(
-                                                &mut s,
-                                                outcome,
-                                                self.data.as_ref(),
-                                                pool_ref,
-                                            ))
-                                        })
-                                    }
-                                }
-                            } else {
-                                futures::executor::block_on(crate::server::handlers::talk::resume_eve_after_battle(
-                                    &mut s,
-                                    outcome,
-                                    self.data.as_ref(),
-                                    pool_ref,
-                                ))
-                            };
-                            for f in &eve_frames {
-                                let _ = p.frames.try_send(f.clone());
-                            }
-                            if let Some((fight_id, diahinh)) = next_battle {
-                                eve_followups.push((*id, s.clone(), fight_id, diahinh));
-                            }
-                            ended_sessions.push(s.clone());
-                            let mut map = crate::server::session::lock_online_sessions();
-                            if let Some(global_s) = map.get_mut(&(*id as u32)) {
-                                *global_s = s.clone();
-                            }
-                            session_updated = true;
-                        }
+        // 1. Gather all participant IDs for this battle (online + disconnected)
+        //    and drain their parked offline Eve sessions if any.
+        let mut participant_ids: Vec<i64> = Vec::new();
+        let recorded_participants = self
+            .battle_participants
+            .lock()
+            .ok()
+            .and_then(|mut p| p.remove(&id));
+        if let Some(ref rec) = recorded_participants {
+            participant_ids.extend(rec.iter().copied());
+        }
+
+        if let Ok(mut members) = self.members.lock() {
+            if let Some(ref rec) = recorded_participants {
+                for pid in rec {
+                    if members.remove(pid) {
+                        participant_ids.push(*pid);
                     }
                 }
-                if !session_updated {
-                    // Not in the online registry (logged out / test harness):
-                    // no frame channel exists, so no resume can be delivered.
-                    // A fresh login builds a clean session anyway.
-                    let mut map = crate::server::session::lock_online_sessions();
-                    if let Some(s) = map.get_mut(&(*id as u32)) {
-                        s.battle_id = 0;
-                        s.last_battle_end_ms = now_ms;
-                        s.encounter_steps = 0;
-                        if outcome == Outcome::PlayerWin && arena_40_challenger == Some(*id as u32) {
-                            let _ = crate::server::handlers::event_npcs::resolve_40_npc_victory(s, self.data.as_ref());
-                        }
-                        ended_sessions.push(s.clone());
-                    }
+            } else {
+                participant_ids.extend(members.drain());
+            }
+        }
+
+        let mut offline_parked: HashMap<i64, Session> = HashMap::new();
+        if let Ok(mut offline_map) = self.offline_eve_sessions.lock() {
+            let keys: Vec<(i32, i64)> = offline_map
+                .keys()
+                .copied()
+                .filter(|&(bid, _)| bid == id)
+                .collect();
+            for key in keys {
+                if let Some(sess) = offline_map.remove(&key) {
+                    participant_ids.push(key.1);
+                    offline_parked.insert(key.1, sess);
                 }
             }
-            if outcome == Outcome::PlayerWin {
-                if let Some(cid) = arena_40_challenger {
-                    if !ids.contains(&(cid as i64)) {
-                        let mut map = crate::server::session::lock_online_sessions();
-                        if let Some(s) = map.get_mut(&cid) {
-                            let _ = crate::server::handlers::event_npcs::resolve_40_npc_victory(s, self.data.as_ref());
-                            ended_sessions.push(s.clone());
+        }
+
+        if let Some(cid) = arena_40_challenger {
+            participant_ids.push(i64::from(cid));
+        }
+
+        if participant_ids.is_empty() {
+            if let Ok(online) = self.online.try_read() {
+                for (pid, p) in online.iter() {
+                    if let Ok(s) = p.session.try_read() {
+                        if s.talking_battle > 0 || s.battle_id == id {
+                            participant_ids.push(*pid);
                         }
                     }
                 }
             }
         }
-        // Chained Eve battle: the `members` lock above is free again, so the
-        // spawn path (which re-enters the sink) can run. A session clone is
-        // passed — `start_encounter_battle` syncs the online entry itself.
-        for (player, session, fight_id, diahinh) in eve_followups {
+
+        participant_ids.sort_unstable();
+        participant_ids.dedup();
+        let lock_ids: Vec<u32> = participant_ids
+            .iter()
+            .filter_map(|&pid| u32::try_from(pid).ok().filter(|&u| u > 0))
+            .collect();
+
+        // 2. Execute post-battle progression, registry sync, and atomic DB
+        //    write-through under Two-Phase State Lock (`lock_player_operations`).
+        let run_async = async {
+            let _op_guards = crate::server::session::lock_player_operations(lock_ids).await;
+            let pool_opt = self.pool.read().await.clone();
+            let mut ended_sessions: Vec<Session> = Vec::new();
+            let mut eve_followups: Vec<(i64, Session, u16, i32)> = Vec::new();
+            let mut eve_warps: Vec<(
+                i64,
+                u16,
+                Option<Arc<tokio::sync::RwLock<Session>>>,
+                Option<mpsc::Sender<String>>,
+                Session,
+            )> = Vec::new();
+
+            // Snapshot online session handles once for legacy `battle_quest_win`
+            // member lookups without holding `self.online` across awaits.
+            let online_entries: HashMap<i64, (Arc<tokio::sync::RwLock<Session>>, mpsc::Sender<String>)> = {
+                let online = self.online.read().await;
+                online
+                    .iter()
+                    .map(|(pid, p)| (*pid, (Arc::clone(&p.session), p.frames.clone())))
+                    .collect()
+            };
+            let legacy_member_map: HashMap<i64, Arc<tokio::sync::RwLock<Session>>> = online_entries
+                .iter()
+                .map(|(pid, (sess, _))| (*pid, Arc::clone(sess)))
+                .collect();
+
+            for &pid in &participant_ids {
+                if let Some((sess_arc, tx)) = online_entries.get(&pid) {
+                    let mut s = sess_arc.write().await;
+                    s.battle_id = 0;
+                    s.last_battle_end_ms = now_ms;
+                    s.encounter_steps = 0;
+
+                    if outcome == Outcome::PlayerWin && arena_40_challenger == Some(pid as u32) {
+                        let victory_frames = crate::server::handlers::event_npcs::resolve_40_npc_victory(
+                            &mut s,
+                            self.data.as_ref(),
+                        );
+                        for f in victory_frames {
+                            let _ = tx.try_send(f);
+                        }
+                    }
+
+                    let is_eve_leader = s.id_leader == 0 || s.id_leader == s.id;
+                    if is_eve_leader {
+                        let eve_out = crate::server::handlers::talk::resume_eve_after_battle_deferred_warp(
+                            &mut s,
+                            outcome,
+                            self.data.as_ref(),
+                            pool_opt.as_ref(),
+                        )
+                        .await;
+                        for f in eve_out.outgoing {
+                            let _ = tx.try_send(f.frame);
+                        }
+                        for (target_id, frame) in eve_out.direct_messages {
+                            self.send_to(i64::from(target_id), frame);
+                        }
+                        for mb in eve_out.map_broadcast {
+                            if let Some(target_map) = mb.map_id {
+                                send_to_map(&self.online, i64::from(target_map), mb.frame);
+                            } else {
+                                let exclude = if mb.subject > 0 { i64::from(mb.subject) } else { pid };
+                                self.send_map(exclude, mb.frame);
+                            }
+                        }
+                        if let Some((fight_id, diahinh)) = eve_out.eve_battle {
+                            eve_followups.push((pid, s.clone(), fight_id, diahinh));
+                        }
+                        if let Some(warp_id) = eve_out.eve_warp {
+                            eve_warps.push((
+                                pid,
+                                warp_id,
+                                Some(Arc::clone(sess_arc)),
+                                Some(tx.clone()),
+                                s.clone(),
+                            ));
+                        }
+                    } else if s
+                        .current_event_session
+                        .as_ref()
+                        .is_some_and(|ev| ev.phase == crate::eve::EventPhase::AwaitingBattle)
+                    {
+                        s.current_event_session = None;
+                    }
+
+                    if s.talking_battle > 0 {
+                        let mut frames = Vec::new();
+                        if outcome == Outcome::PlayerLose {
+                            crate::server::handlers::quest::quest_lose_frames(
+                                &mut s,
+                                self.data.as_ref(),
+                                &mut frames,
+                            );
+                        } else {
+                            let mut member = |mem: i64| legacy_member_map.get(&mem).cloned();
+                            crate::server::handlers::quest::battle_quest_win(
+                                &mut s,
+                                self.data.as_ref(),
+                                &mut frames,
+                                &mut member,
+                            );
+                        }
+                        for f in frames {
+                            let _ = tx.try_send(f);
+                        }
+                    }
+
+                    crate::server::session::registry_update_if_online(&s);
+                    ended_sessions.push(s.clone());
+                } else if let Some(mut s) = crate::server::session::registry_get(pid as u32) {
+                    s.battle_id = 0;
+                    s.last_battle_end_ms = now_ms;
+                    s.encounter_steps = 0;
+                    if outcome == Outcome::PlayerWin && arena_40_challenger == Some(pid as u32) {
+                        let _ = crate::server::handlers::event_npcs::resolve_40_npc_victory(
+                            &mut s,
+                            self.data.as_ref(),
+                        );
+                    }
+                    let is_eve_leader = s.id_leader == 0 || s.id_leader == s.id;
+                    if is_eve_leader {
+                        let eve_out = crate::server::handlers::talk::resume_eve_after_battle_deferred_warp(
+                            &mut s,
+                            outcome,
+                            self.data.as_ref(),
+                            pool_opt.as_ref(),
+                        )
+                        .await;
+                        for (target_id, frame) in eve_out.direct_messages {
+                            self.send_to(i64::from(target_id), frame);
+                        }
+                        for mb in eve_out.map_broadcast {
+                            if let Some(target_map) = mb.map_id {
+                                send_to_map(&self.online, i64::from(target_map), mb.frame);
+                            } else {
+                                let exclude = if mb.subject > 0 { i64::from(mb.subject) } else { pid };
+                                self.send_map(exclude, mb.frame);
+                            }
+                        }
+                        if let Some((fight_id, diahinh)) = eve_out.eve_battle {
+                            eve_followups.push((pid, s.clone(), fight_id, diahinh));
+                        }
+                        if let Some(warp_id) = eve_out.eve_warp {
+                            eve_warps.push((pid, warp_id, None, None, s.clone()));
+                        }
+                    } else if s
+                        .current_event_session
+                        .as_ref()
+                        .is_some_and(|ev| ev.phase == crate::eve::EventPhase::AwaitingBattle)
+                    {
+                        s.current_event_session = None;
+                    }
+                    crate::server::session::registry_update_if_online(&s);
+                    ended_sessions.push(s);
+                } else if let Some(mut offline_s) = offline_parked.remove(&pid) {
+                    offline_s.battle_id = 0;
+                    offline_s.last_battle_end_ms = now_ms;
+                    offline_s.encounter_steps = 0;
+                    let is_eve_leader = offline_s.id_leader == 0 || offline_s.id_leader == offline_s.id;
+                    if is_eve_leader {
+                        let eve_out = crate::server::handlers::talk::resume_eve_after_battle_deferred_warp(
+                            &mut offline_s,
+                            outcome,
+                            self.data.as_ref(),
+                            pool_opt.as_ref(),
+                        )
+                        .await;
+                        for (target_id, frame) in eve_out.direct_messages {
+                            self.send_to(i64::from(target_id), frame);
+                        }
+                        for mb in eve_out.map_broadcast {
+                            if let Some(target_map) = mb.map_id {
+                                send_to_map(&self.online, i64::from(target_map), mb.frame);
+                            } else {
+                                let exclude = if mb.subject > 0 { i64::from(mb.subject) } else { pid };
+                                self.send_map(exclude, mb.frame);
+                            }
+                        }
+                        if let Some(warp_id) = eve_out.eve_warp {
+                            eve_warps.push((pid, warp_id, None, None, offline_s.clone()));
+                        }
+                    } else if offline_s
+                        .current_event_session
+                        .as_ref()
+                        .is_some_and(|ev| ev.phase == crate::eve::EventPhase::AwaitingBattle)
+                    {
+                        offline_s.current_event_session = None;
+                    }
+                    ended_sessions.push(offline_s);
+                }
+            }
+
+            if !ended_sessions.is_empty() {
+                if let Some(ref pool) = pool_opt {
+                    let refs: Vec<&Session> = ended_sessions.iter().collect();
+                    if !crate::db::persist::persist_sessions_transaction(
+                        Some(pool),
+                        &refs,
+                        &["stats", "homdo", "trangbi", "quest", "pet"],
+                    )
+                    .await
+                    {
+                        tracing::warn!(battle_id = id, "Battle End DB write-through failed");
+                    }
+                }
+            }
+
+            drop(_op_guards);
+
+            for (pid, warp_id, sess_arc_opt, tx_opt, mut warp_sess) in eve_warps {
+                let mut warp_out = crate::server::dispatcher::HandleOutcome::default();
+                if crate::server::handlers::quest::perform_party_warp_and_persist(
+                    &mut warp_sess,
+                    self.data.as_ref(),
+                    pool_opt.as_ref(),
+                    warp_id,
+                    &mut warp_out,
+                )
+                .await
+                {
+                    if let Some(sess_arc) = sess_arc_opt {
+                        let mut s = sess_arc.write().await;
+                        s.map_id = warp_sess.map_id;
+                        s.map_x = warp_sess.map_x;
+                        s.map_y = warp_sess.map_y;
+                    }
+                    if let Some(tx) = tx_opt {
+                        for f in warp_out.outgoing {
+                            let _ = tx.try_send(f.frame);
+                        }
+                    }
+                    for (target_id, frame) in warp_out.direct_messages {
+                        self.send_to(i64::from(target_id), frame);
+                    }
+                    for mb in warp_out.map_broadcast {
+                        if let Some(target_map) = mb.map_id {
+                            send_to_map(&self.online, i64::from(target_map), mb.frame);
+                        } else {
+                            let exclude = if mb.subject > 0 { i64::from(mb.subject) } else { pid };
+                            self.send_map(exclude, mb.frame);
+                        }
+                    }
+                }
+            }
+
+            eve_followups
+        };
+
+        let eve_followups = if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            match handle.runtime_flavor() {
+                tokio::runtime::RuntimeFlavor::MultiThread => {
+                    tokio::task::block_in_place(|| handle.block_on(run_async))
+                }
+                _ => futures::executor::block_on(run_async),
+            }
+        } else {
+            futures::executor::block_on(run_async)
+        };
+
+        // 3. Chained Eve battles: all participant locks and `members` locks are
+        //    now free, so `start_eve_encounter` can safely spawn the next battle.
+        for (player, mut session, fight_id, diahinh) in eve_followups {
             let Some(service) = self.eve_service.get().and_then(std::sync::Weak::upgrade) else {
                 tracing::warn!(
                     player,
@@ -458,96 +702,7 @@ impl BattleSink for BattleSinkImpl {
                 );
                 continue;
             };
-            let mut session = session;
             service.start_eve_encounter(&mut session, fight_id, diahinh);
-        }
-        // G3 — batch-persist the post-battle player stats (Hp/Sp/Texp/Lv/
-        // HpMax/SpMax/Point/SkillPoint) + pet stats (texp) for every member on
-        // win/lose/flee. `None` pool = no-op (golden replay).
-        if !ended_sessions.is_empty() {
-            if let Ok(pool) = self.pool.try_read() {
-                if let Some(pool) = pool.clone() {
-                    tokio::spawn(async move {
-                        let refs: Vec<&Session> = ended_sessions.iter().collect();
-                        crate::db::persist::persist_sessions_transaction(
-                            Some(&pool),
-                            &refs,
-                            &["stats", "pet"],
-                        )
-                        .await;
-                    });
-                }
-            }
-        }
-        if outcome == Outcome::PlayerLose {
-            // Defeat: run the OnLose dialog progression for every quest-battle
-            // session (ticket 19 review #8 — PlayerLose must call OnLose).
-            if let Some(online) = try_read_online_with_retry(&self.online, 5, std::time::Duration::from_millis(2)) {
-                for (player, p) in online.iter() {
-                    let _ = player;
-                    if let Some(mut s) = try_write_session_with_retry(&p.session, 5, std::time::Duration::from_millis(2)) {
-                        if s.talking_battle <= 0 {
-                            continue;
-                        }
-                        let mut frames = Vec::new();
-                        crate::server::handlers::quest::quest_lose_frames(
-                            &mut s,
-                            self.data.as_ref(),
-                            &mut frames,
-                        );
-                        for f in frames {
-                            let _ = p.frames.try_send(f);
-                        }
-                    }
-                }
-            }
-            return;
-        }
-        if let Ok(online) = self.online.try_read() {
-            // Snapshot member sessions so the quest-win closure can reach them.
-            let members: HashMap<i64, Arc<tokio::sync::RwLock<Session>>> = online
-                .iter()
-                .map(|(id, p)| (*id, p.session.clone()))
-                .collect();
-            for (player, p) in online.iter() {
-                if let Ok(mut s) = p.session.try_write() {
-                    if s.talking_battle <= 0 {
-                        // Legacy quest battles only: Eve-scripted sessions
-                        // (CP6 #4) already resumed in the clearing pass and
-                        // never set `talking_battle`, so this gate skips
-                        // `battle_quest_win` for them by construction.
-                        continue;
-                    }
-                    let mut frames = Vec::new();
-                    let mut member = |mem: i64| members.get(&mem).cloned();
-                    crate::server::handlers::quest::battle_quest_win(
-                        &mut s,
-                        self.data.as_ref(),
-                        &mut frames,
-                        &mut member,
-                    );
-                    for f in frames {
-                        let _ = p.frames.try_send(f);
-                    }
-                    // Persist the quest-step + item mutations arising from OnWin
-                    // (scoped by player_id) so a crash after battle never loses
-                    // the granted rewards / advanced steps.
-                    if let Ok(pool) = self.pool.try_read() {
-                        if let Some(pool) = pool.clone() {
-                            let session = s.clone();
-                            tokio::spawn(async move {
-                                crate::db::persist::persist_sessions_transaction(
-                                    Some(&pool),
-                                    &[&session],
-                                    &["quest", "homdo", "trangbi"],
-                                )
-                                .await;
-                            });
-                        }
-                    }
-                }
-                let _ = player;
-            }
         }
     }
 }
@@ -708,6 +863,8 @@ impl BattleService {
             pool: Arc::clone(&pool),
             eve_service: std::sync::OnceLock::new(),
             active_40_npc: Arc::clone(&active_40_npc),
+            battle_participants: Arc::new(Mutex::new(HashMap::new())),
+            offline_eve_sessions: Arc::new(Mutex::new(HashMap::new())),
         });
         BattleService {
             manager: Arc::new(BattleManager::new()),
@@ -777,8 +934,8 @@ impl BattleService {
     }
 
     /// Register an online player with a pre-existing frame sender channel.
-    /// If the player is already registered (e.g. in battle during relogin),
-    /// redirects the frame sender while preserving their in-battle session state.
+    /// If the player is already registered, refreshes both the session handle
+    /// and the frame sender so `BattleService` always observes the latest state.
     pub fn register_sender(
         &self,
         player: i64,
@@ -788,6 +945,7 @@ impl BattleService {
         for attempt in 0..10 {
             if let Ok(mut online) = self.online.try_write() {
                 if let Some(existing) = online.get_mut(&player) {
+                    existing.session = session;
                     existing.frames = frames;
                 } else {
                     online.insert(
@@ -808,8 +966,19 @@ impl BattleService {
     }
 
     pub fn unregister(&self, player: i64) {
+        let mut snapshotted = false;
         if let Ok(mut online) = self.online.try_write() {
-            online.remove(&player);
+            if let Some(existing) = online.remove(&player) {
+                if let Ok(s) = existing.session.try_read() {
+                    self.sink.snapshot_offline_eve_session(&s);
+                    snapshotted = true;
+                }
+            }
+        }
+        if !snapshotted {
+            if let Some(s) = crate::server::session::registry_get(player as u32) {
+                self.sink.snapshot_offline_eve_session(&s);
+            }
         }
         if let Ok(mut members) = self.sink.members.lock() {
             members.remove(&player);
@@ -1055,6 +1224,7 @@ impl BattleService {
         let id = self.next_battle_id();
         let terrain = if diahinh > 0 { diahinh } else { 112 };
         let mut battle = Battle::new(id, terrain);
+        battle.fight_type = fight_data.fight_type;
         let lid = i64::from(leader_session.id);
 
         // 1. Leader & Leader Pet
@@ -1161,12 +1331,27 @@ impl BattleService {
             }
         }
 
-        // 3. Enemy Formation
+        // 3. Enemy Formation (`left_enemies` on rows 0..=1, team 2)
         for (idx, enemy) in fight_data.left_enemies.iter().enumerate().take(10) {
             if let Some(npc) = self.data.npcs.get(&i64::from(enemy.npc_id)) {
                 let row = enemy.row();
                 let col = enemy.col();
                 battle.add_npc(npc, (idx + 1) as i64, row, col, 3);
+            }
+        }
+
+        // 4. Ally Formation (`right_enemies` on rows 2..=3, team 1)
+        for (idx, ally) in fight_data.right_enemies.iter().enumerate().take(10) {
+            if let Some(npc) = self.data.npcs.get(&i64::from(ally.npc_id)) {
+                let row = if ally.location_pos < 10 {
+                    2 + ally.row()
+                } else {
+                    ally.row().clamp(2, 3)
+                };
+                let col = ally.col();
+                if battle.cell(row, col).map(|c| c.id == 0).unwrap_or(false) {
+                    battle.add_npc(npc, (idx + 1) as i64, row, col, 3);
+                }
             }
         }
 
@@ -1378,6 +1563,12 @@ impl BattleService {
         if let Ok(mut members) = self.sink.members.lock() {
             members.insert(i64::from(session.id));
         }
+        if let Ok(mut participants) = self.sink.battle_participants.lock() {
+            participants
+                .entry(battle_id)
+                .or_default()
+                .push(i64::from(session.id));
+        }
         let join = self.build_join_frame(session, battle_id);
         self.sink.send_to(i64::from(session.id), join);
         self.sink
@@ -1424,6 +1615,7 @@ impl BattleService {
 
     /// Leave the current battle (op 0x0B sub 1 or sub 5).
     pub fn leave_battle(&self, session: &mut Session) {
+        self.sink.snapshot_offline_eve_session(session);
         let now_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis() as u64)
@@ -1443,12 +1635,7 @@ impl BattleService {
                 }
             }
         }
-        let mut map = crate::server::session::lock_online_sessions();
-        if let Some(s) = map.get_mut(&session.id) {
-            s.battle_id = 0;
-            s.last_battle_end_ms = now_ms;
-            s.encounter_steps = 0;
-        }
+        crate::server::session::registry_update_if_online(session);
     }
 
     /// Submit a battle command (op 0x32) to the player's battle.
@@ -1496,6 +1683,12 @@ impl BattleService {
     /// Push a frame to every online player on the map except `player`.
     pub fn send_map(&self, player: i64, frame: String) {
         self.sink.send_map(player, frame);
+    }
+
+    /// Trigger post-battle resolution (`Two-Phase State Lock`, Eve resume,
+    /// `registry_update_if_online`, and atomic DB write-through) for `id`.
+    pub fn battle_ended(&self, id: i32, outcome: Outcome) {
+        self.sink.battle_ended(id, outcome);
     }
 
     /// Is `player` currently online (used by PK gates)?
@@ -1693,7 +1886,12 @@ impl BattleService {
 
         if let Ok(mut members) = self.sink.members.lock() {
             members.insert(lid);
-            members.extend(extra_members);
+            members.extend(extra_members.iter().copied());
+        }
+        if let Ok(mut participants) = self.sink.battle_participants.lock() {
+            let entry = participants.entry(id).or_default();
+            entry.push(lid);
+            entry.extend(extra_members);
         }
         self.record_join_cells(id, &battle);
 

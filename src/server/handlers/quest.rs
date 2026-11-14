@@ -908,6 +908,129 @@ pub fn perform_warp(session: &mut Session, warp: &crate::data::tables::Warp, out
     }
 }
 
+/// Two-Phase State Lock + atomic SQLite write-through Door Warp for solo or party.
+///
+/// 1. Validates `(session.map_id, warp_id)` in `data.warps` (`warp.map2 > 0`) and
+///    refuses independent warp by a following party member.
+/// 2. Acquires `lock_player_operations` in ascending player-ID order **before**
+///    reading any party member from `registry_get`.
+/// 3. Updates leader & online members' `(map_id, map_x, map_y)`, calls
+///    `registry_update_if_online`, and emits `14 07` + `0x0C` + `hide_from_map`.
+/// 4. Persists leader & all warped members via `persist_sessions_transaction`
+///    (Door Warp write-through checkpoint).
+pub async fn perform_party_warp_and_persist(
+    session: &mut Session,
+    data: &GameData,
+    pool: Option<&crate::db::pool::DbPool>,
+    warp_id: u16,
+    out: &mut HandleOutcome,
+) -> bool {
+    let warp_key = (i64::from(session.map_id), i64::from(warp_id));
+    let Some(warp) = data.warps.get(&warp_key) else {
+        tracing::debug!(
+            map_id = session.map_id,
+            warp_id,
+            "Door Warp refused: no Warps.dat row"
+        );
+        return false;
+    };
+    if warp.map2 <= 0 {
+        tracing::debug!(
+            map_id = session.map_id,
+            warp_id,
+            dest_map = warp.map2,
+            "Door Warp refused: invalid destination map"
+        );
+        return false;
+    }
+
+    let id = session.id;
+    let id_leader = session.id_leader;
+    if id_leader > 0 && id_leader != id {
+        tracing::debug!("Door Warp refused: member follows a party leader");
+        return false;
+    }
+
+    let mut participant_ids = vec![id];
+    if id_leader == id && id > 0 {
+        for &m in &session.id_mem {
+            if m > 0 && m != id {
+                participant_ids.push(m);
+            }
+        }
+    }
+
+    // Phase 1: Deterministic RAM Lock BEFORE reading any partner from registry.
+    let _guards = crate::server::session::lock_player_operations(participant_ids.clone()).await;
+
+    let old_map = session.map_id;
+    let dest_map = warp.map2 as u16;
+    let dest_x = warp.x as u16;
+    let dest_y = warp.y as u16;
+    let wire_warp_id = (warp.warpid & 0xFF) as u8;
+
+    session.map_id = dest_map;
+    session.map_x = dest_x;
+    session.map_y = dest_y;
+    crate::server::session::registry_update_if_online(session);
+
+    out.send("F44402001407");
+    out.send(crate::server::spawn::build_relocate_packet(
+        id, dest_map, dest_x, dest_y, wire_warp_id,
+    ));
+    out.broadcast_to_map(id, old_map, crate::battle::packets::hide_from_map(id));
+
+    let mut warped_members: Vec<Session> = Vec::new();
+    if id_leader == id && id > 0 {
+        for member_id in session.id_mem {
+            if member_id > 0 && member_id != id {
+                let Some(mut mem_session) = crate::server::session::registry_get(member_id) else {
+                    continue;
+                };
+                let member_old_map = mem_session.map_id;
+                mem_session.map_id = dest_map;
+                mem_session.map_x = dest_x;
+                mem_session.map_y = dest_y;
+                crate::server::session::registry_update_if_online(&mem_session);
+
+                let member_pkt = crate::server::spawn::build_relocate_packet(
+                    member_id, dest_map, dest_x, dest_y, wire_warp_id,
+                );
+                out.send_to(member_id, "F44402001407");
+                out.send_to(member_id, member_pkt);
+                out.broadcast_to_map(
+                    member_id,
+                    member_old_map,
+                    crate::battle::packets::hide_from_map(member_id),
+                );
+                warped_members.push(mem_session);
+            }
+        }
+    }
+
+    // Phase 2: Atomic SQLite write-through checkpoint for leader + all warped members.
+    let mut to_persist: Vec<&Session> = Vec::new();
+    if session.db_character_id > 0 {
+        to_persist.push(session);
+    }
+    for m in &warped_members {
+        if m.db_character_id > 0 {
+            to_persist.push(m);
+        }
+    }
+    if !to_persist.is_empty()
+        && !crate::db::persist::persist_sessions_transaction(pool, &to_persist, &[]).await
+    {
+        tracing::warn!(
+            leader_id = session.id,
+            dest_map,
+            "Door Warp DB write-through failed"
+        );
+    }
+
+    true
+}
+
 /// Handle warp-talk (H8) completion: confirm warp into 0x0C flow.
 pub async fn handle_warp_confirm(
     conn: &mut Conn,
@@ -983,7 +1106,7 @@ pub async fn handle_warp_confirm(
 
     // Lookup warp data
     let warp_key = (map_id as i64, idtalking as i64);
-    if let Some(warp) = data.warps.get(&warp_key) {
+    if let Some(_warp) = data.warps.get(&warp_key) {
         // Check if this warp has a battle gate
         if let Some(gate) = data.battle_gates.get(&warp_key) {
             if gate.diahinh > 0 {
@@ -999,16 +1122,11 @@ pub async fn handle_warp_confirm(
             }
         }
 
-        let id = conn.session.id;
-        let id_leader = conn.session.id_leader;
-        if id_leader > 0 && id_leader != id {
+        let warp_id_u16 = u16::try_from(idtalking).unwrap_or(0);
+        if !perform_party_warp_and_persist(&mut conn.session, data, _env.pool, warp_id_u16, out).await {
             end_talk(conn, out);
-            return; // Member cannot warp independently while following leader
+            return;
         }
-
-        // Fade → relocate → hide, plus the session/registry position update
-        // (shared with the Eve Door path via `perform_warp`).
-        perform_warp(&mut conn.session, warp, out);
 
         // Party warp direct messages are queued in out.direct_messages and dispatched
         // uniformly by the connection loop (server_control).

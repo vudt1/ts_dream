@@ -19,6 +19,7 @@ pub const SUB_SELECT_MENU: u8 = 0x09; // C -> S menu option select
 pub const SUB_STAT_POINT_TOAST: u8 = 0x16; // S -> C stat point toast & WA0014 sound
 pub const SUB_SKILL_POINT_TOAST: u8 = 0x17; // S -> C skill point toast & WA0014 sound
 pub const SUB_EVENT_ALERT: u8 = 0x29; // S -> C special event broadcast alert (e.g. 2K)
+pub const SUB_EXP_TOAST: u8 = 0x2A; // S -> C EXP gain toast & ExpUP sound
 pub const SUB_LOCK_ACTOR: u8 = 0x2C; // S -> C lock/unlock character
 
 /// Size of the raw EveResult binary payload in bytes.
@@ -183,6 +184,20 @@ impl NpcTalkCodec {
     /// Builds the hex string representation of special event alert frame (`14 29 <code: 1B>`).
     pub fn build_event_alert_hex(code: u8) -> String {
         encoder::hex(&Self::build_event_alert_frame(code))
+    }
+
+    /// Builds the decoded 11-byte frame for EXP gain toast & ExpUP sound:
+    /// `F4 44 07 00 14 2A 01 [exp_delta: 4B LE]`
+    pub fn build_exp_toast_frame(exp_delta: u32) -> Vec<u8> {
+        let mut writer = PacketWriter::new(OP_NPC_EVENT, SUB_EXP_TOAST);
+        writer.write_u8(0x01);
+        writer.write_u32_le(exp_delta);
+        writer.build_frame()
+    }
+
+    /// Builds the hex string representation of the EXP gain toast frame (`14 2A 01 <exp_delta>`).
+    pub fn build_exp_toast_hex(exp_delta: u32) -> String {
+        encoder::hex(&Self::build_exp_toast_frame(exp_delta))
     }
 }
 

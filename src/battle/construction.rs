@@ -52,6 +52,8 @@ pub struct Battle {
     pub current_wave: usize,
     pub challenger_id: u32,
     pub is_40_npc: bool,
+    /// `EveFightData::fight_type` for scripted Eve encounters (`0` otherwise).
+    pub fight_type: u8,
 }
 
 impl Battle {
@@ -73,6 +75,7 @@ impl Battle {
             current_wave: 0,
             challenger_id: 0,
             is_40_npc: false,
+            fight_type: 0,
         };
 
         // Create 20 cells (row 0..3, col 0..4)
@@ -344,7 +347,7 @@ impl Battle {
             cell.lv = npc.lv;
             cell.thuoctinh = npc.thuoctinh;
             cell.leader_id = 0;
-            cell.team = 2;
+            cell.team = team_for_row(row);
             cell.int1 = npc.int1;
             cell.atk = npc.atk;
             cell.def = npc.def;

@@ -738,6 +738,11 @@ pub fn lock_online_sessions() -> std::sync::MutexGuard<'static, std::collections
     }
 }
 
+/// Reads a cloned snapshot of an online player session from the central registry.
+pub fn registry_get(id: u32) -> Option<Session> {
+    lock_online_sessions().get(&id).cloned()
+}
+
 /// Updates an online player session in the central registry if they are currently online.
 pub fn registry_update_if_online(s: &Session) {
     let mut sessions = lock_online_sessions();

@@ -1,4 +1,4 @@
-# Handoff: Quest Refactor — Tickets 01, 02, 03, 04 & 05
+# Handoff: Quest Refactor — Tickets 01 through 08
 
 ## Summary of Completed Work
 
@@ -95,9 +95,51 @@
 
 ---
 
+### Ticket 06 (`06-missing-eve-effect-executors.md`) — `resolved`
+1. **Missing Eve Effect Executors (`src/server/handlers/talk.rs`, `src/protocol/codecs/npc_talk.rs`, `src/protocol/mod.rs`)**:
+   - Implemented `NpcTeam (rt=0, rc=3)` emitting `S→C 0x14 01` for `p_style ∈ 1..=5` (with warning skip for unsupported styles).
+   - Implemented `RewardPet (rt=0, rc=8)` via `execute_reward_pet`: allocates `1..=4` via `pet_box::next_active_slot`, hydrates `PetState` from `data.npcs` (or fallback defaults), emits `0x14 01` + `0F 08` + `0F 01` (or `0x14 01` + `0F 02` on removal), and calls `registry_update_if_online`.
+   - Implemented `MoveEntity (rt=4)` (validated `rc == 3 && result_value >= 10_000` -> `0x14 01`), `PlayMovie (rt=5)` (`0x14 01`), and server-side `NpcAction (rt=9)` (never emitted raw via `0x14`). `UNKNOWN` `result_type`/`result_class` log `tracing::warn!` and skip fail-closed.
+2. **`Player (rc=7)` & `Gold/Points (rc=5)` & `Pre-Flight Probe` (`src/server/handlers/talk.rs`)**:
+   - Fixed `Player (rc=7)` fallthrough bug on `param == 3` and separated `savemap` (`param=0/1/3, p_style=1`) from `GetArmy (param=2)`.
+   - Completed `texp` (`param=1, p_style=4`): computes `texp_get_lv_up`, updates `level`, `recompute_stats()`, heals `hp`/`sp` to max, grants `point` (`+2/lv`) & `skill_point` (`+1/lv`), emits `0x14 0x2A 0x01 <exp_delta: u32_LE>`, `0x08 01 24/23/CD/19/CE/1A/26/25`, and `05 0A`.
+   - Added `POINT_CAP` (`src/protocol/mod.rs`) and extended `preflight_probe_batch` to check `GOLD_CAP`, `POINT_CAP`, `InsufficientGold`/`InsufficientPoint`, and 4-slot `RewardPet` capacity All-or-Nothing; `rc=5` emits `0x1A 01/02/04/05` + `0x1A 03` (`point_frame`).
+3. **Tests (`tests/missing_eve_effect_executors_test.rs`)**:
+   - Added 4 E2E tests covering `12001` Tống Nhân (`0x14 09` choice `32` -> `RewardPet 14105`, `NpcTeam`, `Quest 10027`, DB write-through), `Player rc=7` `texp` level-up + `savemap` + `param=3` no-fallthrough, `MoveEntity`/`PlayMovie`/`NpcAction`/`UNKNOWN` fail-closed, and negative All-or-Nothing rejection on `GOLD_CAP`, `POINT_CAP`, and full 4-slot pet bag.
+
+---
+
+### Ticket 07 (`07-door-triggers-walkstep-and-party-warp.md`) — `resolved`
+1. **Door & WalkStep Triggers (`src/server/handlers/npc_event.rs`, `src/server/handlers/talk.rs`, `src/server/handlers/movement.rs`, `src/server/dispatcher.rs`)**:
+   - Wired `NpcTrigger::ClickDoor` on `0x14 04 <door_id: u16_LE>` (`handle_talk_click_door`, preserving bare `F4 44 02 00 14 04` as `end_talk`).
+   - Added `NpcTrigger::WalkStep { x, y }` to `NpcTrigger` (`kind = 16`, skipping pure `rt=3` random-encounter battles so step-counter encounters remain unaffected).
+   - Added `movement::handle_move_dispatch` and `movement::handle_player_update_dispatch` (wired in `dispatcher.rs`) to trigger `NpcTrigger::MeetDoor` (closest door within ±60 px) and `NpcTrigger::WalkStep` into `EventRunner`.
+2. **Party `Door Warp` (`Two-Phase State Lock` + Write-Through) (`src/server/handlers/quest.rs`, `src/server/session.rs`, `src/server/handlers/talk.rs`)**:
+   - Added `session::registry_get` and `quest::perform_party_warp_and_persist`: validates `Warps.dat` (`map2 > 0`), acquires `lock_player_operations` **before** calling `registry_get(member_id)`, updates leader & online members' `(map_id, map_x, map_y)`, calls `registry_update_if_online`, emits `14 07` + `0x0C` + `hide_from_map`, and persists leader + all warped members atomically via `persist_sessions_transaction`.
+   - Wired both `execute_event_step_with_pool` (`DomainEffect::Warp`) and `quest::handle_warp_confirm` (`0x14 08`) to `perform_party_warp_and_persist`.
+3. **Tests (`tests/door_triggers_walkstep_and_party_warp_test.rs`)**:
+   - Added 3 E2E tests covering `ClickDoor` party warp + DB write-through for Leader & Member (plus bare `0x14 04` EndTalk), `WalkStep` + `MeetDoor` party warp + DB persistence, and negative unmet door condition / invalid warp destination leaving Leader & Member RAM/registry/SQLite untouched.
+
+---
+
+### Ticket 08 (`08-eve-battle-sync-registry-and-disconnect.md`) — `resolved`
+1. **`EveFightData` & Pre-Battle Talk Unlock (`src/battle/service.rs`, `src/battle/construction.rs`, `src/server/handlers/talk.rs`)**:
+   - `BattleService::start_encounter_battle` propagates `fight_data.fight_type`, spawns `left_enemies` on Team 2 (rows `0..=1`) and `right_enemies` on Team 1 (rows `2..=3`), and falls back to terrain `112` when `SceneInfo.background_no == 0`.
+   - Talk UI (`Session::talk_locked`) is cleanly unlocked (`14 2C Unlock` + `14 08 EndTalk`) before entering battle.
+2. **Post-Battle `Two-Phase State Lock`, Registry Sync & Deferred Warp (`src/battle/service.rs`, `src/server/handlers/talk.rs`, `src/server/dispatcher.rs`)**:
+   - `BattleService::battle_ended` collects sorted, deduplicated participant IDs (`battle_participants` + `members` + `offline_eve_sessions` + `active_40_npc`) and acquires `lock_player_operations(lock_ids)` before mutating sessions or reading registry.
+   - Added `HandleOutcome::eve_warp` and `talk::resume_eve_after_battle_deferred_warp` so post-battle `DomainEffect::Warp` steps execute `quest::perform_party_warp_and_persist` **after** `drop(_op_guards)`, preventing re-entrant `lock_player_operations` deadlocks and lock-order inversions while preserving `direct_messages` and `map_broadcast`.
+   - Calls `registry_update_if_online(&s)` for online participants, executes atomic SQLite write-through (`persist_sessions_transaction`) at `Battle End` (Win, Lose, Flee), and preserves `register_sender` session handle refresh.
+3. **Mid-Battle Disconnect & Party Scope (`src/battle/service.rs`, `src/eve/auto_chain.rs`)**:
+   - `unregister` and `leave_battle` snapshot parked `AwaitingBattle` Eve sessions into `offline_eve_sessions` so `battle_ended` still runs `resume_eve_after_battle_deferred_warp` and persists post-battle rewards/quests to SQLite for offline players.
+   - Standard Eve quest progression runs only for solo players or the party Leader (`s.id_leader == 0 || s.id_leader == s.id`); party Members clear parked `AwaitingBattle` sessions without advancing standard Eve quests.
+   - Updated `EveAutoChainEngine::try_auto_chain` to prioritize `cc=8` (`BattleResult`) chains when `completed.battle_result != 0` without skipping `completed.eve_no` via `completed_eve_counts`, ensuring `12001` Tống Dũng (`eve_no=16` `cond 7`) resolves `OnWin` (`RewardPet 14106`, `Quest 10028`) instead of falling through to `eve_no=83` (`50225`).
+4. **Tests (`tests/eve_battle_sync_registry_and_disconnect_test.rs`)**:
+   - Verified all 5 E2E tests: `12001` Tống Dũng win (`14106` + `NpcTeam` + `Quest 10028` + registry + movement packet safety + SQLite), negative Lose/Flee (no `[OnWin]` + SQLite persistence), party Member standard Eve quest preservation, mid-battle disconnect DB persistence for relogin, and `EveFightData` `right_enemies`/terrain `112` + post-battle `Warp` `direct_messages`/`map_broadcast`, plus `architecture_guardrails_test` and full `cargo test --all-targets --no-fail-fast`.
+
+---
+
 ## Next Tickets for Continuation
 
-Tickets `06` through `08` in `.scratch/quest-refactor/issues/` remain `ready-for-agent`:
-- **Next recommended:** `06-missing-eve-effect-executors.md` (unblocked).
+All tickets `01` through `08` in `.scratch/quest-refactor/issues/` are now `resolved`.
 - **Important note for production DB:** Existing `DB/ts_dream.db` files created from `0001_init.sql` must have `migrations/0002_eve_quest_persistence.sql` applied before running the updated binary (since `db::pool::migrate` is a no-op per ADR 0004).
-- **Important notes for Ticket 06+:** `DomainEffect::{NpcTeam, RewardPet, MoveEntity, PlayMovie, NpcAction}` are already wired in `src/eve/planner.rs` and `process_single_domain_effect` in `src/server/handlers/talk.rs` for Ticket 06 to implement.

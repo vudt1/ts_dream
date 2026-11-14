@@ -4,6 +4,113 @@ use crate::protocol::encoder;
 use crate::server::dispatcher::OpcodeCtx;
 use crate::server::spawn;
 
+/// Async dispatcher entry for Op 0x05 (`handle_player_update`).
+pub async fn handle_player_update_dispatch(ctx: &mut OpcodeCtx<'_>) {
+    if ctx.sub == 1 && ctx.payload.len() >= 5 {
+        handle_move_dispatch(ctx).await;
+        return;
+    }
+    handle_player_update(ctx);
+}
+
+/// Async dispatcher entry for Op 0x06 (`handle_move`) + `MeetDoor` / `WalkStep` Eve triggers.
+pub async fn handle_move_dispatch(ctx: &mut OpcodeCtx<'_>) {
+    handle_move(ctx);
+    if ctx.sub != 1
+        || ctx.payload.len() < 5
+        || ctx.conn.session.battle_id > 0
+        || ctx.conn.session.current_event_session.is_some()
+    {
+        return;
+    }
+    let id = ctx.conn.session.id;
+    let id_leader = ctx.conn.session.id_leader;
+    if id_leader > 0 && id_leader != id {
+        return;
+    }
+
+    let px = ctx.conn.session.map_x;
+    let py = ctx.conn.session.map_y;
+    let seed = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i32)
+        .unwrap_or(12345);
+    let mut rng = crate::battle::rng::DotNetRandom::new(seed);
+
+    // 1. MeetDoor: check closest door within ±60 px of new coordinates.
+    if let Some(scene) = ctx.data.scene_eve_data.get(&u32::from(ctx.conn.session.map_id)) {
+        let mut closest_door: Option<(u16, i64)> = None;
+        for door in scene.doors.values() {
+            let dx = (i32::from(px) - door.x).abs();
+            let dy = (i32::from(py) - door.y).abs();
+            if dx <= 60 && dy <= 60 {
+                let dist2 = i64::from(dx) * i64::from(dx) + i64::from(dy) * i64::from(dy);
+                if closest_door.map_or(true, |(_, best)| dist2 < best) {
+                    closest_door = Some((door.id, dist2));
+                }
+            }
+        }
+        if let Some((door_id, _)) = closest_door {
+            if let Some(event_session) = crate::server::handlers::npc_event::resolve_npc_event(
+                &ctx.conn.session,
+                ctx.data,
+                crate::server::handlers::npc_event::NpcTrigger::MeetDoor(i32::from(door_id)),
+                &mut rng,
+            ) {
+                let first_non_action = event_session.results.iter().find(|r| r.result_type != 0);
+                let should_lock_ui = !matches!(first_non_action.map(|r| r.result_type), Some(2 | 3));
+                ctx.conn.session.idtalking = i32::from(door_id);
+                ctx.conn.session.talk_type = "DOOR".to_string();
+                ctx.conn.session.talk_count = 0;
+                ctx.conn.session.current_event_session = Some(event_session);
+                if should_lock_ui {
+                    ctx.conn.session.talk_locked = true;
+                    ctx.out.send("F44402000602");
+                    ctx.out.send(crate::protocol::codecs::npc_talk::NpcTalkCodec::build_talk_lock_hex(
+                        id,
+                        crate::protocol::codecs::npc_talk::TalkLockMode::Lock,
+                    ));
+                }
+                crate::server::handlers::talk::execute_event_step_with_pool(
+                    &mut ctx.conn.session,
+                    ctx.data,
+                    ctx.env.pool,
+                    &mut ctx.out,
+                )
+                .await;
+                return;
+            }
+        }
+    }
+
+    // 2. WalkStep: scripted Eve encounter-zone events (non-random-battle).
+    if let Some(event_session) = crate::server::handlers::npc_event::resolve_npc_event(
+        &ctx.conn.session,
+        ctx.data,
+        crate::server::handlers::npc_event::NpcTrigger::WalkStep { x: px, y: py },
+        &mut rng,
+    ) {
+        let first_non_action = event_session.results.iter().find(|r| r.result_type != 0);
+        let should_lock_ui = !matches!(first_non_action.map(|r| r.result_type), Some(2 | 3));
+        ctx.conn.session.current_event_session = Some(event_session);
+        if should_lock_ui {
+            ctx.conn.session.talk_locked = true;
+            ctx.out.send("F44402000602");
+            ctx.out.send(crate::protocol::codecs::npc_talk::NpcTalkCodec::build_talk_lock_hex(
+                id,
+                crate::protocol::codecs::npc_talk::TalkLockMode::Lock,
+            ));
+        }
+        crate::server::handlers::talk::execute_event_step_with_pool(
+            &mut ctx.conn.session,
+            ctx.data,
+            ctx.env.pool,
+            &mut ctx.out,
+        )
+        .await;
+    }
+}
+
 /// Op 0x05 — Player / Actor state sync (C->S is non-movement: sub=6 form selection, sub=7 tab switch).
 pub fn handle_player_update(ctx: &mut OpcodeCtx) {
     if ctx.sub == 1 && ctx.payload.len() >= 5 {
@@ -202,6 +309,7 @@ fn try_trigger_random_encounter(ctx: &mut OpcodeCtx) {
         .scene_infos
         .get(&1)
         .map(|s| s.background_no as i32)
+        .filter(|&bg| bg > 0)
         .unwrap_or(112);
 
     ctx.service

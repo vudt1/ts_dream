@@ -91,7 +91,7 @@ pub async fn handle_talk(ctx: &mut OpcodeCtx<'_>) {
     let (sub, payload) = (ctx.sub, ctx.payload);
     match sub {
         1 => handle_talk_start(conn, payload, data, Some(ctx.service), pool, out).await,
-        4 => end_talk(conn, out),
+        4 => handle_talk_click_door(conn, payload, data, pool, out).await,
         6 => handle_talk_continue(conn, payload, data, pool, out).await,
         8 => handle_talk_warp(conn, payload, data, &ctx.env, out).await,
         9 => handle_talk_select_menu(conn, payload, data, pool, out).await,
@@ -161,14 +161,19 @@ fn resolve_npc(data: &GameData, conn: &Conn, map_object_id: i32) -> Option<(i32,
 pub enum PreFlightError {
     HomdoFull { item_id: u16 },
     QuestLedgerFull { quest_id: u16 },
+    PetBagFull { pet_id: u16 },
+    GoldCapExceeded,
+    InsufficientGold,
+    PointCapExceeded,
+    InsufficientPoint,
 }
 
 /// All-or-Nothing pre-flight probe over the contiguous non-blocking
 /// `DomainEffect` batch starting at `effects[0]`.
 ///
-/// Simulates `homdo (0x17)` item mutations (both deductions and additions) and
-/// `Quest Ledger (0x18)` 200-slot allocations on cloned scratch state before any
-/// real mutation occurs.
+/// Simulates `homdo (0x17)` item mutations, `Quest Ledger (0x18)` 200-slot
+/// allocations, `RewardPet` 4-slot active pet bag capacity, and `GOLD_CAP` /
+/// `POINT_CAP` bounds on scratch state before any real mutation occurs.
 fn preflight_probe_batch(
     session: &Session,
     data: &GameData,
@@ -178,6 +183,10 @@ fn preflight_probe_batch(
 
     let mut trial_homdo = session.homdo.clone();
     let mut trial_quests = session.quest_tasks.clone();
+    let mut trial_pets = session.pets.clone();
+    let mut trial_gold = session.gold;
+    let mut trial_point = session.point;
+    let mut trial_shop_point = session.shop_point;
 
     for effect in effects {
         if effect.is_blocking_or_terminal() {
@@ -235,6 +244,94 @@ fn preflight_probe_batch(
                     }
                 }
             }
+            DomainEffect::RewardPet(res) => {
+                let pet_id = res.parameter;
+                match res.parameter_style {
+                    1 if pet_id > 0 => {
+                        if !trial_pets.iter().any(|p| p.id == pet_id) {
+                            let Some(stt) = crate::server::pet_box::next_active_slot(&trial_pets)
+                            else {
+                                return Err(PreFlightError::PetBagFull { pet_id });
+                            };
+                            trial_pets.push(crate::server::session::PetState {
+                                stt,
+                                id: pet_id,
+                                ..Default::default()
+                            });
+                        }
+                    }
+                    2 if pet_id > 0 => {
+                        trial_pets.retain(|p| p.id != pet_id);
+                    }
+                    _ => {}
+                }
+            }
+            DomainEffect::MutateMoney { p_style, amount } => match *p_style {
+                1 => {
+                    if *amount > 0 {
+                        if *amount < 1000 {
+                            let rewarded = u32::from(*amount as u16).saturating_mul(20);
+                            if u32::from(trial_point).saturating_add(rewarded) > u32::from(u16::MAX) {
+                                return Err(PreFlightError::PointCapExceeded);
+                            }
+                            trial_point = trial_point.saturating_add(rewarded as u16);
+                        } else {
+                            let next = u64::from(trial_gold).saturating_add(*amount as u64);
+                            if next > u64::from(crate::protocol::GOLD_CAP) {
+                                return Err(PreFlightError::GoldCapExceeded);
+                            }
+                            trial_gold = next as u32;
+                        }
+                    } else if *amount < 0 {
+                        let abs = amount.unsigned_abs();
+                        if trial_gold < abs {
+                            return Err(PreFlightError::InsufficientGold);
+                        }
+                        trial_gold -= abs;
+                    }
+                }
+                2 => {
+                    if *amount > 0 {
+                        let abs = *amount as u32;
+                        if trial_gold < abs {
+                            return Err(PreFlightError::InsufficientGold);
+                        }
+                        trial_gold -= abs;
+                    }
+                }
+                3 => {
+                    if *amount > 0 {
+                        let next = u64::from(trial_shop_point).saturating_add(*amount as u64);
+                        if next > u64::from(crate::protocol::POINT_CAP) {
+                            return Err(PreFlightError::PointCapExceeded);
+                        }
+                        trial_shop_point = next as u32;
+                    }
+                }
+                4 => {
+                    if *amount > 0 {
+                        let abs = *amount as u32;
+                        if trial_shop_point < abs {
+                            return Err(PreFlightError::InsufficientPoint);
+                        }
+                        trial_shop_point -= abs;
+                    }
+                }
+                _ => {}
+            },
+            DomainEffect::PlayerEffect {
+                parameter: 1,
+                p_style: 3,
+                result_value,
+            } => {
+                if *result_value > 0 {
+                    let gained = (*result_value & 0xFFFF) as u32;
+                    if u32::from(trial_point).saturating_add(gained) > u32::from(u16::MAX) {
+                        return Err(PreFlightError::PointCapExceeded);
+                    }
+                    trial_point = trial_point.saturating_add(gained as u16);
+                }
+            }
             _ => {}
         }
     }
@@ -251,6 +348,36 @@ fn emit_preflight_rejection(session: &mut Session, out: &mut HandleOutcome, err:
             tracing::debug!(item_id, "pre-flight rejected: homdo (25 slots) full");
             out.send(crate::server::spawn::sys_msg_frame(
                 "Túi đồ đã đầy, không thể nhận thêm vật phẩm.",
+            ));
+        }
+        PreFlightError::PetBagFull { pet_id } => {
+            tracing::debug!(pet_id, "pre-flight rejected: active pet roster (4 slots) full");
+            out.send(crate::server::spawn::sys_msg_frame(
+                "Túi võ tướng đã đầy (tối đa 4), không thể nhận thêm.",
+            ));
+        }
+        PreFlightError::GoldCapExceeded => {
+            tracing::debug!("pre-flight rejected: GOLD_CAP exceeded");
+            out.send(crate::server::spawn::sys_msg_frame(
+                "Số tiền vượt quá giới hạn cho phép.",
+            ));
+        }
+        PreFlightError::InsufficientGold => {
+            tracing::debug!("pre-flight rejected: insufficient gold");
+            out.send(crate::server::spawn::sys_msg_frame(
+                "Không đủ tiền để thực hiện thao tác.",
+            ));
+        }
+        PreFlightError::PointCapExceeded => {
+            tracing::debug!("pre-flight rejected: POINT_CAP exceeded");
+            out.send(crate::server::spawn::sys_msg_frame(
+                "Số điểm vượt quá giới hạn cho phép.",
+            ));
+        }
+        PreFlightError::InsufficientPoint => {
+            tracing::debug!("pre-flight rejected: insufficient point");
+            out.send(crate::server::spawn::sys_msg_frame(
+                "Không đủ điểm để thực hiện thao tác.",
             ));
         }
     }
@@ -293,6 +420,124 @@ fn apply_skill_reward_to_session(
         skill_name
     )));
     crate::server::session::registry_update_if_online(session);
+}
+
+fn execute_reward_pet(
+    session: &mut Session,
+    data: &GameData,
+    out: &mut HandleOutcome,
+    res: &EveResult,
+) {
+    let pet_id = res.parameter;
+    if pet_id == 0 {
+        return;
+    }
+    match res.parameter_style {
+        1 => {
+            if session.pets.iter().any(|p| p.id == pet_id) {
+                tracing::debug!(pet_id, "RewardPet add skipped: player already owns pet");
+                return;
+            }
+            let Some(stt) = crate::server::pet_box::next_active_slot(&session.pets) else {
+                tracing::warn!(pet_id, "RewardPet add skipped: active pet roster full");
+                return;
+            };
+            let pet = if let Some(npc) = data.npcs.get(&i64::from(pet_id)) {
+                let lv = npc.lv.clamp(1, 200) as u8;
+                let hp_max = if npc.hp > 0 {
+                    npc.hp.min(i64::from(u16::MAX)) as u16
+                } else {
+                    crate::battle::engine::get_hp_max(npc.reborn, 0, i64::from(lv), npc.hpx)
+                        .clamp(1, i64::from(u16::MAX)) as u16
+                };
+                let sp_max = if npc.sp > 0 {
+                    npc.sp.min(i64::from(u16::MAX)) as u16
+                } else {
+                    crate::battle::engine::get_sp_max(npc.reborn, 0, i64::from(lv), npc.spx)
+                        .clamp(0, i64::from(u16::MAX)) as u16
+                };
+                let skills: [(u16, u8); 4] = [
+                    (npc.skill[0].max(0) as u16, if npc.skill[0] > 0 { 1 } else { 0 }),
+                    (npc.skill[1].max(0) as u16, if npc.skill[1] > 0 { 1 } else { 0 }),
+                    (npc.skill[2].max(0) as u16, if npc.skill[2] > 0 { 1 } else { 0 }),
+                    (npc.skill[3].max(0) as u16, if npc.skill[3] > 0 { 1 } else { 0 }),
+                ];
+                crate::server::session::PetState {
+                    stt,
+                    id: pet_id,
+                    name: npc.name.clone(),
+                    level: lv,
+                    thuoctinh: npc.thuoctinh.clamp(0, 255) as u8,
+                    hp: hp_max,
+                    hp_max,
+                    sp: sp_max,
+                    sp_max,
+                    hpx: npc.hpx.clamp(0, i64::from(u16::MAX)) as u16,
+                    spx: npc.spx.clamp(0, i64::from(u16::MAX)) as u16,
+                    int1: npc.int1.clamp(0, i64::from(u16::MAX)) as u16,
+                    atk: npc.atk.clamp(0, i64::from(u16::MAX)) as u16,
+                    def: npc.def.clamp(0, i64::from(u16::MAX)) as u16,
+                    agi: npc.agi.clamp(0, i64::from(u16::MAX)) as u16,
+                    fai: 60,
+                    skills,
+                    storage_type: crate::db::modern::model::PetStorageType::Carried,
+                    ..Default::default()
+                }
+            } else {
+                let hp_max = crate::battle::engine::get_hp_max(0, 0, 1, 0) as u16;
+                crate::server::session::PetState {
+                    stt,
+                    id: pet_id,
+                    level: 1,
+                    thuoctinh: 1,
+                    hp: hp_max,
+                    hp_max,
+                    fai: 60,
+                    storage_type: crate::db::modern::model::PetStorageType::Carried,
+                    ..Default::default()
+                }
+            };
+            let stat_frame = crate::server::spawn::pet_stat_frame(session, &pet);
+            session.pets.push(pet);
+            out.send(NpcTalkCodec::build_talk_step_hex(res));
+            out.send(stat_frame);
+            out.send(format!(
+                "F4440C000F01{}{:02X}{}01",
+                encoder::le32(session.id),
+                stt,
+                encoder::le32(u32::from(pet_id))
+            ));
+            crate::server::session::registry_update_if_online(session);
+        }
+        2 => {
+            let Some(pos) = session.pets.iter().position(|p| p.id == pet_id) else {
+                tracing::debug!(pet_id, "RewardPet remove skipped: player does not own pet");
+                return;
+            };
+            let stt = session.pets[pos].stt;
+            session.pets.remove(pos);
+            if session.active_pet_stt == stt {
+                session.active_pet_stt = 0;
+            }
+            let lo = u16::from(stt) * 10 + 1;
+            let hi = u16::from(stt) * 10 + 6;
+            session.trangbi.retain(|i| !(lo..=hi).contains(&u16::from(i.slot)));
+            out.send(NpcTalkCodec::build_talk_step_hex(res));
+            out.send(format!(
+                "F44407000F02{}{:02X}",
+                encoder::le32(session.id),
+                stt
+            ));
+            crate::server::session::registry_update_if_online(session);
+        }
+        other => {
+            tracing::warn!(
+                pet_id,
+                p_style = other,
+                "unmapped RewardPet (rc=8) p_style; skipped"
+            );
+        }
+    }
 }
 
 fn process_single_domain_effect(
@@ -397,6 +642,7 @@ fn process_single_domain_effect(
             let diahinh = scene
                 .and_then(|s| s.scene_infos.get(&1))
                 .map(|info| i32::from(info.background_no))
+                .filter(|&bg| bg > 0)
                 .unwrap_or(112);
             if let Some(ev) = session.current_event_session.as_mut() {
                 ev.phase = EventPhase::AwaitingBattle;
@@ -404,15 +650,48 @@ fn process_single_domain_effect(
             out.eve_battle = Some((*fight_id, diahinh));
             StepOutcome::Halt
         }
-        DomainEffect::MoveEntity(_)
-        | DomainEffect::PlayMovie(_)
-        | DomainEffect::NpcAction(_)
-        | DomainEffect::NpcTeam(_)
-        | DomainEffect::RewardPet(_) => {
+        DomainEffect::NpcTeam(res) => {
+            if (1..=5).contains(&res.parameter_style) {
+                out.send(NpcTalkCodec::build_talk_step_hex(res));
+            } else {
+                tracing::warn!(
+                    p_style = res.parameter_style,
+                    param = res.parameter,
+                    val = res.result_value,
+                    "unsupported NpcTeam (rc=3) p_style; skipped"
+                );
+            }
+            StepOutcome::Continue
+        }
+        DomainEffect::RewardPet(res) => {
+            execute_reward_pet(session, data, out, res);
+            StepOutcome::Continue
+        }
+        DomainEffect::MoveEntity(res) => {
+            if res.result_class == 3 && res.result_value >= 10_000 {
+                out.send(NpcTalkCodec::build_talk_step_hex(res));
+            } else {
+                tracing::warn!(
+                    rc = res.result_class,
+                    param = res.parameter,
+                    val = res.result_value,
+                    "invalid MoveEntity (rt=4) record; skipped"
+                );
+            }
+            StepOutcome::Continue
+        }
+        DomainEffect::PlayMovie(res) => {
+            out.send(NpcTalkCodec::build_talk_step_hex(res));
+            StepOutcome::Continue
+        }
+        DomainEffect::NpcAction(res) => {
+            // rt=9 is 100% server-side; never sent raw via S->C 0x14.
             tracing::debug!(
-                result_type = raw_result.result_type,
-                result_class = raw_result.result_class,
-                "Eve effect executor deferred to Ticket 06; skipping"
+                rc = res.result_class,
+                param = res.parameter,
+                p_style = res.parameter_style,
+                val = res.result_value,
+                "executed server-side NpcAction (rt=9)"
             );
             StepOutcome::Continue
         }
@@ -485,6 +764,16 @@ pub async fn execute_event_step_with_pool(
     pool: Option<&DbPool>,
     out: &mut HandleOutcome,
 ) {
+    execute_event_step_with_pool_opts(session, data, pool, out, false).await;
+}
+
+async fn execute_event_step_with_pool_opts(
+    session: &mut Session,
+    data: &GameData,
+    pool: Option<&DbPool>,
+    out: &mut HandleOutcome,
+    defer_warp: bool,
+) {
     let mut batch_probed = false;
     loop {
         let remaining: Option<Vec<EveResult>> = session
@@ -509,6 +798,33 @@ pub async fn execute_event_step_with_pool(
                 return;
             }
             batch_probed = true;
+        }
+
+        if let crate::eve::planner::DomainEffect::Warp { warp_id } = effects[0] {
+            if session.talk_locked {
+                out.send(NpcTalkCodec::build_talk_lock_hex(
+                    session.id,
+                    TalkLockMode::Unlock,
+                ));
+                session.talk_locked = false;
+            }
+            if defer_warp {
+                out.eve_warp = Some(warp_id);
+                reset_talk_context(session);
+                session.current_event_session = None;
+                return;
+            }
+            if crate::server::handlers::quest::perform_party_warp_and_persist(
+                session, data, pool, warp_id, out,
+            )
+            .await
+            {
+                reset_talk_context(session);
+                session.current_event_session = None;
+            } else {
+                end_talk_session(session, out);
+            }
+            return;
         }
 
         match process_single_domain_effect(session, data, out, &effects[0], &rem[0]) {
@@ -668,29 +984,48 @@ async fn finish_event_session_with_pool_iter(
 /// A session that is not parked returns empty output untouched. Kept here
 /// rather than in `battle::service` because it drives this module's dialog
 /// state machine (and so the battle layer only forwards the outcome).
-pub async fn resume_eve_after_battle(
+pub async fn resume_eve_after_battle_full(
     session: &mut Session,
     outcome: Outcome,
     data: &GameData,
     pool: Option<&DbPool>,
-) -> (Vec<String>, Option<(u16, i32)>) {
+) -> HandleOutcome {
+    resume_eve_after_battle_opts(session, outcome, data, pool, false).await
+}
+
+pub async fn resume_eve_after_battle_deferred_warp(
+    session: &mut Session,
+    outcome: Outcome,
+    data: &GameData,
+    pool: Option<&DbPool>,
+) -> HandleOutcome {
+    resume_eve_after_battle_opts(session, outcome, data, pool, true).await
+}
+
+async fn resume_eve_after_battle_opts(
+    session: &mut Session,
+    outcome: Outcome,
+    data: &GameData,
+    pool: Option<&DbPool>,
+    defer_warp: bool,
+) -> HandleOutcome {
     let parked = matches!(
         session.current_event_session.as_ref(),
         Some(ev) if ev.phase == EventPhase::AwaitingBattle
     );
     if !parked {
-        return (Vec::new(), None);
+        return HandleOutcome::default();
     }
     let battle_result: i32 = match outcome {
         Outcome::PlayerWin => 1,
         Outcome::PlayerLose => 2,
         Outcome::PlayerFled => 3,
         // Defensive: a battle still marked Running never reaches `battle_ended`.
-        Outcome::Running => return (Vec::new(), None),
+        Outcome::Running => return HandleOutcome::default(),
     };
     {
         let Some(ev) = session.current_event_session.as_mut() else {
-            return (Vec::new(), None);
+            return HandleOutcome::default();
         };
         ev.battle_result = battle_result;
         ev.phase = EventPhase::Executing;
@@ -698,33 +1033,43 @@ pub async fn resume_eve_after_battle(
         ev.current_index = ev.current_index.saturating_add(1);
     }
     let mut out = HandleOutcome::default();
-    execute_event_step_with_pool(session, data, pool, &mut out).await;
+    execute_event_step_with_pool_opts(session, data, pool, &mut out, defer_warp).await;
+    out
+}
+
+pub async fn resume_eve_after_battle(
+    session: &mut Session,
+    outcome: Outcome,
+    data: &GameData,
+    pool: Option<&DbPool>,
+) -> (Vec<String>, Option<(u16, i32)>) {
+    let out = resume_eve_after_battle_full(session, outcome, data, pool).await;
     let next_battle = out.eve_battle;
     let frames = out.outgoing.into_iter().map(|f| f.frame).collect();
     (frames, next_battle)
 }
 
-pub fn resume_eve_after_battle_sync(
+pub fn resume_eve_after_battle_sync_full(
     session: &mut Session,
     outcome: Outcome,
     data: &GameData,
-) -> (Vec<String>, Option<(u16, i32)>) {
+) -> HandleOutcome {
     let parked = matches!(
         session.current_event_session.as_ref(),
         Some(ev) if ev.phase == EventPhase::AwaitingBattle
     );
     if !parked {
-        return (Vec::new(), None);
+        return HandleOutcome::default();
     }
     let battle_result: i32 = match outcome {
         Outcome::PlayerWin => 1,
         Outcome::PlayerLose => 2,
         Outcome::PlayerFled => 3,
-        Outcome::Running => return (Vec::new(), None),
+        Outcome::Running => return HandleOutcome::default(),
     };
     {
         let Some(ev) = session.current_event_session.as_mut() else {
-            return (Vec::new(), None);
+            return HandleOutcome::default();
         };
         ev.battle_result = battle_result;
         ev.phase = EventPhase::Executing;
@@ -732,6 +1077,15 @@ pub fn resume_eve_after_battle_sync(
     }
     let mut out = HandleOutcome::default();
     execute_event_step(session, data, &mut out);
+    out
+}
+
+pub fn resume_eve_after_battle_sync(
+    session: &mut Session,
+    outcome: Outcome,
+    data: &GameData,
+) -> (Vec<String>, Option<(u16, i32)>) {
+    let out = resume_eve_after_battle_sync_full(session, outcome, data);
     let next_battle = out.eve_battle;
     let frames = out.outgoing.into_iter().map(|f| f.frame).collect();
     (frames, next_battle)
@@ -868,102 +1222,177 @@ fn execute_action_result_non_skill(
                 }
             }
         }
-        // Gold / stat-point reward (Bear `GoldEffectHandler`, CP6 #10):
+        // Gold / stat-point / shop-point reward (rc=5):
         // parameter_style=type, result_value=amount.
         5 => {
             let amount = result.result_value;
             match result.parameter_style {
-                // Type 1: small amounts convert to stat points at 20:1,
-                // anything >= 1000 is plain gold.
-                1 if amount > 0 => {
-                    if amount < 1000 {
-                        let rewarded = u16::try_from(amount * 20).unwrap_or(u16::MAX);
-                        // Bear caps its point pool at 1_000_000_000;
-                        // `Session.point` is a `u16`, so it saturates there.
-                        session.point = session.point.saturating_add(rewarded);
-                        out.send(build_stat_update(0x26, i32::from(session.point)));
-                    } else {
-                        session.gold = session.gold.saturating_add(amount as u32);
+                // Type 1: small positive amounts (< 1000) convert to stat points at 20:1;
+                // >= 1000 is plain gold; negative deducts gold.
+                1 => {
+                    if amount > 0 {
+                        if amount < 1000 {
+                            let rewarded = u16::try_from(amount * 20).unwrap_or(u16::MAX);
+                            session.point = session.point.saturating_add(rewarded);
+                            out.send(build_stat_update(0x26, i32::from(session.point)));
+                        } else {
+                            let add = amount as u32;
+                            session.gold = session.gold.saturating_add(add).min(crate::protocol::GOLD_CAP);
+                            out.send(gold_frame(session.gold));
+                            out.send(format!("F44406001A01{}", encoder::le32(add)));
+                        }
+                        crate::server::session::registry_update_if_online(session);
+                    } else if amount < 0 {
+                        let sub = amount.unsigned_abs();
+                        session.gold = session.gold.saturating_sub(sub);
                         out.send(gold_frame(session.gold));
+                        out.send(format!("F44406001A02{}", encoder::le32(sub)));
+                        crate::server::session::registry_update_if_online(session);
                     }
                 }
-                // Type 2 (Bear `GoldEffectHandler`): deduct gold from player
-                // (e.g. gate entry fees or penalties). Saturating to prevent underflow.
+                // Type 2: deduct gold from player.
                 2 => {
                     if amount > 0 {
-                        session.gold = session.gold.saturating_sub(amount as u32);
+                        let sub = amount as u32;
+                        session.gold = session.gold.saturating_sub(sub);
+                        out.send(gold_frame(session.gold));
+                        out.send(format!("F44406001A02{}", encoder::le32(sub)));
+                        crate::server::session::registry_update_if_online(session);
                     }
-                    out.send(gold_frame(session.gold));
+                }
+                // Type 3: add shop points (`0x1A 05` + `0x1A 03` total).
+                3 => {
+                    if amount > 0 {
+                        let add = amount as u32;
+                        session.shop_point = session
+                            .shop_point
+                            .saturating_add(add)
+                            .min(crate::protocol::POINT_CAP);
+                        out.send(format!("F44406001A05{}", encoder::le32(add)));
+                        out.send(crate::server::handlers::shops::point_frame(session.shop_point));
+                        crate::server::session::registry_update_if_online(session);
+                    }
+                }
+                // Type 4: deduct shop points (`0x1A 03` total).
+                4 => {
+                    if amount > 0 {
+                        let sub = amount as u32;
+                        session.shop_point = session.shop_point.saturating_sub(sub);
+                        out.send(crate::server::handlers::shops::point_frame(session.shop_point));
+                        crate::server::session::registry_update_if_online(session);
+                    }
                 }
                 other => {
-                    tracing::debug!(
+                    tracing::warn!(
                         gold_type = other,
                         amount,
-                        "Eve gold result type has no proven executor; skipped"
+                        "unmapped rc=5 Gold/Point p_style; skipped"
                     );
                 }
             }
         }
-        // Player-attribute effects (Bear `StatBonusAndBallEffectHandler` +
-        // `GetSaveMap`, CP6 #10).
-        7 => {
-            // parameter_style 1 (Bear `GetSaveMap`): refresh the respawn point
-            // from the current map.
-            if result.parameter_style == 1 {
-                crate::server::handlers::quest::save_map(session);
+        // Player-attribute effects (rc=7).
+        7 => match result.parameter {
+            // parameter 0 | 5: savemap when p_style == 1.
+            0 | 5 => {
+                if result.parameter_style == 1 {
+                    crate::server::handlers::quest::save_map(session);
+                    crate::server::session::registry_update_if_online(session);
+                } else {
+                    tracing::warn!(
+                        param = result.parameter,
+                        style = result.parameter_style,
+                        "unmapped rc=7 savemap p_style; skipped"
+                    );
+                }
             }
-            // parameter 3: open NPC shop form (Bear HotelShopAndSaveMapEffectHandler.cs:13-15).
-            // Eve effect 7 with param 3 directly triggers the NPC shop dialogue interface.
-            if result.parameter == 3 {
-                out.send(crate::server::handlers::shops::open_npc_shop_frame());
-            }
-            match result.parameter {
-                // parameter 1 (Bear `GetSttBonus`): type = parameter_style,
-                // points = result_value's low 16 bits.
-                1 => match result.parameter_style {
-                    2 => {
-                        let gained = (result.result_value & 0xFFFF) as u16;
-                        session.skill_point = session.skill_point.saturating_add(gained);
-                        out.send(build_stat_update(0x25, i32::from(session.skill_point)));
-                        out.send(NpcTalkCodec::build_skill_point_toast_hex(gained.min(255) as u8));
-                    }
-                    3 => {
-                        let gained = (result.result_value & 0xFFFF) as u16;
-                        session.point = session.point.saturating_add(gained);
+            // parameter 1 (`GetSttBonus` / `savemap` / `texp`):
+            1 => match result.parameter_style {
+                1 => {
+                    crate::server::handlers::quest::save_map(session);
+                    crate::server::session::registry_update_if_online(session);
+                }
+                2 => {
+                    let gained = (result.result_value & 0xFFFF) as u16;
+                    session.skill_point = session.skill_point.saturating_add(gained);
+                    out.send(build_stat_update(0x25, i32::from(session.skill_point)));
+                    out.send(NpcTalkCodec::build_skill_point_toast_hex(gained.min(255) as u8));
+                    crate::server::session::registry_update_if_online(session);
+                }
+                3 => {
+                    let gained = (result.result_value & 0xFFFF) as u16;
+                    session.point = session.point.saturating_add(gained);
+                    out.send(build_stat_update(0x26, i32::from(session.point)));
+                    out.send(NpcTalkCodec::build_stat_point_toast_hex(gained.min(255) as u8));
+                    crate::server::session::registry_update_if_online(session);
+                }
+                // Type 4: EXP reward (`texp`) with level-up check, stat recompute,
+                // full HP/SP heal, `0x08` stat syncs, and `0x14 0x2A 0x01 <exp_delta>`.
+                4 => {
+                    let exp_delta = result.result_value.max(0) as u32;
+                    session.texp = session.texp.saturating_add(exp_delta);
+                    out.send(build_stat_update(0x24, session.texp as i32));
+                    out.send(NpcTalkCodec::build_exp_toast_hex(exp_delta));
+
+                    let lv_ups = crate::data::texps::texp_get_lv_up(
+                        &data.texps,
+                        i64::from(session.level),
+                        usize::from(session.reborn),
+                        i64::from(session.texp),
+                    );
+                    if lv_ups > 0 {
+                        let new_lv = (i64::from(session.level) + lv_ups)
+                            .clamp(1, crate::protocol::MAX_LEVEL)
+                            as u8;
+                        session.level = new_lv;
+                        session.recompute_stats();
+                        session.hp = session.hp_max;
+                        session.sp = session.sp_max;
+                        session.point = session.point.saturating_add((2 * lv_ups) as u16);
+                        session.skill_point = session.skill_point.saturating_add(lv_ups as u16);
+
+                        out.send(build_stat_update(0x23, i32::from(session.level)));
+                        out.send(crate::battle::packets::level_up(session.id));
+                        out.send(build_stat_update(0xCD, i32::from(session.hp_max)));
+                        out.send(build_stat_update(0x19, i32::from(session.hp)));
+                        out.send(build_stat_update(0xCE, i32::from(session.sp_max)));
+                        out.send(build_stat_update(0x1A, i32::from(session.sp)));
                         out.send(build_stat_update(0x26, i32::from(session.point)));
-                        out.send(NpcTalkCodec::build_stat_point_toast_hex(gained.min(255) as u8));
+                        out.send(build_stat_update(0x25, i32::from(session.skill_point)));
                     }
-                    // Type 4: EXP reward into session.texp and broadcast stat update 0x24.
-                    4 => {
-                        let exp = result.result_value.max(0) as u32;
-                        session.texp = session.texp.saturating_add(exp);
-                        out.send(build_stat_update(0x24, session.texp as i32));
-                    }
-                    other => tracing::debug!(
-                        stt_bonus_type = other,
-                        value = result.result_value,
-                        "Eve stat-bonus result type has no executor; skipped"
-                    ),
-                },
-                // parameter 2 (Bear `GetArmy`): army effects have no session
-                // store yet — deferred (CP6 #10).
-                2 => tracing::debug!(
-                    army_type = result.parameter_style,
+                    crate::server::session::registry_update_if_online(session);
+                }
+                other => tracing::warn!(
+                    stt_bonus_type = other,
                     value = result.result_value,
-                    "Eve army result skipped: no army store wired"
+                    "unmapped rc=7 param=1 p_style; skipped"
                 ),
-                other => tracing::debug!(
-                    param = other,
-                    style = result.parameter_style,
-                    "Eve player-attribute class result has no executor; skipped"
-                ),
+            },
+            // parameter 2 (`GetArmy`): no army store wired yet.
+            2 => tracing::debug!(
+                army_type = result.parameter_style,
+                value = result.result_value,
+                "Eve army result skipped: no army store wired"
+            ),
+            // parameter 3: open NPC shop form + optional savemap (no fallthrough).
+            3 => {
+                out.send(crate::server::handlers::shops::open_npc_shop_frame());
+                if result.parameter_style == 1 {
+                    crate::server::handlers::quest::save_map(session);
+                    crate::server::session::registry_update_if_online(session);
+                }
             }
-        }
+            other => tracing::warn!(
+                param = other,
+                style = result.parameter_style,
+                "unmapped rc=7 Player parameter; skipped"
+            ),
+        },
         other => {
-            tracing::debug!(
+            tracing::warn!(
                 class = other,
                 param = result.parameter,
-                "Eve action result class has no executor; skipped"
+                "unmapped Eve action result class; skipped"
             );
         }
     }
@@ -1215,6 +1644,48 @@ async fn handle_talk_continue(
     end_talk(conn, out);
 }
 
+async fn handle_talk_click_door(
+    conn: &mut Conn,
+    payload: &[u8],
+    data: &GameData,
+    pool: Option<&DbPool>,
+    out: &mut HandleOutcome,
+) {
+    // Bare `F4 44 02 00 14 04` (empty payload) is the client's end-talk frame.
+    if payload.len() < 2 {
+        end_talk(conn, out);
+        return;
+    }
+    let door_id = encoder::u16_le(payload[0], payload[1]) as i32;
+    if conn.session.id_leader > 0 && conn.session.id_leader != conn.session.id {
+        end_talk(conn, out);
+        return;
+    }
+    let mut rng = DotNetRandom::new(eve_rng_seed());
+    if let Some(event_session) = npc_event::resolve_npc_event(
+        &conn.session,
+        data,
+        NpcTrigger::ClickDoor(door_id),
+        &mut rng,
+    ) {
+        let first_non_action = event_session.results.iter().find(|r| r.result_type != 0);
+        let should_lock_ui = !matches!(first_non_action.map(|r| r.result_type), Some(2 | 3));
+        let char_id = conn.session.id;
+        conn.session.idtalking = door_id;
+        conn.session.talk_type = "DOOR".to_string();
+        conn.session.talk_count = 0;
+        conn.session.current_event_session = Some(event_session);
+        if should_lock_ui {
+            conn.session.talk_locked = true;
+            out.send("F44402000602");
+            out.send(NpcTalkCodec::build_talk_lock_hex(char_id, TalkLockMode::Lock));
+        }
+        execute_event_step_with_pool(&mut conn.session, data, pool, out).await;
+        return;
+    }
+    end_talk(conn, out);
+}
+
 async fn handle_talk_warp(
     conn: &mut Conn,
     payload: &[u8],
@@ -1277,6 +1748,7 @@ async fn handle_talk_select_menu(
         // Record the choice on the active session: `snapshot_state` reads it
         // back for the conditionClass=10 branch re-evaluation, and the queue
         // index skips the already-delivered Surface result.
+        let (mx, my) = (conn.session.map_x, conn.session.map_y);
         let trigger_and_surface = conn
             .session
             .current_event_session
@@ -1289,6 +1761,7 @@ async fn handle_talk_select_menu(
                     1 => NpcTrigger::ClickNpc(ev.npc_click_id),
                     4 => NpcTrigger::ClickDoor(ev.npc_click_id),
                     8 => NpcTrigger::MeetDoor(ev.npc_click_id),
+                    16 => NpcTrigger::WalkStep { x: mx, y: my },
                     _ => return None,
                 };
                 Some((trigger, ev.last_surface_id))

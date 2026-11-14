@@ -93,12 +93,13 @@ pub fn eve_events_enabled() -> bool {
     EVE_EVENTS_ENABLED.load(Ordering::Relaxed)
 }
 
-/// Trigger kinds handled here: ClickNpc=1, ClickDoor=4, MeetDoor=8.
+/// Trigger kinds handled here: ClickNpc=1, ClickDoor=4, MeetDoor=8, WalkStep=16.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NpcTrigger {
     ClickNpc(i32),
     ClickDoor(i32),
     MeetDoor(i32),
+    WalkStep { x: u16, y: u16 },
 }
 
 impl NpcTrigger {
@@ -107,12 +108,14 @@ impl NpcTrigger {
             NpcTrigger::ClickNpc(_) => 1,
             NpcTrigger::ClickDoor(_) => 4,
             NpcTrigger::MeetDoor(_) => 8,
+            NpcTrigger::WalkStep { .. } => 16,
         }
     }
 
     fn click_id(self) -> i32 {
         match self {
             NpcTrigger::ClickNpc(id) | NpcTrigger::ClickDoor(id) | NpcTrigger::MeetDoor(id) => id,
+            NpcTrigger::WalkStep { .. } => 0,
         }
     }
 }
@@ -298,6 +301,44 @@ fn activate(
     rng: &mut DotNetRandom,
     chain_filter: Option<ChainFilter<'_>>,
 ) -> Option<EventSession> {
+    if let NpcTrigger::WalkStep { x, y } = trigger {
+        for enc in scene.encounters.iter().filter(|enc| enc.contains(x, y)) {
+            for &eve_no in &enc.events {
+                let Some(event_data) = scene.npc_events.get(&u16::from(eve_no)) else {
+                    continue;
+                };
+                if EveAutoChainEngine::should_skip_event(&enc.events, eve_no, event_data, state) {
+                    continue;
+                }
+                let Some(resolved) =
+                    resolve_event(event_data, state, &scene.group_datas, rng, chain_filter)
+                else {
+                    continue;
+                };
+                // Pure random-encounter battles (all results rt=3) are governed by
+                // the step-counter in `try_trigger_random_encounter`, not WalkStep.
+                if resolved.results.iter().all(|r| r.result_type == 3) {
+                    continue;
+                }
+                return Some(EventSession {
+                    map_id,
+                    eve_no: i32::from(event_data.eve_no),
+                    npc_click_id: i32::from(enc.id),
+                    trigger_kind: trigger.kind(),
+                    chain_depth: 0,
+                    results: resolved.results,
+                    current_index: 0,
+                    phase: crate::eve::auto_chain::EventPhase::Executing,
+                    last_surface_id: -1,
+                    last_choice_code: -1,
+                    battle_result: 0,
+                    matched_condition_no: resolved.matched_condition_no,
+                });
+            }
+        }
+        return None;
+    }
+
     let click = trigger.click_id() as u16;
     let events: &[u8] = match trigger.kind() {
         1 => &scene.npcs.get(&click)?.events,

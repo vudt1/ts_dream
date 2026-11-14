@@ -365,13 +365,16 @@ fn action_class5_gold_type1_points_then_gold() {
     assert_eq!(session.point, 7);
     assert_eq!(out.outgoing[0].frame, gold_frame(7));
 
-    // Type 2 saturating at 0 when amount exceeds owned gold:
+    // Type 2 when amount exceeds owned gold: rejected All-or-Nothing by Pre-Flight Probe (Ticket 06):
     let mut session = session_with_event(SOURCE_MAP, vec![gold_action(2, 999)]);
     session.gold = 5;
     let mut out = HandleOutcome::default();
     execute_event_step(&mut session, &data, &mut out);
-    assert_eq!(session.gold, 0);
-    assert_eq!(out.outgoing[0].frame, gold_frame(0));
+    assert_eq!(session.gold, 5);
+    assert!(
+        !out.outgoing.iter().any(|f| f.frame.starts_with("F44406001A")),
+        "All-or-Nothing pre-flight rejection must not emit 0x1A gold frames"
+    );
 }
 
 #[test]
