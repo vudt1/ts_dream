@@ -139,3 +139,70 @@ fn test_respec_handler_uses_item_count_changed_frame() {
         );
     }
 }
+
+#[test]
+fn test_canonical_test_binaries_only() {
+    const CANONICAL_BINARIES: &[&str] = &[
+        "architecture_guardrails_test.rs",
+        "battle_test.rs",
+        "compound_test.rs",
+        "data_loaders_test.rs",
+        "db_test.rs",
+        "economy_inventory_test.rs",
+        "eve_quest_test.rs",
+        "events_arena_test.rs",
+        "server_network_test.rs",
+        "server_stop_test.rs",
+        "skill_job_system_test.rs",
+    ];
+
+    let tests_dir = Path::new("tests");
+    let mut stray = Vec::new();
+    for entry in fs::read_dir(tests_dir).expect("read tests/").flatten() {
+        let path = entry.path();
+        if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("rs") {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if !CANONICAL_BINARIES.contains(&name.as_str()) {
+                stray.push(name);
+            }
+        }
+    }
+
+    assert!(
+        stray.is_empty(),
+        "Stray top-level test binary/files in tests/ (add submodules under tests/<domain>/ instead): {:?}",
+        stray
+    );
+}
+
+#[test]
+fn test_build_rs_does_not_watch_db_dir() {
+    let build_rs = fs::read_to_string("build.rs").expect("read build.rs");
+    assert!(
+        !build_rs.contains("cargo:rerun-if-changed=DB\""),
+        "build.rs must not watch the DB/ directory directly (tests mutate DB/ts_dream_test.db and would trigger full rebuilds)"
+    );
+}
+
+#[test]
+fn test_no_pub_test_helpers_in_src() {
+    let mut violations = Vec::new();
+    for file in collect_rs_files(Path::new("src")) {
+        let content = fs::read_to_string(&file).unwrap_or_default();
+        for (idx, line) in content.lines().enumerate() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("//") {
+                continue;
+            }
+            if trimmed.contains("pub fn test_") {
+                violations.push(format!("{}:{} -> {}", file.display(), idx + 1, trimmed));
+            }
+        }
+    }
+
+    assert!(
+        violations.is_empty(),
+        "Test-only helpers (`pub fn test_*`) belong in tests/common/, not src/:\n{}",
+        violations.join("\n")
+    );
+}

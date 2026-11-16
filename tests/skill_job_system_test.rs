@@ -11,16 +11,13 @@
 
 mod common;
 
-use std::path::PathBuf;
-use ts_dream::data::loader::GameData;
 use ts_dream::protocol::codecs::StatsPacketBuilder;
 use ts_dream::server::session::Session;
 use ts_dream::server::spawn;
 
 #[test]
 fn test_skills_data_loader_canonical_376() {
-    let data_dir = PathBuf::from("Data");
-    let data = GameData::load(&data_dir).expect("GameData::load must succeed");
+    let data = std::sync::Arc::clone(common::shared_game_data());
     assert_eq!(
         data.skills.len(),
         376,
@@ -179,7 +176,7 @@ fn create_test_event_session(results: Vec<ts_dream::data::loaders::EveResult>) -
 
 #[test]
 fn test_eve_script_skill_reward() {
-    let data = GameData::load(std::path::Path::new("Data")).expect("Failed to load GameData");
+    let data = std::sync::Arc::clone(common::shared_game_data());
 
     let mut session = Session::new();
     session.id = 5001;
@@ -257,7 +254,7 @@ fn test_eve_script_skill_reward() {
 
 #[tokio::test]
 async fn test_job_skill_learning_gates_subcode_01() {
-    let data = GameData::load(std::path::Path::new("Data")).expect("Failed to load GameData");
+    let data = std::sync::Arc::clone(common::shared_game_data());
     let mut conn = ts_dream::server::session::Conn::new();
     conn.session.id = 6001;
     conn.session.thuoctinh = 3; // Hỏa
@@ -295,7 +292,7 @@ async fn test_job_skill_learning_gates_subcode_01() {
 
 #[tokio::test]
 async fn test_bulk_skill_commit_subcode_04_atomic() {
-    let data = GameData::load(std::path::Path::new("Data")).expect("Failed to load GameData");
+    let data = std::sync::Arc::clone(common::shared_game_data());
     let mut conn = ts_dream::server::session::Conn::new();
     conn.session.id = 6002;
     conn.session.thuoctinh = 3; // Hỏa
@@ -334,7 +331,7 @@ async fn test_bulk_skill_commit_subcode_04_atomic() {
 
 #[tokio::test]
 async fn test_reborn_2_dragon_balls_and_hero_ball_slots() {
-    let data = GameData::load(std::path::Path::new("Data")).expect("Failed to load GameData");
+    let data = std::sync::Arc::clone(common::shared_game_data());
     let mut conn = ts_dream::server::session::Conn::new();
     conn.session.id = 7001;
     conn.session.reborn = 2;
@@ -572,7 +569,7 @@ async fn test_combat_job_skills_passives_and_mechanics() {
     };
     battle2.list_war.insert(ts_dream::battle::engine::war_key(0, 2), buffed_enemy);
 
-    let data_game = ts_dream::data::loader::GameData::load(std::path::Path::new("Data")).expect("load data");
+    let data_game = std::sync::Arc::clone(common::shared_game_data());
     let (npcs, items, pet_slots, players) = (
         std::collections::HashMap::new(),
         std::collections::HashMap::new(),
@@ -616,8 +613,7 @@ async fn test_combat_job_skills_passives_and_mechanics() {
 
 #[tokio::test]
 async fn test_respec_memory_manual_and_careful_pouch_opcode_0x2a() {
-    let data_dir = PathBuf::from("Data");
-    let data = std::sync::Arc::new(GameData::load(&data_dir).expect("GameData::load must succeed"));
+    let data = std::sync::Arc::clone(common::shared_game_data());
 
     let mut conn = ts_dream::server::session::Conn::new();
     conn.session.id = 6001;
@@ -763,8 +759,7 @@ async fn test_respec_memory_manual_and_careful_pouch_opcode_0x2a() {
 
 #[tokio::test]
 async fn test_respec_attr_floor_enforcement() {
-    let data_dir = PathBuf::from("Data");
-    let data = std::sync::Arc::new(GameData::load(&data_dir).expect("GameData::load must succeed"));
+    let data = std::sync::Arc::clone(common::shared_game_data());
 
     let mut conn = ts_dream::server::session::Conn::new();
     conn.session.id = 6002;
@@ -858,8 +853,7 @@ fn test_instigation_status_bonus_mechanics() {
 
 #[tokio::test]
 async fn test_bulk_skill_commit_atomicity_on_insufficient_sp() {
-    let data_dir = PathBuf::from("Data");
-    let data = std::sync::Arc::new(GameData::load(&data_dir).expect("GameData::load must succeed"));
+    let data = std::sync::Arc::clone(common::shared_game_data());
 
     let mut conn = ts_dream::server::session::Conn::new();
     conn.session.id = 8001;
@@ -903,8 +897,7 @@ async fn test_bulk_skill_commit_atomicity_on_insufficient_sp() {
 
 #[tokio::test]
 async fn test_reborn_2_rollback_atomicity_on_invalid_hero_skill() {
-    let data_dir = PathBuf::from("Data");
-    let data = std::sync::Arc::new(GameData::load(&data_dir).expect("GameData::load must succeed"));
+    let data = std::sync::Arc::clone(common::shared_game_data());
 
     let mut conn = ts_dream::server::session::Conn::new();
     conn.session.id = 8002;
@@ -956,8 +949,7 @@ async fn test_reborn_2_rollback_atomicity_on_invalid_hero_skill() {
 async fn test_respec_db_failure_restores_ram_snapshot_and_preserves_inventory() {
     let pool = common::test_db::setup_test_db().await;
     let repos = ts_dream::db::modern::sqlite::SqliteRepositories::new(pool.clone());
-    let data_dir = PathBuf::from("Data");
-    let data = std::sync::Arc::new(GameData::load(&data_dir).expect("GameData::load must succeed"));
+    let data = std::sync::Arc::clone(common::shared_game_data());
 
     // 1. Create character in SQLite test db
     let acc_id = ts_dream::db::accounts::create(&pool, "pass1", "pass2")
@@ -1096,7 +1088,7 @@ async fn test_respec_db_failure_restores_ram_snapshot_and_preserves_inventory() 
 
 #[tokio::test]
 async fn test_celestial_shield_ally_targeting_and_reduction_via_battle_runner() {
-    let data_game = GameData::load(std::path::Path::new("Data")).expect("load data");
+    let data_game = std::sync::Arc::clone(common::shared_game_data());
 
     let mut battle = ts_dream::battle::construction::Battle::new(1, 1);
     let mut caster = Session::new();
@@ -1205,8 +1197,7 @@ async fn test_celestial_shield_ally_targeting_and_reduction_via_battle_runner() 
 #[tokio::test]
 async fn test_post_battle_eve_skill_reward_persistence() {
     let pool = common::test_db::setup_test_db().await;
-    let data_dir = PathBuf::from("Data");
-    let data = GameData::load(&data_dir).expect("GameData::load must succeed");
+    let data = std::sync::Arc::clone(common::shared_game_data());
 
     let acc_id = ts_dream::db::accounts::create(&pool, "postbattle1", "pass")
         .await
@@ -1271,8 +1262,7 @@ async fn test_post_battle_eve_skill_reward_persistence() {
 #[tokio::test]
 async fn test_eve_skill_reward_db_failure_rolls_back_ram_and_suppresses_frame() {
     let pool = common::test_db::setup_test_db().await;
-    let data_dir = PathBuf::from("Data");
-    let data = GameData::load(&data_dir).expect("GameData::load must succeed");
+    let data = std::sync::Arc::clone(common::shared_game_data());
 
     let mut session = Session::new();
     session.id = 9991;
@@ -1321,7 +1311,7 @@ async fn test_eve_skill_reward_db_failure_rolls_back_ram_and_suppresses_frame() 
 
 #[tokio::test]
 async fn test_holy_spirit_dispel_integrity_and_damage_scaling() {
-    let data_game = GameData::load(std::path::Path::new("Data")).expect("load data");
+    let data_game = std::sync::Arc::clone(common::shared_game_data());
 
     // Case 1: Target without Type 19 buff -> Holy Spirit does NOT broadcast purge_status(PURGE_TYPE_AURA)
     let mut battle = ts_dream::battle::construction::Battle::new(1, 1);

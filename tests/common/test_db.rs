@@ -8,7 +8,8 @@
 //! time while non-DB tests stay parallel.
 
 use std::ops::Deref;
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex as StdMutex, OnceLock};
+use std::time::Duration;
 
 use tokio::sync::{Mutex, OwnedMutexGuard};
 use ts_dream::db::pool::{bootstrap, DbPool};
@@ -16,12 +17,18 @@ use ts_dream::db::pool::{bootstrap, DbPool};
 /// Environment variable overriding the test database URL.
 pub const TEST_DB_URL_ENV: &str = "TS_TEST_DB_URL";
 
+const DB_LOCK_TIMEOUT: Duration = Duration::from_secs(15);
 const SCHEMA: &str = include_str!("../../migrations/0001_init.sql");
 const MIGRATION_0002: &str = include_str!("../../migrations/0002_eve_quest_persistence.sql");
 
 fn db_lock() -> Arc<Mutex<()>> {
     static LOCK: OnceLock<Arc<Mutex<()>>> = OnceLock::new();
     LOCK.get_or_init(|| Arc::new(Mutex::new(()))).clone()
+}
+
+fn lock_holder() -> &'static StdMutex<Option<String>> {
+    static HOLDER: OnceLock<StdMutex<Option<String>>> = OnceLock::new();
+    HOLDER.get_or_init(|| StdMutex::new(None))
 }
 
 /// Resolve the test DB URL: `TS_TEST_DB_URL`, else `<repo>/DB/ts_dream_test.db`.
@@ -57,15 +64,59 @@ impl Deref for TestDb {
     }
 }
 
-/// Lock the shared test DB, drop every schema object, and re-run `0001_init.sql`.
-pub async fn setup_test_db() -> TestDb {
-    let guard = db_lock().lock_owned().await;
-    let url = test_db_url();
-    let pool = bootstrap(&url, None)
-        .await
-        .unwrap_or_else(|e| panic!("bootstrap test SQLite at {url}: {e}"));
-    reset_schema(&pool).await;
-    TestDb { pool, _guard: guard }
+impl Drop for TestDb {
+    fn drop(&mut self) {
+        if let Ok(mut holder) = lock_holder().lock() {
+            *holder = None;
+        }
+    }
+}
+
+/// Lock the shared test DB (with diagnostic timeout), drop every schema object,
+/// and re-run migrations.
+#[track_caller]
+pub fn setup_test_db() -> impl std::future::Future<Output = TestDb> {
+    let caller = std::panic::Location::caller();
+    let thread_name = std::thread::current()
+        .name()
+        .unwrap_or("unnamed")
+        .to_string();
+    let requester = format!(
+        "{}:{}:{} (thread `{}`)",
+        caller.file(),
+        caller.line(),
+        caller.column(),
+        thread_name
+    );
+
+    async move {
+        let guard = tokio::time::timeout(DB_LOCK_TIMEOUT, db_lock().lock_owned())
+            .await
+            .unwrap_or_else(|_| {
+                let current = lock_holder()
+                    .lock()
+                    .ok()
+                    .and_then(|g| g.clone())
+                    .unwrap_or_else(|| "<unknown>".to_string());
+                panic!(
+                    "Timed out after {}s waiting for test DB lock at {} (currently held by: {})",
+                    DB_LOCK_TIMEOUT.as_secs(),
+                    requester,
+                    current
+                );
+            });
+
+        if let Ok(mut holder) = lock_holder().lock() {
+            *holder = Some(requester);
+        }
+
+        let url = test_db_url();
+        let pool = bootstrap(&url, None)
+            .await
+            .unwrap_or_else(|e| panic!("bootstrap test SQLite at {url}: {e}"));
+        reset_schema(&pool).await;
+        TestDb { pool, _guard: guard }
+    }
 }
 
 async fn reset_schema(pool: &DbPool) {

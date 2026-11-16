@@ -61,8 +61,8 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 - **Ràng buộc (Invariants)**: `grp < 2` là Phe Địch (Phe 2); `grp >= 2` là Phe Ta (Phe 1). Các kỹ năng lan 3 mục tiêu (`sl_danh = 3`) khi nhắm ô tâm 2 phải lấy 2 ô kề Isometric là `{1, 2, 4}`.
 
 ### DiaHinh / Địa hình trận đấu
-- **Định nghĩa**: Mã định danh "địa hình" của một trận đấu, chỉ được echo vào packet mở bàn cờ và các biến thể packet thành viên (PK/NPC thường dùng `112`, NPC chủ động `4712`, trận thủ thành dùng `TeamDef[0]`, bàn mở cho thành viên PK dùng `7000`).
-- **Ràng buộc (Invariants)**: `DiaHinh` **không** ảnh hưởng targeting hay sát thương.
+- **Định nghĩa**: Mã định danh "địa hình" và nhạc nền của một trận đấu được truyền trong gói mở bàn cờ `0x0B 0xFA` (giá trị 16-bit LE): byte thấp chọn nền bàn cờ `"FField<N>"` (ví dụ `109`, `112`, `129` lấy từ `geolBaseAtt` của `ground_server.mmg` cho trận Eve/ngộ địch ngẫu nhiên, mặc định `112` khi thiếu dữ liệu hoặc PK/NPC thường; còn các trận đặc thù legacy dùng `4712`, `TeamDef[0]`, `7000`), và byte cao (khi `> 0`) chọn chỉ số `TFight` để phát `BKMusic`.
+- **Ràng buộc (Invariants)**: `DiaHinh` **không** ảnh hưởng targeting hay sát thương. Không dùng `SceneInfo.background_no` (chứa Map ID `> 255`) làm `DiaHinh` vì sẽ làm sai `FField` và tràn sang byte cao `BKMusic`.
 
 ### TeamDef / Đội thủ thành (Defender Team)
 - **Định nghĩa**: Danh sách tối đa 10 NPC thủ thành (2 hàng trên của lưới chiến trận) của trận đấu khởi tạo từ quest TeamDef/nhóm hoặc NPC chủ động. Trong trận NPC chủ động, danh sách được nhân bản từ cùng một npcId theo `SoLuong` (1..5) tại các slot cố định.
@@ -271,9 +271,9 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 - **Tránh dùng các từ mơ hồ**: *Level*, *Reborn* (cấp độ/đổi nghề khác với quân hàm).
 
 ### Địa chất bản đồ (geolBaseAtt)
-- **Định nghĩa**: Mã địa chất của một bản đồ, trích từ file `ground.mmg` (mapId → 1 byte), dùng cho chất liệu nền chiến đấu (battle background).
-- **Ràng buộc (Invariants)**: Parser tham khảo độc lập (`GroundMmgLoader`), **chưa** đấu vào `GameData::load` vì chưa chắc server cần — **không** nhầm với `DiaHinh` (mã địa hình trận đấu echo trên wire).
-- **Tránh dùng các từ mơ hồ**: *DiaHinh*, *Terrain* (khi nói wire packet phải dùng `DiaHinh`).
+- **Định nghĩa**: Mã địa chất 1 byte (`u8`) của một bản đồ trích từ `ground_server.mmg` (tệp rút gọn cho server từ `ground.mmg` của client, giữ `width`, `height` và `geolBaseAtt` theo cấu trúc `MapData.New`), biểu thị trực tiếp mã nền chiến đấu `"FField<N>"` (như `109`, `112`, `129`).
+- **Ràng buộc (Invariants)**: Được nạp vào `GameData` qua `GroundMmgLoader` làm nguồn xác định byte thấp của `DiaHinh` cho các trận chiến Eve và ngộ địch ngẫu nhiên (fallback `112` khi bản đồ không có bản ghi).
+- **Tránh dùng các từ mơ hồ**: *Terrain*, *SceneInfo.background_no* (khi nói gói tin chiến đấu phải dùng `DiaHinh`).
 
 ### Tiền tệ (Currencies: Kim, Tiền trang, Điểm)
 - **Định nghĩa**: Hệ thống 3 loại tài nguyên tiền tệ của nhân vật:

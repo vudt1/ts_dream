@@ -1,3 +1,5 @@
+mod common;
+
 use std::path::Path;
 use ts_dream::data::loaders::compound::CompoundDatLoader;
 use ts_dream::data::loaders::item::ItemDatLoader;
@@ -108,10 +110,8 @@ fn test_delphi_rng_determinism() {
 fn test_validator_rules() {
     use ts_dream::crafting::basic::validator::{validate_compound_inputs, CraftInputSlot};
     use ts_dream::crafting::error::CraftError;
-    use ts_dream::data::loader::GameData;
 
-    let data_dir = Path::new("Data");
-    let game_data = GameData::load(data_dir).expect("load GameData");
+    let game_data = std::sync::Arc::clone(common::shared_game_data());
 
     // Case 1: < 2 items
     let inputs1 = [
@@ -150,10 +150,8 @@ fn test_validator_rules() {
 #[test]
 fn test_execute_compound_with_real_game_data() {
     use ts_dream::crafting::basic::{execute_compound, CraftInputSlot, DelphiRng};
-    use ts_dream::data::loader::GameData;
 
-    let data_dir = Path::new("Data");
-    let game_data = GameData::load(data_dir).expect("load GameData");
+    let game_data = std::sync::Arc::clone(common::shared_game_data());
 
     // Find two valid mineral items with compound_material > 0 deterministically
     let mineral_1 = game_data
@@ -193,10 +191,8 @@ fn test_execute_compound_with_real_game_data() {
 #[test]
 fn test_compound_fallback_when_unmatched() {
     use ts_dream::crafting::basic::{execute_compound, CraftInputSlot, DelphiRng};
-    use ts_dream::data::loader::GameData;
 
-    let data_dir = Path::new("Data");
-    let mut game_data = GameData::load(data_dir).expect("load GameData");
+    let mut game_data = (**common::shared_game_data()).clone();
 
     // Empty the recipe table to guarantee recipe lookup fails and triggers fallback
     game_data.compounds.clear();
@@ -233,7 +229,6 @@ fn test_compound_fallback_when_unmatched() {
 // =========================================================================
 // Integration Test Helper: shared test DB (DB/ts_dream_test.db)
 // =========================================================================
-mod common;
 use common::test_db::setup_test_db;
 
 // =========================================================================
@@ -313,7 +308,6 @@ fn test_socketing_engine_pure_logic() {
 #[tokio::test]
 async fn test_handle_compound_wire_and_db_flow() {
     use ts_dream::battle::service::BattleService;
-    use ts_dream::data::loader::GameData;
     use ts_dream::db::modern::sqlite::SqliteRepositories;
     use ts_dream::server::dispatcher::{HandleOutcome, OpcodeCtx, ServerEnv};
     use ts_dream::server::handlers::crafting::{handle_compound, SOUND_BLACKSMITH};
@@ -327,8 +321,7 @@ async fn test_handle_compound_wire_and_db_flow() {
         hub: None,
         sender: None,
     };
-    let data_dir = Path::new("Data");
-    let game_data = GameData::load(data_dir).expect("load GameData");
+    let game_data = std::sync::Arc::clone(common::shared_game_data());
     let service = BattleService::default();
 
     // Create account & character
@@ -513,7 +506,6 @@ async fn test_handle_compound_wire_and_db_flow() {
 #[tokio::test]
 async fn test_handle_select_feather_wire_and_db_flow() {
     use ts_dream::battle::service::BattleService;
-    use ts_dream::data::loader::GameData;
     use ts_dream::db::modern::sqlite::SqliteRepositories;
     use ts_dream::server::dispatcher::{HandleOutcome, OpcodeCtx, ServerEnv};
     use ts_dream::server::handlers::crafting::{handle_select_feather, SOUND_BLACKSMITH};
@@ -527,8 +519,7 @@ async fn test_handle_select_feather_wire_and_db_flow() {
         hub: None,
         sender: None,
     };
-    let data_dir = Path::new("Data");
-    let game_data = GameData::load(data_dir).expect("load GameData");
+    let game_data = std::sync::Arc::clone(common::shared_game_data());
     let service = BattleService::default();
 
     let acc_id = ts_dream::db::accounts::create(&pool, "pass1", "pass2")
@@ -633,7 +624,6 @@ async fn test_handle_select_feather_wire_and_db_flow() {
 #[tokio::test]
 async fn test_handle_socket_feather_wire_and_db_flow() {
     use ts_dream::battle::service::BattleService;
-    use ts_dream::data::loader::GameData;
     use ts_dream::db::modern::sqlite::SqliteRepositories;
     use ts_dream::server::dispatcher::{HandleOutcome, OpcodeCtx, ServerEnv};
     use ts_dream::server::handlers::crafting::{handle_socket_feather, SOUND_BLACKSMITH};
@@ -647,8 +637,7 @@ async fn test_handle_socket_feather_wire_and_db_flow() {
         hub: None,
         sender: None,
     };
-    let data_dir = Path::new("Data");
-    let game_data = GameData::load(data_dir).expect("load GameData");
+    let game_data = std::sync::Arc::clone(common::shared_game_data());
     let service = BattleService::default();
 
     let acc_id = ts_dream::db::accounts::create(&pool, "pass1", "pass2")
@@ -886,7 +875,6 @@ fn test_socketing_to_level_10_and_max_level_rejection() {
 #[tokio::test]
 async fn test_handle_socket_feather_level_10_and_max_level_wire() {
     use ts_dream::battle::service::BattleService;
-    use ts_dream::data::loader::GameData;
     use ts_dream::db::modern::sqlite::SqliteRepositories;
     use ts_dream::server::dispatcher::{HandleOutcome, OpcodeCtx, ServerEnv};
     use ts_dream::server::handlers::crafting::handle_socket_feather;
@@ -900,8 +888,7 @@ async fn test_handle_socket_feather_level_10_and_max_level_wire() {
         hub: None,
         sender: None,
     };
-    let data_dir = Path::new("Data");
-    let game_data = GameData::load(data_dir).expect("load GameData");
+    let game_data = std::sync::Arc::clone(common::shared_game_data());
     let service = BattleService::default();
 
     let acc_id = ts_dream::db::accounts::create(&pool, "pass1", "pass2")
@@ -968,7 +955,6 @@ async fn test_handle_socket_feather_level_10_and_max_level_wire() {
 #[tokio::test]
 async fn test_compound_1_item_triggers_need_at_least_two_items_toast() {
     use ts_dream::battle::service::BattleService;
-    use ts_dream::data::loader::GameData;
     use ts_dream::db::modern::sqlite::SqliteRepositories;
     use ts_dream::server::dispatcher::{HandleOutcome, OpcodeCtx, ServerEnv};
     use ts_dream::server::handlers::crafting::handle_compound;
@@ -982,8 +968,7 @@ async fn test_compound_1_item_triggers_need_at_least_two_items_toast() {
         hub: None,
         sender: None,
     };
-    let data_dir = Path::new("Data");
-    let game_data = GameData::load(data_dir).expect("load GameData");
+    let game_data = std::sync::Arc::clone(common::shared_game_data());
     let service = BattleService::default();
 
     let mut conn = Conn::default();
@@ -1139,7 +1124,6 @@ fn test_socket_blank_gear_with_high_level_feather_rejected() {
 #[tokio::test]
 async fn test_select_feather_wire_payload_variants() {
     use ts_dream::battle::service::BattleService;
-    use ts_dream::data::loader::GameData;
     use ts_dream::db::modern::sqlite::SqliteRepositories;
     use ts_dream::server::dispatcher::{HandleOutcome, OpcodeCtx, ServerEnv};
     use ts_dream::server::handlers::crafting::handle_select_feather;
@@ -1153,8 +1137,7 @@ async fn test_select_feather_wire_payload_variants() {
         hub: None,
         sender: None,
     };
-    let data_dir = Path::new("Data");
-    let game_data = GameData::load(data_dir).expect("load GameData");
+    let game_data = std::sync::Arc::clone(common::shared_game_data());
     let service = BattleService::default();
 
     let acc_id = ts_dream::db::accounts::create(&pool, "pass1", "pass2")
@@ -1252,7 +1235,6 @@ async fn test_select_feather_wire_payload_variants() {
 #[tokio::test]
 async fn test_collateral_slot_preservation_on_compound_and_socketing() {
     use ts_dream::battle::service::BattleService;
-    use ts_dream::data::loader::GameData;
     use ts_dream::db::modern::sqlite::SqliteRepositories;
     use ts_dream::server::dispatcher::{HandleOutcome, OpcodeCtx, ServerEnv};
     use ts_dream::server::handlers::crafting::{handle_compound, handle_socket_feather};
@@ -1266,8 +1248,7 @@ async fn test_collateral_slot_preservation_on_compound_and_socketing() {
         hub: None,
         sender: None,
     };
-    let data_dir = Path::new("Data");
-    let game_data = GameData::load(data_dir).expect("load GameData");
+    let game_data = std::sync::Arc::clone(common::shared_game_data());
     let service = BattleService::default();
 
     let acc_id = ts_dream::db::accounts::create(&pool, "pass1", "pass2")
@@ -1414,9 +1395,7 @@ async fn test_collateral_slot_preservation_on_compound_and_socketing() {
 
 #[tokio::test]
 async fn test_compound_with_arbitrary_box_positions() {
-    use std::path::Path;
     use ts_dream::battle::service::BattleService;
-    use ts_dream::data::loader::GameData;
     use ts_dream::db::modern::sqlite::SqliteRepositories;
     use ts_dream::server::dispatcher::{HandleOutcome, OpcodeCtx, ServerEnv};
     use ts_dream::server::handlers::crafting::handle_compound;
@@ -1430,8 +1409,7 @@ async fn test_compound_with_arbitrary_box_positions() {
         hub: None,
         sender: None,
     };
-    let data_dir = Path::new("Data");
-    let game_data = GameData::load(data_dir).expect("load GameData");
+    let game_data = std::sync::Arc::clone(common::shared_game_data());
     let service = BattleService::default();
 
     let mineral_1 = game_data.item_defs.values().filter(|i| (23..=37).contains(&i.kind)).min_by_key(|i| i.id).unwrap();
@@ -1499,9 +1477,7 @@ async fn test_compound_with_arbitrary_box_positions() {
 
 #[tokio::test]
 async fn test_socket_and_select_feather_short_payload_toast() {
-    use std::path::Path;
     use ts_dream::battle::service::BattleService;
-    use ts_dream::data::loader::GameData;
     use ts_dream::db::modern::sqlite::SqliteRepositories;
     use ts_dream::server::dispatcher::{HandleOutcome, OpcodeCtx, ServerEnv};
     use ts_dream::server::handlers::crafting::{handle_select_feather, handle_socket_feather};
@@ -1516,8 +1492,7 @@ async fn test_socket_and_select_feather_short_payload_toast() {
         hub: None,
         sender: None,
     };
-    let data_dir = Path::new("Data");
-    let game_data = GameData::load(data_dir).expect("load GameData");
+    let game_data = std::sync::Arc::clone(common::shared_game_data());
     let service = BattleService::default();
     let mut conn = Conn::default();
 

@@ -439,25 +439,3 @@ async fn handle(ctx: &mut OpcodeCtx<'_>) -> Result<()> {
 pub fn hex_of(decoded: &[u8]) -> String {
     encoder::hex(decoded)
 }
-
-/// Build an `OpcodeCtx` for a test that drives one handler directly.
-pub fn test_ctx<'a>(
-    conn: &'a mut Conn,
-    data: &'a GameData,
-    service: &'a BattleService,
-    out: &'a mut HandleOutcome,
-    sub: u8,
-    payload: &'a [u8],
-) -> OpcodeCtx<'a> {
-    OpcodeCtx {
-        conn,
-        data,
-        service,
-        out,
-        opcode: 0,
-        sub,
-        payload,
-        decoded: &[],
-        env: ServerEnv::none(),
-    }
-}

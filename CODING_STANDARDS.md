@@ -56,7 +56,7 @@ Khi thực hiện bất kỳ giao dịch nào tương tác giữa 2 người ch�
 ## 3. Testing Guide & Test Integrity Standards (Quy chuẩn Kiểm thử)
 
 ### 3.1 Vị trí Kiểm thử Tập trung
-- Mọi unit test / integration test mới **bắt buộc** phải đặt trong thư mục `tests/` ở repo root (ví dụ: `tests/economy_wire_test.rs`).
+- Mọi unit test / integration test mới **bắt buộc** phải đặt dưới `tests/` như một submodule trong các domain suite chuẩn (ví dụ: `tests/economy_inventory/`, khai báo trong `tests/economy_inventory_test.rs`), không tự tạo file `*_test.rs` lẻ ở root `tests/`.
 - **Tuyệt đối cấm** viết `#[cfg(test)]` inline trong `src/` (kể cả module test nhỏ).
 
 ### 3.2 Kiểm thử Chống Ăn Lan (Collateral Transfer Integrity)
@@ -72,7 +72,7 @@ Khi thực hiện bất kỳ giao dịch nào tương tác giữa 2 người ch�
 
 ### 3.4 Tách biệt Cơ sở Dữ liệu
 - DB test chính thức là file SQLite riêng `DB/ts_dream_test.db` (gitignored), chạy cùng chế độ WAL + dual-pool như production để test phản ánh đúng hành vi persist/checkpoint.
-- Test nối DB qua helper `tests/common/test_db.rs` (`mod common;` + `common::test_db::setup_test_db().await`). Helper đọc `TS_TEST_DB_URL` (mặc định `sqlite://<repo>/DB/ts_dream_test.db`), khóa toàn cục để các test DB trong cùng binary chạy tuần tự, xóa sạch schema rồi chạy lại `migrations/0001_init.sql` → mỗi test bắt đầu từ DB trống, độc lập và lặp lại được.
+- Test nối DB qua helper `tests/common/test_db.rs` (`crate::common::test_db::setup_test_db().await`). Helper đọc `TS_TEST_DB_URL` (mặc định `sqlite://<repo>/DB/ts_dream_test.db`), giữ `db_lock()` với timeout chẩn đoán để các test DB trong cùng binary chạy tuần tự, xóa sạch schema rồi chạy lại migrations → mỗi test bắt đầu từ DB trống, độc lập và lặp lại được. **Không giữ thêm shared test lock nào qua `setup_test_db().await`** (tránh lock-order deadlock); các test kiểm tra trạng thái global toàn process (`lock_online_sessions().is_empty()`) đặt ở `tests/server_stop_test.rs`.
 - File production `DB/ts_dream.db` chỉ dành cho server; test luôn trỏ tới `DB/ts_dream_test.db`.
 
 ### 3.5 Nguyên Tắc "Every User Story must have a Negative Test"
