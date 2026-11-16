@@ -34,9 +34,13 @@
   - Sau khi phát `0B FA` (nạp scene) và `0B 0A` (trailer thời gian lượt), task trận đấu thiết lập rào chắn (Barrier) chờ gói ack `0B FA` (2 bytes) từ client chủ phòng.
   - Áp dụng cơ chế **Fallback Timeout 1.5s**: Nếu sau 1.5s chưa nhận được ack (do packet loss hoặc client cũ), server tự động giải phóng rào chắn và tiến hành mở hiệp đầu tiên.
 - **Trật tự 4 Bước của Mỗi Hiệp Đấu trong `manager.rs`**:
-  1. **Bước 1 (Đầu hiệp — Turn Prompt)**: Server phát gói tin `34 01` (`packets::your_turn()`) cho mọi người chơi còn sống phe ta và khởi động bộ đếm lùi thời gian (mặc định 20 giây).
-  2. **Bước 2 (Thu thập lệnh — Command Collection)**: Lắng nghe và gom `PlayerInput` gửi lên qua kênh `0x32` từ các đấu sĩ hợp lệ (`owns_commandable_cell`). Khi tất cả đã sẵn sàng hoặc hết 20 giây timeout, tự động gán đòn đánh cơ bản cho đơn vị chưa kịp ra lệnh.
-  3. **Bước 3 (Thực thi & Diễn hoạt — Action Execution)**: Gọi `battle.run_turn(...)`, phát tuần tự các gói tin diễn hoạt hoạt ảnh `35 03` (thế võ), `32 01` (chiêu thức), `33 01` (HP/SP), `35 0F` (icon trạng thái) ra `BattleSink`.
+  1. **Bước 1 (Đầu hiệp — Turn Prompt)**: Server phát gói tin `34 01` (`packets::your_turn()`) cho mọi người chơi còn sống phe ta và khởi động bộ đếm lùi thời gian (mặc định 20 giây). Luôn phát `34 01` kể cả khi Nhân vật/Sủng vật đang bị khóa lượt để client đồng bộ reset cờ lượt.
+  2. **Bước 2 (Thu thập lệnh — Command Collection & Ngoại lệ Trạng thái Khóa Lượt)**:
+     - Lắng nghe và gom `PlayerInput` gửi lên qua kênh `0x32` từ các đấu sĩ hợp lệ (`owns_commandable_cell`).
+     - **Auto-Skip ô bị Khóa Lượt**: Giữ nguyên thứ tự `collect_commands` chạy trước `run_turn`, đồng thời dùng hàm dự đoán trạng thái sau tick đầu hiệp (tính cả bước giảm 1 lượt và giải hạn khi `turn <= 1` ở Pha 1) để loại bỏ mọi ô đang chịu *Khống chế cứng* (Type 3) hoặc *Hỗn loạn/Cuồng nộ* (`14021 | 20014`) khỏi `waiting_cells` và `fill_timeout_commands`. Nếu toàn bộ ô điều khiển được của phe người chơi đều bị khóa lượt, `collect_commands` kết thúc ngay (`0ms`) để bước sang Bước 3.
+     - **Từ chối đồng bộ gói `0x32` của ô bị Khóa Lượt**: `BattleHandle` duy trì snapshot nhẹ tập ô bị khóa lượt (cập nhật đầu mỗi hiệp trước `34 01`) để `submit_command` kiểm tra O(1) đồng bộ. Mọi lệnh `0x32 sub 1/2` gửi cho ô đang bị khóa bị từ chối: không đưa vào `commands`, không phát `35 05` giả ở `sub 1`, không trừ vật phẩm ở `sub 2`, và gửi cảnh báo `sys_msg_frame` (`"Đang trong trạng thái khống chế, không thể hành động lượt này!"`) xuống client.
+     - Với các ô không bị khóa chưa kịp ra lệnh khi hết 20 giây timeout, tự động gán đòn đánh cơ bản.
+  3. **Bước 3 (Thực thi & Diễn hoạt — Action Execution)**: Gọi `battle.run_turn(...)`, phát tuần tự các gói tin diễn hoạt hoạt ảnh `35 03` (thế võ), `32 01` (chiêu thức), `33 01` (HP/SP), `35 0F` (icon trạng thái) ra `BattleSink`. Khi một đấu sĩ đồng thời dính *Khống chế cứng* (Type 3) và *Hỗn loạn/Cuồng nộ* (`14021 | 20014`), **Type 3 được ưu tiên trước** để bỏ qua lượt hoàn toàn (không chạy `auto_berserk`).
   4. **Bước 4 (Kết thúc diễn hoạt & Độ trễ hiệp — Action Finish & Pacing)**:
      - Phát gói tin `32 02` (`packets::turn_action_finish()`).
      - Tạm dừng luồng trận đấu bằng **Dynamic Skill Delay Pacing**:
@@ -51,7 +55,7 @@
 Tuân thủ nghiêm ngặt 4 pha timing trên lưới cờ $4 \times 5$:
 1. **Pha 1 (Đầu hiệp)**: Bắn `35 01` (`purge_status`) và `clear_unit_status` (`35 0F` flag=0) để gỡ bỏ hiệu ứng/icon trạng thái đã hết thời hạn.
 2. **Pha 2 (Khởi động đòn đánh)**: Bắn `35 03` (`force_state7`) trước mỗi đòn đánh để xả sạch FX cũ và ép đơn vị vào tư thế rút vũ khí. Nếu có dịch chuyển ô cờ, bắn `35 07`.
-3. **Pha 3 (Tác động chiêu thức)**: Sau khi phát `32 01`, nếu kỹ năng gây buff/debuff thành công thì bắn `35 0F` (`battle_unit_status`) để cập nhật 6 khe biểu tượng HUD ('B'..'G') và số hiệp.
+3. **Pha 3 (Tác động chiêu thức)**: Sau khi phát `32 01` (bao gồm cả hiệu ứng phụ Type 3 trên đòn đánh vật lý/phép thuật), nếu kỹ năng gây buff/debuff thành công (cả cast trực tiếp lẫn phản đòn) thì bắn `35 01` (`troi_start` cho lớp FX trạng thái) và `35 0F` (`battle_unit_status`) để cập nhật 6 khe biểu tượng HUD ('B'..'G') và số hiệp.
 4. **Pha 4 (Dọn dẹp)**: Bắn `35 04` nếu có vật phẩm rơi, `35 06` nếu có thoại NPC mở màn/kịch bản, `35 0B` cho bảng tin chiến sự.
 
 ---

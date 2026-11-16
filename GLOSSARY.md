@@ -83,6 +83,17 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 ### Turn / Lượt chiến đấu
 - **Định nghĩa**: Một chu kỳ của vòng chiến đấu gồm: reset trạng thái lệnh, tick buff (đốt/độc theo lượt), chờ lệnh người chơi tối đa ~21 giây, sắp xếp thứ tự hành động (`Attacked DESC, Agi DESC, Random DESC`) và thực thi hành động từng thực thể.
 
+### Trạng thái Khóa Lượt (Turn-Locking Status) & Debuff mềm
+- **Định nghĩa**: Phân loại các trạng thái bất lợi trên Ô chiến trận theo quyền điều khiển lượt trong chiến đấu:
+  - **Khống chế cứng (Hard Crowd Control / Disable)**: Trạng thái làm đấu sĩ mất hoàn toàn khả năng hành động trong lượt (như Băng phong, Hôn mê, Choáng, Trói cây, Sa bộc, Thanh Long). Đấu sĩ bị bỏ qua lượt hoàn toàn và không thể chọn bất kỳ hành động chiến đấu nào (Đánh thường, Phòng thủ, Dùng vật phẩm, Thi triển kỹ năng, Thu phục, Bỏ chạy).
+  - **Hỗn loạn / Cuồng nộ (Berserk / Confusion)**: Trạng thái làm Nhân vật hoặc Sủng vật mất quyền chọn lệnh của người chơi nhưng tự động thực hiện Đánh thường vào một mục tiêu ngẫu nhiên phe địch.
+  - **Debuff mềm (Soft Debuff)**: Trạng thái gây sát thương theo lượt hoặc suy giảm chỉ số (như Bỏ độc, giảm Nhanh nhẹn, Thu nhỏ) nhưng **không** tước quyền chọn lệnh chiến đấu của người chơi.
+- **Ràng buộc (Invariants)**:
+  - Chỉ **Khống chế cứng** và **Hỗn loạn / Cuồng nộ** thuộc nhóm **Trạng thái Khóa Lượt**: người chơi không thể chọn lệnh cho ô đó và pha thu thập lệnh tự động bỏ qua ô bị khóa mà không chờ hết thời gian đếm ngược.
+  - **Thứ tự ưu tiên**: Khi một đấu sĩ đồng thời chịu **Khống chế cứng** và **Hỗn loạn / Cuồng nộ**, **Khống chế cứng** luôn thắng — đấu sĩ mất lượt hoàn toàn và không tự động đánh thường.
+  - Nếu hệ thống nhận được lệnh chiến đấu cho một ô đang mang **Trạng thái Khóa Lượt**, lệnh bị từ chối đồng bộ, không tiêu hao vật phẩm hay SP và trả về cảnh báo hệ thống cho người chơi.
+- **Tránh dùng các từ mơ hồ**: *Debuff* (khi ngữ cảnh thực sự chỉ riêng *Trạng thái Khóa Lượt* hoặc *Khống chế cứng*).
+
 ### RNG battle / Luồng ngẫu nhiên trận đấu
 - **Định nghĩa**: Ba luồng ngẫu nhiên kiểu .NET (time-seeded, độc lập) của một trận: `random_0` (chọn drop/kỹ năng), `random_1` (tie-break thứ tự lượt + sai số sát thương), `random_2` (tọa độ respawn). Một luồng thứ tư `random_3` ở tầng thế giới lo việc di chuyển NPC tuần tra.
 - **Ràng buộc (Invariants)**: Các luồng không được trộn lẫn; thứ tự sử dụng phải khớp thuật toán PRNG 56-phần-tử cố định để replay deterministic.
