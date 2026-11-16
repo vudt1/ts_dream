@@ -527,7 +527,7 @@ async fn ticket12_e2e_rt2_warp_uses_eve_scene_info_and_persists_party() {
                 }],
                 ..Default::default()
             }],
-            ..Default::default()
+            when_happen: [true, false, false, false],
         },
     );
     scene.doors.insert(
@@ -642,7 +642,7 @@ async fn ticket12_e2e_rt2_warp_prefers_eve_scene_info_over_conflicting_warps_txt
                 }],
                 ..Default::default()
             }],
-            ..Default::default()
+            when_happen: [true, false, false, false],
         },
     );
     scene.doors.insert(
@@ -774,7 +774,7 @@ async fn ticket12_negative_missing_both_or_zero_dest_map_id_skips_safely() {
                 }],
                 ..Default::default()
             }],
-            ..Default::default()
+            when_happen: [true, false, false, false],
         },
     );
     scene.doors.insert(

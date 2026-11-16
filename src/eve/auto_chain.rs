@@ -57,6 +57,23 @@ impl EventTriggerKind {
     pub const fn as_eve_code(self) -> i32 {
         self as i32
     }
+
+    /// Whether an event's `when_happen` flags `[on_click_obj, on_stroke_obj, on_into_area, on_ser_stroke]`
+    /// permit activation by this trigger kind.
+    #[must_use]
+    pub fn matches_when_happen(self, when_happen: [bool; 4]) -> bool {
+        match self {
+            Self::ClickDoor => when_happen[0],
+            Self::MeetDoor => when_happen[1] || when_happen[2],
+            Self::ClickNpc => {
+                when_happen[0]
+                    || when_happen[1]
+                    || when_happen[3]
+                    || !when_happen.iter().any(|&flag| flag)
+            }
+            Self::WalkStep => true,
+        }
+    }
 }
 
 /// An in-flight event session (immutable by convention; callers replace it).
@@ -167,6 +184,9 @@ impl EveAutoChainEngine {
                 let Some(event_data) = scene.npc_events.get(&u16::from(eve_no)) else {
                     continue;
                 };
+                if !completed.trigger_kind.matches_when_happen(event_data.when_happen) {
+                    continue;
+                }
 
                 let Some(resolved) =
                     resolve_event(event_data, state, &scene.group_datas, rng, *filter)

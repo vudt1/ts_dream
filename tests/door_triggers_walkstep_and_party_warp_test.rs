@@ -146,8 +146,8 @@ fn build_door_test_data(require_quest: Option<u16>, valid_warp: bool) -> GameDat
         1,
         NpcEventData {
             eve_no: 1,
+            when_happen: [true, true, false, false],
             conditions: vec![cond],
-            ..Default::default()
         },
     );
 

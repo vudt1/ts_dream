@@ -16,7 +16,7 @@ use tracing::debug;
 /// Result of a successful AND chain match.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChainResolveResult {
-    /// Result queue attached to the matched chain head.
+    /// Result queue collected across all conditions in the matched chain.
     pub results: Vec<EveResult>,
     /// Matched chain head `conditionNo` (auto-chain loop detection key).
     pub matched_condition_no: i32,
@@ -64,15 +64,15 @@ pub fn build_chains(conditions: &[EveCondition]) -> Vec<&[EveCondition]> {
     chains
 }
 
-/// Find the best fully-matching AND chain whose head carries results.
+/// Find the best fully-matching AND chain whose combined results are non-empty.
 ///
-/// Matching strategy (4-tier sort):
+/// Matching strategy (3-tier sort + declaration-order tie-break):
 /// 1. Primary: highest cls=2 (quest step) `conditionValue` in the chain
 ///    (higher threshold = more precise quest stage).
 /// 2. Secondary: chain length (longer = more constraints = more precise).
-/// 3. Tertiary: head result count (more = main handler, fewer = fallback
-///    greeting).
-/// 4. Final: declaration order (data order = design priority).
+/// 3. Tertiary: total result count across all conditions in the chain
+///    (more = main handler, fewer = fallback greeting).
+/// 4. Tie-break: declaration order (data order = design priority).
 ///
 /// `chain_filter` optionally restricts candidates, e.g. "chain must contain
 /// conditionClass=8" after a battle or "=10" after a dialogue choice.
@@ -85,9 +85,9 @@ pub fn resolve(
     let mut best: Option<ChainCandidate<'_>> = None;
 
     for chain in chains {
-        let head = &chain[0];
-        // The chain head must carry results.
-        if head.results.is_empty() {
+        // The combined chain must carry at least one result.
+        let result_count: usize = chain.iter().map(|c| c.results.len()).sum();
+        if result_count == 0 {
             continue;
         }
         // Optional extra filter for re-evaluation passes.
@@ -107,7 +107,11 @@ pub fn resolve(
             .map(|c| c.condition_value)
             .max()
             .unwrap_or(0);
-        let candidate = ChainCandidate { chain, step_score };
+        let candidate = ChainCandidate {
+            chain,
+            step_score,
+            result_count,
+        };
 
         let better = match &best {
             None => true,
@@ -119,14 +123,19 @@ pub fn resolve(
     }
 
     let winner = best?;
+    let results: Vec<EveResult> = winner
+        .chain
+        .iter()
+        .flat_map(|c| c.results.iter().cloned())
+        .collect();
     debug!(
         cond_nos = ?winner.chain.iter().map(|c| c.condition_no).collect::<Vec<_>>(),
-        result_count = winner.chain[0].results.len(),
+        result_count = results.len(),
         step_score = winner.step_score,
         "matched AND chain"
     );
     Some(ChainResolveResult {
-        results: winner.chain[0].results.clone(),
+        results,
         matched_condition_no: i32::from(winner.chain[0].condition_no),
         step_score: winner.step_score,
     })
@@ -135,11 +144,12 @@ pub fn resolve(
 struct ChainCandidate<'a> {
     chain: &'a [EveCondition],
     step_score: i32,
+    result_count: usize,
 }
 
 impl ChainCandidate<'_> {
-    /// 4-tier comparison; declaration order wins ties by never displacing
-    /// an earlier equal candidate.
+    /// 3-tier comparison + declaration-order tie-break (earlier equal candidate
+    /// is never displaced).
     fn is_better_than(&self, current: &ChainCandidate<'_>) -> bool {
         if self.step_score != current.step_score {
             return self.step_score > current.step_score;
@@ -147,7 +157,7 @@ impl ChainCandidate<'_> {
         if self.chain.len() != current.chain.len() {
             return self.chain.len() > current.chain.len();
         }
-        self.chain[0].results.len() > current.chain[0].results.len()
+        self.result_count > current.result_count
     }
 }
 

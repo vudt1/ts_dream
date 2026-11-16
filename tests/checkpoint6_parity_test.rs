@@ -248,7 +248,7 @@ fn test_class2_quest_save_triggers_quest_dont_when_mark_present() {
     // Quest 10001 maps to mark position 0
     data.quest_marks.insert(10001, 0);
 
-    // 1. Quest 10005: mark position > 0 -> should record quest_dont and emit Sub 0x05
+    // 1. Quest 10005: mark position > 0, p_style=1 step=1 -> advances quest_tasks WITHOUT setting quest_dont
     let quest_10005 = EveResult {
         result_type: 0,
         result_class: 2,
@@ -263,11 +263,33 @@ fn test_class2_quest_save_triggers_quest_dont_when_mark_present() {
 
     assert!(session.quest_tasks.contains_key(&10005));
     assert!(
-        session.quest_dont.contains(&32),
-        "quest_dont must record mark 32 for quest 10005"
+        !session.quest_dont.contains(&32),
+        "p_style=1 step=1 must NOT eagerly mark quest_dont 32 for quest 10005"
     );
-    // Frame emitted for quest_dont: 18 05 [32: 2B LE = 20 00] [flag: 1B = 01]
     let dont_frames: Vec<_> = out
+        .outgoing
+        .iter()
+        .filter(|f| f.frame.contains("1805"))
+        .collect();
+    assert_eq!(dont_frames.len(), 0);
+
+    // Explicit MarkDont (p_style=5) -> records quest_dont 32 and emits Sub 0x05
+    let mark_10005 = EveResult {
+        result_type: 0,
+        result_class: 2,
+        parameter: 10005,
+        parameter_style: 5,
+        result_value: 1,
+        ..Default::default()
+    };
+    let mut session_mark = session_with_action(vec![mark_10005]);
+    let mut out_mark = HandleOutcome::default();
+    execute_event_step(&mut session_mark, &data, &mut out_mark);
+    assert!(
+        session_mark.quest_dont.contains(&32),
+        "MarkDont (p_style=5) must record mark 32 for quest 10005"
+    );
+    let dont_frames: Vec<_> = out_mark
         .outgoing
         .iter()
         .filter(|f| f.frame.contains("1805"))

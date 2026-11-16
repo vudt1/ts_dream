@@ -44,7 +44,6 @@ pub enum QuestOp {
     Advance {
         quest_id: u16,
         step: u8,
-        mark_dont_on_step1: bool,
     },
     Subtract {
         quest_id: u16,
@@ -310,7 +309,6 @@ fn plan_quest_op(quest_id: u16, p_style: u8, result_value: i32) -> QuestOp {
                 QuestOp::Advance {
                     quest_id,
                     step: (result_value & 0xFF) as u8,
-                    mark_dont_on_step1: true,
                 }
             }
         }
@@ -331,7 +329,6 @@ fn plan_quest_op(quest_id: u16, p_style: u8, result_value: i32) -> QuestOp {
         4 => QuestOp::Advance {
             quest_id,
             step: (result_value & 0xFF) as u8,
-            mark_dont_on_step1: false,
         },
         5 => QuestOp::MarkDont { quest_id },
         _ => QuestOp::Unsupported {

@@ -328,21 +328,10 @@ fn execute_update_quest(
                 crate::server::session::registry_update_if_online(session);
             }
         }
-        QuestOp::Advance {
-            quest_id,
-            step,
-            mark_dont_on_step1,
-        } => {
+        QuestOp::Advance { quest_id, step } => {
             let current = session.quest_tasks.get(&quest_id).map(|&(_, s)| s);
             let next_step = compute_quest_advance_step(current, step, battle_result);
             set_quest_task(session, out, quest_id, next_step);
-            if mark_dont_on_step1 && step == 1 && !matches!(battle_result, 2 | 3) {
-                if let Some(&mark) = data.quest_marks.get(&quest_id) {
-                    if mark > 0 {
-                        set_quest_dont(session, out, mark, 1);
-                    }
-                }
-            }
             crate::server::session::registry_update_if_online(session);
         }
         QuestOp::Subtract { quest_id, step } => {
@@ -361,7 +350,7 @@ fn execute_update_quest(
             quest_id,
             result_value,
         } => {
-            if !matches!(battle_result, 2 | 3) {
+            if result_value > 0 && !matches!(battle_result, 2 | 3) {
                 let target_qid = if quest_id == 2 && result_value >= 10000 {
                     result_value as u16
                 } else {

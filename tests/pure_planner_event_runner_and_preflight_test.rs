@@ -553,8 +553,8 @@ async fn e2e_12001_si_triet_repeatable_and_12136_gian_ung_skill_write_through_db
         "Quest 10049 must persist via FinishChain write-through"
     );
     assert!(
-        reloaded.quest_dont.contains(&27),
-        "Mark.dat bit_id 27 for Quest 10049 must persist via FinishChain write-through"
+        !reloaded.quest_dont.contains(&27),
+        "p_style=1 step=1 for Quest 10049 must NOT prematurely mark quest_dont bit 27"
     );
     assert_eq!(
         reloaded.completed_eve_counts.get(&(12136, 2)),

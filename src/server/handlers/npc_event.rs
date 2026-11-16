@@ -320,6 +320,9 @@ fn activate(
         let Some(event_data) = scene.npc_events.get(&u16::from(eve_no)) else {
             continue;
         };
+        if !trigger.kind().matches_when_happen(event_data.when_happen) {
+            continue;
+        }
         let Some(planned) =
             plan_chain(event_data, state, &scene.group_datas, rng, chain_filter)
         else {

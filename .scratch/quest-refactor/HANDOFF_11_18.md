@@ -1,9 +1,9 @@
-# Handoff: Quest Refactor — Tickets 11 through 18 (Progress: 11–13 Resolved)
+# Handoff: Quest Refactor — Tickets 11 through 18 (Progress: 11–15 Resolved)
 
 > **Spec reference:** [`.scratch/quest-refactor/spec-p0-p2.md`](spec-p0-p2.md)  
 > **Prior handoff:** [`.scratch/quest-refactor/HANDOFF_01_10.md`](HANDOFF_01_10.md)
 
-## Summary of Completed Work (Tickets 11–13)
+## Summary of Completed Work (Tickets 11–15)
 
 ### Ticket 11 ([`issues/11-remove-should-skip-event.md`](issues/11-remove-should-skip-event.md)) — `resolved`
 1. **Removed `should_skip_event` & `has_later_completed_event` (`src/eve/auto_chain.rs`, `src/server/handlers/npc_event.rs`)**:
@@ -59,20 +59,54 @@
 
 ---
 
-## Verification Record (Tickets 11–13)
+### Ticket 14 ([`issues/14-when-happen-group-use-mode-and-and-chain-results.md`](issues/14-when-happen-group-use-mode-and-and-chain-results.md)) — `resolved`
+1. **Door `when_happen` Separation (`src/eve/auto_chain.rs`, `src/server/handlers/npc_event.rs`)**:
+   - Added `EventTriggerKind::matches_when_happen(self, when_happen: [bool; 4]) -> bool`:
+     - `ClickDoor`: requires `when_happen[0]` (`on_click_obj`).
+     - `MeetDoor`: requires `when_happen[1] || when_happen[2]` (`on_stroke_obj || on_into_area`).
+     - `ClickNpc`: accepts `when_happen[0] || when_happen[1] || when_happen[3]` (with all-false fallback), preserving `3,122` `on_ser_stroke` NPC events.
+     - `WalkStep`: returns `true` (not filtered by `when_happen`), preserving `1,835` `on_click_obj` encounters.
+   - Enforced `matches_when_happen` in both `npc_event::activate` and `EveAutoChainEngine::try_auto_chain`.
+2. **`GroupData.use_mode == 2` (`src/eve/group.rs`)**:
+   - `select_member` now checks `group_data.use_mode == 2` before `pick_member` and weighted random selection, returning `KEEP_ALL` to retain every group member; `use_mode == 1` and `use_mode == 3` continue through the existing `pick_member` / weighted random path.
+3. **`EveResolver::resolve` `chain[1..].results` (`src/eve/resolver.rs`)**:
+   - `resolve` now checks total result count across the entire AND chain (`chain.iter().map(|c| c.results.len()).sum::<usize>() > 0`) instead of `head.results.is_empty()`.
+   - Collects `results` from all links `winner.chain[0..]` in order, uses total `result_count` as the tertiary tie-breaker, and updates doc comments to match the 3 comparison tiers + declaration-order tie-break.
+4. **Tests (`tests/tickets_14_15_test.rs`, `tests/door_triggers_walkstep_and_party_warp_test.rs`, `tests/tickets_11_12_13_test.rs`)**:
+   - Updated synthetic `ClickDoor` / `MeetDoor` fixtures in `door_triggers_walkstep_and_party_warp_test.rs` and `tickets_11_12_13_test.rs` with explicit `when_happen` flags.
+   - Added 6 tests in `tests/tickets_14_15_test.rs`:
+     - `ticket14_door_when_happen_separates_click_door_and_meet_door`
+     - `ticket14_click_npc_on_ser_stroke_and_walkstep_encounter_on_click_obj_preserved`
+     - `ticket14_auto_chain_door_respects_when_happen`
+     - `ticket14_group_data_use_mode_2_keeps_all_while_1_and_3_pick_one`
+     - `ticket14_e2e_group_use_mode_2_grants_all_items_and_preserves_adjacent_homdo_slots`
+     - `ticket14_resolver_collects_chain_1_plus_results_in_order` & `ticket14_e2e_and_chain_tail_results_execute`
 
+---
+
+### Ticket 15 ([`issues/15-quest-dont-step1-and-cc7-p2-regression.md`](issues/15-quest-dont-step1-and-cc7-p2-regression.md)) — `resolved`
+1. **Removed `mark_dont_on_step1` (`src/eve/planner.rs`, `src/server/handlers/eve_runner.rs`)**:
+   - Removed the `mark_dont_on_step1: bool` field from `QuestOp::Advance` in `src/eve/planner.rs` (no other consumers).
+   - Removed the automatic `set_quest_dont(session, out, mark, 1)` call on `step == 1` in `eve_runner::execute_update_quest`; `rt=0, rc=2, p_style=1` now only updates the `Quest Ledger`.
+   - Verified `set_quest_dont(..., 1)` (`S->C 0x18 05`) is only called via `QuestOp::MarkDont` (`p_style=5`) and `QuestOp::ExplicitMark` (`p_style=3` with `result_value > 0`, guarded in `eve_runner.rs`).
+2. **Tests (`tests/tickets_14_15_test.rs`, `tests/checkpoint6_parity_test.rs`, `tests/pure_planner_event_runner_and_preflight_test.rs`)**:
+   - Updated `checkpoint6_parity_test.rs` (`test_class2_quest_save_triggers_quest_dont_when_mark_present`) and `pure_planner_event_runner_and_preflight_test.rs` (Quest 10049 `p_style=1 step=1` no longer marks `quest_dont` bit 27).
+   - Added 12 tests in `tests/tickets_14_15_test.rs` (including real `Data/eve.emg` `use_mode == 2` & `15` AND chains / `29` tail nodes, `ExplicitMark` `p_style=3` positive-only guard, real `Data/Mark.dat` 7 multi-step quests, and `cc=7, param=2, p_style=4` regression).
+
+---
+
+## Verification Record (Tickets 11–15)
+
+- `cargo test --test tickets_14_15_test`: **12 passed, 0 failed**.
 - `cargo test --test tickets_11_12_13_test`: **12 passed, 0 failed**.
-- `cargo test --all-targets --no-fail-fast`: **exit 0** (all test binaries passed, including `architecture_guardrails_test` 5/5).
-- `cargo clippy --all-targets`: **exit 0**, 0 warnings in modified/added files (`quest.rs`, `tickets_11_12_13_test.rs`, etc.; pre-existing warnings in unrelated modules remain untouched).
-- **Unverified at runtime:** Live `aLogin.exe` TCP gameplay for `FField<N>` / `BKMusic` rendering from `geolBaseAtt` and repeatable-quest `AutoChain` feel (verified at wire-byte `0x0B 0xFA` and E2E test level only).
+- `cargo test --all-targets`: **exit 0** (all test binaries passed, including `architecture_guardrails_test` 5/5).
+- **Unverified at runtime:** Live `aLogin.exe` TCP gameplay for `FField<N>` / `BKMusic` rendering from `geolBaseAtt`, repeatable-quest `AutoChain` feel, and live `Data/eve.emg` door/AND-chain quests end-to-end on `aLogin.exe`.
 
 ---
 
 ## Next Tickets for Continuation
 
-Tickets **14 through 18** in `.scratch/quest-refactor/issues/` remain `ready-for-agent`:
-- `14-when-happen-group-use-mode-and-and-chain-results.md`
-- `15-quest-dont-step1-and-cc7-p2-regression.md`
+Tickets **16 through 18** in `.scratch/quest-refactor/issues/` remain `ready-for-agent`:
 - `16-movement-walkstep-hotpath-and-sync-future-isolation.md`
 - `17-party-two-phase-lock-and-db-persist.md`
 - `18-event-session-preplan-index-startup-db-and-docs.md`

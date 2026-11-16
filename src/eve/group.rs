@@ -69,6 +69,11 @@ pub fn apply_group_data(
 /// Returns the chosen `resultNo`, or [`KEEP_ALL`] when the whole group should
 /// be preserved (no members, zero weights).
 fn select_member(group_data: &EveGroupData, rng: &mut DotNetRandom) -> i32 {
+    // use_mode == 2 means "keep every member of this group" regardless of
+    // pick_member or probability weights.
+    if group_data.use_mode == 2 {
+        return KEEP_ALL;
+    }
     // Designer-pinned selection wins outright.
     if group_data.pick_member > 0 {
         return i32::from(group_data.pick_member);
