@@ -6,6 +6,27 @@ use crate::db::modern::model::{EntryLayout, PetStorageType, StorageType};
 use crate::protocol::encoder;
 use crate::protocol::frame::Decoder;
 
+/// Equipment slot position for weapons (`trangbi` slot `3` for players, `pet.stt * 10 + 3` for pets).
+pub const EQUIP_POS_WEAPON: u8 = 3;
+
+/// Computes the `trangbi` slot index (`pet_stt * 10 + equip_pos`) for a pet's equipment.
+pub fn pet_equip_slot(pet_stt: u8, equip_pos: u8) -> u8 {
+    pet_stt.saturating_mul(10).saturating_add(equip_pos)
+}
+
+/// Resolves effective equipment slot position (`1..=6`, or `0` if not equippable)
+/// from explicit `equip_pos` (`fit_type`), falling back to `loai` in `1..=6` for
+/// manually constructed / legacy in-memory items.
+pub fn resolve_equip_pos(equip_pos: u8, loai: u8) -> u8 {
+    if equip_pos > 0 {
+        equip_pos
+    } else if (1..=6).contains(&loai) {
+        loai
+    } else {
+        0
+    }
+}
+
 /// An item in inventory, equipment, storage, etc.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct InventoryItem {
@@ -72,13 +93,7 @@ impl InventoryItem {
             item_hp: def.hp as i16,
             item_sp: def.sp as i16,
             loai: def.loai as u8,
-            equip_pos: if def.equip_pos > 0 {
-                def.equip_pos as u8
-            } else if (1..=6).contains(&def.loai) {
-                def.loai as u8
-            } else {
-                0
-            },
+            equip_pos: resolve_equip_pos(def.equip_pos as u8, def.loai as u8),
             thuoctinh: def.thuoctinh as u8,
             giatri_thuoctinh: def.value as u8,
             ..Default::default()
@@ -89,13 +104,7 @@ impl InventoryItem {
     /// Uses `equip_pos` (`fit_type` from `Item.dat`) when non-zero, falling back
     /// to `loai` in `1..=6` for manually constructed / legacy in-memory items.
     pub fn effective_equip_pos(&self) -> u8 {
-        if self.equip_pos > 0 {
-            self.equip_pos
-        } else if (1..=6).contains(&self.loai) {
-            self.loai
-        } else {
-            0
-        }
+        resolve_equip_pos(self.equip_pos, self.loai)
     }
 }
 

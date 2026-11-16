@@ -8,7 +8,9 @@
 use crate::battle::construction::Battle;
 use crate::battle::damage;
 use crate::battle::dispel;
-use crate::battle::engine::{is_mineral_npc, is_pickaxe, WarInfo};
+use crate::battle::engine::{
+    is_mineral_npc, is_pickaxe, WarInfo, WAR_TYPE_HOSTILE_NPC, WAR_TYPE_TEAMDEF_NPC,
+};
 use crate::battle::combat_formula::{self, SkillFormulaInput};
 use crate::battle::npc_world::NpcWorld;
 use crate::battle::packets;
@@ -22,7 +24,7 @@ use std::collections::HashMap;
 /// Returns `true` if `target` is an enemy Mineral NPC (`typ == 3 | 7`, `kind == 16` or ID `22010`/`22011`).
 /// Player-owned pets (`typ == 4`) are never mineral targets.
 pub fn is_mineral_target(data: &BattleData, target: &WarInfo) -> bool {
-    matches!(target.typ, 3 | 7)
+    matches!(target.typ, WAR_TYPE_HOSTILE_NPC | WAR_TYPE_TEAMDEF_NPC)
         && data
             .npcs
             .get(&target.id)
@@ -32,6 +34,34 @@ pub fn is_mineral_target(data: &BattleData, target: &WarInfo) -> bool {
 #[inline]
 fn is_mineral_immune(data: &BattleData, attacker: &WarInfo, target: &WarInfo) -> bool {
     is_mineral_target(data, target) && !is_pickaxe(attacker.weapon_id)
+}
+
+/// If `target` is immune to `attacker` (Mineral NPC hit without a pickaxe),
+/// emits a `MISS` `skilling_int` fragment at `(row, col)` with `troi` and returns `true`.
+fn try_emit_mineral_miss(
+    data: &BattleData,
+    ts: &mut TurnState,
+    attacker: &WarInfo,
+    target: &WarInfo,
+    row: u8,
+    col: u8,
+    troi: u8,
+) -> bool {
+    if !is_mineral_immune(data, attacker, target) {
+        return false;
+    }
+    let adl = target_adl(target);
+    ts.text10.push_str(&packets::skilling_int(
+        row,
+        col,
+        miss_status::MISS,
+        adl,
+        1,
+        troi,
+        0,
+        1,
+    ));
+    true
 }
 
 #[inline]
@@ -1065,9 +1095,7 @@ impl Battle {
                             avg2,
                             out,
                         );
-                        if !is_mineral_immune(data, &attacker, &target) {
-                            self.note_npc_hit(ts, &mut attacker, &target);
-                        }
+                        self.note_npc_hit_unless_immune(data, ts, &mut attacker, &target);
                         self.write_cell(&mut target, (tpos.row, tpos.col));
                         self.write_cell(&mut attacker, (row, col));
                     }
@@ -1089,9 +1117,7 @@ impl Battle {
                             avg2,
                             out,
                         );
-                        if !is_mineral_immune(data, &attacker, &target) {
-                            self.note_npc_hit(ts, &mut attacker, &target);
-                        }
+                        self.note_npc_hit_unless_immune(data, ts, &mut attacker, &target);
                         self.write_cell(&mut target, (tpos.row, tpos.col));
                         self.write_cell(&mut attacker, (row, col));
                     }
@@ -1544,19 +1570,16 @@ impl Battle {
         if ts.delay == 0 || ts.delay <= sd {
             ts.delay = sd;
         }
-        if is_mineral_immune(data, attacker, target) {
+        if try_emit_mineral_miss(
+            data,
+            ts,
+            attacker,
+            target,
+            target.row,
+            target.col,
+            troi_byte::HP,
+        ) {
             *num36 = 0;
-            let adl = target_adl(target);
-            ts.text10.push_str(&packets::skilling_int(
-                target.row,
-                target.col,
-                miss_status::MISS,
-                adl,
-                1,
-                troi_byte::HP,
-                0,
-                1,
-            ));
             return;
         }
         let _ = (combo_field, num37, num34, do_manh, skill_tt, atk, int_stat);
@@ -1729,21 +1752,9 @@ impl Battle {
         out: &mut Vec<Out>,
     ) {
         let mut rear = rear.clone();
-        if is_mineral_immune(data, attacker, &rear) {
+        let (rr, rc) = (tpos.row ^ 1, tpos.col);
+        if try_emit_mineral_miss(data, ts, attacker, &rear, rr, rc, troi_byte::HP) {
             *num36 = 0;
-            let adl = target_adl(&rear);
-            let rr = tpos.row ^ 1;
-            let rc = tpos.col;
-            ts.text10.push_str(&packets::skilling_int(
-                rr,
-                rc,
-                miss_status::MISS,
-                adl,
-                1,
-                troi_byte::HP,
-                0,
-                1,
-            ));
             ts.text_combo = packets::combo(rr, rc);
             self.write_cell(&mut rear, (rr, rc));
             return;
@@ -1833,19 +1844,16 @@ impl Battle {
         out: &mut Vec<Out>,
     ) {
         ts.delay = skill_delay(data, skill);
-        if is_mineral_immune(data, attacker, target) {
+        if try_emit_mineral_miss(
+            data,
+            ts,
+            attacker,
+            target,
+            target.row,
+            target.col,
+            troi_byte::HP,
+        ) {
             *num36 = 0;
-            let adl = target_adl(target);
-            ts.text10.push_str(&packets::skilling_int(
-                target.row,
-                target.col,
-                miss_status::MISS,
-                adl,
-                1,
-                troi_byte::HP,
-                0,
-                1,
-            ));
             return;
         }
         let _ = (num34, do_manh, skill_tt, int_stat);
@@ -1936,18 +1944,15 @@ impl Battle {
         out: &mut Vec<Out>,
     ) {
         ts.delay = skill_delay(data, skill);
-        if is_mineral_immune(data, attacker, target) {
-            let adl = target_adl(target);
-            ts.text10.push_str(&packets::skilling_int(
-                target.row,
-                target.col,
-                miss_status::MISS,
-                adl,
-                1,
-                troi_byte::MISS,
-                0,
-                1,
-            ));
+        if try_emit_mineral_miss(
+            data,
+            ts,
+            attacker,
+            target,
+            target.row,
+            target.col,
+            troi_byte::MISS,
+        ) {
             return;
         }
         let turn = skill_round(data, skill, skill_lv);
@@ -2545,18 +2550,15 @@ impl Battle {
     ) {
         let _ = out;
         ts.delay = skill_delay(data, skill);
-        if is_mineral_immune(data, attacker, target) {
-            let adl = target_adl(target);
-            ts.text10.push_str(&packets::skilling_int(
-                target.row,
-                target.col,
-                miss_status::MISS,
-                adl,
-                1,
-                troi_byte::MISS,
-                0,
-                1,
-            ));
+        if try_emit_mineral_miss(
+            data,
+            ts,
+            attacker,
+            target,
+            target.row,
+            target.col,
+            troi_byte::MISS,
+        ) {
             return;
         }
         let turn = skill_round(data, skill, skill_lv);
@@ -2669,18 +2671,17 @@ impl Battle {
     ) {
         let _ = out;
         ts.delay = skill_delay(data, skill);
-        if skill == i64::from(SKILL_HOLY_SPIRIT) && is_mineral_immune(data, attacker, target) {
-            let adl = target_adl(target);
-            ts.text10.push_str(&packets::skilling_int(
+        if skill == i64::from(SKILL_HOLY_SPIRIT)
+            && try_emit_mineral_miss(
+                data,
+                ts,
+                attacker,
+                target,
                 target.row,
                 target.col,
-                miss_status::MISS,
-                adl,
-                1,
                 troi_byte::HP,
-                0,
-                1,
-            ));
+            )
+        {
             return;
         }
         let turn = if skill == i64::from(SKILL_TYRANT_WILL)
@@ -2910,6 +2911,18 @@ impl Battle {
     }
 
     /// Register a hit enemy npc (typ 7 or 3) for drop/exp processing.
+    fn note_npc_hit_unless_immune(
+        &self,
+        data: &BattleData,
+        ts: &mut TurnState,
+        attacker: &mut WarInfo,
+        target: &WarInfo,
+    ) {
+        if !is_mineral_immune(data, attacker, target) {
+            self.note_npc_hit(ts, attacker, target);
+        }
+    }
+
     fn note_npc_hit(&self, ts: &mut TurnState, attacker: &mut WarInfo, npc: &WarInfo) {
         if npc.typ == 7 || npc.typ == 3 {
             let entry = format!("{}.{}/{}", npc.row, npc.col, npc.lv);

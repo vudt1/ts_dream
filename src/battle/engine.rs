@@ -7,6 +7,12 @@ use crate::protocol::encoder;
 
 pub const PICKAXE_IDS: [u16; 6] = [10001, 10530, 10531, 10532, 10533, 10534];
 
+/// `WarInfo.typ` value for a hostile enemy NPC.
+pub const WAR_TYPE_HOSTILE_NPC: u8 = 3;
+
+/// `WarInfo.typ` value for a TeamDef enemy NPC.
+pub const WAR_TYPE_TEAMDEF_NPC: u8 = 7;
+
 /// Returns `true` if `weapon_id` is one of the 6 standard mining pickaxes.
 pub fn is_pickaxe(weapon_id: u16) -> bool {
     PICKAXE_IDS.contains(&weapon_id)

@@ -3,12 +3,25 @@
 //! `persist`; golden replay keeps everything in-memory over the seeded session.
 
 use crate::db::persist;
-use crate::protocol::encoder;
+use crate::protocol::{
+    encoder, ITEM_SUB_EQUIP, ITEM_SUB_PET_EQUIP, ITEM_SUB_PET_UNEQUIP, ITEM_SUB_UNEQUIP,
+};
 use crate::server::dispatcher::{hex_of, HandleOutcome, OpcodeCtx};
 use crate::server::handlers::stats::build_stat_update;
 use crate::server::map_drops;
-use crate::server::session::{Conn, InventoryItem};
+use crate::server::session::{pet_equip_slot, registry_update_if_online, Conn, InventoryItem};
+use crate::server::spawn::sys_msg_frame;
 use std::sync::Arc;
+
+fn reject_if_in_battle(conn: &Conn, out: &mut HandleOutcome) -> bool {
+    if conn.session.battle_id > 0 {
+        out.send(sys_msg_frame(
+            "Không thể thay đổi trang bị khi đang trong trận đấu!",
+        ));
+        return true;
+    }
+    false
+}
 
 /// Pickup range (`-150 <= dx <= 150`, same for dy).
 const PICKUP_RANGE: i32 = 150;
@@ -45,17 +58,17 @@ pub async fn handle_inventory(ctx: &mut OpcodeCtx<'_>) {
         // Sub 10: Move / stack item (echo raw packet back on success)
         10 => handle_move_stack(conn, payload, decoded, out, pool).await,
         // Sub 11: Equip player item
-        11 => handle_equip(conn, payload, out, pool, hub).await,
+        ITEM_SUB_EQUIP => handle_equip(conn, payload, out, pool, hub).await,
         // Sub 12: Unequip player item
-        12 => handle_unequip(conn, payload, out, pool, hub).await,
+        ITEM_SUB_UNEQUIP => handle_unequip(conn, payload, out, pool, hub).await,
         // Sub 14: Craft item
         14 => handle_craft(conn, payload, out).await,
         // Sub 15: Use item
         15 => handle_use_item(conn, payload, out, pool, ctx.data).await,
         // Sub 17: Equip pet item
-        17 => handle_pet_equip(conn, payload, out, pool).await,
+        ITEM_SUB_PET_EQUIP => handle_pet_equip(conn, payload, out, pool).await,
         // Sub 18: Unequip pet item
-        18 => handle_pet_unequip(conn, payload, out, pool).await,
+        ITEM_SUB_PET_UNEQUIP => handle_pet_unequip(conn, payload, out, pool).await,
         // Sub 20: Battle item/skill
         20 => handle_battle_item(conn, payload, out).await,
         // Sub 36: Auxiliary bag (Tuideo) query
@@ -316,17 +329,23 @@ async fn handle_equip(
     pool: Option<&crate::db::pool::DbPool>,
     hub: Option<&crate::web::server_control::ServerControl>,
 ) {
-    if conn.session.battle_id > 0 || payload.is_empty() {
+    if payload.is_empty() || reject_if_in_battle(conn, out) {
         return;
     }
     let homdo_slot = payload[0];
     let Some(pos) = conn.session.homdo.iter().position(|i| i.slot == homdo_slot) else {
+        out.send(sys_msg_frame("Không tìm thấy vật phẩm!"));
         return;
     };
     let item = conn.session.homdo[pos].clone();
     let equip_pos = item.effective_equip_pos();
     // Equip gates: id > 0, equip_pos 1..=6, and player level >= item level.
-    if item.id == 0 || !(1..=6).contains(&equip_pos) || conn.session.level < item.lv {
+    if item.id == 0 || !(1..=6).contains(&equip_pos) {
+        out.send(sys_msg_frame("Vật phẩm này không thể trang bị!"));
+        return;
+    }
+    if conn.session.level < item.lv {
+        out.send(sys_msg_frame("Cấp độ chưa đủ để trang bị vật phẩm này!"));
         return;
     }
 
@@ -352,6 +371,7 @@ async fn handle_equip(
 
     out.send(format!("F44403001711{:02X}", homdo_slot));
     conn.session.recompute_stats();
+    registry_update_if_online(&conn.session);
     out.send(conn.session.dump_trangbi());
     // Status burst: HP/SP max + gear 2-stats.
     out.send(build_stat_update(0x19, conn.session.hp_max as i32));
@@ -384,7 +404,7 @@ async fn handle_unequip(
     pool: Option<&crate::db::pool::DbPool>,
     hub: Option<&crate::web::server_control::ServerControl>,
 ) {
-    if conn.session.battle_id > 0 || payload.len() < 2 {
+    if payload.len() < 2 || reject_if_in_battle(conn, out) {
         return;
     }
     let trangbi_slot = payload[0];
@@ -396,6 +416,7 @@ async fn handle_unequip(
         .iter()
         .any(|i| i.slot == homdo_slot && i.id > 0)
     {
+        out.send(sys_msg_frame("Ô túi đồ đích đã có vật phẩm!"));
         return;
     }
     let Some(pos) = conn
@@ -404,6 +425,7 @@ async fn handle_unequip(
         .iter()
         .position(|i| i.slot == trangbi_slot)
     else {
+        out.send(sys_msg_frame("Không tìm thấy trang bị!"));
         return;
     };
     let mut item = conn.session.trangbi.remove(pos);
@@ -421,6 +443,7 @@ async fn handle_unequip(
         trangbi_slot, homdo_slot
     ));
     conn.session.recompute_stats();
+    registry_update_if_online(&conn.session);
     out.send(conn.session.dump_trangbi());
     out.send(conn.session.dump_homdo());
     out.send(build_stat_update(0x19, conn.session.hp_max as i32));
@@ -599,11 +622,12 @@ async fn handle_pet_equip(
     out: &mut HandleOutcome,
     pool: Option<&crate::db::pool::DbPool>,
 ) {
-    if conn.session.battle_id > 0 || payload.len() < 2 {
+    if payload.len() < 2 || reject_if_in_battle(conn, out) {
         return;
     }
     let pet_stt = payload[0];
     if !(1..=4).contains(&pet_stt) {
+        out.send(sys_msg_frame("Không tìm thấy võ tướng!"));
         return;
     }
     let item_slot = payload[1];
@@ -613,22 +637,24 @@ async fn handle_pet_equip(
         .iter()
         .position(|i| i.slot == item_slot && i.id > 0)
     else {
+        out.send(sys_msg_frame("Không tìm thấy vật phẩm!"));
         return;
     };
     let item = conn.session.homdo[item_pos].clone();
     let equip_pos = item.effective_equip_pos();
     if !(1..=6).contains(&equip_pos) {
+        out.send(sys_msg_frame("Vật phẩm này không thể trang bị!"));
         return;
     }
     let Some(pet) = conn.session.pets.iter().find(|p| p.stt == pet_stt) else {
+        out.send(sys_msg_frame("Không tìm thấy võ tướng!"));
         return;
     };
     if pet.level < item.lv {
+        out.send(sys_msg_frame("Cấp độ võ tướng chưa đủ để trang bị!"));
         return;
     }
-    let Ok(equip_slot) = u8::try_from(pet_stt as u16 * 10 + equip_pos as u16) else {
-        return;
-    };
+    let equip_slot = pet_equip_slot(pet_stt, equip_pos);
 
     conn.session.homdo.remove(item_pos);
     let empty_homdo = InventoryItem {
@@ -651,6 +677,7 @@ async fn handle_pet_equip(
     persist::upsert_item(pool, conn.session.id, "trangbi", &equipped).await;
 
     conn.session.recompute_pet_stats();
+    registry_update_if_online(&conn.session);
     if let Some(pet) = conn.session.pets.iter().find(|p| p.stt == pet_stt) {
         let pet_snap = pet.clone();
         persist::upsert_pet(pool, conn.session.id, &pet_snap).await;
@@ -666,19 +693,17 @@ async fn handle_pet_unequip(
     out: &mut HandleOutcome,
     pool: Option<&crate::db::pool::DbPool>,
 ) {
-    if conn.session.battle_id > 0 || payload.len() < 2 {
+    if payload.len() < 2 || reject_if_in_battle(conn, out) {
         return;
     }
     let pet_stt = payload[0];
     if !(1..=4).contains(&pet_stt) {
+        out.send(sys_msg_frame("Không tìm thấy võ tướng!"));
         return;
     }
     let equip_sub = payload[1];
     let target_trangbi_slot = if equip_sub < 10 {
-        match u8::try_from(pet_stt as u16 * 10 + equip_sub as u16) {
-            Ok(s) => s,
-            Err(_) => return,
-        }
+        pet_equip_slot(pet_stt, equip_sub)
     } else {
         equip_sub
     };
@@ -689,6 +714,7 @@ async fn handle_pet_unequip(
         .iter()
         .position(|i| i.slot == target_trangbi_slot && i.id > 0)
     else {
+        out.send(sys_msg_frame("Không tìm thấy trang bị!"));
         return;
     };
 
@@ -699,6 +725,7 @@ async fn handle_pet_unequip(
         payload[2]
     } else {
         let Some(slot) = crate::server::inventory::free_slot(&conn.session.homdo) else {
+            out.send(sys_msg_frame("Túi đồ đã đầy!"));
             return; // Bag full
         };
         slot
@@ -716,6 +743,7 @@ async fn handle_pet_unequip(
     persist::upsert_item(pool, conn.session.id, "homdo", &item).await;
 
     conn.session.recompute_pet_stats();
+    registry_update_if_online(&conn.session);
     if let Some(pet) = conn.session.pets.iter().find(|p| p.stt == pet_stt) {
         let pet_snap = pet.clone();
         persist::upsert_pet(pool, conn.session.id, &pet_snap).await;

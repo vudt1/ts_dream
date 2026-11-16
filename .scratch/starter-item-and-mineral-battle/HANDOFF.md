@@ -1,13 +1,14 @@
-# Handoff: Starter Item (`31007`), Pickaxe Equip Unlock & Mineral Combat (Tickets 01, 02 & 03)
+# Handoff: Starter Item (`31007`), Pickaxe Equip Unlock, Mineral Combat & Review Remediation (Tickets 01–04)
 
 **Date:** 2026-11-16
 **Completed Tickets:**
 - [01-starter-item-31007.md](issues/01-starter-item-31007.md) — `Status: resolved`
 - [02-equip-pos-pickaxe-unlock.md](issues/02-equip-pos-pickaxe-unlock.md) — `Status: resolved`
 - [03-mineral-npc-pickaxe-combat.md](issues/03-mineral-npc-pickaxe-combat.md) — `Status: resolved`
+- [04-code-review-remediation.md](issues/04-code-review-remediation.md) — `Status: resolved`
 
 **Next Ticket (Unblocked):**
-- None (all 3 tickets in `.scratch/starter-item-and-mineral-battle/` are `resolved`).
+- None (all 4 tickets in `.scratch/starter-item-and-mineral-battle/` are `resolved`).
 
 ---
 
@@ -56,32 +57,33 @@
 - **`tests/battle/mineral_pickaxe.rs`** & **`tests/battle_test.rs`**:
   - Added 8 comprehensive integration tests covering `weapon_id` loading & 23-byte snapshot parity, all 6 pickaxes positive cases, non-pickaxe / `10497`/`10499`/`10500` negative cases across all harmful skill types, player-pet strict independence, mixed AoE & mixed Combo, Rear Guard (`20006`), capture rejection (`15001`), and PvP `typ == 4` pet isolation.
 
+### Ticket 04: Code Review Remediation (Standards Sync, Rejection Notices, Constants & Deduplication)
+- **`src/server/handlers/inventory.rs`**:
+  - Added `registry_update_if_online(&conn.session)` after mutating `trangbi` / `homdo` / pet stats in `handle_equip`, `handle_unequip`, `handle_pet_equip`, and `handle_pet_unequip` so party members' equipped weapons (including pickaxes) are immediately visible in `online_sessions` when entering a multiplayer battle.
+  - Replaced silent `return;` rejections across `handle_equip`, `handle_unequip`, `handle_pet_equip`, and `handle_pet_unequip` (`battle_id > 0`, non-equippable item, insufficient level, occupied target slot, bag full, invalid pet/item) with explicit `sys_msg_frame` system notices.
+- **`src/server/session.rs`**:
+  - Extracted `EQUIP_POS_WEAPON: u8 = 3`, `pet_equip_slot(pet_stt, equip_pos)`, and `resolve_equip_pos(equip_pos, loai) -> u8`, reused by both `InventoryItem::from_template` and `InventoryItem::effective_equip_pos`.
+- **`src/battle/engine.rs`**, **`src/battle/construction.rs`**, **`src/battle/runner.rs`**:
+  - Added named domain constants `WAR_TYPE_HOSTILE_NPC` (`3`) and `WAR_TYPE_TEAMDEF_NPC` (`7`) in `engine.rs`, and replaced raw literals `3` and `3 | 7` in `construction.rs` and `is_mineral_target`.
+  - Extracted `equipped_weapon_id` and `Battle::assign_pet_weapon` in `construction.rs` to share weapon lookup and pet slot assignment between `add_player`, `load_leader_pets`, and `load_member_pet`.
+  - Extracted `try_emit_mineral_miss` and `Battle::note_npc_hit_unless_immune` in `runner.rs` to deduplicate the mineral immunity early-return guards and NPC hit-tracking checks across all harmful skill handlers and `run_turn`.
+- **`tests/economy_inventory/pet_equip_unequip.rs`**:
+  - Added `test_party_member_pickaxe_equip_syncs_online_sessions_for_battle` (verifies `online_sessions` sync on equip/unequip and real multiplayer `BattleService::start_encounter_battle` hitting Mineral NPC `25002`).
+  - Added `test_equip_unequip_rejections_emit_sys_msg_frame` (verifies wire `sys_msg_frame` notices for all player/pet equip and unequip rejection gates).
+
 ---
 
 ## 2. Verification Status
 
-- `cargo test --test battle_test`: **158 passed, 0 failed** (including 8 new tests in `mineral_pickaxe`)
+- `cargo test --test architecture_guardrails_test`: **8 passed, 0 failed**
+- `cargo test --test battle_test`: **158 passed, 0 failed** (including 8 tests in `mineral_pickaxe`)
 - `cargo test --test server_network_test`: **94 passed, 0 failed**
-- `cargo test --test economy_inventory_test`: **52 passed, 0 failed**
+- `cargo test --test economy_inventory_test`: **54 passed, 0 failed** (including 2 new tests in `pet_equip_unequip`)
 - `cargo test --all-targets --no-fail-fast`: **Exit code 0 — all test suites passed**
 - All changes remain uncommitted in the working tree per `AGENTS.md`.
 
 ---
 
-## 3. Guidance for Next Agent (Ticket 03: Mineral NPC & Pickaxe Combat)
+## 3. Notes
 
-Ticket `03-mineral-npc-pickaxe-combat.md` is now unblocked. Follow `spec.md` §Implementation Decisions #3–5 and §Testing Decisions #3:
-
-1. **`WarInfo` weapon tracking**:
-   - Add `pub weapon_id: u16` (default `0`) to `WarInfo` without changing the 23-byte wire snapshot (`0B 05` / `0B FA`).
-   - Populate `weapon_id` when loading the player from `session.trangbi` slot `3`, and when loading each pet (both leader pets and party member pets) from the owner's `trangbi` slot `pet.stt * 10 + 3`.
-2. **Pure identification helpers**:
-   - Pickaxe IDs: `[10001, 10530, 10531, 10532, 10533, 10534]` -> `is_pickaxe(weapon_id: u16) -> bool`.
-   - Mineral NPCs: `is_mineral_npc(npc)` when `npc.kind == 16 || npc.id == 22010 || npc.id == 22011`.
-   - Mineral target: `is_mineral_target(data, target)` when `matches!(target.typ, 3 | 7)` and `data.npcs.get(&target.id)` satisfies `is_mineral_npc`. (Note: player pets `typ == 4` are explicitly excluded.)
-3. **Per-target / per-attacker battle rules**:
-   - Enforce `is_mineral_target(data, target) && !is_pickaxe(attacker.weapon_id)` in `apply_physical`, `apply_damage_to_rear` (evaluate on `rear`!), `apply_magic`, `apply_buff19` (`Holy Spirit`), `apply_status3`, `apply_buff15`.
-   - Blocked hits return `MISS` (`miss_status::MISS = 0`, `damage = 0`), apply no debuff/SP drain/reflect, while still consuming attacker SP and setting `attacked = true`.
-   - In `apply_catch` (Gate 4, skill `15001`), reject capture if `is_mineral_target(data, target)` (blocks `22010`, `22011`, and `25001..=25252`).
-4. **Tests**:
-   - Add comprehensive tests in `tests/battle/` (declared in `tests/battle_test.rs`) covering positive, negative, mixed AoE, mixed Combo, Rear Guard (`20006`), capture rejection (`15001` on `22010`/`22011`/`25002`), and PvP `typ == 4` pet isolation.
+- All tickets (`01` through `04`) for `.scratch/starter-item-and-mineral-battle/` are resolved; no open follow-up tickets remain.

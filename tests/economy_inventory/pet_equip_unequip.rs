@@ -875,3 +875,416 @@ async fn test_player_and_pet_pickaxe_equip_swap_unequip_and_rejections() {
     assert!(conn.session.trangbi.iter().any(|i| i.slot == 2 && i.id == 19737));
 }
 
+#[tokio::test]
+async fn test_party_member_pickaxe_equip_syncs_online_sessions_for_battle() {
+    use std::sync::Arc;
+    use tokio::sync::RwLock;
+    use ts_dream::battle::runner::{BattleAction, BattleCommand};
+    use ts_dream::battle::service::BattleService;
+    use ts_dream::data::loaders::item::ItemDef;
+    use ts_dream::data::loaders::{EveFightData, EveFightEnemy};
+    use ts_dream::data::tables::Npc;
+    use ts_dream::protocol::{
+        encoder, ITEM_SUB_EQUIP, ITEM_SUB_PET_EQUIP, ITEM_SUB_PET_UNEQUIP, ITEM_SUB_UNEQUIP,
+        OP_BATTLE, OP_ITEM,
+    };
+    use ts_dream::server::session::{
+        lock_online_sessions, registry_get, registry_register_for_login,
+    };
+
+    let mut data = ts_dream::data::loader::GameData::default();
+    let pickaxe_defs = [
+        ItemDef {
+            id: 10001,
+            kind: 39,
+            fit_type: 3,
+            level: 0,
+            attr1_kind: 210,
+            attr1_value: 25,
+            ..Default::default()
+        },
+        ItemDef {
+            id: 10534,
+            kind: 39,
+            fit_type: 3,
+            level: 50,
+            attr1_kind: 210,
+            attr1_value: 30,
+            ..Default::default()
+        },
+    ];
+    for def in &pickaxe_defs {
+        data.items.insert(i64::from(def.id), def.to_item());
+    }
+    data.npcs.insert(
+        25002,
+        Npc {
+            id: 25002,
+            kind: 16,
+            hp: 20,
+            sp: 50,
+            lv: 5,
+            def: 1,
+            agi: 1,
+            ..Default::default()
+        },
+    );
+    let data = Arc::new(data);
+
+    let leader_id = 88_101u32;
+    let member_id = 88_102u32;
+
+    let leader_sess = Arc::new(RwLock::new(Session {
+        id: leader_id,
+        map_id: 10817,
+        level: 50,
+        hp: 500,
+        hp_max: 500,
+        sp: 200,
+        sp_max: 200,
+        agi: 50,
+        id_leader: leader_id,
+        id_mem: [member_id, 0, 0, 0],
+        ..Default::default()
+    }));
+
+    let mut member_initial = Session {
+        id: member_id,
+        map_id: 10817,
+        level: 50,
+        hp: 500,
+        hp_max: 500,
+        sp: 200,
+        sp_max: 200,
+        atk: 120,
+        agi: 200,
+        id_leader: leader_id,
+        active_pet_stt: 1,
+        pets: vec![PetState {
+            stt: 1,
+            id: 11001,
+            name: b"Golem".to_vec(),
+            level: 50,
+            hp: 500,
+            hp_max: 500,
+            sp: 100,
+            sp_max: 100,
+            atk: 100,
+            agi: 150,
+            ..Default::default()
+        }],
+        homdo: vec![
+            InventoryItem {
+                slot: 1,
+                id: 10001,
+                count: 1,
+                ..Default::default()
+            },
+            InventoryItem {
+                slot: 2,
+                id: 10001,
+                count: 1,
+                ..Default::default()
+            },
+            InventoryItem {
+                slot: 3,
+                id: 10534,
+                count: 1,
+                ..Default::default()
+            },
+        ],
+        ..Default::default()
+    };
+    member_initial.hydrate_templates(&data);
+
+    // Register initial sessions before equipping (simulates logged-in party).
+    {
+        let leader_guard = leader_sess.read().await;
+        registry_register_for_login(&leader_guard);
+    }
+    registry_register_for_login(&member_initial);
+
+    let mut member_conn = Conn::default();
+    member_conn.session = member_initial;
+
+    let mut service = BattleService::new(Arc::clone(&data));
+    service.set_input_timeout(std::time::Duration::from_millis(60));
+    let mut rx_leader = service.register(i64::from(leader_id), Arc::clone(&leader_sess));
+    let member_sess = Arc::new(RwLock::new(member_conn.session.clone()));
+    let _rx_member = service.register(i64::from(member_id), Arc::clone(&member_sess));
+
+    let env = ServerEnv::none();
+    let mut out = HandleOutcome::default();
+
+    // Party member equips pickaxe for self (slot 1) and pet 1 (slot 2), then swaps self to 10534 (slot 3).
+    for (sub, payload) in [
+        (ITEM_SUB_EQUIP, &[1u8][..]),
+        (ITEM_SUB_PET_EQUIP, &[1u8, 2u8][..]),
+        (ITEM_SUB_EQUIP, &[3u8][..]),
+    ] {
+        let mut ctx = OpcodeCtx {
+            conn: &mut member_conn,
+            out: &mut out,
+            env,
+            data: &data,
+            service: &service,
+            decoded: &[],
+            opcode: OP_ITEM,
+            sub,
+            payload,
+        };
+        handle_inventory(&mut ctx).await;
+    }
+
+    // 1. Registry must immediately reflect swapped player pickaxe and pet pickaxe.
+    let synced = registry_get(member_id).expect("member must stay in online_sessions");
+    assert_eq!(
+        synced.trangbi.iter().find(|i| i.slot == 3).map(|i| i.id),
+        Some(10534),
+        "player equip/swap must sync trangbi slot 3 to online_sessions"
+    );
+    assert_eq!(
+        synced.trangbi.iter().find(|i| i.slot == 13).map(|i| i.id),
+        Some(10001),
+        "pet equip must sync trangbi slot 13 to online_sessions"
+    );
+
+    // 2. Start party encounter against Mineral NPC 25002 (20 HP).
+    // Leader defends (no pickaxe), member attacks with newly equipped pickaxe!
+    let fight = EveFightData {
+        eve_no: 901,
+        fight_type: 0,
+        link_to_result: 0,
+        left_enemies: vec![EveFightEnemy {
+            no: 1,
+            npc_id: 25002,
+            location_pos: 2,
+            ai: 0,
+        }],
+        right_enemies: Vec::new(),
+        bk_music: 0,
+    };
+
+    let battle_id = {
+        let mut guard = leader_sess.write().await;
+        service.start_encounter_battle(&mut guard, &fight, 112)
+    };
+    assert!(battle_id > 0);
+
+    // Leader at (3,2) defends; member at (3,1) normal-attacks Mineral NPC at (0,2).
+    let leader_snap = leader_sess.read().await.clone();
+    assert!(service.submit_command(
+        &leader_snap,
+        BattleCommand {
+            row: 3,
+            col: 2,
+            target_row: 3,
+            target_col: 2,
+            action: BattleAction::Defend,
+        },
+    ));
+    let member_snap = member_sess.read().await.clone();
+    assert!(service.submit_command(
+        &member_snap,
+        BattleCommand {
+            row: 3,
+            col: 1,
+            target_row: 0,
+            target_col: 2,
+            action: BattleAction::NormalAttack,
+        },
+    ));
+    assert!(service.submit_command(
+        &member_snap,
+        BattleCommand {
+            row: 2,
+            col: 1,
+            target_row: 0,
+            target_col: 2,
+            action: BattleAction::NormalAttack,
+        },
+    ));
+
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_millis(1500);
+    loop {
+        if leader_sess.read().await.battle_id == 0 {
+            break;
+        }
+        assert!(
+            tokio::time::Instant::now() <= deadline,
+            "party mineral battle did not finish (pickaxe weapon_id failed to sync?)"
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+    }
+
+    // Verify battle-end frame for leader is emitted once member's synced pickaxe kills Mineral NPC.
+    let mut frames = Vec::new();
+    while let Ok(f) = rx_leader.try_recv() {
+        frames.push(f);
+    }
+    let battle_end_prefix = format!("{:02X}00{}", OP_BATTLE, encoder::le32(leader_id));
+    assert!(
+        frames.iter().any(|f| f.contains(&battle_end_prefix)),
+        "battle must conclude with finish frame once member's synced pickaxe kills Mineral NPC"
+    );
+
+    // 3. Unequip player & pet gear -> must also sync empty trangbi back to online_sessions.
+    member_conn.session.battle_id = 0;
+    for (sub, payload) in [
+        (ITEM_SUB_UNEQUIP, &[3u8, 1u8][..]),
+        (ITEM_SUB_PET_UNEQUIP, &[1u8, 3u8, 2u8][..]),
+    ] {
+        let mut ctx = OpcodeCtx {
+            conn: &mut member_conn,
+            out: &mut out,
+            env,
+            data: &data,
+            service: &service,
+            decoded: &[],
+            opcode: OP_ITEM,
+            sub,
+            payload,
+        };
+        handle_inventory(&mut ctx).await;
+    }
+    let synced_after = registry_get(member_id).expect("member still registered");
+    assert!(
+        synced_after.trangbi.iter().all(|i| i.slot != 3 && i.slot != 13),
+        "unequip must sync removed gear to online_sessions"
+    );
+
+    let mut online = lock_online_sessions();
+    online.remove(&leader_id);
+    online.remove(&member_id);
+}
+
+#[tokio::test]
+async fn test_equip_unequip_rejections_emit_sys_msg_frame() {
+    use ts_dream::protocol::{
+        ITEM_SUB_EQUIP, ITEM_SUB_PET_EQUIP, ITEM_SUB_PET_UNEQUIP, ITEM_SUB_UNEQUIP, OP_ITEM,
+    };
+    use ts_dream::server::spawn::sys_msg_frame;
+
+    let data = ts_dream::data::loader::GameData::default();
+    let service = ts_dream::battle::service::BattleService::default();
+    let env = ServerEnv::none();
+
+    let mut conn = Conn::default();
+    conn.session = Session {
+        id: 77_001,
+        level: 20,
+        pets: vec![PetState {
+            stt: 1,
+            id: 11001,
+            level: 20,
+            ..Default::default()
+        }],
+        homdo: vec![
+            InventoryItem {
+                slot: 1,
+                id: 29335, // non-equippable (loai 27, equip_pos 0)
+                count: 1,
+                loai: 27,
+                ..Default::default()
+            },
+            InventoryItem {
+                slot: 2,
+                id: 10530, // pickaxe lv 90 > level 20
+                count: 1,
+                loai: 39,
+                equip_pos: 3,
+                lv: 90,
+                ..Default::default()
+            },
+        ],
+        trangbi: vec![
+            InventoryItem {
+                slot: 3,
+                id: 10001,
+                count: 1,
+                loai: 39,
+                equip_pos: 3,
+                ..Default::default()
+            },
+            InventoryItem {
+                slot: 13,
+                id: 10001,
+                count: 1,
+                loai: 39,
+                equip_pos: 3,
+                ..Default::default()
+            },
+        ],
+        ..Default::default()
+    };
+
+    let cases: &[(u8, Vec<u8>, i32, &str)] = &[
+        // 1. Player equip non-equippable item
+        (ITEM_SUB_EQUIP, vec![1], 0, "Vật phẩm này không thể trang bị!"),
+        // 2. Pet equip insufficient level
+        (ITEM_SUB_PET_EQUIP, vec![1, 2], 0, "Cấp độ võ tướng chưa đủ để trang bị!"),
+        // 3. Player unequip to occupied homdo slot 1
+        (ITEM_SUB_UNEQUIP, vec![3, 1], 0, "Ô túi đồ đích đã có vật phẩm!"),
+        // 4. Pet equip blocked in battle
+        (ITEM_SUB_PET_EQUIP, vec![1, 2], 99, "Không thể thay đổi trang bị khi đang trong trận đấu!"),
+        // 5. Pet unequip blocked in battle
+        (ITEM_SUB_PET_UNEQUIP, vec![1, 3], 99, "Không thể thay đổi trang bị khi đang trong trận đấu!"),
+        // 6. Player equip blocked in battle
+        (ITEM_SUB_EQUIP, vec![2], 99, "Không thể thay đổi trang bị khi đang trong trận đấu!"),
+        // 7. Player unequip blocked in battle
+        (ITEM_SUB_UNEQUIP, vec![3, 5], 99, "Không thể thay đổi trang bị khi đang trong trận đấu!"),
+    ];
+
+    for (sub, payload, battle_id, expected_msg) in cases {
+        conn.session.battle_id = *battle_id;
+        let mut out = HandleOutcome::default();
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            out: &mut out,
+            env,
+            data: &data,
+            service: &service,
+            decoded: &[],
+            opcode: OP_ITEM,
+            sub: *sub,
+            payload,
+        };
+        handle_inventory(&mut ctx).await;
+        assert_eq!(
+            out.outgoing.iter().map(|f| f.frame.as_str()).collect::<Vec<_>>(),
+            vec![sys_msg_frame(expected_msg)],
+            "sub {sub} (battle_id={battle_id}) must emit expected sys_msg_frame"
+        );
+    }
+
+    // 8. Pet unequip when homdo is full (all 25 slots occupied)
+    conn.session.battle_id = 0;
+    conn.session.homdo.clear();
+    for s in 1..=25u8 {
+        conn.session.homdo.push(InventoryItem {
+            slot: s,
+            id: 32012,
+            count: 1,
+            ..Default::default()
+        });
+    }
+    let mut out_full = HandleOutcome::default();
+    let mut ctx_full = OpcodeCtx {
+        conn: &mut conn,
+        out: &mut out_full,
+        env,
+        data: &data,
+        service: &service,
+        decoded: &[],
+        opcode: OP_ITEM,
+        sub: ITEM_SUB_PET_UNEQUIP,
+        payload: &[1, 3],
+    };
+    handle_inventory(&mut ctx_full).await;
+    assert_eq!(
+        out_full.outgoing.iter().map(|f| f.frame.as_str()).collect::<Vec<_>>(),
+        vec![sys_msg_frame("Túi đồ đã đầy!")],
+        "pet unequip on full bag must emit sys_msg_frame"
+    );
+}
+

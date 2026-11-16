@@ -8,8 +8,17 @@ use crate::battle::packets;
 use crate::battle::rng::BattleRng;
 use crate::data::tables::Npc;
 use crate::protocol::*;
-use crate::server::session::{PetState, Session};
+use crate::server::session::{pet_equip_slot, PetState, Session, EQUIP_POS_WEAPON};
 use std::collections::HashMap;
+
+fn equipped_weapon_id(session: &Session, slot: u8) -> u16 {
+    session
+        .trangbi
+        .iter()
+        .find(|item| item.slot == slot)
+        .map(|item| item.id)
+        .unwrap_or(0)
+}
 
 /// One battle-start packet, tagged with its recipient routing.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -204,12 +213,7 @@ impl Battle {
             cell.reborn = session.reborn as i64;
             cell.row = row;
             cell.col = col;
-            cell.weapon_id = session
-                .trangbi
-                .iter()
-                .find(|item| item.slot == 3)
-                .map(|item| item.id)
-                .unwrap_or(0);
+            cell.weapon_id = equipped_weapon_id(session, EQUIP_POS_WEAPON);
 
             // Apply Job passive skill bonuses
             for &(skill_id, lv_u8) in &session.skills {
@@ -269,6 +273,14 @@ impl Battle {
         }
     }
 
+    fn assign_pet_weapon(&mut self, session: &Session, pet_stt: u8, row: u8, col: u8) {
+        let pet_weapon_slot = pet_equip_slot(pet_stt, EQUIP_POS_WEAPON);
+        let weapon_id = equipped_weapon_id(session, pet_weapon_slot);
+        if let Some(cell) = self.list_war.get_mut(&war_key(row ^ 1, col)) {
+            cell.weapon_id = weapon_id;
+        }
+    }
+
     /// Load the leader's up-to-4 battle pets.
     ///
     /// Leader pets sit at `(row^1, col)` for cols `1,3,0,4` using pet Stt
@@ -283,16 +295,7 @@ impl Battle {
             let pet = session.pets.iter().find(|p| i64::from(p.stt) == stt);
             if let Some(pet) = pet {
                 self.add_pet(pet, session.id as i64, leader_id, row, col, team);
-                let pet_weapon_slot = pet.stt.saturating_mul(10).saturating_add(3);
-                let weapon_id = session
-                    .trangbi
-                    .iter()
-                    .find(|item| item.slot == pet_weapon_slot)
-                    .map(|item| item.id)
-                    .unwrap_or(0);
-                if let Some(cell) = self.list_war.get_mut(&war_key(row ^ 1, col)) {
-                    cell.weapon_id = weapon_id;
-                }
+                self.assign_pet_weapon(session, pet.stt, row, col);
             }
         }
     }
@@ -305,16 +308,7 @@ impl Battle {
         if (1..=4).contains(&stt) {
             if let Some(pet) = session.pets.iter().find(|p| i64::from(p.stt) == stt) {
                 self.add_pet(pet, session.id as i64, leader_id, row, col, team);
-                let pet_weapon_slot = pet.stt.saturating_mul(10).saturating_add(3);
-                let weapon_id = session
-                    .trangbi
-                    .iter()
-                    .find(|item| item.slot == pet_weapon_slot)
-                    .map(|item| item.id)
-                    .unwrap_or(0);
-                if let Some(cell) = self.list_war.get_mut(&war_key(row ^ 1, col)) {
-                    cell.weapon_id = weapon_id;
-                }
+                self.assign_pet_weapon(session, pet.stt, row, col);
             }
         }
     }
