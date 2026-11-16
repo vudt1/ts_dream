@@ -5,6 +5,18 @@
 use crate::data::texps::texp_get_lv_up;
 use crate::protocol::encoder;
 
+pub const PICKAXE_IDS: [u16; 6] = [10001, 10530, 10531, 10532, 10533, 10534];
+
+/// Returns `true` if `weapon_id` is one of the 6 standard mining pickaxes.
+pub fn is_pickaxe(weapon_id: u16) -> bool {
+    PICKAXE_IDS.contains(&weapon_id)
+}
+
+/// Returns `true` if `npc` is a Mineral NPC (`kind == 16` or ID `22010` / `22011`).
+pub fn is_mineral_npc(npc: &crate::data::tables::Npc) -> bool {
+    npc.kind == 16 || npc.id == 22010 || npc.id == 22011
+}
+
 /// EXP level-ups from a battle reward, via the Texps array (§6.6).
 pub fn exp_lv_up(texps: &[crate::data::tables::TexpRow], lv: i64, reborn: usize, texp: i64) -> i64 {
     texp_get_lv_up(texps, lv, reborn, texp)
@@ -75,6 +87,9 @@ pub struct WarInfo {
     pub type19_turn: i64,
     pub hoa_huyet_lv: i64,
     pub sach_dong_lv: i64,
+    /// Equipped weapon item ID (slot `3` for players, `pet.stt * 10 + 3` for pets).
+    /// Excluded from the 23-byte `0B 05` / `0B FA` wire snapshot.
+    pub weapon_id: u16,
 }
 
 impl WarInfo {

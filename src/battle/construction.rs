@@ -204,6 +204,12 @@ impl Battle {
             cell.reborn = session.reborn as i64;
             cell.row = row;
             cell.col = col;
+            cell.weapon_id = session
+                .trangbi
+                .iter()
+                .find(|item| item.slot == 3)
+                .map(|item| item.id)
+                .unwrap_or(0);
 
             // Apply Job passive skill bonuses
             for &(skill_id, lv_u8) in &session.skills {
@@ -277,6 +283,16 @@ impl Battle {
             let pet = session.pets.iter().find(|p| i64::from(p.stt) == stt);
             if let Some(pet) = pet {
                 self.add_pet(pet, session.id as i64, leader_id, row, col, team);
+                let pet_weapon_slot = pet.stt.saturating_mul(10).saturating_add(3);
+                let weapon_id = session
+                    .trangbi
+                    .iter()
+                    .find(|item| item.slot == pet_weapon_slot)
+                    .map(|item| item.id)
+                    .unwrap_or(0);
+                if let Some(cell) = self.list_war.get_mut(&war_key(row ^ 1, col)) {
+                    cell.weapon_id = weapon_id;
+                }
             }
         }
     }
@@ -289,6 +305,16 @@ impl Battle {
         if (1..=4).contains(&stt) {
             if let Some(pet) = session.pets.iter().find(|p| i64::from(p.stt) == stt) {
                 self.add_pet(pet, session.id as i64, leader_id, row, col, team);
+                let pet_weapon_slot = pet.stt.saturating_mul(10).saturating_add(3);
+                let weapon_id = session
+                    .trangbi
+                    .iter()
+                    .find(|item| item.slot == pet_weapon_slot)
+                    .map(|item| item.id)
+                    .unwrap_or(0);
+                if let Some(cell) = self.list_war.get_mut(&war_key(row ^ 1, col)) {
+                    cell.weapon_id = weapon_id;
+                }
             }
         }
     }
@@ -326,6 +352,7 @@ impl Battle {
             cell.reborn = pet.reborn as i64;
             cell.row = pet_row;
             cell.col = col;
+            cell.weapon_id = 0;
         }
     }
 
@@ -355,6 +382,7 @@ impl Battle {
             cell.reborn = npc.reborn;
             cell.row = row;
             cell.col = col;
+            cell.weapon_id = 0;
         }
     }
 
@@ -384,6 +412,7 @@ impl Battle {
             cell.exp = 0;
             cell.id_skill = 0;
             cell.lv_skill = 0;
+            cell.weapon_id = 0;
         }
     }
 

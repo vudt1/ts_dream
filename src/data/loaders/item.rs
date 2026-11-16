@@ -74,6 +74,7 @@ impl ItemDef {
             name: self.name_viscii.clone(),
             level: self.level as i64,
             loai: self.kind as i64,
+            equip_pos: self.fit_type as i64,
             thuoctinh: self.element as i64,
             value: self.element_value as i64,
             rb_pet_from: self.spare3 as i64,

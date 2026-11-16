@@ -99,6 +99,16 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
   - Túi Sủng vật tùy thân phải còn ô trống (< 4 con) và chưa sở hữu võ tướng cùng `template_id`.
   - Máu NPC phải dưới 50% MaxHP.
   - Nếu NPC có thuộc tính đặc biệt (`FUN_00625128 == 0x16`), người chơi bắt buộc phải đã học kỹ năng Triệu gọi `14026`.
+  - Không áp dụng cho **Quái Khoáng (Mineral NPC)**: mọi Quái Khoáng đều bị cấm thu phục (kể cả các NPC ngoại lệ như `22010`, `22011`).
+
+### Quái Khoáng (Mineral NPC) & Vũ khí Cuốc (Pickaxe)
+- **Định nghĩa**:
+  - **Quái Khoáng (Mineral NPC)**: Thực thể NPC địch trong chiến đấu (`typ == 3` hoặc `7`) thuộc nhóm Khoáng/Thạch/Thủy Tinh/Quặng (`kind == 16`, dải `25001..=25252`) cùng hai NPC đặc biệt `22010` (*Thủy Tinh Quái*) và `22011` (*KhoángChìQuái*). Không áp dụng cho Sủng vật đồng hành (`typ == 4`) của người chơi.
+  - **Vũ khí Cuốc (Pickaxe)**: Nhóm vũ khí khai khoáng chuyên dụng gồm đúng 6 vật phẩm (`10001` *Cuốc*, `10530` *Cuốc chân kim*, `10531` *Cuốc tân truyền*, `10532` *Cuốc hòa điền*, `10533` *Cuốc đá vũ hoa*, `10534` *Cuốc nham thạch đỏ*), trang bị tại ô Vũ khí (`equip_pos = 3`) của Nhân vật hoặc Sủng vật.
+- **Ràng buộc (Invariants)**:
+  - **Điều kiện gây sát thương & hiệu ứng**: Đấu sĩ đang ra đòn (Nhân vật hoặc Sủng vật kiểm tra độc lập trên ô vũ khí của chính mình) bắt buộc phải trang bị một trong 6 Vũ khí Cuốc mới có thể gây sát thương, hiệu ứng khống chế hoặc debuff lên ô Quái Khoáng. Ngược lại, mọi đòn tấn công/kỹ năng gây hại vào ô Quái Khoáng đều rơi vào trạng thái **Miss** (`0` sát thương, không áp dụng hiệu ứng) theo từng mục tiêu và từng người đánh (vẫn tiêu tốn SP và lượt).
+  - **Cấm thu phục**: Toàn bộ Quái Khoáng (bao gồm cả `22010` và `22011`) bị cấm thu phục bằng kỹ năng `15001`.
+- **Tránh dùng các từ mơ hồ**: *Quái đá*, *Cuốc đào 29335* (đạo cụ không mặc được), *Hoàng Cân Sừ Đầu 10497*.
 
 ### Hợp kích / Combo (Battle Combo)
 - **Định nghĩa**: Cơ chế hợp lực liên hoàn trong chiến đấu theo lượt khi 2 hoặc nhiều đấu sĩ cùng phe hành động liên tiếp nhắm vào cùng một mục tiêu, kích hoạt chuỗi diễn hoạt hội đồng (mã giả client `20006`/`20007`) và nhân dồn sát thương $\times 1.3$ cho mỗi mắt xích.
@@ -218,10 +228,14 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 - **Định nghĩa**: Không gian tọa độ thế giới game nơi các Nhân vật di chuyển, tương tác với NPC và kích hoạt các sự kiện/trận đấu.
 
 ### Tân thủ / Newbie (Trạng thái tân thủ)
-- **Định nghĩa**: Cờ đếm `characters.newbie` (`BIGINT NOT NULL DEFAULT 0`, ánh xạ `Session.newbie: u32`) đánh dấu người chơi đã nhận gói quà tân thủ hay chưa. Giá trị `1` chặn nhận lại gói `TSVN123/TSVN456` (guard `AlreadyGifted` trong `src/db/item_code.rs:116`).
-- **Ràng buộc (Invariants)**: `0` = chưa nhận, `1` = đã nhận quà tân thủ. Persist qua `src/db/persist.rs:49` (`"newbie" => "newbie"`) và `src/db/modern/sqlite/session.rs:79,261`.
-- **Phạm vi hiện tại (sau ADR 0001 cleanup)**: Sách 46238 chỉ tăng `newbie` (đã xóa `Spx2+50` / `SpMax+50` và stat frame `0xD0`).
+- **Định nghĩa**: Cờ đếm `characters.newbie` (`BIGINT NOT NULL DEFAULT 0`, ánh xạ `Session.newbie: u32`) đánh dấu người chơi đã nhận gói quà gift code `TSVN123/TSVN456` hay chưa (đồng thời sách `46238` tăng giá trị đếm). Giá trị `1` chặn nhận lại gói `TSVN123/TSVN456` (guard `AlreadyGifted` trong `src/db/item_code.rs:116`).
+- **Ràng buộc (Invariants)**: `0` = chưa nhận, `1` = đã nhận gift code `TSVN123/TSVN456`. Persist qua `src/db/persist.rs:49` (`"newbie" => "newbie"`) và `src/db/modern/sqlite/session.rs:79,261`.
+- **Phạm vi hiện tại (sau ADR 0001 cleanup)**: Sách 46238 chỉ tăng `newbie` (đã xóa `Spx2+50` / `SpMax+50` và stat frame `0xD0`). Tách biệt hoàn toàn với **Đồ mặc định tạo nhân vật** (bao gồm `31007` *Vé đoái hoán tâm* cấp sẵn khi tạo nhân vật).
 - **Tránh dùng các từ mơ hồ**: *tanthu* (tên legacy tiếng Việt không dấu, đã đổi thành `newbie` thống nhất).
+
+### Đồ mặc định tạo nhân vật (Character Starter Items)
+- **Định nghĩa**: Bộ vật phẩm và trang bị được cấp cố định một lần ngay tại thời điểm khởi tạo nhân vật mới (`0x09 Sub 01`), gồm `32012 × 4` (hòm đồ ô `1`), `31007 × 1` (*Vé đoái hoán tâm*, hòm đồ ô `2`) và trang bị `19737 × 1` (trang bị ô `2`).
+- **Ràng buộc (Invariants)**: Chỉ cấp lúc tạo nhân vật mới (`characters.newbie` vẫn khởi tạo `0`); không kiểm tra hay cấp bù khi nhân vật cũ Enter Game.
 
 ### Web Admin Dashboard (Hệ thống Quản trị Web)
 - **Định nghĩa**: Bounded Context vận hành & giám sát (Operations) cho phép Quản trị viên theo dõi số lượng người chơi online, xem log gói tin realtime (SSE) và điều khiển trạng thái server (Start/Stop).

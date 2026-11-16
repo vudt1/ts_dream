@@ -121,3 +121,115 @@ fn test_hydrate_templates_across_all_containers() {
     assert_eq!(session.trangbi[0].def1, 30);
     assert_eq!(session.trangbi[0].doben, 60);
 }
+
+#[test]
+fn test_pickaxe_itemdef_preserves_kind_39_and_equip_pos_3() {
+    use ts_dream::data::loaders::item::ItemDef;
+
+    let pickaxe_def = ItemDef {
+        id: 10534,
+        kind: 39,
+        fit_type: 3,
+        level: 110,
+        attr1_kind: 210, // atk1
+        attr1_value: 25,
+        ..Default::default()
+    };
+    let tool_def = ItemDef {
+        id: 29335,
+        kind: 27,
+        fit_type: 0,
+        level: 0,
+        ..Default::default()
+    };
+
+    let mut data = GameData::default();
+    data.items.insert(10534, pickaxe_def.to_item());
+    data.items.insert(29335, tool_def.to_item());
+
+    let mut session = Session::default();
+    session.homdo.push(InventoryItem {
+        slot: 1,
+        id: 10534,
+        count: 1,
+        ..Default::default()
+    });
+    session.homdo.push(InventoryItem {
+        slot: 2,
+        id: 29335,
+        count: 1,
+        ..Default::default()
+    });
+    // Manual legacy item without equip_pos set (only loai = 2)
+    session.trangbi.push(InventoryItem {
+        slot: 2,
+        id: 19737,
+        count: 1,
+        loai: 2,
+        ..Default::default()
+    });
+
+    session.hydrate_templates(&data);
+
+    let pickaxe = &session.homdo[0];
+    assert_eq!(pickaxe.loai, 39, "kind=39 must be preserved for Compound/Shop/Trade");
+    assert_eq!(pickaxe.equip_pos, 3, "fit_type=3 must map to equip_pos=3");
+    assert_eq!(pickaxe.effective_equip_pos(), 3);
+    assert_eq!(pickaxe.atk1, 25);
+
+    let tool = &session.homdo[1];
+    assert_eq!(tool.equip_pos, 0);
+    assert_eq!(tool.effective_equip_pos(), 0, "non-equippable item must have effective_equip_pos=0");
+
+    let legacy_armor = &session.trangbi[0];
+    assert_eq!(legacy_armor.effective_equip_pos(), 2, "legacy in-memory item with loai=2 must fallback to equip_pos=2");
+}
+
+#[test]
+fn test_real_item_dat_pickaxes_and_tools_equip_pos() {
+    use std::path::Path;
+    use ts_dream::data::loaders::item::ItemDatLoader;
+
+    let path = Path::new("Data/Item.dat");
+    assert!(path.exists(), "Data/Item.dat must exist");
+    let bytes = std::fs::read(path).expect("read Item.dat");
+    let defs = ItemDatLoader::load(&bytes).expect("load Item.dat");
+
+    let mut data = GameData::default();
+    for (&id, def) in &defs {
+        data.items.insert(id as i64, def.to_item());
+    }
+
+    let mut session = Session::default();
+    let pickaxe_ids: [u16; 6] = [10001, 10530, 10531, 10532, 10533, 10534];
+    for (idx, &id) in pickaxe_ids.iter().enumerate() {
+        let def = defs.get(&id).unwrap_or_else(|| panic!("pickaxe {id} missing from Item.dat"));
+        assert_eq!(def.kind, 39, "pickaxe {id} kind in Item.dat");
+        assert_eq!(def.fit_type, 3, "pickaxe {id} fit_type in Item.dat");
+        session.homdo.push(InventoryItem {
+            slot: (idx + 1) as u8,
+            id,
+            count: 1,
+            ..Default::default()
+        });
+    }
+
+    // 29335 (Cuốc đào) & 31007 (Vé đoái hoán tâm) must be non-equippable (fit_type = 0)
+    let tool_def = defs.get(&29335).expect("29335 missing from Item.dat");
+    assert_eq!(tool_def.fit_type, 0, "29335 must have fit_type=0");
+    let ticket_def = defs.get(&31007).expect("31007 missing from Item.dat");
+    assert_eq!(ticket_def.fit_type, 0, "31007 must have fit_type=0");
+
+    session.homdo.push(InventoryItem { slot: 7, id: 29335, count: 1, ..Default::default() });
+    session.homdo.push(InventoryItem { slot: 8, id: 31007, count: 1, ..Default::default() });
+    session.hydrate_templates(&data);
+
+    for idx in 0..pickaxe_ids.len() {
+        let item = &session.homdo[idx];
+        assert_eq!(item.loai, 39, "hydrated pickaxe {} must preserve loai=39", item.id);
+        assert_eq!(item.equip_pos, 3, "hydrated pickaxe {} must have equip_pos=3", item.id);
+        assert_eq!(item.effective_equip_pos(), 3);
+    }
+    assert_eq!(session.homdo[6].effective_equip_pos(), 0, "29335 must not be equippable");
+    assert_eq!(session.homdo[7].effective_equip_pos(), 0, "31007 must not be equippable");
+}

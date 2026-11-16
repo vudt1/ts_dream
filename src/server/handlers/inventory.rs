@@ -228,7 +228,7 @@ async fn handle_move_stack(
     }
     let dst_idx = conn.session.homdo.iter().position(|i| i.slot == newslot);
     let src_count = u16::from(src.count);
-    if (1..=6).contains(&src.loai) {
+    if (1..=6).contains(&src.effective_equip_pos()) {
         // Equipment: only moves to an empty slot or swaps with dst.
         if dst_idx.is_none() {
             conn.session.homdo[src_idx].slot = newslot;
@@ -324,15 +324,15 @@ async fn handle_equip(
         return;
     };
     let item = conn.session.homdo[pos].clone();
-    let loai = item.loai;
-    // Equip gates: id > 0, loai 1..=6, and player level >= item level.
-    if item.id == 0 || !(1..=6).contains(&loai) || conn.session.level < item.lv {
+    let equip_pos = item.effective_equip_pos();
+    // Equip gates: id > 0, equip_pos 1..=6, and player level >= item level.
+    if item.id == 0 || !(1..=6).contains(&equip_pos) || conn.session.level < item.lv {
         return;
     }
 
     conn.session.homdo.remove(pos);
     // Unequip the current occupant of that equip slot into homdo.
-    if let Some(old_pos) = conn.session.trangbi.iter().position(|i| i.slot == loai) {
+    if let Some(old_pos) = conn.session.trangbi.iter().position(|i| i.slot == equip_pos) {
         let mut old_item = conn.session.trangbi.remove(old_pos);
         old_item.slot = homdo_slot;
         persist::upsert_item(pool, conn.session.id, "homdo", &old_item).await;
@@ -346,7 +346,7 @@ async fn handle_equip(
     }
 
     let mut equipped = item;
-    equipped.slot = loai;
+    equipped.slot = equip_pos;
     conn.session.trangbi.push(equipped.clone());
     persist::upsert_item(pool, conn.session.id, "trangbi", &equipped).await;
 
@@ -599,7 +599,7 @@ async fn handle_pet_equip(
     out: &mut HandleOutcome,
     pool: Option<&crate::db::pool::DbPool>,
 ) {
-    if payload.len() < 2 {
+    if conn.session.battle_id > 0 || payload.len() < 2 {
         return;
     }
     let pet_stt = payload[0];
@@ -616,8 +616,8 @@ async fn handle_pet_equip(
         return;
     };
     let item = conn.session.homdo[item_pos].clone();
-    let loai = item.loai;
-    if !(1..=6).contains(&loai) {
+    let equip_pos = item.effective_equip_pos();
+    if !(1..=6).contains(&equip_pos) {
         return;
     }
     let Some(pet) = conn.session.pets.iter().find(|p| p.stt == pet_stt) else {
@@ -626,7 +626,7 @@ async fn handle_pet_equip(
     if pet.level < item.lv {
         return;
     }
-    let Ok(equip_slot) = u8::try_from(pet_stt as u16 * 10 + loai as u16) else {
+    let Ok(equip_slot) = u8::try_from(pet_stt as u16 * 10 + equip_pos as u16) else {
         return;
     };
 
@@ -666,7 +666,7 @@ async fn handle_pet_unequip(
     out: &mut HandleOutcome,
     pool: Option<&crate::db::pool::DbPool>,
 ) {
-    if payload.len() < 2 {
+    if conn.session.battle_id > 0 || payload.len() < 2 {
         return;
     }
     let pet_stt = payload[0];

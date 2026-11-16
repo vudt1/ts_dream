@@ -4,7 +4,8 @@
 //!   starter inventories commit together (no half-created rows).
 //! - Bear `initChar` parity: non-empty pass1/pass2 from the packet overwrite
 //!   the dashboard passwords; empty passwords keep them.
-//! - Homdo is NOT seeded; Trangbi slot 2 = 19737 is.
+//! - Starter inventories: Homdo slot 1 = 32012x4, slot 2 = 31007x1;
+//!   Trangbi slot 2 = 19737x1; `characters.newbie = 0`.
 //! - Name race: second account reusing a taken name gets `09 03 01` and no row.
 //! - `DOUBLE_LOGIN` == Bear `[00][19]` == SystemAlert 19.
 //! - Enter-game short-circuit for charless authed sessions (no extra login).
@@ -131,15 +132,44 @@ async fn test_atomic_create_with_password_overwrite() {
     // Appearance color lives in session RAM for player_appear (covered by
     // the `hair` column in DB — no separate color columns).
     assert_eq!(conn.session.color, "1122334455667788");
+    assert!(
+        conn.session.homdo.iter().any(|i| i.slot == 1 && i.id == 32012 && i.count == 4),
+        "RAM homdo must hold starter 32012x4 at slot 1, got {:?}",
+        conn.session.homdo
+    );
+    assert!(
+        conn.session.homdo.iter().any(|i| i.slot == 2 && i.id == 31007 && i.count == 1),
+        "RAM homdo must hold starter 31007x1 at slot 2, got {:?}",
+        conn.session.homdo
+    );
+    assert!(
+        conn.session.trangbi.iter().any(|i| i.slot == 2 && i.id == 19737 && i.count == 1),
+        "RAM trangbi slot 2 must be 19737, got {:?}",
+        conn.session.trangbi
+    );
+    assert_eq!(conn.session.newbie, 0, "RAM newbie must remain 0");
+
     let mut probe = Session::new();
     assert!(repos.sessions().load(acc, &mut probe).await.unwrap());
     assert_eq!(probe.name, b"AtomicHero");
     assert_eq!(probe.map_id, 10817);
     assert_eq!((probe.map_x, probe.map_y), (442, 758));
     assert_eq!(probe.hair, 3);
+    assert_eq!(probe.newbie, 0, "DB newbie must remain 0 after create");
+    let db_newbie: i64 = sqlx::query_scalar("SELECT newbie FROM characters WHERE playerid = ?")
+        .bind(acc)
+        .fetch_one(&pool.read)
+        .await
+        .unwrap();
+    assert_eq!(db_newbie, 0, "characters.newbie column must be 0");
     assert!(
         probe.homdo.iter().any(|i| i.slot == 1 && i.id == 32012 && i.count == 4),
-        "homdo (inventories type 1) must hold starter 32012x4, got {:?}",
+        "homdo (inventories type 1) must hold starter 32012x4 at slot 1, got {:?}",
+        probe.homdo
+    );
+    assert!(
+        probe.homdo.iter().any(|i| i.slot == 2 && i.id == 31007 && i.count == 1),
+        "homdo (inventories type 1) must hold starter 31007x1 at slot 2, got {:?}",
         probe.homdo
     );
     assert!(
@@ -288,4 +318,196 @@ async fn test_enter_game_short_circuit_charless() {
         "charless authed session must get create-char screen"
     );
     assert!(!conn.session.logined);
+}
+
+#[tokio::test]
+async fn test_starter_item_31007_enter_game_and_relogin_no_duplication() {
+    let pool = setup_test_db().await;
+    let repos = SqliteRepositories::new(pool.clone());
+    let data = ts_dream::data::loader::GameData::default();
+    let service = ts_dream::battle::service::BattleService::default();
+    let env = ServerEnv {
+        pool: Some(&pool),
+        repos: Some(&repos),
+        hub: None,
+        sender: None,
+    };
+
+    let acc = ts_dream::db::accounts::create(&pool, "enterpass1", "enterpass2")
+        .await
+        .unwrap();
+    let mut conn = Conn::default();
+    conn.session.id = acc as u32;
+    conn.session.authed = true;
+
+    name_check(&mut conn, &data, &service, env, b"Starter31007").await;
+    let frames = create_char(&mut conn, &data, &service, env, &create_payload(b"", b"")).await;
+    assert!(frames.iter().any(|f| f == spawn::CHAR_CREATE_SUCCESS));
+
+    // Enter game (0x03 Sub 01): must emit 17 05 containing 32012x4 at slot 1 and 31007x1 at slot 2.
+    let mut out = ts_dream::server::dispatcher::HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            out: &mut out,
+            env,
+            data: &data,
+            service: &service,
+            decoded: &[],
+            opcode: 0x03,
+            sub: 1,
+            payload: &[],
+        };
+        handle_enter_game(&mut ctx).await;
+    }
+    assert!(conn.session.logined);
+    assert_eq!(conn.session.newbie, 0, "newbie must stay 0 on enter game");
+
+    let homdo_frame = out
+        .outgoing
+        .iter()
+        .map(|f| f.frame.as_str())
+        .find(|f| f.len() >= 12 && &f[8..12] == "1705")
+        .expect("17 05 homdo sync frame must be emitted on enter game");
+    // 12-byte entry: [slot:1B][id:2B LE][count:1B]...
+    // slot 1 + 32012 (0x7D0C -> 0C7D) + count 4 -> 010C7D04
+    // slot 2 + 31007 (0x791F -> 1F79) + count 1 -> 021F7901
+    assert!(
+        homdo_frame.contains("010C7D04"),
+        "17 05 must contain slot 1 32012x4 (collateral), got {homdo_frame}"
+    );
+    assert!(
+        homdo_frame.contains("021F7901"),
+        "17 05 must contain slot 2 31007x1, got {homdo_frame}"
+    );
+
+    // Relogin (fresh Conn + 0x01 login): must NOT duplicate 31007.
+    let mut relogin_conn = Conn::default();
+    let pass = b"enterpass1";
+    let mut relogin_payload = Vec::new();
+    relogin_payload.extend_from_slice(&(acc as u32).to_le_bytes());
+    relogin_payload.extend_from_slice(ts_dream::protocol::ID_PREFIX.as_bytes());
+    relogin_payload.extend_from_slice(&ts_dream::protocol::MIN_VERSION.to_le_bytes());
+    relogin_payload.extend_from_slice(pass);
+    let mut relogin_out = ts_dream::server::dispatcher::HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut relogin_conn,
+            out: &mut relogin_out,
+            env,
+            data: &data,
+            service: &service,
+            decoded: &[],
+            opcode: 0x01,
+            sub: pass.len() as u8,
+            payload: &relogin_payload,
+        };
+        ts_dream::server::handlers::login::handle_login(&mut ctx).await;
+    }
+    assert!(relogin_conn.session.logined);
+    assert_eq!(
+        relogin_conn.session.homdo.iter().filter(|i| i.id == 31007).count(),
+        1,
+        "relogin must not duplicate 31007"
+    );
+    assert_eq!(
+        relogin_conn.session.homdo.iter().filter(|i| i.id == 32012).count(),
+        1,
+        "relogin must keep 32012x4 intact"
+    );
+    let db_31007_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM inventories WHERE playerid = ? AND storagetype = 1 AND itemid = 31007",
+    )
+    .bind(acc)
+    .fetch_one(&pool.read)
+    .await
+    .unwrap();
+    assert_eq!(db_31007_count, 1, "DB must have exactly 1 row for 31007");
+}
+
+#[tokio::test]
+async fn test_existing_char_newbie_zero_not_granted_31007_on_enter_game() {
+    let pool = setup_test_db().await;
+    let repos = SqliteRepositories::new(pool.clone());
+    let data = ts_dream::data::loader::GameData::default();
+    let service = ts_dream::battle::service::BattleService::default();
+    let env = ServerEnv {
+        pool: Some(&pool),
+        repos: Some(&repos),
+        hub: None,
+        sender: None,
+    };
+
+    let acc = ts_dream::db::accounts::create(&pool, "legacy01", "legacy02")
+        .await
+        .unwrap();
+    let mut conn = Conn::default();
+    conn.session.id = acc as u32;
+    conn.session.authed = true;
+
+    name_check(&mut conn, &data, &service, env, b"LegacyHero").await;
+    create_char(&mut conn, &data, &service, env, &create_payload(b"", b"")).await;
+
+    // Simulate an older character created before this update: remove 31007 from DB, newbie=0.
+    sqlx::query("DELETE FROM inventories WHERE playerid = ? AND itemid = 31007")
+        .bind(acc)
+        .execute(&pool.write)
+        .await
+        .unwrap();
+
+    let mut enter_conn = Conn::default();
+    enter_conn.session.id = acc as u32;
+    enter_conn.session.authed = true;
+    let mut out = ts_dream::server::dispatcher::HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut enter_conn,
+            out: &mut out,
+            env,
+            data: &data,
+            service: &service,
+            decoded: &[],
+            opcode: 0x03,
+            sub: 1,
+            payload: &[],
+        };
+        handle_enter_game(&mut ctx).await;
+    }
+    assert!(enter_conn.session.logined);
+    assert_eq!(enter_conn.session.newbie, 0);
+    assert!(
+        !enter_conn.session.homdo.iter().any(|i| i.id == 31007),
+        "existing character with newbie=0 must NOT be backfilled with 31007 on enter game"
+    );
+    let db_31007: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM inventories WHERE playerid = ? AND itemid = 31007",
+    )
+    .bind(acc)
+    .fetch_one(&pool.read)
+    .await
+    .unwrap();
+    assert_eq!(db_31007, 0);
+}
+
+#[tokio::test]
+async fn test_in_memory_fallback_create_char_seeds_31007_and_keeps_newbie_zero() {
+    let data = ts_dream::data::loader::GameData::default();
+    let service = ts_dream::battle::service::BattleService::default();
+    let env = ServerEnv {
+        pool: None,
+        repos: None,
+        hub: None,
+        sender: None,
+    };
+
+    let mut conn = Conn::default();
+    conn.session.id = 9999;
+    conn.session.authed = true;
+    name_check(&mut conn, &data, &service, env, b"InMemHero").await;
+    let frames = create_char(&mut conn, &data, &service, env, &create_payload(b"", b"")).await;
+    assert!(frames.iter().any(|f| f == spawn::CHAR_CREATE_SUCCESS));
+    assert_eq!(conn.session.newbie, 0);
+    assert!(conn.session.homdo.iter().any(|i| i.slot == 1 && i.id == 32012 && i.count == 4));
+    assert!(conn.session.homdo.iter().any(|i| i.slot == 2 && i.id == 31007 && i.count == 1));
+    assert!(conn.session.trangbi.iter().any(|i| i.slot == 2 && i.id == 19737 && i.count == 1));
 }

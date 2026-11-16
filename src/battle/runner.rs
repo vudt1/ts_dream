@@ -8,7 +8,7 @@
 use crate::battle::construction::Battle;
 use crate::battle::damage;
 use crate::battle::dispel;
-use crate::battle::engine::WarInfo;
+use crate::battle::engine::{is_mineral_npc, is_pickaxe, WarInfo};
 use crate::battle::combat_formula::{self, SkillFormulaInput};
 use crate::battle::npc_world::NpcWorld;
 use crate::battle::packets;
@@ -18,6 +18,32 @@ use crate::data::tables::{BinarySkillDef, Item, Npc, Skill};
 use crate::protocol::*;
 use crate::protocol::encoder;
 use std::collections::HashMap;
+
+/// Returns `true` if `target` is an enemy Mineral NPC (`typ == 3 | 7`, `kind == 16` or ID `22010`/`22011`).
+/// Player-owned pets (`typ == 4`) are never mineral targets.
+pub fn is_mineral_target(data: &BattleData, target: &WarInfo) -> bool {
+    matches!(target.typ, 3 | 7)
+        && data
+            .npcs
+            .get(&target.id)
+            .is_some_and(is_mineral_npc)
+}
+
+#[inline]
+fn is_mineral_immune(data: &BattleData, attacker: &WarInfo, target: &WarInfo) -> bool {
+    is_mineral_target(data, target) && !is_pickaxe(attacker.weapon_id)
+}
+
+#[inline]
+fn target_adl(target: &WarInfo) -> u8 {
+    if target.type4_id == 13003 {
+        attack_status::LANTRANH
+    } else if target.id_skill == 17001 {
+        attack_status::DEF
+    } else {
+        attack_status::ATTACK
+    }
+}
 
 /// Hành động chiến đấu phân loại theo nghiệp vụ (Domain Enum - Quyết định Q5: B)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1039,7 +1065,9 @@ impl Battle {
                             avg2,
                             out,
                         );
-                        self.note_npc_hit(ts, &mut attacker, &target);
+                        if !is_mineral_immune(data, &attacker, &target) {
+                            self.note_npc_hit(ts, &mut attacker, &target);
+                        }
                         self.write_cell(&mut target, (tpos.row, tpos.col));
                         self.write_cell(&mut attacker, (row, col));
                     }
@@ -1061,7 +1089,9 @@ impl Battle {
                             avg2,
                             out,
                         );
-                        self.note_npc_hit(ts, &mut attacker, &target);
+                        if !is_mineral_immune(data, &attacker, &target) {
+                            self.note_npc_hit(ts, &mut attacker, &target);
+                        }
                         self.write_cell(&mut target, (tpos.row, tpos.col));
                         self.write_cell(&mut attacker, (row, col));
                     }
@@ -1514,6 +1544,21 @@ impl Battle {
         if ts.delay == 0 || ts.delay <= sd {
             ts.delay = sd;
         }
+        if is_mineral_immune(data, attacker, target) {
+            *num36 = 0;
+            let adl = target_adl(target);
+            ts.text10.push_str(&packets::skilling_int(
+                target.row,
+                target.col,
+                miss_status::MISS,
+                adl,
+                1,
+                troi_byte::HP,
+                0,
+                1,
+            ));
+            return;
+        }
         let _ = (combo_field, num37, num34, do_manh, skill_tt, atk, int_stat);
         let attack = combat_formula::calculate_attack(
             &mut self.rng.random_damage,
@@ -1684,6 +1729,25 @@ impl Battle {
         out: &mut Vec<Out>,
     ) {
         let mut rear = rear.clone();
+        if is_mineral_immune(data, attacker, &rear) {
+            *num36 = 0;
+            let adl = target_adl(&rear);
+            let rr = tpos.row ^ 1;
+            let rc = tpos.col;
+            ts.text10.push_str(&packets::skilling_int(
+                rr,
+                rc,
+                miss_status::MISS,
+                adl,
+                1,
+                troi_byte::HP,
+                0,
+                1,
+            ));
+            ts.text_combo = packets::combo(rr, rc);
+            self.write_cell(&mut rear, (rr, rc));
+            return;
+        }
         if skill_type == 1 {
             let _ = (combo_field, num37, do_manh, skill_tt, atk);
             let attack = combat_formula::calculate_attack(
@@ -1769,6 +1833,21 @@ impl Battle {
         out: &mut Vec<Out>,
     ) {
         ts.delay = skill_delay(data, skill);
+        if is_mineral_immune(data, attacker, target) {
+            *num36 = 0;
+            let adl = target_adl(target);
+            ts.text10.push_str(&packets::skilling_int(
+                target.row,
+                target.col,
+                miss_status::MISS,
+                adl,
+                1,
+                troi_byte::HP,
+                0,
+                1,
+            ));
+            return;
+        }
         let _ = (num34, do_manh, skill_tt, int_stat);
         let attack = combat_formula::calculate_attack(
             &mut self.rng.random_damage,
@@ -1857,6 +1936,20 @@ impl Battle {
         out: &mut Vec<Out>,
     ) {
         ts.delay = skill_delay(data, skill);
+        if is_mineral_immune(data, attacker, target) {
+            let adl = target_adl(target);
+            ts.text10.push_str(&packets::skilling_int(
+                target.row,
+                target.col,
+                miss_status::MISS,
+                adl,
+                1,
+                troi_byte::MISS,
+                0,
+                1,
+            ));
+            return;
+        }
         let turn = skill_round(data, skill, skill_lv);
         let status_id = binary_skill_def(data, skill)
             .map(|s| i64::from(s.hit_status))
@@ -2217,8 +2310,10 @@ impl Battle {
         // Also target cannot have type3 status (freeze/petrify).
         let gate3_valid_target = !matches!(target.typ, 2 | 4 | 9 | 14) && target.type3_id == 0;
 
-        // Gate 4: Npc.dat can_capture flag must be true (not_pet == 0).
-        let can_capture = data.npcs.get(&target.id).map(|n| n.can_capture).unwrap_or(false);
+        // Gate 4: Npc.dat can_capture flag must be true (not_pet == 0),
+        // and Mineral NPCs (kind == 16 or IDs 22010/22011) are never capturable.
+        let can_capture = data.npcs.get(&target.id).map(|n| n.can_capture).unwrap_or(false)
+            && !is_mineral_target(data, target);
 
         // Gate 5: No duplicate pet: player must not already possess this template_id in their 4 pet slots.
         let gate5_not_duplicate = !slots.contains(&target.id);
@@ -2450,6 +2545,20 @@ impl Battle {
     ) {
         let _ = out;
         ts.delay = skill_delay(data, skill);
+        if is_mineral_immune(data, attacker, target) {
+            let adl = target_adl(target);
+            ts.text10.push_str(&packets::skilling_int(
+                target.row,
+                target.col,
+                miss_status::MISS,
+                adl,
+                1,
+                troi_byte::MISS,
+                0,
+                1,
+            ));
+            return;
+        }
         let turn = skill_round(data, skill, skill_lv);
         let mut byte_val;
         if target.type15_id > 0 {
@@ -2560,6 +2669,20 @@ impl Battle {
     ) {
         let _ = out;
         ts.delay = skill_delay(data, skill);
+        if skill == i64::from(SKILL_HOLY_SPIRIT) && is_mineral_immune(data, attacker, target) {
+            let adl = target_adl(target);
+            ts.text10.push_str(&packets::skilling_int(
+                target.row,
+                target.col,
+                miss_status::MISS,
+                adl,
+                1,
+                troi_byte::HP,
+                0,
+                1,
+            ));
+            return;
+        }
         let turn = if skill == i64::from(SKILL_TYRANT_WILL)
             || skill == i64::from(SKILL_CELESTIAL_SHIELD)
             || skill == i64::from(SKILL_ENERGY_CONCENTRATION)

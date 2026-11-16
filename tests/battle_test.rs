@@ -28,6 +28,8 @@ mod item_frame;
 mod levelup_frames;
 #[path = "battle/lifecycle.rs"]
 mod lifecycle;
+#[path = "battle/mineral_pickaxe.rs"]
+mod mineral_pickaxe;
 #[path = "battle/open_leader.rs"]
 mod open_leader;
 #[path = "battle/open_self_kind.rs"]

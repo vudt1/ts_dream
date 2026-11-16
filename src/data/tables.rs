@@ -60,6 +60,8 @@ pub struct Item {
     pub thuoctinh: i64,
     pub value: i64,
     pub loai: i64,
+    /// Equipment slot position (`fit_type` from `Item.dat`: `1..=6` equippable, `0` otherwise).
+    pub equip_pos: i64,
     pub rb_pet_from: i64,
     pub rb_pet_to: i64,
     pub add_pet: i64,

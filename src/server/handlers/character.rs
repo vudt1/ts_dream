@@ -226,9 +226,9 @@ pub fn apply_to_session(session: &mut Session, data: &CreateCharData) {
     // job 0 / lv 1, computed HP/SP via `starting_hp_sp`, map 10817/442/758,
     // Tiengtam/ThamChien = 1) plus the starter Trangbi row, so a
     // create → login in the golden stub yields the same Logined1 sequence as
-    // the live path. Starter bag (inventories type 1 = Homdo): item 32012×4;
-    // starter Trangbi (type 8): 19737 at slot 2. On the live path the next
-    // login also reloads everything from the DB.
+    // the live path. Starter bag (inventories type 1 = Homdo): item 32012×4
+    // at slot 1, item 31007×1 at slot 2; starter Trangbi (type 8): 19737 at
+    // slot 2. On the live path the next login also reloads everything from the DB.
     let hp = crate::battle::engine::get_hp_max(0, 0, 1, i64::from(data.hpx));
     let sp = crate::battle::engine::get_sp_max(0, 0, 1, i64::from(data.spx));
     session.level = 1;
@@ -265,6 +265,12 @@ pub fn apply_to_session(session: &mut Session, data: &CreateCharData) {
         slot: 1,
         id: 32012,
         count: 4,
+        ..Default::default()
+    });
+    session.homdo.push(InventoryItem {
+        slot: 2,
+        id: 31007,
+        count: 1,
         ..Default::default()
     });
     session.trangbi.clear();

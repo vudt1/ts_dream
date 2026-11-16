@@ -633,6 +633,7 @@ impl GameData {
                 thuoctinh: num_at(19, &f, "Items.txt")?,
                 value: num_at(20, &f, "Items.txt")?,
                 loai: num_at(21, &f, "Items.txt")?,
+                equip_pos: 0,
                 rb_pet_from: num_at(22, &f, "Items.txt")?,
                 rb_pet_to: num_at(23, &f, "Items.txt")?,
                 add_pet: num_at(24, &f, "Items.txt")?,

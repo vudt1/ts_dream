@@ -594,3 +594,284 @@ fn test_pet_summary_wire_format_includes_10_byte_equipment() {
     assert!(stat_frame.contains("8913"), "Pet equipment item ID must be present in 0F08 frame");
 }
 
+#[tokio::test]
+async fn test_player_and_pet_pickaxe_equip_swap_unequip_and_rejections() {
+    use ts_dream::data::loaders::item::ItemDef;
+
+    let pool = setup_test_db().await;
+    let repos = SqliteRepositories::new(pool.clone());
+    let acc_id = ts_dream::db::accounts::create(&pool, "pick_user", "pick_pass")
+        .await
+        .expect("create account");
+
+    let seed = ts_dream::db::modern::traits::CharacterSeed {
+        level: 110,
+        sex: 0,
+        hair: 1,
+        element: 1,
+        map_id: 10817,
+        map_x: 100,
+        map_y: 100,
+    };
+    repos
+        .characters()
+        .create(acc_id, b"Miner", &seed)
+        .await
+        .expect("create character");
+
+    let mut data = ts_dream::data::loader::GameData::default();
+    let defs = [
+        ItemDef {
+            id: 10001,
+            kind: 39,
+            fit_type: 3,
+            level: 0,
+            attr1_kind: 210,
+            attr1_value: 5,
+            ..Default::default()
+        },
+        ItemDef {
+            id: 10530,
+            kind: 39,
+            fit_type: 3,
+            level: 90,
+            attr1_kind: 210,
+            attr1_value: 15,
+            ..Default::default()
+        },
+        ItemDef {
+            id: 10534,
+            kind: 39,
+            fit_type: 3,
+            level: 110,
+            attr1_kind: 210,
+            attr1_value: 30,
+            ..Default::default()
+        },
+        ItemDef {
+            id: 29335, // Cuốc đào (non-equippable)
+            kind: 27,
+            fit_type: 0,
+            level: 0,
+            ..Default::default()
+        },
+    ];
+    for d in &defs {
+        data.items.insert(i64::from(d.id), d.to_item());
+    }
+
+    let mut session = Session {
+        id: acc_id as u32,
+        db_character_id: acc_id,
+        name: b"Miner".to_vec(),
+        level: 110,
+        pets: vec![PetState {
+            stt: 1,
+            id: 11001,
+            name: b"Golem".to_vec(),
+            level: 50, // enough for 10001 (lv0), not enough for 10530 (lv90)
+            ..Default::default()
+        }],
+        homdo: vec![
+            InventoryItem { slot: 1, id: 10001, count: 1, ..Default::default() },
+            InventoryItem { slot: 2, id: 10534, count: 1, ..Default::default() },
+            InventoryItem { slot: 3, id: 10530, count: 1, ..Default::default() },
+            InventoryItem { slot: 4, id: 29335, count: 1, ..Default::default() },
+            InventoryItem { slot: 5, id: 32012, count: 4, ..Default::default() }, // collateral
+        ],
+        trangbi: vec![
+            InventoryItem { slot: 2, id: 19737, count: 1, loai: 2, agi1: 1, ..Default::default() }, // collateral
+        ],
+        ..Default::default()
+    };
+    session.hydrate_templates(&data);
+    repos.sessions().save(&session).await.expect("save session");
+
+    let mut conn = Conn::default();
+    conn.session = session;
+    let service = ts_dream::battle::service::BattleService::default();
+    let env = ServerEnv {
+        pool: Some(&pool),
+        repos: Some(&repos),
+        hub: None,
+        sender: None,
+    };
+
+    // 1. Player equips 10001 (slot 1) -> trangbi slot 3, emits 17 11 and 17 0B, atk2 += 5
+    let mut out = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            out: &mut out,
+            env,
+            data: &data,
+            service: &service,
+            decoded: &[],
+            opcode: 0x17,
+            sub: 11, // player equip
+            payload: &[1],
+        };
+        handle_inventory(&mut ctx).await;
+    }
+    assert!(out.outgoing.iter().any(|f| f.frame == "F4440300171101"));
+    assert!(out.outgoing.iter().any(|f| f.frame.len() >= 12 && &f.frame[8..12] == "170B"));
+    assert_eq!(conn.session.trangbi.iter().find(|i| i.slot == 3).map(|i| i.id), Some(10001));
+    assert_eq!(conn.session.atk2, 5);
+
+    // 2. Player swaps 10001 with 10534 (slot 2) -> trangbi slot 3 becomes 10534, 10001 returns to homdo slot 2
+    out.outgoing.clear();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            out: &mut out,
+            env,
+            data: &data,
+            service: &service,
+            decoded: &[],
+            opcode: 0x17,
+            sub: 11,
+            payload: &[2],
+        };
+        handle_inventory(&mut ctx).await;
+    }
+    assert_eq!(conn.session.trangbi.iter().find(|i| i.slot == 3).map(|i| i.id), Some(10534));
+    assert_eq!(conn.session.atk2, 30);
+    assert!(conn.session.homdo.iter().any(|i| i.slot == 2 && i.id == 10001));
+
+    // 3. Negative: Player tries to equip 29335 (slot 4, equip_pos=0) -> rejected, item stays in homdo slot 4
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            out: &mut out,
+            env,
+            data: &data,
+            service: &service,
+            decoded: &[],
+            opcode: 0x17,
+            sub: 11,
+            payload: &[4],
+        };
+        handle_inventory(&mut ctx).await;
+    }
+    assert_eq!(conn.session.trangbi.iter().find(|i| i.slot == 3).map(|i| i.id), Some(10534));
+    assert!(conn.session.homdo.iter().any(|i| i.slot == 4 && i.id == 29335));
+
+    // 4. Negative: Pet (lv 50) tries to equip 10530 (lv 90, slot 3) -> rejected
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            out: &mut out,
+            env,
+            data: &data,
+            service: &service,
+            decoded: &[],
+            opcode: 0x17,
+            sub: 17, // pet equip
+            payload: &[1, 3],
+        };
+        handle_inventory(&mut ctx).await;
+    }
+    assert!(conn.session.trangbi.iter().all(|i| i.slot != 13));
+    assert!(conn.session.homdo.iter().any(|i| i.slot == 3 && i.id == 10530));
+
+    // 5. Pet equips 10001 (slot 2) -> trangbi slot 13 (1*10 + 3)
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            out: &mut out,
+            env,
+            data: &data,
+            service: &service,
+            decoded: &[],
+            opcode: 0x17,
+            sub: 17,
+            payload: &[1, 2],
+        };
+        handle_inventory(&mut ctx).await;
+    }
+    assert_eq!(conn.session.trangbi.iter().find(|i| i.slot == 13).map(|i| i.id), Some(10001));
+    assert!(conn.session.homdo.iter().all(|i| i.slot != 2));
+
+    // 6. Negative: Pet equip & unequip blocked when battle_id > 0
+    conn.session.battle_id = 42;
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            out: &mut out,
+            env,
+            data: &data,
+            service: &service,
+            decoded: &[],
+            opcode: 0x17,
+            sub: 18, // pet unequip
+            payload: &[1, 3],
+        };
+        handle_inventory(&mut ctx).await;
+    }
+    assert_eq!(
+        conn.session.trangbi.iter().find(|i| i.slot == 13).map(|i| i.id),
+        Some(10001),
+        "pet unequip must be blocked during battle"
+    );
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            out: &mut out,
+            env,
+            data: &data,
+            service: &service,
+            decoded: &[],
+            opcode: 0x17,
+            sub: 17, // pet equip
+            payload: &[1, 3],
+        };
+        handle_inventory(&mut ctx).await;
+    }
+    assert_eq!(
+        conn.session.trangbi.iter().find(|i| i.slot == 13).map(|i| i.id),
+        Some(10001),
+        "pet equip must be blocked during battle"
+    );
+
+    // 7. Out of battle: pet unequip & player unequip succeed
+    conn.session.battle_id = 0;
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            out: &mut out,
+            env,
+            data: &data,
+            service: &service,
+            decoded: &[],
+            opcode: 0x17,
+            sub: 18, // pet unequip
+            payload: &[1, 3],
+        };
+        handle_inventory(&mut ctx).await;
+    }
+    assert!(conn.session.trangbi.iter().all(|i| i.slot != 13));
+    assert!(conn.session.homdo.iter().any(|i| i.id == 10001));
+
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            out: &mut out,
+            env,
+            data: &data,
+            service: &service,
+            decoded: &[],
+            opcode: 0x17,
+            sub: 12, // player unequip
+            payload: &[3, 6],
+        };
+        handle_inventory(&mut ctx).await;
+    }
+    assert!(conn.session.trangbi.iter().all(|i| i.slot != 3));
+    assert_eq!(conn.session.atk2, 0);
+    assert!(conn.session.homdo.iter().any(|i| i.slot == 6 && i.id == 10534));
+
+    // 8. Collateral integrity: homdo slot 5 (32012x4) and trangbi slot 2 (19737) untouched
+    assert!(conn.session.homdo.iter().any(|i| i.slot == 5 && i.id == 32012 && i.count == 4));
+    assert!(conn.session.trangbi.iter().any(|i| i.slot == 2 && i.id == 19737));
+}
+

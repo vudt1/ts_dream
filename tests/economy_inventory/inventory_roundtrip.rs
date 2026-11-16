@@ -35,6 +35,7 @@ fn sample_item(slot: u8, id: u16, count: u8) -> InventoryItem {
         item_hp: 100,
         item_sp: 50,
         loai: 1,
+        equip_pos: 1,
         thuoctinh: 2,
         giatri_thuoctinh: 5,
     }

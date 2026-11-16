@@ -37,6 +37,8 @@ pub struct InventoryItem {
     pub item_hp: i16,
     pub item_sp: i16,
     pub loai: u8,
+    /// Equipment slot position (`1..=6` when equippable, `0` otherwise).
+    pub equip_pos: u8,
     /// Item element (`_Thuoctinh`, Items.txt `element`).
     pub thuoctinh: u8,
     /// Elemental stat bonus (`_GiatriThuoctinh`, Items.txt `elem_val`).
@@ -70,9 +72,29 @@ impl InventoryItem {
             item_hp: def.hp as i16,
             item_sp: def.sp as i16,
             loai: def.loai as u8,
+            equip_pos: if def.equip_pos > 0 {
+                def.equip_pos as u8
+            } else if (1..=6).contains(&def.loai) {
+                def.loai as u8
+            } else {
+                0
+            },
             thuoctinh: def.thuoctinh as u8,
             giatri_thuoctinh: def.value as u8,
             ..Default::default()
+        }
+    }
+
+    /// Effective equipment slot position (`1..=6`, or `0` if not equippable).
+    /// Uses `equip_pos` (`fit_type` from `Item.dat`) when non-zero, falling back
+    /// to `loai` in `1..=6` for manually constructed / legacy in-memory items.
+    pub fn effective_equip_pos(&self) -> u8 {
+        if self.equip_pos > 0 {
+            self.equip_pos
+        } else if (1..=6).contains(&self.loai) {
+            self.loai
+        } else {
+            0
         }
     }
 }
@@ -605,6 +627,7 @@ impl Session {
                 item.item_hp = tpl.item_hp;
                 item.item_sp = tpl.item_sp;
                 item.loai = tpl.loai;
+                item.equip_pos = tpl.equip_pos;
                 item.thuoctinh = tpl.thuoctinh;
                 item.giatri_thuoctinh = tpl.giatri_thuoctinh;
             }
