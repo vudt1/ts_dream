@@ -3,20 +3,23 @@
 //! - Unified `u16` `eve_no` index lookup between `SceneEveData` and `npc_event` (no `Vec<u8>` / `u8` truncation)
 
 use std::collections::HashMap;
+use std::sync::Arc;
 use ts_dream::battle::rng::DotNetRandom;
 use ts_dream::battle::runner::Outcome;
+use ts_dream::battle::service::BattleService;
 use ts_dream::data::loader::GameData;
+use ts_dream::data::loaders::eve::{EveFightData, EveFightEnemy};
 use ts_dream::data::loaders::{
     EveCondition, EveEncounterPlacement, EveNpcPlacement, EveResult, NpcEventData, SceneEveData,
 };
 use ts_dream::eve::auto_chain::{AutoChainResult, EveAutoChainEngine, EventPhase, EventTriggerKind};
 use ts_dream::eve::planner::DomainEffect;
-use ts_dream::server::dispatcher::HandleOutcome;
+use ts_dream::server::dispatcher::{dispatch, HandleOutcome, ServerEnv};
 use ts_dream::server::handlers::eve_runner::{
     execute_event_step_with_pool, resume_eve_after_battle_full,
 };
 use ts_dream::server::handlers::npc_event::{resolve_npc_event, NpcTrigger};
-use ts_dream::server::session::Session;
+use ts_dream::server::session::{Conn, Session};
 
 fn make_talk_result(mean_no: u16) -> EveResult {
     EveResult {
@@ -168,6 +171,7 @@ fn ticket18_npc_event_uses_scene_u16_index_without_u8_truncation() {
     scene.door_events_by_door.insert(2, vec![300]);
     scene.encounters.push(EveEncounterPlacement {
         id: 3,
+        full_map: true,
         ..Default::default()
     });
     scene.encounter_events_by_id.insert(3, vec![300]);
@@ -183,6 +187,7 @@ fn ticket18_npc_event_uses_scene_u16_index_without_u8_truncation() {
         NpcTrigger::ClickNpc(1),
         NpcTrigger::ClickDoor(2),
         NpcTrigger::WalkStepEncounter(3),
+        NpcTrigger::WalkStep { x: 100, y: 100 },
     ] {
         let ev = resolve_npc_event(&session, &data, trigger, &mut rng)
             .expect("u16 eve_no > 255 must resolve directly from SceneEveData u16 indices");
@@ -249,4 +254,73 @@ fn ticket18_npc_event_uses_scene_u16_index_without_u8_truncation() {
     assert_eq!(chained.eve_no, 301);
     assert_eq!(chained.planned_effects.len(), 1);
     let _ = EventTriggerKind::ClickNpc;
+}
+
+#[tokio::test]
+async fn ticket18_random_encounter_uses_encounter_events_by_id_u16_index() {
+    let mut scene = SceneEveData::default();
+    scene.npc_events.insert(
+        301,
+        NpcEventData {
+            eve_no: 301,
+            when_happen: [true, false, false, false],
+            conditions: vec![EveCondition {
+                condition_no: 1,
+                condition_class: 0,
+                and_num: 1,
+                results: vec![EveResult {
+                    result_type: 3,
+                    result_mean_no: 77,
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        },
+    );
+    scene.fight_datas.insert(
+        77,
+        EveFightData {
+            eve_no: 77,
+            right_enemies: vec![EveFightEnemy {
+                npc_id: 11001,
+                ..Default::default()
+            }],
+            ..Default::default()
+        },
+    );
+    scene.encounters.push(EveEncounterPlacement {
+        id: 5,
+        full_map: true,
+        events: Vec::new(),
+        ..Default::default()
+    });
+    scene.encounter_events_by_id.insert(5, vec![301]);
+
+    let mut data = GameData::default();
+    data.scene_eve_data.insert(12001, scene);
+    let data_arc = Arc::new(data);
+    let service = BattleService::new(Arc::clone(&data_arc));
+    let env = ServerEnv::none();
+
+    let mut conn = Conn {
+        session: Session {
+            id: 18501,
+            map_id: 12001,
+            map_x: 100,
+            map_y: 100,
+            encounter_steps: 19,
+            encounter_threshold: 20,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let [x0, x1] = 120u16.to_le_bytes();
+    let [y0, y1] = 120u16.to_le_bytes();
+    let move_pkt = vec![0xF4, 0x44, 0x07, 0x00, 0x06, 0x01, 2, x0, x1, y0, y1];
+    let _out = dispatch(&mut conn, &move_pkt, &data_arc, &service, &env).await;
+    assert!(
+        conn.session.battle_id > 0,
+        "random encounter must resolve u16 eve_no=301 via encounter_events_by_id"
+    );
 }

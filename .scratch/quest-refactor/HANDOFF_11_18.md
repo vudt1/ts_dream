@@ -3,7 +3,7 @@
 > **Spec reference:** [`.scratch/quest-refactor/spec-p0-p2.md`](spec-p0-p2.md)  
 > **Prior handoff:** [`.scratch/quest-refactor/HANDOFF_01_10.md`](HANDOFF_01_10.md)
 
-## Summary of Completed Work (Tickets 11–17)
+## Summary of Completed Work (Tickets 11–18)
 
 ### Ticket 11 ([`issues/11-remove-should-skip-event.md`](issues/11-remove-should-skip-event.md)) — `resolved`
 1. **Removed `should_skip_event` & `has_later_completed_event` (`src/eve/auto_chain.rs`, `src/server/handlers/npc_event.rs`)**:
@@ -13,13 +13,13 @@
 2. **Preserved Loop Guards & Condition-Based Branching (`src/eve/auto_chain.rs`)**:
    - Guard #1 (`detect_same_chain`) uses `continue` instead of early `return AutoChainResult::NoMatch`, allowing subsequent events/conditions in the same `EveNo` to be evaluated while keeping all 4 infinite-loop guards (`detect_same_chain`, `detect_re_question`, `detect_re_battle`, `detect_duplicate_items`) active.
    - Branching now relies solely on `EveCondition` (`cc=2`, `cc=12`, etc.) and `EveResolver` priority order.
-3. **Tests (`tests/tickets_11_12_13_test.rs`, `tests/p0_blockers_test.rs`, `tests/pure_planner_event_runner_and_preflight_test.rs`)**:
-   - Added 4 tests in `tests/tickets_11_12_13_test.rs`:
+3. **Tests (`tests/eve_quest/tickets_11_12_13.rs`, `tests/eve_quest/p0_blockers.rs`, `tests/eve_quest/pure_planner_event_runner_and_preflight.rs`)**:
+   - Added 4 tests in `tests/eve_quest/tickets_11_12_13.rs`:
      - `ticket11_multi_step_same_eve_no_without_cc12_succeeds` (E2E via `dispatcher::dispatch`)
      - `ticket11_npc_with_multiple_independent_quests_later_does_not_lock_earlier`
      - `ticket11_auto_chain_battle_result_zero_and_same_condition_guard` (positive `battle_result == 0` + negative Guard #1)
      - `ticket11_negative_one_time_quest_with_cc12_still_blocked`
-   - Updated `tests/p0_blockers_test.rs` and `tests/pure_planner_event_runner_and_preflight_test.rs` for `cc=12` / `AutoChain` behavior after `should_skip_event` removal.
+   - Updated `tests/eve_quest/p0_blockers.rs` and `tests/eve_quest/pure_planner_event_runner_and_preflight.rs` for `cc=12` / `AutoChain` behavior after `should_skip_event` removal.
 
 ---
 
@@ -31,8 +31,8 @@
    - Wired `resolve_warp_destination` across `eve_runner.rs`, `quest.rs` (`perform_party_warp_and_persist` with `Two-Phase State Lock` + atomic DB write-through, and `handle_warp_confirm`), and `battle/service.rs` (both online and offline `eve_warp` paths).
    - Unified all `"Warps.dat"` references/comments in `src/` to `"Warps.txt"` (`quest.rs`, `eve/planner.rs`).
    - *Minor non-blocking note:* `src/server/handlers/quest.rs:1032` still logs `"Warp id={} map={} not found in Warps.txt"` when `resolve_warp_destination` returns `None`.
-3. **Tests (`tests/tickets_11_12_13_test.rs`, `tests/movement_warp_test.rs`, `tests/npc_eve_e2e_test.rs`, `tests/door_triggers_walkstep_and_party_warp_test.rs`)**:
-   - Added 5 tests in `tests/tickets_11_12_13_test.rs`:
+3. **Tests (`tests/eve_quest/tickets_11_12_13.rs`, `tests/server_network/movement_warp.rs`, `tests/eve_quest/npc_eve_e2e.rs`, `tests/eve_quest/door_triggers_walkstep_and_party_warp.rs`)**:
+   - Added 5 tests in `tests/eve_quest/tickets_11_12_13.rs`:
      - `ticket12_eve_emg_parses_dest_map_id_for_all_10336_rt2_warps` (verifies `10,336 / 10,336` `rt=2` results in `Data/eve.emg`)
      - `ticket12_e2e_rt2_warp_uses_eve_scene_info_and_persists_party` (E2E via `dispatcher::dispatch` + DB persistence for leader & member)
      - `ticket12_e2e_rt2_warp_prefers_eve_scene_info_over_conflicting_warps_txt`
@@ -50,9 +50,9 @@
    - `GameData::load` / `load_from_dir` loads `ground_server.mmg` (fallback `ground.mmg`) into `ground_metas` and `ground_terrains`, exposing `GameData::map_diahinh(map_id)` with fallback `112`.
    - Updated `eve_runner.rs` (EVE `rt=6` battle) and `movement.rs` (random encounter `WalkStep` & `WalkConfirm`) to use `data.map_diahinh(...)` for `0x0B 0xFA` `DiaHinh` instead of `scene_infos.get(&1).background_no`.
    - Updated `GLOSSARY.md` definitions for `DiaHinh` and `geolBaseAtt`.
-3. **Tests (`tests/tickets_11_12_13_test.rs`, `tests/ground_test.rs`)**:
-   - Updated `tests/ground_test.rs` to load `Data/ground_server.mmg` and assert all `4,528` maps have positive `width` and `height`.
-   - Added 3 tests in `tests/tickets_11_12_13_test.rs`:
+3. **Tests (`tests/eve_quest/tickets_11_12_13.rs`, `tests/data_loaders/ground.rs`)**:
+   - Updated `tests/data_loaders/ground.rs` to load `Data/ground_server.mmg` and assert all `4,528` maps have positive `width` and `height`.
+   - Added 3 tests in `tests/eve_quest/tickets_11_12_13.rs`:
      - `ticket13_gamedata_loads_ground_server_mmg_and_map_diahinh`
      - `ticket13_eve_battle_0x0b_fa_uses_ground_diahinh_not_scene_info_background_no`
      - `ticket13_random_encounter_0x0b_fa_uses_ground_diahinh_and_fallback_112`
@@ -72,9 +72,9 @@
 3. **`EveResolver::resolve` `chain[1..].results` (`src/eve/resolver.rs`)**:
    - `resolve` now checks total result count across the entire AND chain (`chain.iter().map(|c| c.results.len()).sum::<usize>() > 0`) instead of `head.results.is_empty()`.
    - Collects `results` from all links `winner.chain[0..]` in order, uses total `result_count` as the tertiary tie-breaker, and updates doc comments to match the 3 comparison tiers + declaration-order tie-break.
-4. **Tests (`tests/tickets_14_15_test.rs`, `tests/door_triggers_walkstep_and_party_warp_test.rs`, `tests/tickets_11_12_13_test.rs`)**:
-   - Updated synthetic `ClickDoor` / `MeetDoor` fixtures in `door_triggers_walkstep_and_party_warp_test.rs` and `tickets_11_12_13_test.rs` with explicit `when_happen` flags.
-   - Added 6 tests in `tests/tickets_14_15_test.rs`:
+4. **Tests (`tests/eve_quest/tickets_14_15.rs`, `tests/eve_quest/door_triggers_walkstep_and_party_warp.rs`, `tests/eve_quest/tickets_11_12_13.rs`)**:
+   - Updated synthetic `ClickDoor` / `MeetDoor` fixtures in `tests/eve_quest/door_triggers_walkstep_and_party_warp.rs` and `tests/eve_quest/tickets_11_12_13.rs` with explicit `when_happen` flags.
+   - Added 6 tests in `tests/eve_quest/tickets_14_15.rs`:
      - `ticket14_door_when_happen_separates_click_door_and_meet_door`
      - `ticket14_click_npc_on_ser_stroke_and_walkstep_encounter_on_click_obj_preserved`
      - `ticket14_auto_chain_door_respects_when_happen`
@@ -89,9 +89,9 @@
    - Removed the `mark_dont_on_step1: bool` field from `QuestOp::Advance` in `src/eve/planner.rs` (no other consumers).
    - Removed the automatic `set_quest_dont(session, out, mark, 1)` call on `step == 1` in `eve_runner::execute_update_quest`; `rt=0, rc=2, p_style=1` now only updates the `Quest Ledger`.
    - Verified `set_quest_dont(..., 1)` (`S->C 0x18 05`) is only called via `QuestOp::MarkDont` (`p_style=5`) and `QuestOp::ExplicitMark` (`p_style=3` with `result_value > 0`, guarded in `eve_runner.rs`).
-2. **Tests (`tests/tickets_14_15_test.rs`, `tests/checkpoint6_parity_test.rs`, `tests/pure_planner_event_runner_and_preflight_test.rs`)**:
-   - Updated `checkpoint6_parity_test.rs` (`test_class2_quest_save_triggers_quest_dont_when_mark_present`) and `pure_planner_event_runner_and_preflight_test.rs` (Quest 10049 `p_style=1 step=1` no longer marks `quest_dont` bit 27).
-   - Added 12 tests in `tests/tickets_14_15_test.rs` (including real `Data/eve.emg` `use_mode == 2` & `15` AND chains / `29` tail nodes, `ExplicitMark` `p_style=3` positive-only guard, real `Data/Mark.dat` 7 multi-step quests, and `cc=7, param=2, p_style=4` regression).
+2. **Tests (`tests/eve_quest/tickets_14_15.rs`, `tests/eve_quest/checkpoint6_parity.rs`, `tests/eve_quest/pure_planner_event_runner_and_preflight.rs`)**:
+   - Updated `tests/eve_quest/checkpoint6_parity.rs` (`test_class2_quest_save_triggers_quest_dont_when_mark_present`) and `tests/eve_quest/pure_planner_event_runner_and_preflight.rs` (Quest 10049 `p_style=1 step=1` no longer marks `quest_dont` bit 27).
+   - Added 12 tests in `tests/eve_quest/tickets_14_15.rs` (including real `Data/eve.emg` `use_mode == 2` & `15` AND chains / `29` tail nodes, `ExplicitMark` `p_style=3` positive-only guard, real `Data/Mark.dat` 7 multi-step quests, and `cc=7, param=2, p_style=4` regression).
 
 ---
 

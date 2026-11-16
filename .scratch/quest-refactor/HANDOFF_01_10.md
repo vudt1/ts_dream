@@ -181,10 +181,10 @@
 All tickets `01` through `10` in `.scratch/quest-refactor/issues/` are now `resolved`.
 - **Codebase & Data Parity Notes (Synced with Current Repo):**
   - `EventRunner`, `preflight_probe_batch`, `execute_event_step_core`, and `DomainEffect` executors live in `src/server/handlers/eve_runner.rs` (extracted from `src/server/handlers/talk.rs` in Ticket 10).
-  - `EveCondition` (`src/data/loaders/eve.rs`) stores `to_result: u16` and `results: Vec<EveResult>`.
+  - `EveCondition` (`src/data/loaders/eve.rs`) stores `to_result: u8` and `results: Vec<EveResult>`.
   - `rt=0, rc=5` (`MutateMoney`) is supported (`0x1A 01/02/04/05/06`), `DomainEffect::Unsupported` handles unknown `result_type`/`result_class` fail-closed, and `rt=9` (`NpcAction`, `p_style ∈ {1, 2}`) is handled server-side.
   - `Warps.txt` (not `Warps.dat`) is the warp table in `GameData` / `quest.rs`.
-  - `OP_RANK` (`0x41`) and `OP_BOAT_RACE` (`0x46`) are dispatched to `system::handle_rank` and `boat_race` in `src/server/dispatcher.rs` (not in `unimplemented`).
+  - `OP_RANK` (`0x41`) and `OP_BOAT_RACE` (`0x46`) are dispatched to `system::handle_rank` and `guild::handle_boat_race` in `src/server/dispatcher.rs` (not in `unimplemented`).
   - Verified `Data/eve.emg` corpus counts: `15` multi-link AND chains, `223` scene events with `cc=12` (`param != 0`), and `rt=9` records with `p_style ∈ {1, 2}`.
 - **Runtime / live client checks remaining:** Live `aLogin.exe` rendering of `0x14 01` on `MutateItem` and `0x1A 05/06` without `0x1A 03`, plus a dedicated 40-NPC multi-wave `advance_wave` + `battle_ended` test asserting `quest_tasks[218]` preservation in `sess_arc`.
 - **Important note for production DB:** Existing `DB/ts_dream.db` files created from `0001_init.sql` must have `migrations/0002_eve_quest_persistence.sql` applied before running the updated binary (since `db::pool::migrate` is a no-op per ADR 0004).

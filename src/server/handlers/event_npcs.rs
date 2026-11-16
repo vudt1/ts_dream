@@ -385,6 +385,11 @@ pub async fn try_handle_event_npc(
         }
 
         // 2. Deterministic Test Fallback
+        if conn.session.id_leader > 0 && conn.session.id_leader != conn.session.id {
+            out.send(crate::server::spawn::sys_msg_frame("Chi doi truong moi co the chuyen tang"));
+            end_talk(conn, out);
+            return true;
+        }
         let current_stage = ((map_id - 12911) + 1) as u8; // 1..=17
         let quest_step = conn.session.quest_tasks.get(&212).map(|&(_, s)| s).unwrap_or(0);
         if quest_step != current_stage {
@@ -517,6 +522,11 @@ pub async fn try_handle_event_npc(
         }
 
         // 2. Deterministic Test Fallback
+        if conn.session.id_leader > 0 && conn.session.id_leader != conn.session.id {
+            out.send(crate::server::spawn::sys_msg_frame("Chi doi truong moi co the chuyen tang"));
+            end_talk(conn, out);
+            return true;
+        }
         let current_stage = ((map_id - 49960) + 1) as u8; // 1..=9
         let quest_step = conn.session.quest_tasks.get(&12309).map(|&(_, s)| s).unwrap_or(0);
         if quest_step != current_stage {

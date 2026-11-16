@@ -358,7 +358,22 @@ async fn ticket17_e2e_event_npcs_15312_15313_61210_party_lock_registry_and_sqlit
         assert_eq!((db_s.map_id, db_s.map_x, db_s.map_y), (12911, 400, 400));
     }
 
-    // 2. Test 15313: leader clicks 15313 on map 12911 -> warps leader & members to 12912 + quest 212=2 in DB
+    // 2. Test 15313: negative member-click rejection, then leader click -> warps leader & members to 12912 + quest 212=2
+    member_conns[0].session.map_id = 12911;
+    let out_member_15313 = dispatch(
+        &mut member_conns[0],
+        &click_npc_frame(15313),
+        &data_arc,
+        &service,
+        &env,
+    )
+    .await;
+    assert_eq!(member_conns[0].session.map_id, 12911);
+    assert!(out_member_15313
+        .outgoing
+        .iter()
+        .any(|f| f.frame.contains(&ts_dream::server::spawn::sys_msg_frame("Chi doi truong moi co the chuyen tang"))));
+
     let _out_15313 = dispatch(
         &mut leader_conn,
         &click_npc_frame(15313),
@@ -395,6 +410,22 @@ async fn ticket17_e2e_event_npcs_15312_15313_61210_party_lock_registry_and_sqlit
             }
         }
     }
+
+    // Negative: party member clicking 61210 on map 49960 is rejected without changing map
+    member_conns[0].session.map_id = 49960;
+    let out_member_61210 = dispatch(
+        &mut member_conns[0],
+        &click_npc_frame(61210),
+        &data_arc,
+        &service,
+        &env,
+    )
+    .await;
+    assert_eq!(member_conns[0].session.map_id, 49960);
+    assert!(out_member_61210
+        .outgoing
+        .iter()
+        .any(|f| f.frame.contains(&ts_dream::server::spawn::sys_msg_frame("Chi doi truong moi co the chuyen tang"))));
 
     let _out_61210 = dispatch(
         &mut leader_conn,

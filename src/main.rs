@@ -99,8 +99,8 @@ async fn main() -> anyhow::Result<()> {
     //     sessions and batch-write dirty ones in one transaction each.
     ts_dream::server::auto_save::spawn(pool.clone());
 
-    // 3d. Eve-event activation gate (ticket 07): off by default so wire parity
-    //     with the golden captures holds; operators opt in via `TS_EVE_EVENTS=1`.
+    // 3d. Eve-event activation gate: enabled by default in production (`EVE_EVENTS_ENABLED = true`);
+    //     keep `TS_EVE_EVENTS=1` opt-in log compatibility.
     if std::env::var("TS_EVE_EVENTS").is_ok_and(|v| v == "1" || v.eq_ignore_ascii_case("true")) {
         ts_dream::server::handlers::npc_event::set_eve_events_enabled(true);
         tracing::info!("Eve event engine enabled (TS_EVE_EVENTS)");

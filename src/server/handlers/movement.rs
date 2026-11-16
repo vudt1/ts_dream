@@ -286,32 +286,41 @@ fn try_trigger_random_encounter(ctx: &mut OpcodeCtx) -> Option<crate::eve::state
         crate::server::handlers::npc_event::snapshot_state_with_data(&conn.session, Some(ctx.data), None);
     let mut chosen_fight_id: Option<u16> = None;
 
-    for &eve_no in &encounter.events {
-        let Some(event_data) = scene.npc_events.get(&u16::from(eve_no)) else {
-            continue;
-        };
-        let Some(resolved) =
-            crate::eve::resolver::resolve_event(event_data, &state, &scene.group_datas, &mut rng, None)
-        else {
-            continue;
-        };
-
+    let mut try_resolve_fight = |eve_no: u16| -> Option<u16> {
+        let event_data = scene.npc_events.get(&eve_no)?;
+        let resolved = crate::eve::resolver::resolve_event(
+            event_data,
+            &state,
+            &scene.group_datas,
+            &mut rng,
+            None,
+        )?;
         for res in &resolved.results {
-            if res.result_type == 3 {
-                // Battle result
-                let fight_id = if res.result_group_no > 0 {
-                    res.result_mean_no
-                } else {
-                    res.result_mean_no
-                };
-                if fight_id > 0 {
-                    chosen_fight_id = Some(fight_id);
-                    break;
-                }
+            if res.result_type == 3 && res.result_mean_no > 0 {
+                return Some(res.result_mean_no);
             }
         }
-        if chosen_fight_id.is_some() {
-            break;
+        None
+    };
+
+    if let Some(eve_nos) = scene
+        .encounter_events_by_id
+        .get(&encounter.id)
+        .filter(|v| !v.is_empty())
+        .map(Vec::as_slice)
+    {
+        for &eve_no in eve_nos {
+            if let Some(fid) = try_resolve_fight(eve_no) {
+                chosen_fight_id = Some(fid);
+                break;
+            }
+        }
+    } else {
+        for &eve_no in &encounter.events {
+            if let Some(fid) = try_resolve_fight(u16::from(eve_no)) {
+                chosen_fight_id = Some(fid);
+                break;
+            }
         }
     }
 

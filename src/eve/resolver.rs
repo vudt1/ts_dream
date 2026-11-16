@@ -1,4 +1,4 @@
-//! Tier 3 - AND chain grouping, 4-tier prioritized matching and event
+//! Tier 3 - AND chain grouping, 3-tier prioritized matching (plus declaration-order tie-break) and event
 //! resolution (chain match + GroupData probability filter).
 //!
 //! Source of truth: `Eve_NpcEventData.lua` where the `andNum` field defines

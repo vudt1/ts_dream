@@ -10,9 +10,9 @@
 //! - and continue finished events via [`EveAutoChainEngine::try_auto_chain`]
 //!   with the 4-layer loop protection.
 //!
-//! Activation is gated behind [`set_eve_events_enabled`]: off by default so
-//! wire parity with the golden captures is preserved until the operator flips
-//! the feature on (`TS_EVE_EVENTS=1` at boot).
+//! Activation is gated behind [`set_eve_events_enabled`]: enabled by default
+//! in production (`EVE_EVENTS_ENABLED = true`), and can be toggled off by tests
+//! or overridden via `TS_EVE_EVENTS=1` at boot.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -86,12 +86,12 @@ fn scene_for(data: &GameData, map_id: u16) -> Option<&SceneEveData> {
 /// - **Completion counts** are the session's `completed_eve_counts`
 ///   (incremented by `finish_event_session`), feeding `conditionClass=12`.
 /// - **Quest-dont marks** are projected into `mission_flags` keyed by the
-///   mark id itself (`Mark.dat` bit-id space `1..=2400` vs mission-id keys). It stays inert until a condition
-///   actually targets such a mission id, because nothing in the Eve flow
-///   sets `quest_dont` today.
-/// - **`mark_defs`** (missionId → bitId) stays empty (CP6 decision #6): no
-///   consumer exists yet, and inventing a projection would make up a mapping
-///   the data files do not define.
+///   mark id itself (`Mark.dat` bit-id space `1..=2400`) and updated when
+///   `MarkDont` (`p_style=5`) or `ExplicitMark` (`p_style=3`, `result_value > 0`)
+///   runs.
+/// - **`mark_defs`** (`missionId -> bitId`) is borrowed zero-copy from
+///   `GameData.quest_marks` (`Option<&HashMap<u16, u16>>`) when `data` is
+///   provided, avoiding per-snapshot allocations.
 pub fn snapshot_state_with_data(
     session: &Session,
     data: Option<&GameData>,
@@ -266,21 +266,16 @@ fn activate(
 ) -> Option<EventSession> {
     if let NpcTrigger::WalkStep { x, y } = trigger {
         for enc in scene.encounters.iter().filter(|enc| enc.contains(x, y)) {
-            for &eve_no in &enc.events {
-                let Some(event_data) = scene.npc_events.get(&u16::from(eve_no)) else {
-                    continue;
-                };
-                let Some(planned) =
-                    plan_chain(event_data, state, &scene.group_datas, rng, chain_filter)
-                else {
-                    continue;
-                };
+            let mut try_walk_eve = |eve_no: u16| -> Option<EventSession> {
+                let event_data = scene.npc_events.get(&eve_no)?;
+                let planned =
+                    plan_chain(event_data, state, &scene.group_datas, rng, chain_filter)?;
                 // Pure random-encounter battles (all results rt=3) are governed by
                 // the step-counter in `try_trigger_random_encounter`, not WalkStep.
                 if planned.results.iter().all(|r| r.result_type == 3) {
-                    continue;
+                    return None;
                 }
-                return Some(EventSession {
+                Some(EventSession {
                     map_id,
                     eve_no: i32::from(event_data.eve_no),
                     npc_click_id: i32::from(enc.id),
@@ -294,7 +289,26 @@ fn activate(
                     last_choice_code: -1,
                     battle_result: 0,
                     matched_condition_no: planned.matched_condition_no,
-                });
+                })
+            };
+
+            if let Some(eve_nos) = scene
+                .encounter_events_by_id
+                .get(&enc.id)
+                .filter(|v| !v.is_empty())
+                .map(Vec::as_slice)
+            {
+                for &eve_no in eve_nos {
+                    if let Some(ev) = try_walk_eve(eve_no) {
+                        return Some(ev);
+                    }
+                }
+            } else {
+                for &eve_no in &enc.events {
+                    if let Some(ev) = try_walk_eve(u16::from(eve_no)) {
+                        return Some(ev);
+                    }
+                }
             }
         }
         return None;
