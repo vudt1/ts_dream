@@ -141,14 +141,6 @@ pub fn snapshot_state_with_data(
         .iter()
         .map(|&bit_id| (i32::from(bit_id), 1))
         .collect();
-    let mark_defs: std::collections::HashMap<i32, i32> = data
-        .map(|d| {
-            d.quest_marks
-                .iter()
-                .map(|(&qid, &bit_id)| (i32::from(qid), i32::from(bit_id)))
-                .collect()
-        })
-        .unwrap_or_default();
     // Surface/choice/battle context of the active or completed event session feeds
     // conditionClass=10 (dialog choice) and =8 (battle result); a session
     // without one keeps the "no dialogue seen yet" -1 / "no battle" 0
@@ -171,7 +163,7 @@ pub fn snapshot_state_with_data(
     let mut state = EveStateBuilder::build_player_state(&PlayerStateInputs {
         missions: &missions,
         raw_flags: &raw_flags,
-        mark_defs: &mark_defs,
+        mark_defs: data.map(|d| &d.quest_marks),
         bag_slots: &bag_slots,
         equips: &equips,
         level: i32::from(session.level),
@@ -213,6 +205,36 @@ pub fn snapshot_state(session: &Session) -> PlayerEventState {
 /// event matched; `None` when the feature is off, the map has no Eve scene, or
 /// no chain matched (caller falls back to legacy talk tables).
 #[must_use]
+pub fn resolve_npc_event_with_filter_and_state(
+    session: &Session,
+    data: &GameData,
+    trigger: NpcTrigger,
+    rng: &mut DotNetRandom,
+    chain_filter: Option<ChainFilter<'_>>,
+    cached_state: Option<&PlayerEventState>,
+) -> Option<EventSession> {
+    let is_dungeon_event_map = matches!(session.map_id, 12911..=12928 | 49960..=49969);
+    if !eve_events_enabled() && !is_dungeon_event_map {
+        return None;
+    }
+    let scene = scene_for(data, session.map_id)?;
+    if let NpcTrigger::WalkStep { x, y } = trigger {
+        if !scene.encounters.iter().any(|enc| enc.contains(x, y)) {
+            return None;
+        }
+    }
+    let owned_state;
+    let state = match cached_state {
+        Some(s) => s,
+        None => {
+            owned_state = snapshot_state_with_data(session, Some(data), None);
+            &owned_state
+        }
+    };
+    activate(scene, i32::from(session.map_id), trigger, state, rng, chain_filter)
+}
+
+#[must_use]
 pub fn resolve_npc_event_with_filter(
     session: &Session,
     data: &GameData,
@@ -220,13 +242,7 @@ pub fn resolve_npc_event_with_filter(
     rng: &mut DotNetRandom,
     chain_filter: Option<ChainFilter<'_>>,
 ) -> Option<EventSession> {
-    let is_dungeon_event_map = matches!(session.map_id, 12911..=12928 | 49960..=49969);
-    if !eve_events_enabled() && !is_dungeon_event_map {
-        return None;
-    }
-    let scene = scene_for(data, session.map_id)?;
-    let state = snapshot_state_with_data(session, Some(data), None);
-    activate(scene, i32::from(session.map_id), trigger, &state, rng, chain_filter)
+    resolve_npc_event_with_filter_and_state(session, data, trigger, rng, chain_filter, None)
 }
 
 /// Resolve one NPC/door interaction against the scene's event list.
@@ -271,6 +287,7 @@ fn activate(
                     trigger_kind: trigger.kind(),
                     chain_depth: 0,
                     results: planned.results,
+                    planned_effects: planned.effects,
                     current_index: 0,
                     phase: crate::eve::auto_chain::EventPhase::Executing,
                     last_surface_id: -1,
@@ -284,64 +301,71 @@ fn activate(
     }
 
     let click = trigger.click_id() as u16;
-    let indexed_events: Vec<u8> = match trigger {
-        NpcTrigger::ClickNpc(_) => scene
-            .npc_events_by_npc
-            .get(&click)
-            .map(|v| v.iter().filter_map(|&e| u8::try_from(e).ok()).collect())
-            .unwrap_or_default(),
-        NpcTrigger::ClickDoor(_) | NpcTrigger::MeetDoor(_) => scene
-            .door_events_by_door
-            .get(&click)
-            .map(|v| v.iter().filter_map(|&e| u8::try_from(e).ok()).collect())
-            .unwrap_or_default(),
-        NpcTrigger::WalkStepEncounter(_) => scene
-            .encounter_events_by_id
-            .get(&click)
-            .map(|v| v.iter().filter_map(|&e| u8::try_from(e).ok()).collect())
-            .unwrap_or_default(),
-        NpcTrigger::WalkStep { .. } => Vec::new(),
-    };
-    let fallback_events: &[u8] = if indexed_events.is_empty() {
-        match trigger {
-            NpcTrigger::ClickNpc(_) => &scene.npcs.get(&click)?.events,
-            NpcTrigger::ClickDoor(_) | NpcTrigger::MeetDoor(_) => &scene.doors.get(&click)?.events,
-            NpcTrigger::WalkStepEncounter(_) => scene
-                .encounters
-                .iter()
-                .find(|enc| enc.id == click)
-                .map(|enc| enc.events.as_slice())?,
-            NpcTrigger::WalkStep { .. } => return None,
-        }
-    } else {
-        indexed_events.as_slice()
-    };
-    for &eve_no in fallback_events {
-        let Some(event_data) = scene.npc_events.get(&u16::from(eve_no)) else {
-            continue;
-        };
+    let try_eve_no = |eve_no: u16, rng: &mut DotNetRandom| -> Option<EventSession> {
+        let event_data = scene.npc_events.get(&eve_no)?;
         if !trigger.kind().matches_when_happen(event_data.when_happen) {
-            continue;
+            return None;
         }
-        let Some(planned) =
-            plan_chain(event_data, state, &scene.group_datas, rng, chain_filter)
-        else {
-            continue;
-        };
-        return Some(EventSession {
+        let planned = plan_chain(event_data, state, &scene.group_datas, rng, chain_filter)?;
+        Some(EventSession {
             map_id,
             eve_no: i32::from(event_data.eve_no),
             npc_click_id: trigger.click_id(),
             trigger_kind: trigger.kind(),
             chain_depth: 0,
             results: planned.results,
+            planned_effects: planned.effects,
             current_index: 0,
             phase: crate::eve::auto_chain::EventPhase::Executing,
             last_surface_id: -1,
             last_choice_code: -1,
             battle_result: 0,
             matched_condition_no: planned.matched_condition_no,
-        });
+        })
+    };
+
+    let indexed: Option<&[u16]> = match trigger {
+        NpcTrigger::ClickNpc(_) => scene
+            .npc_events_by_npc
+            .get(&click)
+            .filter(|v| !v.is_empty())
+            .map(Vec::as_slice),
+        NpcTrigger::ClickDoor(_) | NpcTrigger::MeetDoor(_) => scene
+            .door_events_by_door
+            .get(&click)
+            .filter(|v| !v.is_empty())
+            .map(Vec::as_slice),
+        NpcTrigger::WalkStepEncounter(_) => scene
+            .encounter_events_by_id
+            .get(&click)
+            .filter(|v| !v.is_empty())
+            .map(Vec::as_slice),
+        NpcTrigger::WalkStep { .. } => return None,
+    };
+
+    if let Some(eve_nos) = indexed {
+        for &eve_no in eve_nos {
+            if let Some(ev) = try_eve_no(eve_no, rng) {
+                return Some(ev);
+            }
+        }
+        return None;
+    }
+
+    let fallback_events: &[u8] = match trigger {
+        NpcTrigger::ClickNpc(_) => &scene.npcs.get(&click)?.events,
+        NpcTrigger::ClickDoor(_) | NpcTrigger::MeetDoor(_) => &scene.doors.get(&click)?.events,
+        NpcTrigger::WalkStepEncounter(_) => scene
+            .encounters
+            .iter()
+            .find(|enc| enc.id == click)
+            .map(|enc| enc.events.as_slice())?,
+        NpcTrigger::WalkStep { .. } => return None,
+    };
+    for &eve_no in fallback_events {
+        if let Some(ev) = try_eve_no(u16::from(eve_no), rng) {
+            return Some(ev);
+        }
     }
     None
 }

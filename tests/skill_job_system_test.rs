@@ -164,6 +164,7 @@ fn create_test_event_session(results: Vec<ts_dream::data::loaders::EveResult>) -
         npc_click_id: 0,
         trigger_kind: ts_dream::eve::EventTriggerKind::ClickNpc,
         chain_depth: 0,
+        planned_effects: ts_dream::eve::planner::plan_results(&results),
         results,
         current_index: 0,
         phase: ts_dream::eve::auto_chain::EventPhase::Executing,

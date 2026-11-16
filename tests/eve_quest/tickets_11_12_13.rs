@@ -368,6 +368,7 @@ fn ticket11_auto_chain_battle_result_zero_and_same_condition_guard() {
         trigger_kind: EventTriggerKind::ClickNpc,
         chain_depth: 0,
         results: vec![],
+        planned_effects: vec![],
         current_index: 0,
         phase: EventPhase::Completed,
         last_surface_id: -1,

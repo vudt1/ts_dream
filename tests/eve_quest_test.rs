@@ -34,5 +34,9 @@ mod snapshot_fail_closed_and_menu_filter;
 mod tickets_11_12_13;
 #[path = "eve_quest/tickets_14_15.rs"]
 mod tickets_14_15;
+#[path = "eve_quest/tickets_16_17.rs"]
+mod tickets_16_17;
+#[path = "eve_quest/ticket_18.rs"]
+mod ticket_18;
 #[path = "eve_quest/wire_codec_14_18.rs"]
 mod wire_codec_14_18;

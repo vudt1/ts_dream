@@ -1,4 +1,4 @@
-# Handoff: Quest Refactor — Tickets 01 through 08
+# Handoff: Quest Refactor — Tickets 01 through 10
 
 ## Summary of Completed Work
 
@@ -99,7 +99,7 @@
 1. **Missing Eve Effect Executors (`src/server/handlers/talk.rs`, `src/protocol/codecs/npc_talk.rs`, `src/protocol/mod.rs`)**:
    - Implemented `NpcTeam (rt=0, rc=3)` emitting `S→C 0x14 01` for `p_style ∈ 1..=5` (with warning skip for unsupported styles).
    - Implemented `RewardPet (rt=0, rc=8)` via `execute_reward_pet`: allocates `1..=4` via `pet_box::next_active_slot`, hydrates `PetState` from `data.npcs` (or fallback defaults), emits `0x14 01` + `0F 08` + `0F 01` (or `0x14 01` + `0F 02` on removal), and calls `registry_update_if_online`.
-   - Implemented `MoveEntity (rt=4)` (validated `rc == 3 && result_value >= 10_000` -> `0x14 01`), `PlayMovie (rt=5)` (`0x14 01`), and server-side `NpcAction (rt=9)` (never emitted raw via `0x14`). `UNKNOWN` `result_type`/`result_class` log `tracing::warn!` and skip fail-closed.
+   - Implemented `MoveEntity (rt=4)` (validated `rc == 3 && result_value >= 10_000` -> `0x14 01`), `PlayMovie (rt=5)` (`0x14 01`), and server-side `NpcAction (rt=9)` (never emitted raw via `0x14`). Unknown `result_type`/`result_class` map to `DomainEffect::Unsupported`, log `tracing::warn!`, and skip fail-closed (executed in `src/server/handlers/eve_runner.rs` after Ticket 10).
 2. **`Player (rc=7)` & `Gold/Points (rc=5)` & `Pre-Flight Probe` (`src/server/handlers/talk.rs`)**:
    - Fixed `Player (rc=7)` fallthrough bug on `param == 3` and separated `savemap` (`param=0/1/3, p_style=1`) from `GetArmy (param=2)`.
    - Completed `texp` (`param=1, p_style=4`): computes `texp_get_lv_up`, updates `level`, `recompute_stats()`, heals `hp`/`sp` to max, grants `point` (`+2/lv`) & `skill_point` (`+1/lv`), emits `0x14 0x2A 0x01 <exp_delta: u32_LE>`, `0x08 01 24/23/CD/19/CE/1A/26/25`, and `05 0A`.
@@ -115,7 +115,7 @@
    - Added `NpcTrigger::WalkStep { x, y }` to `NpcTrigger` (`kind = 16`, skipping pure `rt=3` random-encounter battles so step-counter encounters remain unaffected).
    - Added `movement::handle_move_dispatch` and `movement::handle_player_update_dispatch` (wired in `dispatcher.rs`) to trigger `NpcTrigger::MeetDoor` (closest door within ±60 px) and `NpcTrigger::WalkStep` into `EventRunner`.
 2. **Party `Door Warp` (`Two-Phase State Lock` + Write-Through) (`src/server/handlers/quest.rs`, `src/server/session.rs`, `src/server/handlers/talk.rs`)**:
-   - Added `session::registry_get` and `quest::perform_party_warp_and_persist`: validates `Warps.dat` (`map2 > 0`), acquires `lock_player_operations` **before** calling `registry_get(member_id)`, updates leader & online members' `(map_id, map_x, map_y)`, calls `registry_update_if_online`, emits `14 07` + `0x0C` + `hide_from_map`, and persists leader + all warped members atomically via `persist_sessions_transaction`.
+   - Added `session::registry_get` and `quest::perform_party_warp_and_persist`: validates `Warps.txt` (`map2 > 0`), acquires `lock_player_operations` **before** calling `registry_get(member_id)`, updates leader & online members' `(map_id, map_x, map_y)`, calls `registry_update_if_online`, emits `14 07` + `0x0C` + `hide_from_map`, and persists leader + all warped members atomically via `persist_sessions_transaction`.
    - Wired both `execute_event_step_with_pool` (`DomainEffect::Warp`) and `quest::handle_warp_confirm` (`0x14 08`) to `perform_party_warp_and_persist`.
 3. **Tests (`tests/door_triggers_walkstep_and_party_warp_test.rs`)**:
    - Added 3 E2E tests covering `ClickDoor` party warp + DB write-through for Leader & Member (plus bare `0x14 04` EndTalk), `WalkStep` + `MeetDoor` party warp + DB persistence, and negative unmet door condition / invalid warp destination leaving Leader & Member RAM/registry/SQLite untouched.
@@ -179,5 +179,12 @@
 ## Next Tickets for Continuation
 
 All tickets `01` through `10` in `.scratch/quest-refactor/issues/` are now `resolved`.
+- **Codebase & Data Parity Notes (Synced with Current Repo):**
+  - `EventRunner`, `preflight_probe_batch`, `execute_event_step_core`, and `DomainEffect` executors live in `src/server/handlers/eve_runner.rs` (extracted from `src/server/handlers/talk.rs` in Ticket 10).
+  - `EveCondition` (`src/data/loaders/eve.rs`) stores `to_result: u16` and `results: Vec<EveResult>`.
+  - `rt=0, rc=5` (`MutateMoney`) is supported (`0x1A 01/02/04/05/06`), `DomainEffect::Unsupported` handles unknown `result_type`/`result_class` fail-closed, and `rt=9` (`NpcAction`, `p_style ∈ {1, 2}`) is handled server-side.
+  - `Warps.txt` (not `Warps.dat`) is the warp table in `GameData` / `quest.rs`.
+  - `OP_RANK` (`0x41`) and `OP_BOAT_RACE` (`0x46`) are dispatched to `system::handle_rank` and `boat_race` in `src/server/dispatcher.rs` (not in `unimplemented`).
+  - Verified `Data/eve.emg` corpus counts: `15` multi-link AND chains, `223` scene events with `cc=12` (`param != 0`), and `rt=9` records with `p_style ∈ {1, 2}`.
 - **Runtime / live client checks remaining:** Live `aLogin.exe` rendering of `0x14 01` on `MutateItem` and `0x1A 05/06` without `0x1A 03`, plus a dedicated 40-NPC multi-wave `advance_wave` + `battle_ended` test asserting `quest_tasks[218]` preservation in `sess_arc`.
 - **Important note for production DB:** Existing `DB/ts_dream.db` files created from `0001_init.sql` must have `migrations/0002_eve_quest_persistence.sql` applied before running the updated binary (since `db::pool::migrate` is a no-op per ADR 0004).

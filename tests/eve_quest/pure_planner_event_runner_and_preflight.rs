@@ -151,6 +151,7 @@ fn pure_planner_never_emits_0x14_for_rt_ge_7_and_handles_autochain_negative_psty
         trigger_kind: EventTriggerKind::ClickNpc,
         chain_depth: 0,
         results: raw_results[..3].to_vec(),
+        planned_effects: ts_dream::eve::planner::plan_results(&raw_results[..3]),
         current_index: 0,
         phase: EventPhase::Executing,
         last_surface_id: -1,
@@ -181,6 +182,7 @@ fn pure_planner_never_emits_0x14_for_rt_ge_7_and_handles_autochain_negative_psty
             result_value: -3,
             ..Default::default()
         }],
+        planned_effects: vec![],
         current_index: 0,
         phase: EventPhase::Completed,
         last_surface_id: -1,

@@ -131,3 +131,104 @@ pub async fn migrate(_pool: &SqlitePool) -> Result<()> {
     tracing::info!("SQLite migrations are skipped (managed externally per ADR 0004)");
     Ok(())
 }
+
+/// Startup schema sanity-check verifying core tables from `0001_init.sql` and
+/// normalized columns/keys from `0002_eve_quest_persistence.sql`.
+///
+/// Migrations remain manual per ADR 0004; if the database is empty (`0` tables)
+/// or missing migration `0002`, this returns a clear `TsError::Migrate` with
+/// instructions instead of silently failing later on player login/save.
+pub async fn verify_schema(pool: &SqlitePool) -> Result<()> {
+    use sqlx::Row;
+    use std::collections::HashSet;
+
+    const ADR_0004_HINT: &str = "Per ADR 0004, migrations are not applied automatically at startup. \
+        Apply migrations/0001_init.sql and migrations/0002_eve_quest_persistence.sql manually \
+        (e.g. `sqlite3 DB/ts_dream.db < migrations/0001_init.sql && sqlite3 DB/ts_dream.db < migrations/0002_eve_quest_persistence.sql`).";
+
+    const REQUIRED_TABLES: &[&str] = &[
+        "accounts",
+        "characters",
+        "character_money",
+        "inventories",
+        "character_pets",
+        "character_skills",
+        "character_quest_tasks",
+        "character_quest_dont",
+        "character_bit_flags",
+        "character_completed_events",
+    ];
+
+    let rows = sqlx::query("SELECT name FROM sqlite_master WHERE type = 'table'")
+        .fetch_all(pool)
+        .await
+        .map_err(TsError::Db)?;
+
+    let existing_tables: HashSet<String> = rows
+        .into_iter()
+        .filter_map(|r| r.try_get::<String, _>("name").ok())
+        .collect();
+
+    let missing_tables: Vec<&str> = REQUIRED_TABLES
+        .iter()
+        .copied()
+        .filter(|t| !existing_tables.contains(*t))
+        .collect();
+
+    if !missing_tables.is_empty() {
+        return Err(TsError::Migrate(format!(
+            "SQLite schema sanity-check failed: database has {} table(s) and is missing required table(s): [{}]. {}",
+            existing_tables.len(),
+            missing_tables.join(", "),
+            ADR_0004_HINT
+        )));
+    }
+
+    let char_cols_rows = sqlx::query("PRAGMA table_info(characters)")
+        .fetch_all(pool)
+        .await
+        .map_err(TsError::Db)?;
+    let char_cols: HashSet<String> = char_cols_rows
+        .into_iter()
+        .filter_map(|r| r.try_get::<String, _>("name").ok())
+        .collect();
+    let missing_savemap: Vec<&str> = ["savemap_id", "savemap_x", "savemap_y"]
+        .into_iter()
+        .filter(|c| !char_cols.contains(*c))
+        .collect();
+    if !missing_savemap.is_empty() {
+        return Err(TsError::Migrate(format!(
+            "SQLite schema sanity-check failed: `characters` is missing column(s) [{}] from migrations/0002_eve_quest_persistence.sql. {}",
+            missing_savemap.join(", "),
+            ADR_0004_HINT
+        )));
+    }
+
+    let completed_rows = sqlx::query("PRAGMA table_info(character_completed_events)")
+        .fetch_all(pool)
+        .await
+        .map_err(TsError::Db)?;
+    let mut pk_cols: Vec<(i64, String)> = Vec::new();
+    let mut has_scene_id = false;
+    for row in completed_rows {
+        let name: String = row.try_get("name").map_err(TsError::Db)?;
+        let pk: i64 = row.try_get("pk").map_err(TsError::Db)?;
+        if name == "scene_id" {
+            has_scene_id = true;
+        }
+        if pk > 0 {
+            pk_cols.push((pk, name));
+        }
+    }
+    pk_cols.sort_by_key(|(pk, _)| *pk);
+    let pk_names: Vec<&str> = pk_cols.iter().map(|(_, n)| n.as_str()).collect();
+    if !has_scene_id || pk_names.as_slice() != ["playerid", "scene_id", "eventid"] {
+        return Err(TsError::Migrate(format!(
+            "SQLite schema sanity-check failed: `character_completed_events` must have `scene_id` and PRIMARY KEY (playerid, scene_id, eventid) from migrations/0002_eve_quest_persistence.sql (found PK {:?}). {}",
+            pk_names,
+            ADR_0004_HINT
+        )));
+    }
+
+    Ok(())
+}

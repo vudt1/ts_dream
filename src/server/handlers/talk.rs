@@ -21,9 +21,13 @@ use crate::server::handlers::stats::build_stat_update;
 use crate::server::session::{Conn, Session};
 
 pub use super::eve_runner::{
-    activate_event_session, execute_event_step, execute_event_step_with_pool,
-    resume_eve_after_battle, resume_eve_after_battle_deferred_warp, resume_eve_after_battle_full,
-    resume_eve_after_battle_sync, resume_eve_after_battle_sync_full, PreFlightError, StepOutcome,
+    activate_event_session, execute_event_step_with_pool, resume_eve_after_battle,
+    resume_eve_after_battle_deferred_warp, resume_eve_after_battle_full, PreFlightError,
+    StepOutcome,
+};
+#[doc(hidden)]
+pub use super::eve_runner::{
+    execute_event_step, resume_eve_after_battle_sync, resume_eve_after_battle_sync_full,
 };
 
 /// Reset the legacy talk-context fields (`typetalk`, menu, warp confirm)

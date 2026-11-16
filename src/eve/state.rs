@@ -86,9 +86,10 @@ pub struct PlayerStateInputs<'a> {
     pub missions: &'a [(i32, i32)],
     /// `(bitIndex, bitValue)` completion flag records.
     pub raw_flags: &'a [(i32, i32)],
-    /// Mission definition map `missionId -> bitId` used to project raw flags
-    /// onto mission IDs.
-    pub mark_defs: &'a HashMap<i32, i32>,
+    /// Mission definition map `missionId -> bitId` (borrowed directly from
+    /// `GameData.quest_marks` without cloning) used to project raw flags onto
+    /// mission IDs.
+    pub mark_defs: Option<&'a HashMap<u16, u16>>,
     /// `(itemId, quantity)` per occupied bag slot.
     pub bag_slots: &'a [(i32, i32)],
     /// Equipped item IDs.
@@ -137,14 +138,21 @@ impl EveStateBuilder {
             state.mission_steps.insert(mission_id, step);
         }
 
-        let mut flag_by_bit_index: HashMap<i32, i32> = HashMap::new();
-        for &(bit_index, bit_value) in inputs.raw_flags {
-            flag_by_bit_index.insert(bit_index, bit_value);
-        }
-        for (&mission_id, &bit_id) in inputs.mark_defs {
-            if let Some(&flag_value) = flag_by_bit_index.get(&bit_id) {
-                if flag_value > 0 {
-                    state.mission_flags.insert(mission_id, flag_value);
+        if !inputs.raw_flags.is_empty() {
+            if let Some(mark_defs) = inputs.mark_defs {
+                let mut flag_by_bit_index: HashMap<i32, i32> =
+                    HashMap::with_capacity(inputs.raw_flags.len());
+                for &(bit_index, bit_value) in inputs.raw_flags {
+                    flag_by_bit_index.insert(bit_index, bit_value);
+                }
+                for (&mission_id, &bit_id) in mark_defs {
+                    if let Some(&flag_value) = flag_by_bit_index.get(&i32::from(bit_id)) {
+                        if flag_value > 0 {
+                            state
+                                .mission_flags
+                                .insert(i32::from(mission_id), flag_value);
+                        }
+                    }
                 }
             }
         }

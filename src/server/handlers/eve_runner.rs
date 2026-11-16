@@ -883,14 +883,11 @@ async fn execute_event_step_core(
 ) {
     let mut batch_probed = false;
     loop {
-        let remaining: Option<Vec<EveResult>> = session
-            .current_event_session
-            .as_ref()
-            .and_then(|ev| ev.results.get(ev.current_index..).map(|s| s.to_vec()));
-        let Some(rem) = remaining else {
-            return;
+        let (idx, len) = match session.current_event_session.as_ref() {
+            Some(ev) => (ev.current_index, ev.planned_effects.len()),
+            None => return,
         };
-        if rem.is_empty() {
+        if idx >= len {
             if !finish_event_session_with_pool_iter(session, data, pool, out).await {
                 return;
             }
@@ -898,16 +895,24 @@ async fn execute_event_step_core(
             continue;
         }
 
-        let effects = crate::eve::planner::plan_results(&rem);
         if !batch_probed {
-            if let Err(err) = preflight_probe_batch(session, data, &effects) {
+            let probe_res = session
+                .current_event_session
+                .as_ref()
+                .map(|ev| preflight_probe_batch(session, data, &ev.planned_effects[idx..]));
+            if let Some(Err(err)) = probe_res {
                 emit_preflight_rejection(session, out, err);
                 return;
             }
             batch_probed = true;
         }
 
-        if let DomainEffect::Warp { warp_id } = effects[0] {
+        let first_effect = match session.current_event_session.as_ref() {
+            Some(ev) => ev.planned_effects[idx].clone(),
+            None => return,
+        };
+
+        if let DomainEffect::Warp { warp_id } = first_effect {
             if crate::server::handlers::quest::resolve_warp_destination(
                 data,
                 session.map_id,
@@ -926,7 +931,12 @@ async fn execute_event_step_core(
                 continue;
             }
 
-            run_trailing_effects_before_warp(session, data, out, &effects);
+            let trailing = session
+                .current_event_session
+                .as_ref()
+                .map(|ev| ev.planned_effects[idx..].to_vec())
+                .unwrap_or_default();
+            run_trailing_effects_before_warp(session, data, out, &trailing);
 
             if session.talk_locked {
                 out.send(NpcTalkCodec::build_talk_lock_hex(
@@ -954,7 +964,7 @@ async fn execute_event_step_core(
             return;
         }
 
-        match process_single_domain_effect(session, data, out, &effects[0]) {
+        match process_single_domain_effect(session, data, out, &first_effect) {
             StepOutcome::Halt => {
                 if out.eve_battle.is_some() && session.db_character_id > 0 {
                     if !crate::db::persist::persist_sessions_transaction(pool, &[session], &[])
@@ -1012,6 +1022,10 @@ async fn execute_event_step_core(
     }
 }
 
+/// Test-harness-only helper that blocks on an Eve future without a `DbPool`.
+///
+/// Production code MUST use the async `*_with_pool(...).await` entrypoints;
+/// never call this from production handlers.
 fn run_sync_future<F: std::future::Future + Send>(fut: F) -> F::Output
 where
     F::Output: Send,
@@ -1030,7 +1044,10 @@ where
     }
 }
 
-/// Thin synchronous wrapper around [`execute_event_step_core`] (`pool = None`) for sync callers/tests.
+/// Test-harness-only synchronous wrapper around [`execute_event_step_core`] (`pool = None`).
+///
+/// Production code MUST call [`execute_event_step_with_pool`].
+#[doc(hidden)]
 pub fn execute_event_step(session: &mut Session, data: &GameData, out: &mut HandleOutcome) {
     run_sync_future(execute_event_step_core(session, data, None, out, false));
 }
@@ -1132,6 +1149,10 @@ pub async fn resume_eve_after_battle(
     (frames, next_battle)
 }
 
+/// Test-harness-only synchronous wrapper around [`resume_eve_after_battle_full`] (`pool = None`).
+///
+/// Production code MUST call [`resume_eve_after_battle_full`] or [`resume_eve_after_battle`].
+#[doc(hidden)]
 pub fn resume_eve_after_battle_sync_full(
     session: &mut Session,
     outcome: Outcome,
@@ -1140,6 +1161,10 @@ pub fn resume_eve_after_battle_sync_full(
     run_sync_future(resume_eve_after_battle_full(session, outcome, data, None))
 }
 
+/// Test-harness-only synchronous wrapper around [`resume_eve_after_battle`] (`pool = None`).
+///
+/// Production code MUST call [`resume_eve_after_battle`].
+#[doc(hidden)]
 pub fn resume_eve_after_battle_sync(
     session: &mut Session,
     outcome: Outcome,

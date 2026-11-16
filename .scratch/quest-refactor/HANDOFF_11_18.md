@@ -1,9 +1,9 @@
-# Handoff: Quest Refactor — Tickets 11 through 18 (Progress: 11–15 Resolved)
+# Handoff: Quest Refactor — Tickets 11 through 18 (Progress: 11–18 Resolved)
 
 > **Spec reference:** [`.scratch/quest-refactor/spec-p0-p2.md`](spec-p0-p2.md)  
 > **Prior handoff:** [`.scratch/quest-refactor/HANDOFF_01_10.md`](HANDOFF_01_10.md)
 
-## Summary of Completed Work (Tickets 11–15)
+## Summary of Completed Work (Tickets 11–17)
 
 ### Ticket 11 ([`issues/11-remove-should-skip-event.md`](issues/11-remove-should-skip-event.md)) — `resolved`
 1. **Removed `should_skip_event` & `has_later_completed_event` (`src/eve/auto_chain.rs`, `src/server/handlers/npc_event.rs`)**:
@@ -95,21 +95,72 @@
 
 ---
 
-## Verification Record (Tickets 11–15)
+---
 
-- `cargo test --test tickets_14_15_test`: **12 passed, 0 failed**.
-- `cargo test --test tickets_11_12_13_test`: **12 passed, 0 failed**.
-- `cargo test --all-targets`: **exit 0** (all test binaries passed, including `architecture_guardrails_test` 5/5).
+### Ticket 16 ([`issues/16-movement-walkstep-hotpath-and-sync-future-isolation.md`](issues/16-movement-walkstep-hotpath-and-sync-future-isolation.md)) — `resolved`
+1. **WalkStep Encounter Fast-Path & Snapshot Coordination (`src/server/handlers/movement.rs`, `src/server/handlers/npc_event.rs`)**:
+   - `handle_move_dispatch` now checks for a matching `MeetDoor` (±60 px) or `WalkStep` encounter zone (`scene.encounters.iter().any(|enc| enc.contains(px, py))`) before seeding RNG or calling `resolve_npc_event_with_filter_and_state`.
+   - `resolve_npc_event_with_filter_and_state` also gates `NpcTrigger::WalkStep` against `scene.encounters` **before** calling `snapshot_state_with_data`.
+   - `try_trigger_random_encounter` returns `Option<PlayerEventState>` when it builds a snapshot and does not start a battle, allowing `handle_move_dispatch` to reuse that snapshot for `MeetDoor` / `WalkStep` without building a duplicate snapshot.
+2. **Zero-Copy Borrowed `quest_marks` (`src/eve/state.rs`, `src/server/handlers/npc_event.rs`)**:
+   - Changed `PlayerStateInputs::mark_defs` from `&'a HashMap<i32, i32>` to `Option<&'a HashMap<u16, u16>>` borrowed directly from `GameData.quest_marks`.
+   - Removed the per-snapshot 2,394-entry `HashMap<i32, i32>` allocation in `npc_event::snapshot_state_with_data`; `EveStateBuilder::build_player_state` skips mark projection entirely when `raw_flags` is empty.
+3. **Sync Wrapper Isolation (`src/server/handlers/eve_runner.rs`, `src/server/handlers/talk.rs`)**:
+   - Marked `execute_event_step`, `resume_eve_after_battle_sync`, and `resume_eve_after_battle_sync_full` as `#[doc(hidden)]` test-harness-only wrappers; production handlers exclusively use async `*_with_pool(...).await`.
+4. **Tests (`tests/eve_quest/tickets_16_17.rs`)**:
+   - `ticket16_walkstep_outside_encounter_zone_skips_cleanly_and_inside_reuses_snapshot`
+   - `ticket16_quest_marks_borrowed_reference_evaluates_cc2_pstyle3_correctly`
+   - `ticket16_no_production_caller_of_run_sync_future_or_sync_wrappers`
+
+---
+
+### Ticket 17 ([`issues/17-party-two-phase-lock-and-db-persist.md`](issues/17-party-two-phase-lock-and-db-persist.md)) — `resolved`
+1. **Two-Phase State Lock & Multi-Member DB Persist (`src/server/handlers/event_npcs.rs`, `src/server/handlers/battle.rs`)**:
+   - Event NPCs `15312`, `15313`, and `61210` now collect sorted, deduplicated `participant_ids`, acquire `lock_player_operations(participant_ids).await` before reading/updating member sessions via `registry_get`, persist both leader and all warped members via `persist_sessions_transaction(..., &["stats", "quest"])`, and sync via `registry_update_if_online`.
+   - `battle::handle_quiz_answer` (`0x10`) now acquires `lock_player_operations(participant_ids).await` before evacuating party members, syncs leader + members via `registry_update_if_online`, and passes both leader and evacuated members to `persist_sessions_transaction`.
+2. **Movement Party Sync & 40-NPC Review (`src/server/handlers/movement.rs`, `src/battle/construction.rs`, `src/battle/service.rs`)**:
+   - `handle_move_dispatch` acquires `lock_player_operations` in ascending ID order around `handle_move_inner` for party leaders with online members (dropping the guard before `MeetDoor`/`WalkStep` so downstream `perform_party_warp_and_persist` cannot deadlock) and uses `registry_update_if_online(&conn.session)` for the leader.
+   - Verified `BattleService::battle_ended` already holds `lock_player_operations(lock_ids).await` when syncing `quest_tasks[218]` and persisting `ended_sessions`, and `BattleConstruction::advance_wave` holds `lock_online_sessions()` only briefly for synchronous `upsert_quest_task_slot`.
+3. **Tests (`tests/eve_quest/tickets_16_17.rs`)**:
+   - `ticket17_e2e_event_npcs_15312_15313_61210_party_lock_registry_and_sqlite_persist` (including negative member-click rejection)
+   - `ticket17_e2e_north_star_quiz_0x10_party_lock_registry_and_sqlite_persist`
+   - `ticket17_e2e_movement_party_sync_updates_member_coords_safely`
+   - `ticket17_negative_db_failure_rolls_back_ram_and_suppresses_relocate_frames`
+
+---
+
+### Ticket 18 ([`issues/18-event-session-preplan-index-startup-db-and-docs.md`](issues/18-event-session-preplan-index-startup-db-and-docs.md)) — `resolved`
+1. **Pre-planned `EventSession::planned_effects` (`src/eve/auto_chain.rs`, `src/server/handlers/npc_event.rs`, `src/server/handlers/eve_runner.rs`)**:
+   - Added `planned_effects: Vec<DomainEffect>` to `EventSession`, populated once on open (`npc_event::activate` via `plan_chain`) and on `AutoChain` (`EveAutoChainEngine::try_auto_chain` via `plan_chain`).
+   - Updated `eve_runner::execute_event_step_core` to read `ev.planned_effects` sequentially by `current_index` (including after battle resume), eliminating per-step `Vec<EveResult>` clones and repeated `plan_results` calls.
+2. **Unified `u16` `eve_no` Index Lookup (`src/server/handlers/npc_event.rs`)**:
+   - `npc_event::activate` reads `&[u16]` directly from `SceneEveData` indices (`npc_events_by_npc`, `door_events_by_door`, `encounter_events_by_id`), falling back to `&[u8]` (`u16::from`) only when unindexed, eliminating temporary `Vec<u8>` allocations and `u16 -> u8` narrowing casts.
+3. **Startup SQLite Schema Sanity-Check (`src/db/pool.rs`, `src/main.rs`)**:
+   - Added `db::pool::verify_schema(&pool.read)` called at startup in `src/main.rs` right after `db::pool::bootstrap`.
+   - Verifies all core tables from `0001_init.sql` + `0002_eve_quest_persistence.sql`, `characters.{savemap_id, savemap_x, savemap_y}`, and `character_completed_events` composite PK `(playerid, scene_id, eventid)`. Returns `TsError::Migrate` with clear manual migration instructions per ADR 0004 when missing (including 0-table empty DBs).
+4. **Synced `HANDOFF_01_10.md` (`.scratch/quest-refactor/HANDOFF_01_10.md`)**:
+   - Updated title to `Tickets 01 through 10`, `Warps.dat` -> `Warps.txt`, `eve_runner.rs` extraction, `DomainEffect::Unsupported`, `EveCondition.to_result` + `results`, `rc=5` support, `0x46 BoatRace`/`0x41 Rank` dispatch status, and verified `Data/eve.emg` counts (`15` AND chains, `223` `cc=12 param != 0`, `rt=9 p_style ∈ {1, 2}`).
+5. **Tests (`tests/eve_quest/ticket_18.rs`, `tests/db/startup_schema_check.rs`, and `EventSession` test fixtures)**:
+   - Added `ticket18_event_session_preplanned_effects_drive_execution_and_auto_chain` and `ticket18_npc_event_uses_scene_u16_index_without_u8_truncation` in `tests/eve_quest/ticket_18.rs`.
+   - Added 3 `verify_schema` tests (0-table DB, `0001`-only DB, full `0001 + 0002` DB) in `tests/db/startup_schema_check.rs`.
+
+---
+
+## Verification Record (Tickets 11–18)
+
+- `cargo test --test eve_quest_test`: **129 passed, 0 failed**.
+- `cargo test --test db_test`: **21 passed, 0 failed** (including 3 new `startup_schema_check` tests).
+- `cargo test --test architecture_guardrails_test`: **8 passed, 0 failed**.
+- `cargo test --test events_arena_test`: **61 passed, 0 failed**.
+- `cargo clippy --all-targets`: **exit 0**.
+- `cargo test --all-targets --no-fail-fast`: **exit 0** (all test binaries passed).
 - **Unverified at runtime:** Live `aLogin.exe` TCP gameplay for `FField<N>` / `BKMusic` rendering from `geolBaseAtt`, repeatable-quest `AutoChain` feel, and live `Data/eve.emg` door/AND-chain quests end-to-end on `aLogin.exe`.
 
 ---
 
 ## Next Tickets for Continuation
 
-Tickets **16 through 18** in `.scratch/quest-refactor/issues/` remain `ready-for-agent`:
-- `16-movement-walkstep-hotpath-and-sync-future-isolation.md`
-- `17-party-two-phase-lock-and-db-persist.md`
-- `18-event-session-preplan-index-startup-db-and-docs.md`
+All tickets **11 through 18** in `.scratch/quest-refactor/issues/` are now `resolved`.
 
 ## Suggested Skills
 

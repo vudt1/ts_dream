@@ -12,7 +12,7 @@
 
 use crate::battle::rng::DotNetRandom;
 use crate::data::loaders::{EveCondition, SceneEveData};
-use crate::eve::resolver::{resolve_event, ChainFilter};
+use crate::eve::resolver::ChainFilter;
 use crate::eve::state::PlayerEventState;
 use tracing::{debug, info};
 
@@ -91,7 +91,9 @@ pub struct EventSession {
     pub chain_depth: i32,
     /// Result queue for this event.
     pub results: Vec<crate::data::loaders::EveResult>,
-    /// Index of the next result to dispatch.
+    /// Pre-planned domain effects compiled once when opening/updating this session.
+    pub planned_effects: Vec<crate::eve::planner::DomainEffect>,
+    /// Index of the next result/effect to dispatch.
     pub current_index: usize,
     pub phase: EventPhase,
     /// Last displayed Surface ID (conditionClass=10).
@@ -165,9 +167,10 @@ impl EveAutoChainEngine {
         state: &PlayerEventState,
         rng: &mut DotNetRandom,
     ) -> AutoChainResult {
-        let Some(event_list) = event_list_for(scene, completed) else {
+        let (indexed, fallback) = event_list_for(scene, completed);
+        if indexed.is_none() && fallback.is_none() {
             return AutoChainResult::NoMatch;
-        };
+        }
 
         let new_depth = completed.chain_depth + 1;
 
@@ -180,19 +183,19 @@ impl EveAutoChainEngine {
         };
 
         for filter in filter_passes {
-            for &eve_no in event_list {
-                let Some(event_data) = scene.npc_events.get(&u16::from(eve_no)) else {
-                    continue;
-                };
+            let mut try_eve_no = |eve_no: u16| -> Option<EventSession> {
+                let event_data = scene.npc_events.get(&eve_no)?;
                 if !completed.trigger_kind.matches_when_happen(event_data.when_happen) {
-                    continue;
+                    return None;
                 }
 
-                let Some(resolved) =
-                    resolve_event(event_data, state, &scene.group_datas, rng, *filter)
-                else {
-                    continue;
-                };
+                let planned = crate::eve::planner::plan_chain(
+                    event_data,
+                    state,
+                    &scene.group_datas,
+                    rng,
+                    *filter,
+                )?;
 
                 let candidate = EventSession {
                     map_id: completed.map_id,
@@ -200,13 +203,14 @@ impl EveAutoChainEngine {
                     npc_click_id: completed.npc_click_id,
                     trigger_kind: completed.trigger_kind,
                     chain_depth: new_depth,
-                    results: resolved.results,
+                    results: planned.results,
+                    planned_effects: planned.effects,
                     current_index: 0,
                     phase: EventPhase::Executing,
                     last_surface_id: -1,
                     last_choice_code: -1,
                     battle_result: 0,
-                    matched_condition_no: resolved.matched_condition_no,
+                    matched_condition_no: planned.matched_condition_no,
                 };
 
                 if i32::from(eve_no) == completed.eve_no {
@@ -217,26 +221,40 @@ impl EveAutoChainEngine {
                             cond_no = candidate.matched_condition_no,
                             "auto-chain same chain detected; skipping"
                         );
-                        continue;
+                        return None;
                     }
                     // Guard #2: question asked again right after answering.
                     if Self::detect_re_question(&candidate, completed) {
                         debug!(eve_no, "auto-chain surface re-question; skipping");
-                        continue;
+                        return None;
                     }
                     // Guard #3: battle/interaction repeated right after battle.
                     if Self::detect_re_battle(&candidate, completed) {
                         debug!(eve_no, "auto-chain re-battle; skipping");
-                        continue;
+                        return None;
                     }
                     // Guard #4: same item handed out twice.
                     if Self::detect_duplicate_items(&candidate, completed) {
                         info!(eve_no, "auto-chain duplicate item; skipping");
-                        continue;
+                        return None;
                     }
                 }
 
-                return AutoChainResult::Chained(candidate);
+                Some(candidate)
+            };
+
+            if let Some(eve_nos) = indexed {
+                for &eve_no in eve_nos {
+                    if let Some(candidate) = try_eve_no(eve_no) {
+                        return AutoChainResult::Chained(candidate);
+                    }
+                }
+            } else if let Some(eve_nos) = fallback {
+                for &eve_no in eve_nos {
+                    if let Some(candidate) = try_eve_no(u16::from(eve_no)) {
+                        return AutoChainResult::Chained(candidate);
+                    }
+                }
             }
         }
 
@@ -306,26 +324,41 @@ const AUTO_CHAIN_TRIGGER_KINDS: [EventTriggerKind; 4] = [
     EventTriggerKind::WalkStep,
 ];
 
-fn event_list_for<'a>(scene: &'a SceneEveData, session: &EventSession) -> Option<&'a [u8]> {
-    match session.trigger_kind {
-        EventTriggerKind::ClickNpc => Some(
-            scene
-                .npcs
-                .get(&(session.npc_click_id as u16))?
-                .events
-                .as_slice(),
-        ),
-        EventTriggerKind::ClickDoor | EventTriggerKind::MeetDoor => Some(
-            scene
-                .doors
-                .get(&(session.npc_click_id as u16))?
-                .events
-                .as_slice(),
-        ),
+fn event_list_for<'a>(
+    scene: &'a SceneEveData,
+    session: &EventSession,
+) -> (Option<&'a [u16]>, Option<&'a [u8]>) {
+    let click = session.npc_click_id as u16;
+    let indexed = match session.trigger_kind {
+        EventTriggerKind::ClickNpc => scene
+            .npc_events_by_npc
+            .get(&click)
+            .filter(|v| !v.is_empty())
+            .map(Vec::as_slice),
+        EventTriggerKind::ClickDoor | EventTriggerKind::MeetDoor => scene
+            .door_events_by_door
+            .get(&click)
+            .filter(|v| !v.is_empty())
+            .map(Vec::as_slice),
+        EventTriggerKind::WalkStep => scene
+            .encounter_events_by_id
+            .get(&click)
+            .filter(|v| !v.is_empty())
+            .map(Vec::as_slice),
+    };
+    if indexed.is_some() {
+        return (indexed, None);
+    }
+    let fallback = match session.trigger_kind {
+        EventTriggerKind::ClickNpc => scene.npcs.get(&click).map(|n| n.events.as_slice()),
+        EventTriggerKind::ClickDoor | EventTriggerKind::MeetDoor => {
+            scene.doors.get(&click).map(|d| d.events.as_slice())
+        }
         EventTriggerKind::WalkStep => scene
             .encounters
             .iter()
             .find(|enc| i32::from(enc.id) == session.npc_click_id)
             .map(|enc| enc.events.as_slice()),
-    }
+    };
+    (None, fallback)
 }

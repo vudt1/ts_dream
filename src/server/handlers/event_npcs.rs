@@ -131,47 +131,95 @@ pub async fn try_handle_event_npc(
             end_talk(conn, out);
             return true;
         }
-        crate::server::handlers::quest_sync::set_quest_task(&mut conn.session, out, 212, 1);
-        let alert_frame = crate::protocol::codecs::NpcTalkCodec::build_event_alert_hex(2);
-        out.send(alert_frame.clone());
-        out.broadcast(conn.session.id, alert_frame);
+        let mut participant_ids = vec![conn.session.id];
+        if conn.session.id_leader == conn.session.id && conn.session.id > 0 {
+            for &m in &conn.session.id_mem {
+                if m > 0 && m != conn.session.id {
+                    participant_ids.push(m);
+                }
+            }
+        }
+        participant_ids.sort_unstable();
+        participant_ids.dedup();
+        let _guards = crate::server::session::lock_player_operations(participant_ids).await;
+
+        let before_leader = (
+            conn.session.map_id,
+            conn.session.map_x,
+            conn.session.map_y,
+            conn.session.quest_tasks.get(&212).copied(),
+        );
+        let quest_slot = crate::server::handlers::quest_sync::upsert_quest_task_slot(&mut conn.session, 212, 1);
 
         let old_map = conn.session.map_id;
         conn.session.map_id = 12911;
         conn.session.map_x = 400;
         conn.session.map_y = 400;
+
+        let mut warped_members: Vec<(u16, crate::server::session::Session)> = Vec::new();
+        if conn.session.id_leader == conn.session.id && conn.session.id > 0 {
+            for member in conn.session.id_mem {
+                if member > 0 && member != conn.session.id {
+                    if let Some(mut mem) = crate::server::session::registry_get(member) {
+                        let m_old = mem.map_id;
+                        mem.map_id = 12911;
+                        mem.map_x = 400;
+                        mem.map_y = 400;
+                        warped_members.push((m_old, mem));
+                    }
+                }
+            }
+        }
+
+        let mut to_persist: Vec<&crate::server::session::Session> = vec![&conn.session];
+        for (_, mem) in &warped_members {
+            to_persist.push(mem);
+        }
+        if !crate::db::persist::persist_sessions_transaction(
+            pool,
+            &to_persist,
+            &["stats", "quest"],
+        )
+        .await
+        {
+            tracing::warn!(
+                leader_id = conn.session.id,
+                "NPC 15312 DB write-through failed; rolling back RAM state"
+            );
+            conn.session.map_id = before_leader.0;
+            conn.session.map_x = before_leader.1;
+            conn.session.map_y = before_leader.2;
+            match before_leader.3 {
+                Some(prev) => {
+                    conn.session.quest_tasks.insert(212, prev);
+                }
+                None => {
+                    conn.session.quest_tasks.remove(&212);
+                }
+            }
+            end_talk(conn, out);
+            return true;
+        }
+
+        if let Some(slot) = quest_slot {
+            out.send(crate::protocol::codecs::QuestSyncCodec::build_task_entry_hex(slot, 212, 1));
+        }
+        let alert_frame = crate::protocol::codecs::NpcTalkCodec::build_event_alert_hex(2);
+        out.send(alert_frame.clone());
+        out.broadcast(conn.session.id, alert_frame);
+
         crate::server::session::registry_update_if_online(&conn.session);
         out.send("F44402001407");
         out.send(crate::server::spawn::build_relocate_packet(conn.session.id, 12911, 400, 400, 0));
         out.broadcast_to_map(conn.session.id, old_map, crate::battle::packets::hide_from_map(conn.session.id));
 
-        if conn.session.id_leader == conn.session.id && conn.session.id > 0 {
-            for member in conn.session.id_mem {
-                if member > 0 && member != conn.session.id {
-                    let member_old_map = {
-                        let mut online = crate::server::session::lock_online_sessions();
-                        if let Some(mem) = online.get_mut(&member) {
-                            let m_old = mem.map_id;
-                            mem.map_id = 12911;
-                            mem.map_x = 400;
-                            mem.map_y = 400;
-                            m_old
-                        } else {
-                            old_map
-                        }
-                    };
-                    out.send_to(member, "F44402001407");
-                    out.send_to(member, crate::server::spawn::build_relocate_packet(member, 12911, 400, 400, 0));
-                    out.broadcast_to_map(member, member_old_map, crate::battle::packets::hide_from_map(member));
-                }
-            }
+        for (member_old_map, mem) in &warped_members {
+            let member = mem.id;
+            crate::server::session::registry_update_if_online(mem);
+            out.send_to(member, "F44402001407");
+            out.send_to(member, crate::server::spawn::build_relocate_packet(member, 12911, 400, 400, 0));
+            out.broadcast_to_map(member, *member_old_map, crate::battle::packets::hide_from_map(member));
         }
-        let _ = crate::db::persist::persist_sessions_transaction(
-            pool,
-            &[&conn.session],
-            &["stats"],
-        )
-        .await;
         end_talk(conn, out);
         return true;
     }
@@ -345,53 +393,107 @@ pub async fn try_handle_event_npc(
             return true;
         }
 
+        let mut participant_ids = vec![conn.session.id];
+        if conn.session.id_leader == conn.session.id && conn.session.id > 0 {
+            for &m in &conn.session.id_mem {
+                if m > 0 && m != conn.session.id {
+                    participant_ids.push(m);
+                }
+            }
+        }
+        participant_ids.sort_unstable();
+        participant_ids.dedup();
+        let _guards = crate::server::session::lock_player_operations(participant_ids).await;
+
+        let before_leader = (
+            conn.session.map_id,
+            conn.session.map_x,
+            conn.session.map_y,
+            conn.session.quest_tasks.get(&212).copied(),
+        );
         let next_step = current_stage + 1;
-        crate::server::handlers::quest_sync::set_quest_task(&mut conn.session, out, 212, next_step);
+        let quest_slot = crate::server::handlers::quest_sync::upsert_quest_task_slot(
+            &mut conn.session,
+            212,
+            next_step,
+        );
 
         let next_map = map_id + 1;
         let old_map = conn.session.map_id;
         conn.session.map_id = next_map;
         conn.session.map_x = 400;
         conn.session.map_y = 400;
-        crate::server::session::registry_update_if_online(&conn.session);
 
-        out.send("F44402001407");
-        out.send(crate::server::spawn::build_relocate_packet(conn.session.id, next_map, 400, 400, 0));
-        out.broadcast_to_map(conn.session.id, old_map, crate::battle::packets::hide_from_map(conn.session.id));
-
+        let mut warped_members: Vec<(u16, crate::server::session::Session)> = Vec::new();
         if conn.session.id_leader == conn.session.id && conn.session.id > 0 {
             for member in conn.session.id_mem {
                 if member > 0 && member != conn.session.id {
-                    let member_old_map = {
-                        let mut online = crate::server::session::lock_online_sessions();
-                        if let Some(mem) = online.get_mut(&member) {
-                            let m_old = mem.map_id;
-                            mem.map_id = next_map;
-                            mem.map_x = 400;
-                            mem.map_y = 400;
-                            let _ = crate::server::handlers::quest_sync::upsert_quest_task_slot(
-                                mem,
-                                212,
-                                next_step,
-                            );
-                            m_old
-                        } else {
-                            old_map
-                        }
-                    };
-                    out.send_to(member, "F44402001407");
-                    out.send_to(member, crate::server::spawn::build_relocate_packet(member, next_map, 400, 400, 0));
-                    out.broadcast_to_map(member, member_old_map, crate::battle::packets::hide_from_map(member));
+                    if let Some(mut mem) = crate::server::session::registry_get(member) {
+                        let m_old = mem.map_id;
+                        mem.map_id = next_map;
+                        mem.map_x = 400;
+                        mem.map_y = 400;
+                        let _ = crate::server::handlers::quest_sync::upsert_quest_task_slot(
+                            &mut mem,
+                            212,
+                            next_step,
+                        );
+                        warped_members.push((m_old, mem));
+                    }
                 }
             }
         }
 
-        let _ = crate::db::persist::persist_sessions_transaction(
+        let mut to_persist: Vec<&crate::server::session::Session> = vec![&conn.session];
+        for (_, mem) in &warped_members {
+            to_persist.push(mem);
+        }
+        if !crate::db::persist::persist_sessions_transaction(
             pool,
-            &[&conn.session],
+            &to_persist,
             &["stats", "quest"],
         )
-        .await;
+        .await
+        {
+            tracing::warn!(
+                leader_id = conn.session.id,
+                next_map,
+                "NPC 15313 DB write-through failed; rolling back RAM state"
+            );
+            conn.session.map_id = before_leader.0;
+            conn.session.map_x = before_leader.1;
+            conn.session.map_y = before_leader.2;
+            match before_leader.3 {
+                Some(prev) => {
+                    conn.session.quest_tasks.insert(212, prev);
+                }
+                None => {
+                    conn.session.quest_tasks.remove(&212);
+                }
+            }
+            end_talk(conn, out);
+            return true;
+        }
+
+        if let Some(slot) = quest_slot {
+            out.send(crate::protocol::codecs::QuestSyncCodec::build_task_entry_hex(
+                slot,
+                212,
+                next_step,
+            ));
+        }
+        crate::server::session::registry_update_if_online(&conn.session);
+        out.send("F44402001407");
+        out.send(crate::server::spawn::build_relocate_packet(conn.session.id, next_map, 400, 400, 0));
+        out.broadcast_to_map(conn.session.id, old_map, crate::battle::packets::hide_from_map(conn.session.id));
+
+        for (member_old_map, mem) in &warped_members {
+            let member = mem.id;
+            crate::server::session::registry_update_if_online(mem);
+            out.send_to(member, "F44402001407");
+            out.send_to(member, crate::server::spawn::build_relocate_packet(member, next_map, 400, 400, 0));
+            out.broadcast_to_map(member, *member_old_map, crate::battle::packets::hide_from_map(member));
+        }
 
         end_talk(conn, out);
         return true;
@@ -423,53 +525,107 @@ pub async fn try_handle_event_npc(
             return true;
         }
 
+        let mut participant_ids = vec![conn.session.id];
+        if conn.session.id_leader == conn.session.id && conn.session.id > 0 {
+            for &m in &conn.session.id_mem {
+                if m > 0 && m != conn.session.id {
+                    participant_ids.push(m);
+                }
+            }
+        }
+        participant_ids.sort_unstable();
+        participant_ids.dedup();
+        let _guards = crate::server::session::lock_player_operations(participant_ids).await;
+
+        let before_leader = (
+            conn.session.map_id,
+            conn.session.map_x,
+            conn.session.map_y,
+            conn.session.quest_tasks.get(&12309).copied(),
+        );
         let next_step = current_stage + 1;
-        crate::server::handlers::quest_sync::set_quest_task(&mut conn.session, out, 12309, next_step);
+        let quest_slot = crate::server::handlers::quest_sync::upsert_quest_task_slot(
+            &mut conn.session,
+            12309,
+            next_step,
+        );
 
         let next_map = map_id + 1;
         let old_map = conn.session.map_id;
         conn.session.map_id = next_map;
         conn.session.map_x = 400;
         conn.session.map_y = 400;
-        crate::server::session::registry_update_if_online(&conn.session);
 
-        out.send("F44402001407");
-        out.send(crate::server::spawn::build_relocate_packet(conn.session.id, next_map, 400, 400, 0));
-        out.broadcast_to_map(conn.session.id, old_map, crate::battle::packets::hide_from_map(conn.session.id));
-
+        let mut warped_members: Vec<(u16, crate::server::session::Session)> = Vec::new();
         if conn.session.id_leader == conn.session.id && conn.session.id > 0 {
             for member in conn.session.id_mem {
                 if member > 0 && member != conn.session.id {
-                    let member_old_map = {
-                        let mut online = crate::server::session::lock_online_sessions();
-                        if let Some(mem) = online.get_mut(&member) {
-                            let m_old = mem.map_id;
-                            mem.map_id = next_map;
-                            mem.map_x = 400;
-                            mem.map_y = 400;
-                            let _ = crate::server::handlers::quest_sync::upsert_quest_task_slot(
-                                mem,
-                                12309,
-                                next_step,
-                            );
-                            m_old
-                        } else {
-                            old_map
-                        }
-                    };
-                    out.send_to(member, "F44402001407");
-                    out.send_to(member, crate::server::spawn::build_relocate_packet(member, next_map, 400, 400, 0));
-                    out.broadcast_to_map(member, member_old_map, crate::battle::packets::hide_from_map(member));
+                    if let Some(mut mem) = crate::server::session::registry_get(member) {
+                        let m_old = mem.map_id;
+                        mem.map_id = next_map;
+                        mem.map_x = 400;
+                        mem.map_y = 400;
+                        let _ = crate::server::handlers::quest_sync::upsert_quest_task_slot(
+                            &mut mem,
+                            12309,
+                            next_step,
+                        );
+                        warped_members.push((m_old, mem));
+                    }
                 }
             }
         }
 
-        let _ = crate::db::persist::persist_sessions_transaction(
+        let mut to_persist: Vec<&crate::server::session::Session> = vec![&conn.session];
+        for (_, mem) in &warped_members {
+            to_persist.push(mem);
+        }
+        if !crate::db::persist::persist_sessions_transaction(
             pool,
-            &[&conn.session],
+            &to_persist,
             &["stats", "quest"],
         )
-        .await;
+        .await
+        {
+            tracing::warn!(
+                leader_id = conn.session.id,
+                next_map,
+                "NPC 61210 DB write-through failed; rolling back RAM state"
+            );
+            conn.session.map_id = before_leader.0;
+            conn.session.map_x = before_leader.1;
+            conn.session.map_y = before_leader.2;
+            match before_leader.3 {
+                Some(prev) => {
+                    conn.session.quest_tasks.insert(12309, prev);
+                }
+                None => {
+                    conn.session.quest_tasks.remove(&12309);
+                }
+            }
+            end_talk(conn, out);
+            return true;
+        }
+
+        if let Some(slot) = quest_slot {
+            out.send(crate::protocol::codecs::QuestSyncCodec::build_task_entry_hex(
+                slot,
+                12309,
+                next_step,
+            ));
+        }
+        crate::server::session::registry_update_if_online(&conn.session);
+        out.send("F44402001407");
+        out.send(crate::server::spawn::build_relocate_packet(conn.session.id, next_map, 400, 400, 0));
+        out.broadcast_to_map(conn.session.id, old_map, crate::battle::packets::hide_from_map(conn.session.id));
+
+        for (member_old_map, mem) in &warped_members {
+            let member = mem.id;
+            crate::server::session::registry_update_if_online(mem);
+            out.send_to(member, "F44402001407");
+            out.send_to(member, crate::server::spawn::build_relocate_packet(member, next_map, 400, 400, 0));
+            out.broadcast_to_map(member, *member_old_map, crate::battle::packets::hide_from_map(member));
+        }
 
         end_talk(conn, out);
         return true;

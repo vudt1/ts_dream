@@ -71,6 +71,7 @@ fn session_with_action(results: Vec<EveResult>) -> Session {
         npc_click_id: 1,
         trigger_kind: EventTriggerKind::ClickNpc,
         chain_depth: 0,
+        planned_effects: ts_dream::eve::planner::plan_results(&results),
         results,
         current_index: 0,
         phase: EventPhase::Executing,

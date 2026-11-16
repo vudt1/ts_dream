@@ -397,43 +397,89 @@ pub async fn handle_quiz_answer(ctx: &mut OpcodeCtx<'_>) {
         return;
     };
 
+    let member_ids = ctx.conn.session.id_mem;
+    let mut participant_ids = vec![leader_id];
+    for &mem_id in &member_ids {
+        if mem_id > 0 && mem_id != leader_id {
+            participant_ids.push(mem_id);
+        }
+    }
+    participant_ids.sort_unstable();
+    participant_ids.dedup();
+    // Phase 1: Deterministic RAM Lock BEFORE reading/mutating member sessions.
+    let _guards = crate::server::session::lock_player_operations(participant_ids).await;
+
+    let before_leader = (
+        ctx.conn.session.god,
+        ctx.conn.session.hp,
+        ctx.conn.session.ghost,
+        ctx.conn.session.battle_id,
+    );
+    if res.is_correct {
+        ctx.conn.session.god = ctx.conn.session.god.saturating_add(10).min(240);
+    } else {
+        ctx.conn.session.hp = 1;
+        ctx.conn.session.ghost = 1;
+    }
+    ctx.conn.session.battle_id = 0;
+
+    // Collect evacuated party members while holding the lock
+    let mut evacuated_members: Vec<Session> = Vec::new();
+    for &mem_id in &member_ids {
+        if mem_id > 0 && mem_id != leader_id {
+            if let Some(mut mem) = crate::server::session::registry_get(mem_id) {
+                mem.battle_id = 0;
+                evacuated_members.push(mem);
+            }
+        }
+    }
+
+    // Phase 2: Atomic Persistence to DB for leader and all evacuated members
+    // BEFORE updating registry or emitting wire frames.
+    if let Some(pool) = ctx.env.pool {
+        let cols = if res.is_correct {
+            &["god"][..]
+        } else {
+            &["hp", "ghost"][..]
+        };
+        let mut to_persist: Vec<&Session> = vec![&ctx.conn.session];
+        for mem in &evacuated_members {
+            to_persist.push(mem);
+        }
+        if !crate::db::persist::persist_sessions_transaction(Some(pool), &to_persist, cols).await {
+            tracing::warn!(
+                leader_id,
+                battle_id = res.battle_id,
+                "North Star quiz DB write-through failed; rolling back RAM state"
+            );
+            ctx.conn.session.god = before_leader.0;
+            ctx.conn.session.hp = before_leader.1;
+            ctx.conn.session.ghost = before_leader.2;
+            ctx.conn.session.battle_id = before_leader.3;
+            return;
+        }
+    }
+
     // 1. Send S->C 10 02 01 (Correct) or 10 02 02 (Incorrect) modal result dialog
     ctx.out.send(res.result_frame);
 
     if res.is_correct {
-        // Correct answer:
-        // +10 God buff (capped at 240)
-        ctx.conn.session.god = ctx.conn.session.god.saturating_add(10).min(240);
         // S->C 18 08 [playerId][02 00][01]
         ctx.out.send(crate::server::spawn::state_sync_frame(leader_id, 2, 1));
-        // Exit combat with victory
-        ctx.service.leave_battle(&mut ctx.conn.session);
-        ctx.out.send(crate::battle::packets::battle_trailer());
     } else {
-        // Incorrect answer:
-        // Leader HP drops to 1
-        ctx.conn.session.hp = 1;
         ctx.out.send(crate::battle::packets::status_update(0x19, 1));
-        // Afflict Leader with Ghost debuff
-        ctx.conn.session.ghost = 1;
         // S->C 18 08 [playerId][01 00][01]
         ctx.out.send(crate::server::spawn::state_sync_frame(leader_id, 1, 1));
-        // Exit combat
-        ctx.service.leave_battle(&mut ctx.conn.session);
-        ctx.out.send(crate::battle::packets::battle_trailer());
     }
+    ctx.service.leave_battle(&mut ctx.conn.session);
+    ctx.out.send(crate::battle::packets::battle_trailer());
 
-    // Evacuate party members from combat cleanly
-    let member_ids = ctx.conn.session.id_mem;
-    {
-        let mut online = crate::server::session::lock_online_sessions();
-        for &mem_id in &member_ids {
-            if mem_id > 0 && mem_id != leader_id {
-                if let Some(mem) = online.get_mut(&mem_id) {
-                    mem.battle_id = 0;
-                }
-                ctx.service.send_to(i64::from(mem_id), crate::battle::packets::battle_trailer());
-            }
+    for mem in &evacuated_members {
+        crate::server::session::registry_update_if_online(mem);
+    }
+    for &mem_id in &member_ids {
+        if mem_id > 0 && mem_id != leader_id {
+            ctx.service.send_to(i64::from(mem_id), crate::battle::packets::battle_trailer());
         }
     }
     // Clean up battle instance
@@ -441,15 +487,5 @@ pub async fn handle_quiz_answer(ctx: &mut OpcodeCtx<'_>) {
 
     // Two-Phase State Lock / Registry Sync
     crate::server::session::registry_update_if_online(&ctx.conn.session);
-
-    // Persistence to DB
-    if let Some(pool) = ctx.env.pool {
-        let cols = if res.is_correct {
-            &["god"][..]
-        } else {
-            &["hp", "ghost"][..]
-        };
-        let _ = crate::db::persist::persist_sessions_transaction(Some(pool), &[&ctx.conn.session], cols).await;
-    }
 }
 

@@ -76,9 +76,10 @@ async fn main() -> anyhow::Result<()> {
         cfg.data_dir.display()
     );
 
-    // 2. Connect SQLite dual-pool (fail-fast)
+    // 2. Connect SQLite dual-pool (fail-fast) + verify schema (ADR 0004 manual migrations)
     let db_url = cfg.resolve_database_url();
     let pool = ts_dream::db::pool::bootstrap(&db_url, Some(cfg.sqlite_cache_size_kb)).await?;
+    ts_dream::db::pool::verify_schema(&pool.read).await?;
     tracing::info!("connected to SQLite ({db_url})");
 
     // 3. Shared AppState

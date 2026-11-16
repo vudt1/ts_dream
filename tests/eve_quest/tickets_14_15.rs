@@ -381,6 +381,7 @@ fn ticket14_auto_chain_door_respects_when_happen() {
         trigger_kind: EventTriggerKind::ClickDoor,
         chain_depth: 0,
         results: vec![],
+        planned_effects: vec![],
         current_index: 0,
         phase: EventPhase::Completed,
         last_surface_id: -1,
