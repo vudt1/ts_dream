@@ -362,7 +362,7 @@ async fn negative_door_unmet_condition_and_invalid_warp_keep_party_untouched() {
     let reg_mem = registry_get(member_id as u32).unwrap();
     assert_eq!((reg_mem.map_id, reg_mem.map_x, reg_mem.map_y), (12001, 300, 400));
 
-    // 2. Invalid warp destination (missing Warps.dat entry)
+    // 2. Invalid warp destination (missing Warps.txt entry)
     let data_invalid_warp = build_door_test_data(None, false);
     let out_invalid = dispatch(&mut conn, &click_door_frame(10), &data_invalid_warp, &service, &env).await;
     assert!(out_invalid.outgoing.iter().any(|f| f.frame == "F44402001408"));

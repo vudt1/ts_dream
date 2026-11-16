@@ -11,7 +11,7 @@
 //! 4. Duplicate Item Prevention - never hand out the same item twice.
 
 use crate::battle::rng::DotNetRandom;
-use crate::data::loaders::{EveCondition, NpcEventData, SceneEveData};
+use crate::data::loaders::{EveCondition, SceneEveData};
 use crate::eve::resolver::{resolve_event, ChainFilter};
 use crate::eve::state::PlayerEventState;
 use tracing::{debug, info};
@@ -134,7 +134,7 @@ impl EveAutoChainEngine {
 
     /// Re-evaluate the same NPC/door event list after state changed.
     ///
-    /// For each candidate event (skipping finished or surpassed ones), the
+    /// For each candidate event, the
     /// conditions are re-resolved. Same-eveNo candidates must pass all 4 loop
     /// guards before chaining. The returned [`EventSession`] carries depth+1
     /// and is ready for activation; no global state is touched here.
@@ -167,12 +167,6 @@ impl EveAutoChainEngine {
                 let Some(event_data) = scene.npc_events.get(&u16::from(eve_no)) else {
                     continue;
                 };
-                let skip_for_completion = !(filter.is_some() && i32::from(eve_no) == completed.eve_no)
-                    && Self::should_skip_event(event_list, eve_no, event_data, state);
-                if skip_for_completion {
-                    debug!(eve_no, "auto-chain skip: completed or progress surpassed");
-                    continue;
-                }
 
                 let Some(resolved) =
                     resolve_event(event_data, state, &scene.group_datas, rng, *filter)
@@ -201,9 +195,9 @@ impl EveAutoChainEngine {
                         debug!(
                             eve_no,
                             cond_no = candidate.matched_condition_no,
-                            "auto-chain same chain detected; terminating"
+                            "auto-chain same chain detected; skipping"
                         );
-                        return AutoChainResult::NoMatch;
+                        continue;
                     }
                     // Guard #2: question asked again right after answering.
                     if Self::detect_re_question(&candidate, completed) {
@@ -279,35 +273,6 @@ impl EveAutoChainEngine {
         }
         !give_items(&new_session.results).is_disjoint(&completed_give)
     }
-
-    /// Progress watermark: whether an event should be skipped entirely.
-    ///
-    /// Rule 1: already completed and no cls=12 self-managed count condition.
-    /// Rule 2: not yet completed but a later sibling event already is.
-    #[must_use]
-    pub fn should_skip_event(
-        events: &[u8],
-        eve_no: u8,
-        event_data: &NpcEventData,
-        state: &PlayerEventState,
-    ) -> bool {
-        let completed_count = state
-            .completed_eve_counts
-            .get(&(i32::from(eve_no)))
-            .copied()
-            .unwrap_or(0);
-        let has_completion_condition = event_data
-            .conditions
-            .iter()
-            .any(|c| c.condition_class == 12);
-        if completed_count > 0 && !has_completion_condition {
-            return true;
-        }
-        if completed_count == 0 && has_later_completed_event(events, eve_no, state) {
-            return true;
-        }
-        false
-    }
 }
 
 /// Maximum auto-chain depth before giving up.
@@ -320,27 +285,6 @@ const AUTO_CHAIN_TRIGGER_KINDS: [EventTriggerKind; 4] = [
     EventTriggerKind::MeetDoor,
     EventTriggerKind::WalkStep,
 ];
-
-fn has_later_completed_event(events: &[u8], current_eve_no: u8, state: &PlayerEventState) -> bool {
-    let mut found_current = false;
-    for &e in events {
-        if e == current_eve_no {
-            found_current = true;
-            continue;
-        }
-        if found_current
-            && state
-                .completed_eve_counts
-                .get(&(i32::from(e)))
-                .copied()
-                .unwrap_or(0)
-                > 0
-        {
-            return true;
-        }
-    }
-    false
-}
 
 fn event_list_for<'a>(scene: &'a SceneEveData, session: &EventSession) -> Option<&'a [u8]> {
     match session.trigger_kind {

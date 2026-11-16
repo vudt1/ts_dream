@@ -728,11 +728,7 @@ fn process_single_domain_effect(
                 out.send(NpcTalkCodec::build_end_talk_hex());
                 session.talk_locked = false;
             }
-            let diahinh = scene
-                .and_then(|s| s.scene_infos.get(&1))
-                .map(|info| i32::from(info.background_no))
-                .filter(|&bg| bg > 0)
-                .unwrap_or(112);
+            let diahinh = data.map_diahinh(session.map_id);
             if let Some(ev) = session.current_event_session.as_mut() {
                 ev.phase = EventPhase::AwaitingBattle;
             }
@@ -923,12 +919,17 @@ async fn execute_event_step_core(
         }
 
         if let DomainEffect::Warp { warp_id } = effects[0] {
-            let warp_key = (i64::from(session.map_id), i64::from(warp_id));
-            if !data.warps.contains_key(&warp_key) {
+            if crate::server::handlers::quest::resolve_warp_destination(
+                data,
+                session.map_id,
+                warp_id,
+            )
+            .is_none()
+            {
                 tracing::debug!(
                     map_id = session.map_id,
                     warp_id,
-                    "Eve Door result has no Warps.dat row; skipping"
+                    "Eve Door result has no EveSceneInfo or Warps.txt row; skipping"
                 );
                 if let Some(ev) = session.current_event_session.as_mut() {
                     ev.current_index = ev.current_index.saturating_add(1);

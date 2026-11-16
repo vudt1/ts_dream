@@ -12,8 +12,9 @@ fn data_dir() -> PathBuf {
 
 #[test]
 fn ground_loads_reference_terrains() {
-    let bytes = std::fs::read(data_dir().join("ground.mmg")).expect("read ground.mmg");
-    let terrains = GroundMmgLoader::load(&bytes).expect("parse ground.mmg");
+    let bytes =
+        std::fs::read(data_dir().join("ground_server.mmg")).expect("read ground_server.mmg");
+    let terrains = GroundMmgLoader::load(&bytes).expect("parse ground_server.mmg");
     // 4528 indexed maps; only bodies whose walk yields geolBaseAtt > 0 land here.
     assert!(
         terrains.len() > 3000,
@@ -23,6 +24,13 @@ fn ground_loads_reference_terrains() {
     assert!(
         terrains.values().all(|&g| g > 0),
         "zero geolBaseAtt entries must be dropped (Kotlin parity)"
+    );
+
+    let metas = GroundMmgLoader::load_with_meta(&bytes).expect("parse ground_server.mmg meta");
+    assert_eq!(metas.len(), 4528, "all 4528 maps must be preserved");
+    assert!(
+        metas.values().all(|m| m.width > 0 && m.height > 0),
+        "every map must have positive width and height"
     );
 }
 

@@ -104,7 +104,7 @@ pub enum DomainEffect {
     TalkStep(EveResult),
     /// `rt = 6`: Deliver a `TSurface` menu (`0x14 01`) and wait for `0x14 09`.
     AwaitMenuChoice { surface_id: i32, result: EveResult },
-    /// `rt = 2`: Door/warp relocation (`Warps.dat` row `(map_id, warp_id)`).
+    /// `rt = 2`: Door/warp relocation (`EveSceneInfo` or fallback `Warps.txt` row `(map_id, warp_id)`).
     Warp { warp_id: u16 },
     /// `rt = 3`: Scripted Eve battle (`scene.fight_datas[fight_id]`).
     StartBattle { fight_id: u16 },

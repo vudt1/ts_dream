@@ -550,12 +550,14 @@ impl BattleSink for BattleSinkImpl {
                         eve_followups.push((pid, s.clone(), fight_id, diahinh));
                     }
                     if let Some(warp_id) = eve_warp {
-                        if let Some(warp) = self.data.warps.get(&(i64::from(s.map_id), i64::from(warp_id))) {
-                            if warp.map2 > 0 {
-                                s.map_id = warp.map2 as u16;
-                                s.map_x = warp.x as u16;
-                                s.map_y = warp.y as u16;
-                            }
+                        if let Some(resolved) = crate::server::handlers::quest::resolve_warp_destination(
+                            self.data.as_ref(),
+                            s.map_id,
+                            warp_id,
+                        ) {
+                            s.map_id = resolved.dest_map;
+                            s.map_x = resolved.dest_x;
+                            s.map_y = resolved.dest_y;
                         }
                     }
                     crate::server::session::registry_update_if_online(&s);
@@ -568,12 +570,14 @@ impl BattleSink for BattleSinkImpl {
                         .resume_eve_for_participant(pid, &mut offline_s, outcome, pool_opt.as_ref())
                         .await;
                     if let Some(warp_id) = eve_warp {
-                        if let Some(warp) = self.data.warps.get(&(i64::from(offline_s.map_id), i64::from(warp_id))) {
-                            if warp.map2 > 0 {
-                                offline_s.map_id = warp.map2 as u16;
-                                offline_s.map_x = warp.x as u16;
-                                offline_s.map_y = warp.y as u16;
-                            }
+                        if let Some(resolved) = crate::server::handlers::quest::resolve_warp_destination(
+                            self.data.as_ref(),
+                            offline_s.map_id,
+                            warp_id,
+                        ) {
+                            offline_s.map_id = resolved.dest_map;
+                            offline_s.map_x = resolved.dest_x;
+                            offline_s.map_y = resolved.dest_y;
                         }
                     }
                     ended_sessions.push(offline_s);

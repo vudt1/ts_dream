@@ -232,11 +232,7 @@ fn try_trigger_random_encounter(ctx: &mut OpcodeCtx) {
         let roll = rng.next_range(1, 101) as u8;
         if roll <= rate {
             let npc_id = if rng.next_range(0, 2) == 0 { 1643 } else { 1644 };
-            let diahinh = scene
-                .scene_infos
-                .get(&1)
-                .map(|s| s.background_no as i32)
-                .unwrap_or(112);
+            let diahinh = ctx.data.map_diahinh(conn.session.map_id);
             let (_battle_id, modal_frame) =
                 ctx.service.start_north_star_battle(&mut conn.session, npc_id, diahinh);
             ctx.out.send(modal_frame);
@@ -285,12 +281,7 @@ fn try_trigger_random_encounter(ctx: &mut OpcodeCtx) {
         return;
     };
 
-    let diahinh = scene
-        .scene_infos
-        .get(&1)
-        .map(|s| s.background_no as i32)
-        .filter(|&bg| bg > 0)
-        .unwrap_or(112);
+    let diahinh = ctx.data.map_diahinh(conn.session.map_id);
 
     ctx.service
         .start_encounter_battle(&mut conn.session, fight_data, diahinh);

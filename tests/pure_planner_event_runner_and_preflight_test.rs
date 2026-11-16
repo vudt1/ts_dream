@@ -460,12 +460,15 @@ async fn e2e_12001_si_triet_repeatable_and_12136_gian_ung_skill_write_through_db
             .any(|f| f.frame == QuestSyncCodec::build_item_clear_hex(10544)),
         "0x18 04 clear frame emitted"
     );
+    // After Ticket 11 removed should_skip_event Rule 2, turning in repeatable quest 10544
+    // (eve=40) allows AutoChain to re-evaluate eve=36 (now eligible) or emit EndTalk.
     assert!(
         out_turnin
             .outgoing
             .iter()
-            .any(|f| f.frame == NpcTalkCodec::build_end_talk_hex()),
-        "FinishChain emits EndTalk"
+            .any(|f| f.frame == NpcTalkCodec::build_end_talk_hex()
+                || f.frame.starts_with("F44411001401")),
+        "FinishChain either emits EndTalk or AutoChains to repeatable eve=36"
     );
     assert_eq!(conn.session.homdo[0].count, 7, "adjacent slot 1 preserved");
     assert_eq!(conn.session.homdo[1].count, 13, "adjacent slot 2 preserved");

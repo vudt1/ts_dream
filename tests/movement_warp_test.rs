@@ -253,7 +253,9 @@ async fn test_warp_confirm_and_teleport_confirm_cycle() {
         .insert(3001, conn.session.clone());
 
     // Step 1: Client triggers warp gate 1 at map 49902
-    // (In Warps.txt, (49902, 1) warps to map 49901, x=222, y=295)
+    // (EveSceneInfo (49902, 1) takes priority over Warps.txt)
+    let expected_warp = ts_dream::server::handlers::quest::resolve_warp_destination(&data, 49902, 1)
+        .expect("warp (49902, 1) must resolve");
     let decoded_gate = [0xF4, 0x44, 0x04, 0x00, 0x14, 0x08, 0x01, 0x00];
     let out_gate = dispatch(&mut conn, &decoded_gate, &data, &service, &env).await;
 
@@ -264,7 +266,13 @@ async fn test_warp_confirm_and_teleport_confirm_cycle() {
     );
 
     // Must send Opcode 0x0C relocate packet (13 bytes payload)
-    let expected_relocate = spawn::build_relocate_packet(3001, 49901, 222, 295, 1);
+    let expected_relocate = spawn::build_relocate_packet(
+        3001,
+        expected_warp.dest_map,
+        expected_warp.dest_x,
+        expected_warp.dest_y,
+        expected_warp.wire_warp_id,
+    );
     assert!(
         out_gate.outgoing.iter().any(|f| f.frame == expected_relocate),
         "Must send Opcode 0x0C relocate packet"
@@ -279,9 +287,9 @@ async fn test_warp_confirm_and_teleport_confirm_cycle() {
     );
 
     // Session coordinates updated to destination
-    assert_eq!(conn.session.map_id, 49901);
-    assert_eq!(conn.session.map_x, 222);
-    assert_eq!(conn.session.map_y, 295);
+    assert_eq!(conn.session.map_id, expected_warp.dest_map);
+    assert_eq!(conn.session.map_x, expected_warp.dest_x);
+    assert_eq!(conn.session.map_y, expected_warp.dest_y);
 
     // Step 2: Client loads new map and sends confirm Opcode 0x0C Sub 1
     let decoded_confirm = [0xF4, 0x44, 0x02, 0x00, 0x0C, 0x01];
@@ -304,9 +312,9 @@ async fn test_warp_confirm_and_teleport_confirm_cycle() {
     // Online registry must reflect new map
     let reg = lock_online_sessions();
     let s = reg.get(&3001).unwrap();
-    assert_eq!(s.map_id, 49901);
-    assert_eq!(s.map_x, 222);
-    assert_eq!(s.map_y, 295);
+    assert_eq!(s.map_id, expected_warp.dest_map);
+    assert_eq!(s.map_x, expected_warp.dest_x);
+    assert_eq!(s.map_y, expected_warp.dest_y);
     drop(reg);
 
     lock_online_sessions().remove(&3001);
@@ -343,19 +351,21 @@ async fn test_party_warp_follow() {
 
     let env = ServerEnv::none();
 
-    // Leader triggers warp at gate 1 (map 49902 -> map 49901, 222, 295)
+    // Leader triggers warp at gate 1 (EveSceneInfo (49902, 1) -> map 49901)
+    let expected_warp = ts_dream::server::handlers::quest::resolve_warp_destination(&data, 49902, 1)
+        .expect("warp (49902, 1) must resolve");
     let decoded_gate = [0xF4, 0x44, 0x04, 0x00, 0x14, 0x08, 0x01, 0x00];
     let out = dispatch(&mut leader_conn, &decoded_gate, &data, &service, &env).await;
 
     // Leader updated
-    assert_eq!(leader_conn.session.map_id, 49901);
+    assert_eq!(leader_conn.session.map_id, expected_warp.dest_map);
 
     // Member in online registry updated to new map
     let reg = lock_online_sessions();
     let mem = reg.get(&4002).unwrap();
-    assert_eq!(mem.map_id, 49901);
-    assert_eq!(mem.map_x, 222);
-    assert_eq!(mem.map_y, 295);
+    assert_eq!(mem.map_id, expected_warp.dest_map);
+    assert_eq!(mem.map_x, expected_warp.dest_x);
+    assert_eq!(mem.map_y, expected_warp.dest_y);
     drop(reg);
 
     // Both leader and member have hide broadcasts on old map 49902

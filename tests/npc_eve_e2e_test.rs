@@ -89,6 +89,7 @@ fn synthetic_data() -> GameData {
         },
     );
     data.scene_eve_data.insert(u32::from(SOURCE_MAP), scene);
+    data.ground_terrains.insert(u32::from(SOURCE_MAP), 55);
 
     let mut fallback_scene = SceneEveData::default();
     fallback_scene.fight_datas.insert(
@@ -443,7 +444,7 @@ fn door_warps_then_finishes_session() {
     assert_eq!(
         (session.map_id, session.map_x, session.map_y),
         (DEST_MAP, 12, 34),
-        "Door must relocate through the Warps.dat row"
+        "Door must relocate through the Warps.txt row"
     );
     assert_eq!(
         out.outgoing[0].frame, "F44402001407",
@@ -481,7 +482,7 @@ fn door_warps_then_finishes_session() {
 #[test]
 fn door_missing_warp_skips_then_finishes() {
     let data = synthetic_data();
-    // No (9001, 99) row in Warps.dat -> skip, keep walking.
+    // No (9001, 99) row in Warps.txt -> skip, keep walking.
     let mut session = session_with_event(SOURCE_MAP, vec![door_result(99)]);
     let mut out = HandleOutcome::default();
 
@@ -562,7 +563,7 @@ async fn battle_parks_after_talk_and_stray_inputs_are_ignored() {
     assert_eq!(
         out2.eve_battle,
         Some((FIGHT_ID, 55)),
-        "fight id + diahinh from scene_infos[1].background_no"
+        "fight id + diahinh from ground_terrains[SOURCE_MAP]"
     );
     {
         let ev = conn.session.current_event_session.as_ref().expect("session");

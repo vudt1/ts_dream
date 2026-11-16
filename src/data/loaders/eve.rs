@@ -195,6 +195,7 @@ pub struct EveDoorPlacement {
 pub struct EveSceneInfo {
     pub eve_no: u16,
     pub background_no: u16,
+    pub dest_map_id: u16,
     pub player_appear_x: i32,
     pub player_appear_y: i32,
     pub direction: u8,
@@ -735,7 +736,7 @@ impl EveDataLoader {
         for _ in 0..count {
             let eve_no = reader.read_u16();
             let background_no = reader.read_u16();
-            reader.skip(2); // eveFileName
+            let dest_map_id = reader.read_u16();
             let player_appear_x = reader.read_i32();
             let player_appear_y = reader.read_i32();
             let direction = reader.read_u8();
@@ -749,6 +750,7 @@ impl EveDataLoader {
                     EveSceneInfo {
                         eve_no,
                         background_no,
+                        dest_map_id,
                         player_appear_x,
                         player_appear_y,
                         direction,

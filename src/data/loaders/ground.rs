@@ -1,7 +1,8 @@
-//! Ground map-terrain loader for `ground.mmg` (unencrypted).
+//! Ground map-terrain loader for `ground_server.mmg` / `ground.mmg` (unencrypted).
 //!
-//! Source lives in repo root `Data/ground.mmg` (or `CompreseData/Ground.mmg`
-//! in mobile distributions); see `resolve_data_file`.
+//! Source lives in repo root `Data/ground_server.mmg` (stripped server extract
+//! of client `ground.mmg`, keeping `width`, `height`, and `geolBaseAtt`); see
+//! `resolve_data_file`.
 //!
 //! File layout:
 //! ```text
@@ -15,124 +16,215 @@
 //!   + elementCount(u16) + elements(count × 8B)
 //!   + npcCount(u8) + geolBaseAtt(u8)  ← extracted value
 //! ```
-//!
-//! Reference-only parser: intentionally NOT wired into `GameData::load`
-//! (undecided whether the server needs `ground.mmg` data). Call
-//! `GroundMmgLoader::load` directly when a consumer lands.
 
-use crate::data::reader::DatReader;
 use crate::error::Result;
 use std::collections::HashMap;
 
-/// Loads `ground.mmg`, returning `map_id → geolBaseAtt` (entries with
-/// `geolBaseAtt == 0` are dropped).
+/// Extracted per-map metadata from `ground_server.mmg` / `ground.mmg`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GroundMapMeta {
+    pub width: i32,
+    pub height: i32,
+    pub geol_base_att: u8,
+}
+
+type GroundIndexEntry = (u32, [u8; 21], usize, usize);
+
+/// Loads `ground_server.mmg` / `ground.mmg` directly from `&[u8]` without
+/// per-map buffer cloning.
 pub struct GroundMmgLoader;
 
 impl GroundMmgLoader {
     /// Index entry size: name(1 + 20) + position(4) + size(4) = 29.
     pub const INDEX_ENTRY_SIZE: usize = 29;
-    /// Name field size for `read_fixed_ascii`.
+    /// Name field size for fixed ASCII.
     pub const NAME_FIELD_SIZE: usize = 20;
+    /// Stripped server body size: width(4) + height(4) + pic(1) + bw(2) + bh(2)
+    /// + wave(2) + elem(2) + npc(1) + geolBaseAtt(1) = 19 bytes.
+    pub const SERVER_BODY_SIZE: usize = 19;
 
+    /// Load `map_id -> geolBaseAtt` (entries with `geolBaseAtt == 0` are dropped).
     pub fn load(bytes: &[u8]) -> Result<HashMap<u32, u8>> {
-        let mut result = HashMap::new();
-        if bytes.len() < 2 {
-            return Ok(result);
-        }
-        let mut reader = DatReader::new(bytes.to_vec());
+        let metas = Self::load_with_meta(bytes)?;
+        Ok(metas
+            .into_iter()
+            .filter(|(_, m)| m.geol_base_att > 0)
+            .map(|(id, m)| (id, m.geol_base_att))
+            .collect())
+    }
 
-        // Tail index (mirrors `OnLoadMapData`: seek to `length - 2`).
-        reader.seek(bytes.len() - 2);
-        let count = reader.read_u16_raw() as usize;
-        let index_start = bytes
-            .len()
-            .checked_sub(2 + count.saturating_mul(Self::INDEX_ENTRY_SIZE));
-        let Some(index_start) = index_start else {
+    /// Load `map_id -> GroundMapMeta { width, height, geol_base_att }` for all
+    /// valid indexed map bodies.
+    pub fn load_with_meta(bytes: &[u8]) -> Result<HashMap<u32, GroundMapMeta>> {
+        let mut result = HashMap::new();
+        let Some((entries, _)) = Self::parse_index(bytes) else {
             return Ok(result);
         };
 
-        // Parse index entries.
-        let mut entries = Vec::with_capacity(count.min(100_000));
-        reader.seek(index_start);
-        for _ in 0..count {
-            if reader.remaining() < Self::INDEX_ENTRY_SIZE {
-                break;
-            }
-            let name = reader.read_fixed_ascii(Self::NAME_FIELD_SIZE);
-            // `DatReader::new` carries zero keys, so plain reads are raw.
-            let position = reader.read_i32();
-            let size = reader.read_i32();
-            // Name looks like "12001.map" — extract the map id.
-            let map_id = name
-                .split_once(".map")
-                .and_then(|(head, _)| head.parse::<u32>().ok());
-            if let Some(map_id) = map_id {
-                if size > 0 && position >= 0 {
-                    entries.push((map_id, position as usize, size as usize));
-                }
-            }
-        }
-
-        // Walk each body for `geolBaseAtt`; malformed bodies are skipped
-        // (per-entry guard, `geolBaseAtt > 0` only).
-        for (map_id, position, size) in entries {
-            if let Some(geol) = Self::read_geol_base_att(bytes, position, size) {
-                if geol > 0 {
-                    result.insert(map_id, geol);
-                }
+        for (map_id, _raw_name, position, size) in entries {
+            if let Some(meta) = Self::read_map_meta(bytes, position, size) {
+                result.insert(map_id, meta);
             }
         }
         Ok(result)
     }
 
-    /// Walk a map body in `MapData.New` field order; `None` when the walk
-    /// would overrun the body bounds.
-    fn read_geol_base_att(bytes: &[u8], position: usize, size: usize) -> Option<u8> {
+    /// Extract a minimal `ground_server.mmg` buffer in `MapData.New` format
+    /// (keeping `width`, `height`, `geolBaseAtt` and zeroing client visual/block
+    /// arrays). Returns `(buffer, map_count)`.
+    pub fn extract_server_mmg(bytes: &[u8]) -> Result<(Vec<u8>, usize)> {
+        let Some((entries, _)) = Self::parse_index(bytes) else {
+            return Ok((vec![0, 0], 0));
+        };
+
+        let mut out_bodies = Vec::with_capacity(entries.len() * Self::SERVER_BODY_SIZE);
+        let mut out_index: Vec<([u8; 21], i32, i32)> = Vec::with_capacity(entries.len());
+
+        for (_map_id, raw_name, position, size) in entries {
+            let Some(meta) = Self::read_map_meta(bytes, position, size) else {
+                continue;
+            };
+            let body_pos = out_bodies.len() as i32;
+            out_bodies.extend_from_slice(&meta.width.to_le_bytes());
+            out_bodies.extend_from_slice(&meta.height.to_le_bytes());
+            out_bodies.push(0); // mapPicCount = 0
+            out_bodies.extend_from_slice(&0u16.to_le_bytes()); // blockWidth = 0
+            out_bodies.extend_from_slice(&0u16.to_le_bytes()); // blockHeight = 0
+            out_bodies.extend_from_slice(&0u16.to_le_bytes()); // waveCount = 0
+            out_bodies.extend_from_slice(&0u16.to_le_bytes()); // elementCount = 0
+            out_bodies.push(0); // npcCount = 0
+            out_bodies.push(meta.geol_base_att);
+            out_index.push((raw_name, body_pos, Self::SERVER_BODY_SIZE as i32));
+        }
+
+        let count = out_index.len();
+        let mut out =
+            Vec::with_capacity(out_bodies.len() + count * Self::INDEX_ENTRY_SIZE + 2);
+        out.extend_from_slice(&out_bodies);
+        for (raw_name, pos, sz) in &out_index {
+            out.extend_from_slice(raw_name);
+            out.extend_from_slice(&pos.to_le_bytes());
+            out.extend_from_slice(&sz.to_le_bytes());
+        }
+        out.extend_from_slice(&(count as u16).to_le_bytes());
+        Ok((out, count))
+    }
+
+    fn parse_index(bytes: &[u8]) -> Option<(Vec<GroundIndexEntry>, usize)> {
+        if bytes.len() < 2 {
+            return None;
+        }
+        let count = read_u16_le(bytes, bytes.len() - 2)? as usize;
+        let index_start = bytes
+            .len()
+            .checked_sub(2 + count.saturating_mul(Self::INDEX_ENTRY_SIZE))?;
+
+        let mut entries = Vec::with_capacity(count.min(100_000));
+        let mut pos = index_start;
+        for _ in 0..count {
+            if pos + Self::INDEX_ENTRY_SIZE > bytes.len() - 2 {
+                break;
+            }
+            let raw_name: [u8; 21] = bytes[pos..pos + 21].try_into().ok()?;
+            let name_len = raw_name[0] as usize;
+            let name = if name_len > 0 && name_len <= Self::NAME_FIELD_SIZE {
+                String::from_utf8_lossy(&raw_name[1..1 + name_len])
+            } else {
+                std::borrow::Cow::Borrowed("")
+            };
+            let position = read_i32_le(bytes, pos + 21)?;
+            let size = read_i32_le(bytes, pos + 25)?;
+            pos += Self::INDEX_ENTRY_SIZE;
+
+            let map_id = name
+                .split_once(".map")
+                .and_then(|(head, _)| head.parse::<u32>().ok());
+            if let Some(map_id) = map_id {
+                if size > 0 && position >= 0 {
+                    entries.push((map_id, raw_name, position as usize, size as usize));
+                }
+            }
+        }
+        Some((entries, count))
+    }
+
+    /// Walk a map body in `MapData.New` field order directly on `&[u8]`;
+    /// `None` when the walk would overrun the body bounds.
+    fn read_map_meta(bytes: &[u8], position: usize, size: usize) -> Option<GroundMapMeta> {
         let end = position.checked_add(size)?;
         if end > bytes.len() {
             return None;
         }
-        let mut r = DatReader::new(bytes.to_vec());
-        r.seek(position);
+        let mut pos = position;
+        if pos.checked_add(8)? > end {
+            return None;
+        }
+        let width = read_i32_le(bytes, pos)?;
+        let height = read_i32_le(bytes, pos + 4)?;
+        pos += 8;
 
-        need(&mut r, end, 8)?; // width(i32) + height(i32)
-        let map_pic_count = u8_at(&mut r, end)?;
-        need(&mut r, end, map_pic_count as usize * 6)?; // pics: picId(2) + posX(2) + posY(2)
-        // blockWidth(u16) + blockHeight(u16), then w × h block bytes.
-        if r.position() + 4 > end {
+        let map_pic_count = *bytes.get(pos)?;
+        pos += 1;
+        if pos.checked_add(1 + map_pic_count as usize * 6)? > end + 1 {
             return None;
         }
-        let bw = r.read_u16_raw() as usize;
-        let bh = r.read_u16_raw() as usize;
-        need(&mut r, end, bw.checked_mul(bh)?)?;
-        if r.position() + 2 > end {
+        pos = pos.checked_add(map_pic_count as usize * 6)?;
+        if pos > end {
             return None;
         }
-        let wave_count = r.read_u16_raw() as usize;
-        need(&mut r, end, wave_count.checked_mul(6)?)?; // waves: blockX(2)+blockY(2)+soundId(1)+dist(1)
-        if r.position() + 2 > end {
+
+        if pos.checked_add(4)? > end {
             return None;
         }
-        let element_count = r.read_u16_raw() as usize;
-        need(&mut r, end, element_count.checked_mul(8)?)?; // elements: picId(4)+posX(2)+posY(2)
-        need(&mut r, end, 1)?; // npcCount(u8)
-        u8_at(&mut r, end) // geolBaseAtt(u8)
+        let bw = read_u16_le(bytes, pos)? as usize;
+        let bh = read_u16_le(bytes, pos + 2)? as usize;
+        pos += 4;
+        pos = pos.checked_add(bw.checked_mul(bh)?)?;
+        if pos > end {
+            return None;
+        }
+
+        if pos.checked_add(2)? > end {
+            return None;
+        }
+        let wave_count = read_u16_le(bytes, pos)? as usize;
+        pos += 2;
+        pos = pos.checked_add(wave_count.checked_mul(6)?)?;
+        if pos > end {
+            return None;
+        }
+
+        if pos.checked_add(2)? > end {
+            return None;
+        }
+        let element_count = read_u16_le(bytes, pos)? as usize;
+        pos += 2;
+        pos = pos.checked_add(element_count.checked_mul(8)?)?;
+        if pos > end {
+            return None;
+        }
+
+        // npcCount(u8) + geolBaseAtt(u8)
+        if pos.checked_add(2)? > end {
+            return None;
+        }
+        let geol_base_att = *bytes.get(pos + 1)?;
+        Some(GroundMapMeta {
+            width,
+            height,
+            geol_base_att,
+        })
     }
 }
 
-/// Require `n` body bytes, then skip them.
-fn need(r: &mut DatReader, end: usize, n: usize) -> Option<()> {
-    if r.position().checked_add(n)? > end {
-        return None;
-    }
-    r.skip(n);
-    Some(())
+#[inline]
+fn read_u16_le(bytes: &[u8], pos: usize) -> Option<u16> {
+    let slice = bytes.get(pos..pos + 2)?;
+    Some(u16::from_le_bytes([slice[0], slice[1]]))
 }
 
-/// Read one raw byte inside the body bounds.
-fn u8_at(r: &mut DatReader, end: usize) -> Option<u8> {
-    if r.position() + 1 > end || r.position() + 1 > r.len() {
-        return None;
-    }
-    Some(r.read_u8_raw())
+#[inline]
+fn read_i32_le(bytes: &[u8], pos: usize) -> Option<i32> {
+    let slice = bytes.get(pos..pos + 4)?;
+    Some(i32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]))
 }

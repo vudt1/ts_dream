@@ -61,6 +61,7 @@ fn test_game_data() -> GameData {
         },
     );
     data.scene_eve_data.insert(u32::from(TEST_MAP), scene);
+    data.ground_terrains.insert(u32::from(TEST_MAP), 110);
     data
 }
 
@@ -490,7 +491,7 @@ fn test_battle_loss_does_not_mark_completed_and_permits_retry() {
             when_happen: [true, false, false, false],
             conditions: vec![EveCondition {
                 condition_no: 0,
-                condition_class: 0,
+                condition_class: 12,
                 and_num: 1,
                 to_result: 1,
                 results: vec![fight_result(FIGHT_ID), quest_action(702, 1, 3)],
@@ -591,7 +592,7 @@ fn test_battle_flee_does_not_mark_completed_and_permits_retry() {
             when_happen: [true, false, false, false],
             conditions: vec![EveCondition {
                 condition_no: 0,
-                condition_class: 0,
+                condition_class: 12,
                 and_num: 1,
                 to_result: 1,
                 results: vec![fight_result(FIGHT_ID)],

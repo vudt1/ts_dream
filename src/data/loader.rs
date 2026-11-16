@@ -4,6 +4,7 @@
 //! `Loaded()` sets `DataLoaded=true` (the TCP accept gate).
 
 use crate::data::ini::{Ini, NOTHING};
+use crate::data::loaders::{GroundMapMeta, GroundMmgLoader};
 use crate::data::tables::*;
 use crate::data::texps::compute_texps;
 use crate::encoding;
@@ -67,6 +68,8 @@ pub struct GameData {
     pub npc_defs: HashMap<u16, NpcDef>,
     pub warp_defs: HashMap<usize, WarpDef>,
     pub scene_eve_data: HashMap<u32, SceneEveData>,
+    pub ground_terrains: HashMap<u32, u8>,
+    pub ground_metas: HashMap<u32, GroundMapMeta>,
     pub festivals: HashMap<u32, crate::data::loaders::festival::FestivalDef>,
     /// Raw bytes for every accepted binary asset. Typed loaders project the
     /// known catalogs above; untyped catalogs remain available for the next
@@ -292,6 +295,21 @@ impl GameData {
             d.festivals = crate::data::loaders::festival::FestivalDatLoader::load(&bytes)?;
         }
 
+        // 15. ground_server.mmg (fallback ground.mmg)
+        if let Some(p) = resolve_data_file(data_dir, "ground_server.mmg")
+            .or_else(|| resolve_data_file(data_dir, "ground.mmg"))
+        {
+            let bytes = std::fs::read(&p)
+                .map_err(|e| TsError::Data(format!("read {}: {}", p.display(), e)))?;
+            d.ground_metas = GroundMmgLoader::load_with_meta(&bytes)?;
+            d.ground_terrains = d
+                .ground_metas
+                .iter()
+                .filter(|(_, m)| m.geol_base_att > 0)
+                .map(|(&id, m)| (id, m.geol_base_att))
+                .collect();
+        }
+
         d.texps = compute_texps();
         d.loaded = true;
         Ok(d)
@@ -380,7 +398,33 @@ impl GameData {
         if let Some(path) = resolve_data_file(data_dir, "BattleGate.txt") {
             self.load_battle_gates(&path)?;
         }
+
+        // ground_server.mmg (stripped server extract) with fallback to ground.mmg
+        if let Some(path) = resolve_data_file(data_dir, "ground_server.mmg")
+            .or_else(|| resolve_data_file(data_dir, "ground.mmg"))
+        {
+            let bytes = std::fs::read(&path)
+                .map_err(|e| TsError::Data(format!("read {}: {}", path.display(), e)))?;
+            self.ground_metas = GroundMmgLoader::load_with_meta(&bytes)?;
+            self.ground_terrains = self
+                .ground_metas
+                .iter()
+                .filter(|(_, m)| m.geol_base_att > 0)
+                .map(|(&id, m)| (id, m.geol_base_att))
+                .collect();
+        }
         Ok(())
+    }
+
+    /// Resolve combat `DiaHinh` (`FField<N>`) for `map_id` from `ground_server.mmg`
+    /// (`geolBaseAtt`), falling back to `112` when absent or zero.
+    pub fn map_diahinh(&self, map_id: u16) -> i32 {
+        self.ground_terrains
+            .get(&u32::from(map_id))
+            .copied()
+            .filter(|&g| g > 0)
+            .map(i32::from)
+            .unwrap_or(112)
     }
 
     /// Return accepted binary asset names without parsing their record format.

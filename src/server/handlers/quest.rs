@@ -908,10 +908,59 @@ pub fn perform_warp(session: &mut Session, warp: &crate::data::tables::Warp, out
     }
 }
 
+/// Resolved warp destination from `EveSceneInfo` (PC `eve.emg`) or legacy `Warps.txt`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ResolvedWarp {
+    pub dest_map: u16,
+    pub dest_x: u16,
+    pub dest_y: u16,
+    pub wire_warp_id: u8,
+}
+
+/// Resolve warp destination for `(map_id, warp_id)`:
+/// 1. Check `scene_eve_data[map_id].scene_infos[warp_id]` first. If present,
+///    require `dest_map_id > 0` and positive appear coordinates (converting
+///    grid tile to pixel via `tile * 20 - 10`); if invalid, return `None`
+///    without falling back to `Warps.txt`.
+/// 2. Only when `scene_infos` has no entry for `warp_id`, fall back to
+///    `data.warps` (`Warps.txt`).
+pub fn resolve_warp_destination(
+    data: &GameData,
+    map_id: u16,
+    warp_id: u16,
+) -> Option<ResolvedWarp> {
+    if let Some(scene) = data.scene_eve_data.get(&u32::from(map_id)) {
+        if let Some(info) = scene.scene_infos.get(&warp_id) {
+            if info.dest_map_id > 0 && info.player_appear_x > 0 && info.player_appear_y > 0 {
+                let dest_x = u16::try_from(info.player_appear_x * 20 - 10).ok()?;
+                let dest_y = u16::try_from(info.player_appear_y * 20 - 10).ok()?;
+                return Some(ResolvedWarp {
+                    dest_map: info.dest_map_id,
+                    dest_x,
+                    dest_y,
+                    wire_warp_id: (warp_id & 0xFF) as u8,
+                });
+            }
+            return None;
+        }
+    }
+    let warp = data.warps.get(&(i64::from(map_id), i64::from(warp_id)))?;
+    if warp.map2 <= 0 {
+        return None;
+    }
+    Some(ResolvedWarp {
+        dest_map: warp.map2 as u16,
+        dest_x: warp.x as u16,
+        dest_y: warp.y as u16,
+        wire_warp_id: (warp.warpid & 0xFF) as u8,
+    })
+}
+
 /// Two-Phase State Lock + atomic SQLite write-through Door Warp for solo or party.
 ///
-/// 1. Validates `(session.map_id, warp_id)` in `data.warps` (`warp.map2 > 0`) and
-///    refuses independent warp by a following party member.
+/// 1. Resolves `(session.map_id, warp_id)` via [`resolve_warp_destination`]
+///    (`EveSceneInfo` first, fallback `Warps.txt`) and refuses independent warp
+///    by a following party member.
 /// 2. Acquires `lock_player_operations` in ascending player-ID order **before**
 ///    reading any party member from `registry_get`.
 /// 3. Updates leader & online members' `(map_id, map_x, map_y)`, calls
@@ -925,24 +974,14 @@ pub async fn perform_party_warp_and_persist(
     warp_id: u16,
     out: &mut HandleOutcome,
 ) -> bool {
-    let warp_key = (i64::from(session.map_id), i64::from(warp_id));
-    let Some(warp) = data.warps.get(&warp_key) else {
+    let Some(resolved) = resolve_warp_destination(data, session.map_id, warp_id) else {
         tracing::debug!(
             map_id = session.map_id,
             warp_id,
-            "Door Warp refused: no Warps.dat row"
+            "Door Warp refused: no valid EveSceneInfo or Warps.txt row"
         );
         return false;
     };
-    if warp.map2 <= 0 {
-        tracing::debug!(
-            map_id = session.map_id,
-            warp_id,
-            dest_map = warp.map2,
-            "Door Warp refused: invalid destination map"
-        );
-        return false;
-    }
 
     let id = session.id;
     let id_leader = session.id_leader;
@@ -962,11 +1001,16 @@ pub async fn perform_party_warp_and_persist(
 
     // Phase 1: Deterministic RAM Lock BEFORE reading any partner from registry.
     let _guards = crate::server::session::lock_player_operations(participant_ids).await;
-    let dest_map = warp.map2 as u16;
-    let dest_x = warp.x as u16;
-    let dest_y = warp.y as u16;
-    let wire_warp_id = (warp.warpid & 0xFF) as u8;
-    perform_party_warp_locked(session, dest_map, dest_x, dest_y, wire_warp_id, pool, out).await
+    perform_party_warp_locked(
+        session,
+        resolved.dest_map,
+        resolved.dest_x,
+        resolved.dest_y,
+        resolved.wire_warp_id,
+        pool,
+        out,
+    )
+    .await
 }
 
 /// Execute party warp + atomic DB persistence while the caller already holds
@@ -978,28 +1022,27 @@ pub async fn perform_party_warp_for_locked_session(
     warp_id: u16,
     out: &mut HandleOutcome,
 ) -> bool {
-    let Some(warp) = data
-        .warps
-        .get(&(i64::from(session.map_id), i64::from(warp_id)))
-    else {
+    let Some(resolved) = resolve_warp_destination(data, session.map_id, warp_id) else {
         tracing::debug!(
             map_id = session.map_id,
             warp_id,
-            "Door Warp refused: warp_id not found in Warps.dat"
+            "Door Warp refused: warp_id not found in EveSceneInfo or Warps.txt"
         );
         return false;
     };
-    if warp.map2 <= 0 {
-        return false;
-    }
     if session.id_leader > 0 && session.id_leader != session.id {
         return false;
     }
-    let dest_map = warp.map2 as u16;
-    let dest_x = warp.x as u16;
-    let dest_y = warp.y as u16;
-    let wire_warp_id = (warp.warpid & 0xFF) as u8;
-    perform_party_warp_locked(session, dest_map, dest_x, dest_y, wire_warp_id, pool, out).await
+    perform_party_warp_locked(
+        session,
+        resolved.dest_map,
+        resolved.dest_x,
+        resolved.dest_y,
+        resolved.wire_warp_id,
+        pool,
+        out,
+    )
+    .await
 }
 
 async fn perform_party_warp_locked(
@@ -1167,7 +1210,10 @@ pub async fn handle_warp_confirm(
 
     // Lookup warp data
     let warp_key = (map_id as i64, idtalking as i64);
-    if let Some(_warp) = data.warps.get(&warp_key) {
+    let warp_id_u16 = u16::try_from(idtalking).unwrap_or(0);
+    if resolve_warp_destination(data, map_id, warp_id_u16).is_some()
+        || data.warps.contains_key(&warp_key)
+    {
         // Check if this warp has a battle gate
         if let Some(gate) = data.battle_gates.get(&warp_key) {
             if gate.diahinh > 0 {
