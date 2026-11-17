@@ -55,9 +55,13 @@ pub const ENTER_GAME_CREATE: &str = LOGIN_CREATE_CHAR;
 /// instead of hanging.
 pub const DOUBLE_LOGIN: &str = "F44402000013";
 /// Server Greeting Packet gửi ngay khi Client kết nối TCP thành công.
-/// Op: 0x01 (OP_AUTH), Sub: 0x09 (Scene Switch), SceneMode: 0x5A (90 - Login Scene).
-/// Payload 3 bytes: 01 09 5A -> Frame: F444030001095A.
-pub const LOGIN_SCENE_GREETING: &str = "F444030001095A";
+/// Op: 0x01 (OP_AUTH), Sub: 0x09 (Scene Switch), SceneMode: 0x01 (1 - First connect / Clean Login Form).
+/// Lưu ý giao thức TS Online:
+/// - `sceneMode % 100 in [90..99]` (ví dụ `0x5A` = 90) kích hoạt Auto-login lấy thông tin từ RAM `DAT_0092530c`
+///   (dùng cho Reconnect/Relog khi client đã lưu session). Nếu chưa lưu tài khoản, client sẽ báo "iD không chính xác".
+/// - `sceneMode % 100 not in [90..99]` (ví dụ `0x01` = 1) kích hoạt `TFrmLogin.Show()`, mở form trống để người chơi nhập ID/Pass.
+/// Payload 3 bytes: 01 09 01 -> Frame: F4440300010901.
+pub const LOGIN_SCENE_GREETING: &str = "F4440300010901";
 
 pub use crate::protocol::{
     OPCODE_APPEAR, OPCODE_END_TALK, OPCODE_GOLD, OPCODE_HOMDO, OPCODE_HOTKEYS, OPCODE_LUULANG,

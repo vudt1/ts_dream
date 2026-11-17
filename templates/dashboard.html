@@ -304,10 +304,16 @@
             <div class="card" style="margin-bottom: 20px;">
                 <div class="card-header">Create New Game Account</div>
                 <form hx-post="/api/accounts" hx-target="#accounts-table-body" hx-swap="afterbegin" onsubmit="setTimeout(() => this.reset(), 300)">
-                    <div style="display: flex; gap: 12px;">
-                        <input type="text" name="pass1" class="form-input" value="1111111111" maxlength="10" pattern="[!-~]{8,10}" title="8-10 ASCII characters, no spaces" required>
-                        <input type="text" name="pass2" class="form-input" value="1111111111" maxlength="10" pattern="[!-~]{8,10}" title="8-10 ASCII characters, no spaces" required>
-                        <button type="submit" class="btn btn-green">Create Account</button>
+                    <div style="display: flex; gap: 16px; align-items: flex-end;">
+                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <label class="form-label" for="pass1">Password 1 (Login Pass)</label>
+                            <input type="text" id="pass1" name="pass1" class="form-input" value="1111111111" maxlength="10" pattern="[!-~]{8,10}" placeholder="8-10 ASCII characters" title="8-10 ASCII characters, no spaces" required>
+                        </div>
+                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <label class="form-label" for="pass2">Password 2 (Delete Char Pass)</label>
+                            <input type="text" id="pass2" name="pass2" class="form-input" value="1111111111" maxlength="10" pattern="[!-~]{8,10}" placeholder="8-10 ASCII characters" title="8-10 ASCII characters, no spaces" required>
+                        </div>
+                        <button type="submit" class="btn btn-green" style="height: 42px;">Create Account</button>
                     </div>
                 </form>
             </div>
@@ -324,7 +330,7 @@
                     {% for acc in accounts %}
                     <tr>
                         <td><strong>{{ acc.player_id }}</strong></td>
-                        <td>{{ acc.gm_level }}</td>
+                        <td>{% if acc.gm_level > 0 %}yes{% else %}no{% endif %}</td>
                         <td>{% if acc.is_suspended %}yes{% else %}no{% endif %}</td>
                     </tr>
                     {% endfor %}

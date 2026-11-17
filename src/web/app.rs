@@ -400,7 +400,7 @@ async fn create_account(
         &headers,
         || {
             format!(
-                "<tr><td><strong>{}</strong></td><td>0</td><td>no</td></tr>",
+                "<tr><td><strong>{}</strong></td><td>no</td><td>no</td></tr>",
                 player_id
             )
         },
