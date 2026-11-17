@@ -511,15 +511,6 @@ async fn test_player_flee_synchronization_and_cooldown() {
             ..Default::default()
         },
     );
-    data.skills.insert(
-        14003,
-        ts_dream::data::tables::Skill {
-            id: 14003,
-            name: "Đào Tẩu".to_string(),
-            skill_type: 12,
-            ..Default::default()
-        },
-    );
 
     let fight = EveFightData {
         eve_no: 503,
@@ -540,6 +531,7 @@ async fn test_player_flee_synchronization_and_cooldown() {
 
     let leader_sess = Arc::new(RwLock::new(Session {
         id: 5001,
+        level: 60,
         map_id: 12001,
         id_leader: 5001,
         encounter_steps: 25,
@@ -548,6 +540,7 @@ async fn test_player_flee_synchronization_and_cooldown() {
     }));
     let member_sess = Arc::new(RwLock::new(Session {
         id: 5002,
+        level: 60,
         map_id: 12001,
         id_leader: 5001,
         encounter_steps: 15,
@@ -696,6 +689,7 @@ async fn test_party_member_individual_flee() {
 
     let leader_sess = Arc::new(RwLock::new(Session {
         id: 6001,
+        level: 60,
         map_id: 12001,
         id_leader: 6001,
         encounter_steps: 25,
@@ -704,6 +698,7 @@ async fn test_party_member_individual_flee() {
     }));
     let member_sess = Arc::new(RwLock::new(Session {
         id: 6002,
+        level: 60,
         map_id: 12001,
         id_leader: 6001,
         encounter_steps: 15,

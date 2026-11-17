@@ -233,24 +233,56 @@ fn handle_pk_or_attack(
     }
 }
 
-/// Sub 2 sub 2 — PK challenge. Gates: not in battle, `_My_Pk == 1`, target
-/// online + not in battle. Target `Pk == 0` → `F4440300210101`; `Pk == 1` →
-/// start a PK battle (DiaHinh from data[7..9] / payload[5..7], default 112).
+/// Sub 2 sub 2 — PK challenge. Gates: not in battle, `_My_Pk == 1`, not self,
+/// not ListQS / active shop, same map, not same party, target not GM/Angel,
+/// target online + not in battle/ListQS/shop. Target `Pk == 0` → `F4440300210101`;
+/// `Pk == 1` → start a PK battle (DiaHinh from payload[5..7], default 112).
 fn handle_pk_challenge(
     conn: &mut Conn,
     payload: &[u8],
     service: &BattleService,
     out: &mut HandleOutcome,
 ) {
-    if conn.session.pk != 1 || payload.len() < 5 {
+    if conn.session.pk != 1 || conn.session.battle_id != 0 || payload.len() < 5 {
+        return;
+    }
+    if service.is_spectator(i64::from(conn.session.id)) {
+        out.send(crate::server::spawn::sys_msg_frame("Dang quan chien, khong the PK."));
+        return;
+    }
+    if conn.session.shop.active {
+        out.send(crate::server::spawn::sys_msg_frame("Dang bay sap hang, khong the PK."));
         return;
     }
     let target_id = encoder::u32_le_slice(&payload[1..5]);
-    let Some(target_pk) = service.target_pk(i64::from(target_id)) else {
+    if target_id == 0 || target_id == conn.session.id {
+        return;
+    }
+    let Some(target) = service.pk_target_info(i64::from(target_id)) else {
         return; // target offline / unknown
     };
-    let target_in_battle = service.target_battle(i64::from(target_id)).unwrap_or(0) != 0;
-    if conn.session.battle_id != 0 || conn.session.pk != 1 || target_in_battle {
+    if target.battle_id != 0 || target.is_spectator {
+        out.send(crate::server::spawn::sys_msg_frame("Doi phuong dang trong tran dau."));
+        return;
+    }
+    if target.map_id != conn.session.map_id {
+        out.send(crate::server::spawn::sys_msg_frame("Doi phuong khong o cung ban do."));
+        return;
+    }
+    let same_party = (conn.session.id_leader != 0
+        && (conn.session.id_leader == target.id_leader || conn.session.id_leader == target_id))
+        || (target.id_leader != 0 && target.id_leader == conn.session.id)
+        || conn.session.id_mem.contains(&target_id);
+    if same_party {
+        out.send(crate::server::spawn::sys_msg_frame("Khong the PK thanh vien cung to doi."));
+        return;
+    }
+    if target.gm_level > crate::server::gm::PLAYER_GM_LEVEL {
+        out.send(crate::server::spawn::sys_msg_frame("Khong the PK GM."));
+        return;
+    }
+    if target.shop_active {
+        out.send(crate::server::spawn::sys_msg_frame("Doi phuong dang bay sap hang."));
         return;
     }
     let ground = if payload.len() >= 7 {
@@ -258,7 +290,7 @@ fn handle_pk_challenge(
     } else {
         112
     };
-    if !target_pk {
+    if !target.pk {
         out.send("F4440300210101");
     } else {
         service.start_pk_battle(&mut conn.session, i64::from(target_id), ground);

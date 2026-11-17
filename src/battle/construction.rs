@@ -519,16 +519,46 @@ impl Battle {
         entries.iter().map(|e| (e.0, e.1)).collect()
     }
 
+    /// Whether this battle has player combatants on Team 2 (symmetric PvP).
+    pub fn is_pvp(&self) -> bool {
+        self.list_war
+            .values()
+            .any(|c| c.team == 2 && c.typ == 2 && c.id > 0)
+    }
+
+    /// Generate the battle-start packets for a symmetric two-sided PvP battle:
+    /// Team 1 (row 3/2) and Team 2 (row 0/1) both receive leader `0x03` / member
+    /// `0x05` `0BFA` frames and `0B0505` player/pet entity frames.
+    pub fn pk_battle_start_packets(&self, diahinh: i32) -> Vec<StartPacket> {
+        let mut out = self.side_battle_start_packets(diahinh, 3);
+        out.extend(self.side_battle_start_packets(diahinh, 0));
+        out
+    }
+
     /// Generate the battle-start packets for an NPC battle (leader view + each
     /// member's own open frame).
     ///
     /// Returns packets tagged with their recipient (`StartPacket::To`) or the
     /// "show on map" broadcast (`StartPacket::Map`).
     pub fn npc_battle_start_packets(&self, diahinh: i32) -> Vec<StartPacket> {
-        let mut out: Vec<StartPacket> = Vec::new();
+        self.side_battle_start_packets(diahinh, 3)
+    }
 
-        // Leader at (3,2)
-        let Some(leader) = self.cell(3, 2) else {
+    fn entity_frame_for_cell(cell: &WarInfo) -> String {
+        if cell.typ == 2 || cell.typ == 4 {
+            packets::entity_player(&cell.packet_hex())
+        } else {
+            packets::entity_npc(&cell.packet_hex())
+        }
+    }
+
+    fn side_battle_start_packets(&self, diahinh: i32, own_row: u8) -> Vec<StartPacket> {
+        let mut out: Vec<StartPacket> = Vec::new();
+        let pet_row = own_row ^ 1;
+        let enemy_rows = if own_row == 3 { 0..2u8 } else { 2..4u8 };
+
+        // Leader at (own_row, 2)
+        let Some(leader) = self.cell(own_row, 2) else {
             return out;
         };
         if leader.id <= 0 {
@@ -548,8 +578,8 @@ impl Battle {
             frame: packets::show_player_on_map(leader.id as u32),
         });
 
-        // Leader's pet at (2,2)
-        if let Some(pet) = self.cell(2, 2) {
+        // Leader's pet at (pet_row, 2)
+        if let Some(pet) = self.cell(pet_row, 2) {
             if pet.id > 0 {
                 out.push(StartPacket::To {
                     player: leader.id,
@@ -560,7 +590,7 @@ impl Battle {
 
         // Members at cols 1, 3, 0, 4
         for &col in &[1u8, 3, 0, 4] {
-            if let Some(member) = self.cell(3, col) {
+            if let Some(member) = self.cell(own_row, col) {
                 if member.id > 0 {
                     let pkt = member.packet_hex();
                     out.push(StartPacket::To {
@@ -573,7 +603,7 @@ impl Battle {
                     });
 
                     // Member's pet
-                    if let Some(pet) = self.cell(2, col) {
+                    if let Some(pet) = self.cell(pet_row, col) {
                         if pet.id > 0 {
                             out.push(StartPacket::To {
                                 player: leader.id,
@@ -584,7 +614,7 @@ impl Battle {
 
                     // Member's own battle frame
                     out.extend(self.member_battle_frame(diahinh, member.id));
-                } else if let Some(pet) = self.cell(2, col) {
+                } else if let Some(pet) = self.cell(pet_row, col) {
                     // Member absent: still send their (leader-row) pet cell if set.
                     if pet.id > 0 {
                         out.push(StartPacket::To {
@@ -596,14 +626,14 @@ impl Battle {
             }
         }
 
-        // Enemy entities (rows 0-1)
-        for row in 0..2u8 {
+        // Enemy entities
+        for row in enemy_rows {
             for col in 0..5u8 {
                 if let Some(enemy) = self.cell(row, col) {
                     if enemy.id > 0 {
                         out.push(StartPacket::To {
                             player: leader.id,
-                            frame: packets::entity_npc(&enemy.packet_hex()),
+                            frame: Self::entity_frame_for_cell(enemy),
                         });
                     }
                 }
@@ -711,13 +741,14 @@ impl Battle {
         }
 
         // Enemy entities
-        for r in 0..2u8 {
+        let enemy_rows = if row == 3 { 0..2u8 } else { 2..4u8 };
+        for r in enemy_rows {
             for c in 0..5u8 {
                 if let Some(e) = self.cell(r, c) {
                     if e.id > 0 {
                         out.push(StartPacket::To {
                             player: member_id,
-                            frame: packets::entity_npc(&e.packet_hex()),
+                            frame: Self::entity_frame_for_cell(e),
                         });
                     }
                 }

@@ -61,7 +61,23 @@ pub fn get_random_miss_troi(
     randomize_with_percent(rng, 1, 0, percent)
 }
 
-/// Flee roll. `percent = 60 + (lv1-lv2) + (lvtb1-lvtb2)`.
+/// Flee roll with skill bonus.
+/// `percent = clamp(60 + (lv1 - lv2) + (lvtb1 - lvtb2) + spell_bonus, 0, 100)`,
+/// where `spell_bonus` is `+20` for skill `14002` (*Thuật đào tẩu*) and `0` otherwise.
+pub fn get_random_miss_flee_with_skill(
+    rng: &mut DotNetRandom,
+    lv1: i64,
+    lv2: i64,
+    lvtb1: i64,
+    lvtb2: i64,
+    skill_id: i64,
+) -> i64 {
+    let spell_bonus = if skill_id == 14002 { 20 } else { 0 };
+    let percent = (60 + (lv1 - lv2) + (lvtb1 - lvtb2) + spell_bonus).clamp(0, 100);
+    randomize_with_percent(rng, 1, 0, percent)
+}
+
+/// Flee roll. `percent = clamp(60 + (lv1 - lv2) + (lvtb1 - lvtb2), 0, 100)`.
 pub fn get_random_miss_flee(
     rng: &mut DotNetRandom,
     lv1: i64,
@@ -69,11 +85,7 @@ pub fn get_random_miss_flee(
     lvtb1: i64,
     lvtb2: i64,
 ) -> i64 {
-    let num = lv1 - lv2;
-    let num2 = lvtb1 - lvtb2;
-    let percent = 60 + num + num2;
-    // Flee percent may exceed 100 → clamp (the percent roll clamps to [0,100]).
-    randomize_with_percent(rng, 1, 0, percent)
+    get_random_miss_flee_with_skill(rng, lv1, lv2, lvtb1, lvtb2, 18001)
 }
 
 /// Combo roll: checks LVTB Team vs Target Level (Ticket 23).

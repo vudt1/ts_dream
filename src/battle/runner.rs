@@ -2428,16 +2428,21 @@ impl Battle {
         skill: i64,
         out: &mut Vec<Out>,
     ) -> Outcome {
+        // Only player characters (typ=2) and player pets (typ=4) may execute Flee.
+        if attacker.typ != 2 && attacker.typ != 4 {
+            return Outcome::Running;
+        }
         ts.delay = skill_delay(data, skill);
         let is_leader = attacker.leader_id == 0 || attacker.id == attacker.leader_id || attacker.id_char == attacker.leader_id;
-        let hit = damage::get_random_miss_flee(
+        let hit = damage::get_random_miss_flee_with_skill(
             &mut self.rng.random_0,
             attacker.lv,
             target.lv,
             avg_of(ts, attacker.team),
             avg_of(ts, if attacker.team == 1 { 2 } else { 1 }),
+            skill,
         );
-        if hit == 1 || skill == 14002 {
+        if hit == 1 {
             if is_leader {
                 return Outcome::PlayerFled;
             }
@@ -2471,16 +2476,16 @@ impl Battle {
             out.push(Out::Fled { player });
             return Outcome::Running;
         }
-        // Flee failed.
+        // Flee failed: always emit 18002 (skill_type=12, miss=0, adl=2), never 14003.
         let (sl_danh, skill_type) = data
             .skills
-            .get(&(skill + 1))
+            .get(&18002)
             .map(|s| (s.sl_danh as u8, s.skill_type as u8))
-            .unwrap_or((1, 0));
+            .unwrap_or((1, 12));
         let frame = packets::skilling_full_frame(&packets::skilling_full(
             attacker.row,
             attacker.col,
-            (skill + 1) as u16,
+            18002u16,
             sl_danh,
             skill_type,
             attacker.row_attack,
@@ -3167,15 +3172,21 @@ impl Battle {
             let Some(cell) = self.list_war.get(&key).cloned() else {
                 continue;
             };
-            if cell.id <= 0 || cell.typ != 2 || cell.team != 1 {
+            if cell.id <= 0 || cell.typ != 2 || (cell.team != 1 && cell.team != 2) {
                 continue;
             }
             let player = cell.id;
             let snap = data.players.get(&player).copied().unwrap_or_default();
 
-            // Player exp.
+            // Player exp (team 1 Normal battles only).
             let exp_raw = per_exp * cell.exp;
-            if self.kind.allows_rewards() && !fled && cell.hp > 0 && cell.lv < 200 && exp_raw > 0 {
+            if self.kind.allows_rewards()
+                && cell.team == 1
+                && !fled
+                && cell.hp > 0
+                && cell.lv < 200
+                && exp_raw > 0
+            {
                 let mut exp = exp_raw;
                 if cell.reborn == 2 {
                     exp = damage::banker_round(exp as f64 / 2.0) as i64;
@@ -3206,7 +3217,7 @@ impl Battle {
             }
 
             // Decrement God of Fortune buff on victory
-            if self.kind.allows_rewards() && won && !fled && cell.hp > 0 && snap.god > 0 {
+            if self.kind.allows_rewards() && cell.team == 1 && won && !fled && cell.hp > 0 && snap.god > 0 {
                 let new_god = snap.god.saturating_sub(1);
                 out.push(Out::Db(DbUpdate {
                     target: DbTarget::Player(player),
@@ -3227,7 +3238,7 @@ impl Battle {
             // Active-pet exp: every pet cell of our side owned by this player.
             // Ownership (`id_char`) routes the grant to the pet's owner, so a
             // pet is awarded exactly once even with several player rows.
-            if self.kind.allows_rewards() && !fled {
+            if self.kind.allows_rewards() && cell.team == 1 && !fled {
                 let pets: Vec<WarInfo> = self
                     .keys
                     .iter()

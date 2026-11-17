@@ -34,6 +34,25 @@ use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 
+#[derive(Default)]
+struct ExtraBattleParticipants {
+    players: HashMap<i64, PlayerSnapshot>,
+    pets: HashMap<i64, [i64; 4]>,
+    members: Vec<i64>,
+}
+
+/// Snapshot of a potential PK target's eligibility state.
+#[derive(Debug, Clone, Copy)]
+pub struct PkTargetInfo {
+    pub pk: bool,
+    pub battle_id: i32,
+    pub map_id: u16,
+    pub id_leader: u32,
+    pub gm_level: i32,
+    pub shop_active: bool,
+    pub is_spectator: bool,
+}
+
 /// A registered online player: their shared session + frame channel.
 pub struct OnlinePlayer {
     pub session: Arc<tokio::sync::RwLock<Session>>,
@@ -1114,7 +1133,101 @@ impl BattleService {
         )
     }
 
-    /// Start a PK battle.
+    fn add_pvp_member(
+        &self,
+        battle: &mut Battle,
+        mem_sess: &mut Session,
+        lid: i64,
+        row: u8,
+        col: u8,
+        battle_id: i32,
+        extras: &mut ExtraBattleParticipants,
+    ) {
+        let mid = i64::from(mem_sess.id);
+        battle.add_player(mem_sess, lid, row, col);
+        battle.load_member_pet(mem_sess, lid, row, col);
+        mem_sess.battle_id = battle_id;
+        extras.members.push(mid);
+        extras.players.insert(mid, self.snapshot(mem_sess));
+        extras.pets.insert(mid, self.pet_slots(mem_sess));
+    }
+
+    /// Load one PvP side (leader at `(row, 2)`, leader pets, and same-map party
+    /// members at `(row, [1, 3, 0, 4])` with their active pets).
+    fn load_pvp_side(
+        &self,
+        battle: &mut Battle,
+        leader: &Session,
+        row: u8,
+        battle_id: i32,
+        include_leader_in_extras: bool,
+        extras: &mut ExtraBattleParticipants,
+    ) {
+        let lid = i64::from(leader.id);
+        battle.add_player(leader, lid, row, 2);
+        battle.load_leader_pets(leader, lid, row);
+        if include_leader_in_extras {
+            extras.members.push(lid);
+            extras.players.insert(lid, self.snapshot(leader));
+            extras.pets.insert(lid, self.pet_slots(leader));
+            self.sync_online_session(lid, |s| s.battle_id = battle_id);
+        }
+
+        let member_cols = [1u8, 3, 0, 4];
+        let mut loaded_ids = HashSet::new();
+
+        let member_arcs: Vec<(usize, i64, Arc<tokio::sync::RwLock<Session>>)> =
+            if let Some(online) = try_read_online_with_retry(&self.online, 10, std::time::Duration::from_millis(2)) {
+                leader
+                    .id_mem
+                    .iter()
+                    .filter(|&&m| m > 0 && m != leader.id)
+                    .enumerate()
+                    .take(4)
+                    .filter_map(|(i, &mem_id)| {
+                        let mid = i64::from(mem_id);
+                        online.get(&mid).map(|p| (i, mid, Arc::clone(&p.session)))
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
+
+        for (i, mid, arc) in member_arcs {
+            if let Some(mut mem_sess) =
+                try_write_session_with_retry(&arc, 10, std::time::Duration::from_millis(2))
+            {
+                if mem_sess.battle_id != 0 || mem_sess.map_id != leader.map_id {
+                    continue;
+                }
+                self.add_pvp_member(battle, &mut mem_sess, lid, row, member_cols[i], battle_id, extras);
+                loaded_ids.insert(mid);
+            }
+        }
+
+        let mut map = crate::server::session::lock_online_sessions();
+        if let Some(s) = map.get_mut(&leader.id) {
+            s.battle_id = battle_id;
+        }
+        for (i, &mem_id) in leader
+            .id_mem
+            .iter()
+            .filter(|&&m| m > 0 && m != leader.id)
+            .enumerate()
+            .take(4)
+        {
+            let mid = i64::from(mem_id);
+            if let Some(s) = map.get_mut(&mem_id) {
+                if loaded_ids.contains(&mid) {
+                    s.battle_id = battle_id;
+                } else if s.battle_id == 0 && s.map_id == leader.map_id {
+                    self.add_pvp_member(battle, s, lid, row, member_cols[i], battle_id, extras);
+                }
+            }
+        }
+    }
+
+    /// Start a symmetric two-sided PvP battle (`BattleKind::Pk`).
     pub fn start_pk_battle(&self, session: &mut Session, opponent: i64, ground: i64) -> i32 {
         let opp = {
             let online = match self.online.try_read() {
@@ -1126,29 +1239,27 @@ impl BattleService {
                 None => return 0,
             }
         };
+        let opp_snapshot = match opp.try_read() {
+            Ok(g) => g.clone(),
+            Err(_) => return 0,
+        };
+
         let id = self.next_battle_id();
         let terrain = if ground > 0 { ground as i32 } else { 112 };
         let mut battle = Battle::new(id, terrain).with_kind(BattleKind::Pk);
-        battle.add_player(session, i64::from(session.id), 3, 2);
-        battle.load_leader_pets(session, i64::from(session.id), 3);
-        let opp_guard = match opp.try_read() {
-            Ok(g) => g,
-            Err(_) => return 0,
-        };
-        battle.add_player(&opp_guard, opponent, 0, 2);
-        let opponent_start = battle.member_battle_frame(terrain, opponent);
-        let mut extra_players = HashMap::new();
-        let mut extra_pets = HashMap::new();
-        extra_players.insert(opponent, self.snapshot(&opp_guard));
-        extra_pets.insert(opponent, self.pet_slots(&opp_guard));
-        drop(opp_guard);
+        let mut extras = ExtraBattleParticipants::default();
+
+        self.load_pvp_side(&mut battle, session, 3, id, false, &mut extras);
+        self.load_pvp_side(&mut battle, &opp_snapshot, 0, id, true, &mut extras);
+        self.sync_online_session(i64::from(session.id), |s| s.battle_id = id);
+
         self.spawn_battle(
             battle,
             session,
-            extra_players,
-            extra_pets,
-            vec![opponent],
-            opponent_start,
+            extras.players,
+            extras.pets,
+            extras.members,
+            Vec::new(),
         )
     }
 
@@ -1817,6 +1928,22 @@ impl BattleService {
             .unwrap_or(false)
     }
 
+    /// Snapshot of PK-eligibility fields for a target player (None if offline).
+    pub fn pk_target_info(&self, player: i64) -> Option<PkTargetInfo> {
+        let online = self.online.try_read().ok()?;
+        let p = online.get(&player)?;
+        let s = p.session.try_read().ok()?;
+        Some(PkTargetInfo {
+            pk: s.pk == 1,
+            battle_id: s.battle_id,
+            map_id: s.map_id,
+            id_leader: s.id_leader,
+            gm_level: s.gm_level,
+            shop_active: s.shop.active,
+            is_spectator: self.is_spectator(player),
+        })
+    }
+
     /// The target's PK flag (None if offline).
     pub fn target_pk(&self, player: i64) -> Option<bool> {
         let online = self.online.try_read().ok()?;
@@ -1981,16 +2108,27 @@ impl BattleService {
             lid,
             session.skills.iter().map(|&(sk, _)| sk).collect::<Vec<u16>>(),
         );
-        for mem in session.id_mem.iter().filter(|m| **m > 0) {
+        for mem in session
+            .id_mem
+            .iter()
+            .filter(|m| **m > 0)
+            .map(|m| i64::from(*m))
+            .chain(extra_members.iter().copied())
+        {
+            if player_skills.contains_key(&mem) {
+                continue;
+            }
             if let Ok(online) = self.online.try_read() {
-                if let Some(p) = online.get(&i64::from(*mem)) {
+                if let Some(p) = online.get(&mem) {
                     if let Ok(s) = p.session.try_read() {
-                        player_skills.insert(
-                            i64::from(*mem),
-                            s.skills.iter().map(|&(sk, _)| sk).collect(),
-                        );
+                        player_skills.insert(mem, s.skills.iter().map(|&(sk, _)| sk).collect());
+                        continue;
                     }
                 }
+            }
+            let map = crate::server::session::lock_online_sessions();
+            if let Some(s) = map.get(&(mem as u32)) {
+                player_skills.insert(mem, s.skills.iter().map(|&(sk, _)| sk).collect());
             }
         }
         players.extend(extra_players);
@@ -2017,7 +2155,11 @@ impl BattleService {
         self.record_join_cells(id, &battle);
 
         let diahinh = battle.diahinh;
-        let start = battle.npc_battle_start_packets(diahinh);
+        let start = if battle.is_pvp() {
+            battle.pk_battle_start_packets(diahinh)
+        } else {
+            battle.npc_battle_start_packets(diahinh)
+        };
         let manager = Arc::clone(&self.manager);
         let sink = Arc::clone(&self.sink) as Arc<dyn BattleSink>;
         let world = self.world.clone();
