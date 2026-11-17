@@ -437,3 +437,21 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
   - **`0x14 Surface` (`result_type = 6`, chọn qua `C→S 0x14 09`)**: Bảng nút chọn hoặc lưới `TInterForm` nằm trong chuỗi hội thoại Eve (bao gồm cả các nhiệm vụ vấn đáp như Giản Ung / Tống Nhân). Handler `0x14 09` bắt buộc lọc chain bằng `ConditionClass::DialogChoice(surface_id, choice_code)`.
   - **`0x10 Quiz` (`TAC_Question` / `TKC_Question`)**: Khung câu hỏi trắc nghiệm đếm ngược 45 giây của sự kiện dã ngoại (như Vấn Đáp Bắc Tinh Quân).
 - **Tránh dùng các từ mơ hồ**: Gọi chung là *Quiz* hoặc *Menu* mà không phân biệt kênh `0x14` hay `0x10`.
+
+### Trận chiến Thường (Normal Battle) vs Trận chiến PK (`PKBattle`)
+- **Định nghĩa**: Hai phân loại vòng đời của một trận chiến theo nguồn khởi tạo và chính sách phần thưởng:
+  - **Trận chiến Thường (`Normal`)**: Các trận PvE từ kịch bản Eve, đụng độ ngẫu nhiên trên bản đồ, *Trận đấu NPC chủ động*, *TeamDef*, sự kiện 40 NPC, và *Vấn Đáp Bắc Tinh Quân*. Trả đầy đủ vật phẩm rơi (Drop), tiền tệ (Gold), điểm kinh nghiệm Nhân vật và Sủng vật, đồng thời tiêu hao lượt *Thần Tài / Phúc Thần* khi thắng.
+  - **Trận chiến PK (`PKBattle`)**: Các trận được người chơi chủ động phát động qua chế độ con trỏ PK trên bản đồ, bao gồm cả **PK Người chơi (PvP)** (`0x0B 02 02`, đòi hỏi công tắc PK trong Option của cả hai bên đều bật) và **PK Võ tướng / NPC** (`0x0B 02 03`, chỉ cần dùng con trỏ PK bản đồ click NPC, không phụ thuộc công tắc Option PK).
+- **Ràng buộc (Invariants)**:
+  - `PKBattle` giữ nguyên toàn bộ luật chiến đấu theo lượt, sát thương (kể cả hệ số PvP 0.5x lên người chơi/sủng vật), buff/debuff, hợp kích, **Thu phục Võ tướng** (`15001`) và cơ chế hồi sinh NPC tuần tra sau trận.
+  - `PKBattle` **cấm hoàn toàn** rơi vật phẩm, cộng Gold, cộng kinh nghiệm Nhân vật/Sủng vật, và **không** trừ lượt *Phúc Thần*.
+  - Trong khung `0x0B 02 03`, trường 16-bit cuối gói là **chỉ số vị trí NPC trên bản đồ (`1..=100`)**, tuyệt đối không hiểu nhầm thành *DiaHinh*.
+  - Giá trị `fight_type` từ kịch bản Eve (`eve.emg`) dùng để phân loại trận sự kiện/hệ thống Eve (bằng `0` với mọi trận ngoài Eve), **không** dùng thay thế cho phân loại `Normal` vs `PKBattle`.
+- **Tránh dùng các từ mơ hồ**: *PK Mode* (dễ lẫn giữa công tắc Option PvP và con trỏ PK bản đồ), *fight_type = 0* (không đồng nghĩa với PKBattle).
+
+### Chạy trốn (Flee / Escape) & Vai trò Tham chiến (`0B FA` Marker)
+- **Định nghĩa**: Hành động chiến thuật trên *Kênh Lệnh Chiến Đấu* (`0x32 sub 01`) cho phép *Nhân vật* hoặc *Sủng vật* rời khỏi trận đấu trong lượt của mình thông qua lệnh nút thanh công cụ (`18001` — *Chạy trốn*) hoặc kỹ năng chủ động tốn 10 SP (`14002` — *Thuật đào tẩu*). Khi thất bại, hệ thống phát hiệu ứng và thông báo chuẩn bằng mã **`18002`** (*Chạy trốn thất bại*, `skillType = 12`).
+- **Ràng buộc (Invariants)**:
+  - **Vai trò `0B FA`**: Khung mở bàn cờ gán dấu bản thân `0x03` cho Đội trưởng, `0x05` cho Thành viên tổ đội, và chỉ dành `0x04` cho *ListQS / Người quan sát*. Chỉ *ListQS* mang dấu `0x04` mới được rời trận tức thì qua `0x0B 01 03`; chiến đấu viên bắt buộc dùng *Kênh Lệnh Chiến Đấu* `0x32 01 18001` hoặc `14002`.
+  - **Quy tắc tỷ lệ & Phạm vi thoát trận**: Tỷ lệ thành công tính theo chênh lệch cấp độ giữa người thực hiện với mục tiêu đối phương và LVTB hai đội, cộng thêm `+20%` khi dùng *Thuật đào tẩu* (`14002`, không bypass 100%). Nếu Đội trưởng (hoặc *Sủng vật* của Đội trưởng, kể cả ở một trong hai phe của trận PvP) chạy trốn thành công thì toàn bộ trận/đội thoát ngay; nếu Thành viên (hoặc *Sủng vật* của Thành viên) chạy trốn thành công thì chỉ riêng Thành viên đó cùng các *Sủng vật* của họ rời lưới chiến trận, các đồng đội còn lại tiếp tục đánh.
+- **Tránh dùng các từ mơ hồ**: *Leave Battle* (chỉ dành cho *ListQS* thoát quan chiến qua `0x0B 01 03`), `14003` (*Thuật mua bán* bị động, không liên quan đến Flee).

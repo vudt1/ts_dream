@@ -58,13 +58,28 @@ Tuân thủ nghiêm ngặt 4 pha timing trên lưới cờ $4 \times 5$:
 3. **Pha 3 (Tác động chiêu thức)**: Sau khi phát `32 01` (bao gồm cả hiệu ứng phụ Type 3 trên đòn đánh vật lý/phép thuật), nếu kỹ năng gây buff/debuff thành công (cả cast trực tiếp lẫn phản đòn) thì bắn `35 01` (`troi_start` cho lớp FX trạng thái) và `35 0F` (`battle_unit_status`) để cập nhật 6 khe biểu tượng HUD ('B'..'G') và số hiệp.
 4. **Pha 4 (Dọn dẹp)**: Bắn `35 04` nếu có vật phẩm rơi, `35 06` nếu có thoại NPC mở màn/kịch bản, `35 0B` cho bảng tin chiến sự.
 
+### 2.5. Phân loại Trận chiến (`BattleKind`) & Giao thức Mở trận PK (`0x0B Sub 02`)
+- **Tách biệt `BattleKind` (`Normal` vs `Pk`) khỏi `EveFightData::fight_type`**: `fight_type` phản ánh phân loại trận của kịch bản `Data/eve.emg` (`0` khi không phải Eve, `1..=52` trong Eve) nên không đủ ngữ nghĩa phân biệt PK. Mọi trận đấu mang thêm phân loại `BattleKind`:
+  - `BattleKind::Pk` được gán cho **tất cả** trận PvP (`0x0B 02 kind=2`) và **tất cả** trận PK Võ tướng trên bản đồ (`0x0B 02 kind=3`). Theo dịch ngược `FUN_00642720` và `FUN_00642c2c`, phía client kích hoạt cả hai nhánh qua cùng chế độ con trỏ PK (`*gvar_007D9D5C == 1`), nhưng chỉ nhánh PvP (`kind=2`) kiểm tra công tắc Option PK (`TCY_OptionForm + 0x180`); do đó server không đòi hỏi `session.pk == 1` đối với `0x0B 02 03`.
+  - Trường 16-bit cuối của `0x0B 02 03` (`TFightManage + 0x22`) là **index slot NPC trên bản đồ (`1..=100`)**, không phải `DiaHinh` (server mặc định `DiaHinh = 112` cho `0x0B 02 02/03`).
+  - Mọi trận `BattleKind::Pk` chia sẻ toàn bộ cơ chế combat/hợp kích/buff-debuff/`apply_catch`/`npc_respawn`, nhưng **cấm tuyệt đối** Drop, Gold, Player EXP, Pet EXP và không trừ lượt `Stat::God`.
+- **Đối xứng hai phe trong PvP Party**: Hỗ trợ nạp đầy đủ Đội trưởng, Thành viên tổ đội cùng bản đồ và Sủng vật của cả hai phe (`Phe 1` tại hàng `3/2`, `Phe 2` đối xứng tại hàng `0/1`), phát `entity_player` (`0B 05 05`) cho cả hai phe, đồng bộ `battle_id` & kỹ năng của mọi thành viên tham chiến và dọn dẹp cả hai phe khi `Battle::finish`.
+
+### 2.6. Chuẩn hóa Vai trò `0B FA` (`0x03`/`0x05` vs `0x04`) & Nghi thức Chạy trốn (`Flee`)
+- **Khôi phục vai trò chuẩn trên `0B FA` (thay thế giải pháp tạm Ticket 15)**: Vì [`00590ba8`](../../client_pseudo_c/00590ba8_FUN_00590ba8.c) (`case 9`) kiểm tra `player+0x376 == 4` để gửi `0x0B 01 03` (thoát thẳng không theo lượt), mọi chiến đấu viên **phải** nhận dấu `0x03` (Đội trưởng) hoặc `0x05` (Thành viên) trên `0B FA`, chỉ giữ `0x04` cho *ListQS / Người quan sát*. Handler `0x0B 01 03` từ chối chiến đấu viên, chỉ cho phép Người quan sát rời trận trực tiếp; người chơi bấm nút Bỏ chạy trên UI thật sẽ gửi chuẩn `0x32 01 18001`.
+- **Nghi thức Chạy trốn & Phạm vi tổ đội**:
+  - Giữ công thức xác suất theo chênh lệch LV (`60 + (lv1 - lv2) + (lvtb1 - lvtb2)`), bỏ bypass thắng 100% của `14002` (*Thuật đào tẩu*) và thay bằng thưởng `+20%` với ngưỡng clamp `[0..=100]`.
+  - Khi Flee thất bại (cho cả `18001` và `14002`), frame `32 01` luôn mang `skill_id = 18002` (`skill_type = 12`), **không** dùng `skill + 1` (vốn phát nhầm `14003` *Thuật mua bán*).
+  - Khi Đội trưởng hoặc Sủng vật của Đội trưởng (kể cả một trong hai phe ở PvP) chạy trốn thành công, toàn bộ trận đấu kết thúc sạch cho cả hai phe; khi Thành viên hoặc Sủng vật của Thành viên chạy trốn thành công, chỉ rút sạch toàn bộ ô thuộc chủ sở hữu đó khỏi lưới (không ghi đè lại ô cũ, không kích hoạt `npc_respawn` giữa trận và gỡ đồng thời khỏi danh sách người tham gia trận).
+
 ---
 
 ## 3. Hệ quả & Cam kết Kỹ thuật (Consequences)
 
 - **Tích cực**:
-  - Client `aLogin.exe` thật kết nối vào sẽ hoạt động mượt mà, không còn hiện tượng treo đơ menu lệnh ở Hiệp 1, không bị drop lệnh đánh, và xem trọn vẹn hoạt ảnh giữa các hiệp.
-  - Wire Parity đạt mức A chuẩn hóa 100% với giao thức gốc Delphi.
+  - Client `aLogin.exe` thật kết nối vào sẽ hoạt động mượt mà, không còn hiện tượng treo đơ menu lệnh ở Hiệp 1, không bị drop lệnh đánh, và xem trọn vẹn hoạt ảnh giữa các hiệp; nút Bỏ chạy trên thanh công cụ đi đúng kênh `0x32 01 18001`.
+  - Phân tách rạch ròi PvE chuẩn với PKBattle (cả PvP lẫn PK NPC) và hoàn thiện luồng PvP hai phe đối xứng.
 - **Nhiệm vụ đi kèm**:
   - Cập nhật toàn bộ các test fixture trong `tests/` đang giả lập `0x0B Sub 3/4` chuyển sang `0x32 Sub 01/02`.
+  - Cập nhật bộ test hợp đồng `0B FA` (`open_leader`, `open_self_kind`) và `0B 01 03` (`command_channel`) sang vai trò `0x03`/`0x05`/`0x04`.
   - Quản lý chặt chẽ nhịp bất đồng bộ trong Tokio task để không làm block thread khi dùng dynamic delay.
