@@ -255,15 +255,24 @@ impl BattleSink for BattleSinkImpl {
         }
     }
 
-    fn apply_fled(&self, player: i64) {
+    fn apply_fled(&self, battle_id: i32, player: i64) {
         let now_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0);
 
-        // 1. Remove player from self.members so they no longer receive in-battle frames
+        // 1. Remove player from self.members, battle_participants, and offline_eve_sessions
+        //    so they no longer receive in-battle frames and battle_ended won't overwrite them.
         if let Ok(mut members) = self.members.lock() {
             members.remove(&player);
+        }
+        if let Ok(mut participants) = self.battle_participants.lock() {
+            if let Some(list) = participants.get_mut(&battle_id) {
+                list.retain(|&p| p != player);
+            }
+        }
+        if let Ok(mut offline_map) = self.offline_eve_sessions.lock() {
+            offline_map.remove(&(battle_id, player));
         }
 
         let mut fled_session: Option<Session> = None;

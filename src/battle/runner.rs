@@ -404,7 +404,7 @@ pub enum Out {
     /// A pet catch succeeded (pet added to the owner).
     Catch { owner: i64, npc_id: i64 },
     /// A party member fled; restore HP/pets and exit battle for `player`.
-    Fled { player: i64 },
+    Fled { battle_id: i32, player: i64 },
     /// Respawn the battle-triggering map npc at the given position.
     Respawn {
         npc_id: i64,
@@ -1230,6 +1230,9 @@ impl Battle {
                         if r != Outcome::Running {
                             return r;
                         }
+                        if !self.is_cell_occupied(row, col) {
+                            return Outcome::Running;
+                        }
                     }
                     14 => self.apply_heal14(
                         data,
@@ -1304,10 +1307,10 @@ impl Battle {
                 }
 
                 if tpos.row == row && tpos.col == col {
-                    self.write_cell(&mut attacker, (row, col));
+                    self.write_cell_if_occupied(&mut attacker, (row, col));
                 } else {
-                    self.write_cell(&mut target, (tpos.row, tpos.col));
-                    self.write_cell(&mut attacker, (row, col));
+                    self.write_cell_if_occupied(&mut target, (tpos.row, tpos.col));
+                    self.write_cell_if_occupied(&mut attacker, (row, col));
                 }
             }
         }
@@ -1390,10 +1393,22 @@ impl Battle {
             }
         }
 
-        attacker.attacked = true; // Attacked = 2 (acted)
-        self.list_war
-            .insert(crate::battle::engine::war_key(row, col), attacker);
+        if self.is_cell_occupied(row, col) {
+            attacker.attacked = true; // Attacked = 2 (acted)
+            self.list_war
+                .insert(crate::battle::engine::war_key(row, col), attacker);
+        }
         Outcome::Running
+    }
+
+    fn is_cell_occupied(&self, row: u8, col: u8) -> bool {
+        self.cell(row, col).is_some_and(|c| c.id > 0)
+    }
+
+    fn write_cell_if_occupied(&mut self, cell: &mut WarInfo, pos: (u8, u8)) {
+        if self.is_cell_occupied(pos.0, pos.1) {
+            self.write_cell(cell, pos);
+        }
     }
 
     fn write_cell(&mut self, cell: &mut WarInfo, pos: (u8, u8)) {
@@ -2433,7 +2448,12 @@ impl Battle {
             return Outcome::Running;
         }
         ts.delay = skill_delay(data, skill);
-        let is_leader = attacker.leader_id == 0 || attacker.id == attacker.leader_id || attacker.id_char == attacker.leader_id;
+        let owner = if attacker.typ == 4 && attacker.id_char != 0 {
+            attacker.id_char
+        } else {
+            attacker.id
+        };
+        let is_leader = attacker.leader_id == 0 || owner == attacker.leader_id;
         let hit = damage::get_random_miss_flee_with_skill(
             &mut self.rng.random_0,
             attacker.lv,
@@ -2446,23 +2466,26 @@ impl Battle {
             if is_leader {
                 return Outcome::PlayerFled;
             }
-            // Party member flee.
-            let player = if attacker.id_char != 0 {
-                attacker.id_char
-            } else {
-                attacker.id
-            };
-            let (r, c) = (attacker.row, attacker.col);
-            let pr = r ^ 1;
+            // Party member (or member's pet) flee: extract all cells owned by `player`.
+            let player = owner;
+            let owned_cells: Vec<(u8, u8)> = self
+                .keys
+                .iter()
+                .filter_map(|k| self.list_war.get(k))
+                .filter(|c| {
+                    c.id > 0
+                        && ((c.typ == 2 && c.id == player) || (c.typ == 4 && c.id_char == player))
+                })
+                .map(|c| (c.row, c.col))
+                .collect();
             let mut frames = String::new();
-            frames.push_str(&packets::acting(r, c));
-            frames.push_str(&packets::acting(pr, c));
-            // Reset both occupied cells (pet row `pr`, player row `r`); the old
-            // `reposition` frame reset the player cell a second time.
-            frames.push_str(&packets::reset_cell(pr, c));
-            frames.push_str(&packets::reset_cell(r, c));
+            for &(cr, cc) in &owned_cells {
+                frames.push_str(&packets::acting(cr, cc));
+            }
+            for &(cr, cc) in &owned_cells {
+                frames.push_str(&packets::reset_cell(cr, cc));
+            }
             frames.push_str(&packets::hide_from_map(player as u32));
-            frames.push_str(&packets::reset_cell(r, c));
             out.push(Out::Broadcast(frames));
             out.push(Out::MapBroadcast {
                 player,
@@ -2470,10 +2493,13 @@ impl Battle {
             });
             out.push(Out::ToPlayer(player, packets::battle_exit_move()));
             out.push(Out::ToPlayer(player, packets::battle_exit_talk()));
-            self.clear_cell(r, c);
-            self.clear_cell(pr, c);
-            self.npc_respawn(data, out);
-            out.push(Out::Fled { player });
+            for (cr, cc) in owned_cells {
+                self.clear_cell(cr, cc);
+            }
+            out.push(Out::Fled {
+                battle_id: self.id_battle,
+                player,
+            });
             return Outcome::Running;
         }
         // Flee failed: always emit 18002 (skill_type=12, miss=0, adl=2), never 14003.

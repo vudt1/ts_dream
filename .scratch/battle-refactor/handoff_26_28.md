@@ -7,7 +7,7 @@
   - [research-pk-and-flee.md](file:///D:/VUDT/GIT_PCC/ts_dream/.scratch/battle-refactor/research-pk-and-flee.md)
   - [ADR 0006 §2.5–2.6](file:///D:/VUDT/GIT_PCC/ts_dream/docs/adr/0006-battle-protocol-parity-and-turn-lifecycle.md)
   - [GLOSSARY.md](file:///D:/VUDT/GIT_PCC/ts_dream/GLOSSARY.md)
-- **Trạng thái Git**: Toàn bộ thay đổi Ticket 26 và Ticket 27 nằm ở working tree (**chưa commit** theo quy chuẩn [`AGENTS.md`](file:///D:/VUDT/GIT_PCC/ts_dream/AGENTS.md) — user tự commit thủ công).
+- **Trạng thái Git**: Toàn bộ thay đổi Ticket 26, Ticket 27 và Ticket 28 nằm ở working tree (**chưa commit** theo quy chuẩn [`AGENTS.md`](file:///D:/VUDT/GIT_PCC/ts_dream/AGENTS.md) — user tự commit thủ công).
 
 ---
 
@@ -17,7 +17,7 @@
 |:-:|---|:-:|---|
 | 26 | [`issues/26-battle-kind-npc-pk-and-0bfa-roles.md`](file:///D:/VUDT/GIT_PCC/ts_dream/.scratch/battle-refactor/issues/26-battle-kind-npc-pk-and-0bfa-roles.md) | ✅ `completed` | `BattleKind` (`Normal`/`Pk`), sửa `0x0B 02 03` (`npc_on_map_id`, `DiaHinh=112`, luôn `PKBattle`), chặn thưởng/trừ `Stat::God` giữ `15001`/`npc_respawn`, chuẩn hóa `0B FA` (`0x03`/`0x05`/`0x04`) & khóa `0x0B 01 03` cho *ListQS* |
 | 27 | [`issues/27-pvp-party-symmetry-and-flee-formula-18002.md`](file:///D:/VUDT/GIT_PCC/ts_dream/.scratch/battle-refactor/issues/27-pvp-party-symmetry-and-flee-formula-18002.md) | ✅ `completed` | PvP Party 2 phe đối xứng (`0x0B 02 02`), guard thách đấu PK trên người chơi, cleanup Phe 2 trong `Battle::finish`, công thức Flee LV `+20%` (`14002`), chặn NPC dùng Flee, fail luôn phát `18002` |
-| 28 | [`issues/28-party-pvp-flee-matrix-and-zombie-cell-fix.md`](file:///D:/VUDT/GIT_PCC/ts_dream/.scratch/battle-refactor/issues/28-party-pvp-flee-matrix-and-zombie-cell-fix.md) | 🔜 `ready-for-agent` | Ma trận Flee 4 vai trò tổ đội (PvE + PvP 2 phe), sửa bug Zombie Cell trong `execute_entity`, bỏ `npc_respawn`/trùng `reset_cell` ở member flee, gỡ người trốn khỏi `battle_participants` |
+| 28 | [`issues/28-party-pvp-flee-matrix-and-zombie-cell-fix.md`](file:///D:/VUDT/GIT_PCC/ts_dream/.scratch/battle-refactor/issues/28-party-pvp-flee-matrix-and-zombie-cell-fix.md) | ✅ `completed` | Ma trận Flee 4 vai trò tổ đội (PvE + PvP 2 phe), sửa bug Zombie Cell trong `execute_entity`, bỏ `npc_respawn`/trùng `reset_cell` ở member flee, gỡ người trốn khỏi `battle_participants` |
 
 ---
 
@@ -115,7 +115,45 @@
 
 ---
 
-## 4. Lưu Ý Quan Trọng Cho Ticket 28 (Từ Code Review & Kiến Trúc)
+## 4. Chi Tiết Đã Hoàn Thành Ở Ticket 28
+
+### 4.1. Ma trận Chạy trốn 4 vai trò (PvE + PvP 2 phe) & Sửa Zombie Cell
+- [`src/battle/runner.rs`](file:///D:/VUDT/GIT_PCC/ts_dream/src/battle/runner.rs):
+  - `Battle::apply_flee`: tính `owner` (`id_char` khi `typ == 4 && id_char != 0`, ngược lại `id`) và `is_leader = attacker.leader_id == 0 || owner == attacker.leader_id` (tránh nhầm NPC ID của *Sủng vật* trùng `leader_id`).
+    - Nhánh Đội trưởng / *Sủng vật* của Đội trưởng (thuộc Phe người chơi PvE hoặc một trong hai phe PvP Party): trả `Outcome::PlayerFled` để kết thúc sạch cả trận.
+    - Nhánh Thành viên / *Sủng vật* của Thành viên: thu thập toàn bộ `owned_cells` (`(typ == 2 && id == player) || (typ == 4 && id_char == player)`), phát `acting` + `reset_cell` đúng 1 lần mỗi ô, `0B 00` (`hide_from_map`), `05 04` (`battle_exit_move`), `14 08` (`battle_exit_talk`), xóa sạch `owned_cells`, bỏ `npc_respawn` và bỏ `reset_cell` trùng lặp, phát `Out::Fled { battle_id: self.id_battle, player }`.
+  - `Battle::execute_entity` + helper `Battle::is_cell_occupied` & `Battle::write_cell_if_occupied`: chặn ghi đè lại `attacker` / `target` lên lưới sau khi `apply_flee` đã xóa ô (triệt tiêu bug **Zombie Cell**).
+
+### 4.2. Đồng bộ `Out::Fled { battle_id, player }` & `battle_participants`
+- [`src/battle/manager.rs`](file:///D:/VUDT/GIT_PCC/ts_dream/src/battle/manager.rs):
+  - Mở rộng `BattleSink::apply_fled(&self, battle_id: i32, player: i64)` và nhánh `dispatch` cho `Out::Fled { battle_id, player }`.
+- [`src/battle/service.rs`](file:///D:/VUDT/GIT_PCC/ts_dream/src/battle/service.rs):
+  - `BattleSinkImpl::apply_fled(&self, battle_id: i32, player: i64)`: xóa `player` khỏi `self.members`, `self.battle_participants[&battle_id]` và `self.offline_eve_sessions[(battle_id, player)]` bên cạnh việc đặt `battle_id = 0` và đồng bộ `online_sessions`, đảm bảo `battle_ended` sau đó không ghi đè trạng thái hay kích hoạt lại Eve cho người đã thoát.
+
+### 4.3. Kiểm thử & Kết quả xác minh sau chỉnh sửa cuối (Ticket 28)
+- Test mới: [`tests/battle/party_pvp_flee_matrix.rs`](file:///D:/VUDT/GIT_PCC/ts_dream/tests/battle/party_pvp_flee_matrix.rs) (đăng ký trong [`tests/battle_test.rs`](file:///D:/VUDT/GIT_PCC/ts_dream/tests/battle_test.rs)) gồm 4 integration tests:
+  - `pve_and_pvp_leader_or_leader_pet_flee_ends_battle_with_player_fled`
+  - `party_member_or_member_pet_flee_in_pve_and_pvp_extracts_only_owner_cells_without_duplicate_reset_or_respawn`
+  - `member_flee_does_not_create_zombie_cell_across_multiple_turns_and_ends_when_last_survivor_flees`
+  - `service_member_flee_removes_from_participants_skips_34_01_and_battle_ended_does_not_overwrite`
+- Test cập nhật theo chữ ký `Out::Fled { battle_id, player }` / `apply_fled(battle_id, player)`: [`tests/battle/debuff_turn_skip.rs`](file:///D:/VUDT/GIT_PCC/ts_dream/tests/battle/debuff_turn_skip.rs), [`tests/battle/lifecycle.rs`](file:///D:/VUDT/GIT_PCC/ts_dream/tests/battle/lifecycle.rs), [`tests/battle/timing_wiring.rs`](file:///D:/VUDT/GIT_PCC/ts_dream/tests/battle/timing_wiring.rs).
+- Kết quả chạy `cargo test --all-targets --no-fail-fast` sau chỉnh sửa cuối cùng:
+  - `architecture_guardrails_test`: **8 passed**
+  - `battle_test`: **183 passed**
+  - `compound_test`: **21 passed**
+  - `data_loaders_test`: **36 passed**
+  - `db_test`: **21 passed**
+  - `economy_inventory_test`: **54 passed**
+  - `eve_quest_test`: **130 passed**
+  - `events_arena_test`: **61 passed**
+  - `server_network_test`: **94 passed**
+  - `server_stop_test`: **1 passed**
+  - `skill_job_system_test`: **19 passed**
+  - **Tổng cộng: 628 passed, 0 failed, 0 ignored.**
+
+---
+
+## 5. Lưu Ý Kiến Trúc & Trạng Thái Sau Đợt 26 → 28
 
 1. **Về `npc_respawn` trong `0x0B 02 03` standalone**:
    - Theo Ticket 26, `npc_respawn` hoạt động bình thường khi `data.talking_battle > 0` (`session.talking_battle`). Trong `handle_attack_npc` (`0x0B 02 03`), cố ý **không** ghi đè `session.talking_battle = npc_on_map_id` vì `battle_ended` dùng `s.talking_battle > 0` để kích hoạt `battle_quest_win` / `quest_lose_frames` (`src/battle/service.rs:501`). Nếu về sau cần hồi sinh NPC map khi PK trực tiếp ngoài thoại quest, phải tách một trường riêng (ví dụ `map_npc_respawn_slot`) thay vì dùng chung `session.talking_battle`.
@@ -124,22 +162,7 @@
 
 ---
 
-## 5. Frontier & Kế Hoạch Triển Khai Tiếp Theo
+## 6. Trạng Thái Bàn Giao Cuối Đợt (Tickets 26 → 28)
 
-1. **Ticket 28** ([`issues/28-party-pvp-flee-matrix-and-zombie-cell-fix.md`](file:///D:/VUDT/GIT_PCC/ts_dream/.scratch/battle-refactor/issues/28-party-pvp-flee-matrix-and-zombie-cell-fix.md)) — `ready-for-agent`:
-   - Xử lý ma trận Flee 4 vai trò (PvE + PvP 2 phe): Leader / Pet của Leader (bất kỳ phe nào) trốn thành công → `Outcome::PlayerFled` kết thúc sạch cả trận; Member / Pet của Member → chỉ rút toàn bộ ô thuộc `owner`.
-   - Sửa bug **Zombie Cell** trong `Battle::execute_entity` (không ghi đè lại `attacker` / `target` lên lưới sau khi `apply_flee` đã xóa ô), bỏ `npc_respawn` và bỏ `reset_cell` trùng ở nhánh Member flee, mở rộng `Out::Fled { battle_id, player }` để gỡ khỏi `battle_participants`.
-
----
-
-## 6. Các Ràng Buộc Bất Biến & Kỹ Năng Đề Xuất
-
-- **Ràng buộc bất biến** ([`AGENTS.md`](file:///D:/VUDT/GIT_PCC/ts_dream/AGENTS.md), [`CODING_STANDARDS.md`](file:///D:/VUDT/GIT_PCC/ts_dream/CODING_STANDARDS.md)):
-  - Mọi test mới đặt làm submodule dưới `tests/<domain>/`; **cấm** `#[cfg(test)]` trong `src/` và không tạo file `*_test.rs` lẻ ở root `tests/`.
-  - Không đụng `DB/ts_dream.db`; test DB dùng `tests/common/test_db.rs`.
-  - **Không tự ý `git commit`** (giữ thay đổi ở working tree để user commit thủ công).
-  - Trong phát triển chạy `cargo test --test battle_test`; trước handoff cuối chạy `cargo test --all-targets --no-fail-fast`.
-- **Kỹ năng (Skills) đề xuất cho agent kế tiếp**:
-  - `tdd` — triển khai từng vertical slice (ma trận Flee 4 vai trò PvE/PvP, Zombie Cell multi-turn, `Out::Fled` sync) ở seam đã thống nhất trong `spec-pk-and-flee.md`.
-  - `code-review` — rà soát song song Standards + Spec sau khi hoàn tất Ticket 28.
-  - `domain-modeling` — giữ đồng bộ thuật ngữ (`PKBattle`, `ListQS`, `DiaHinh`, *Ô chiến trận*) với `GLOSSARY.md` và `ADR 0006`.
+- Toàn bộ 3 tickets **26 → 28** đã hoàn tất và vượt qua 100% `cargo test --all-targets --no-fail-fast` (**628 passed, 0 failed, 0 ignored**).
+- Thay đổi đang nằm ở working tree để user kiểm tra và `git commit` thủ công theo [`AGENTS.md`](file:///D:/VUDT/GIT_PCC/ts_dream/AGENTS.md).

@@ -38,6 +38,8 @@ mod mineral_pickaxe;
 mod open_leader;
 #[path = "battle/open_self_kind.rs"]
 mod open_self_kind;
+#[path = "battle/party_pvp_flee_matrix.rs"]
+mod party_pvp_flee_matrix;
 #[path = "battle/pvp_party_and_flee.rs"]
 mod pvp_party_and_flee;
 #[path = "battle/rng_determinism.rs"]

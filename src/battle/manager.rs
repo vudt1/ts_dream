@@ -32,7 +32,7 @@ pub trait BattleSink: Send + Sync + 'static {
     fn apply_db(&self, update: DbUpdate);
     fn apply_drop(&self, drop: crate::battle::runner::Out);
     fn apply_catch(&self, owner: i64, npc_id: i64);
-    fn apply_fled(&self, player: i64);
+    fn apply_fled(&self, battle_id: i32, player: i64);
     fn apply_respawn(&self, npc_id: i64, map_id: i64, x: i64, y: i64);
     fn apply_pet_exp(&self, owner: i64, stt: i64, exp: i64);
     /// Apply a PvE gold reward. The default is a no-op for test sinks.
@@ -486,7 +486,7 @@ fn dispatch(out: &[Out], sink: &dyn BattleSink) {
                 owner: *owner,
             }),
             Catch { owner, npc_id } => sink.apply_catch(*owner, *npc_id),
-            Fled { player } => sink.apply_fled(*player),
+            Fled { battle_id, player } => sink.apply_fled(*battle_id, *player),
             Respawn {
                 npc_id,
                 map_id,

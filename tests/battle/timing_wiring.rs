@@ -61,7 +61,7 @@ impl BattleSink for CapturingSink {
     fn apply_db(&self, _update: ts_dream::battle::runner::DbUpdate) {}
     fn apply_drop(&self, _drop: ts_dream::battle::runner::Out) {}
     fn apply_catch(&self, _owner: i64, _npc_id: i64) {}
-    fn apply_fled(&self, _player: i64) {}
+    fn apply_fled(&self, _battle_id: i32, _player: i64) {}
     fn apply_respawn(&self, _npc_id: i64, _map_id: i64, _x: i64, _y: i64) {}
     fn apply_pet_exp(&self, _owner: i64, _stt: i64, _exp: i64) {}
 
