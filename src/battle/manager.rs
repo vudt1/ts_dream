@@ -47,12 +47,28 @@ pub struct BattleHandle {
     pub id: i32,
     tx: mpsc::UnboundedSender<PlayerInput>,
     ack_notify: Arc<tokio::sync::Notify>,
+    locked_cells: Arc<StdRwLock<HashMap<(u8, u8), i64>>>,
 }
 
 impl BattleHandle {
     /// Submit a command for the current turn.
     pub fn command(&self, input: PlayerInput) -> bool {
         self.tx.send(input).is_ok()
+    }
+
+    /// Check synchronously (O(1)) whether `(row, col)` is currently under a
+    /// Turn-Locking Status and owned by `player`.
+    pub fn is_cell_locked_for(&self, row: u8, col: u8, player: i64) -> bool {
+        self.locked_cells
+            .read()
+            .map(|g| g.get(&(row, col)).copied() == Some(player))
+            .unwrap_or(false)
+    }
+
+    pub(crate) fn set_locked_cells(&self, cells: HashMap<(u8, u8), i64>) {
+        if let Ok(mut g) = self.locked_cells.write() {
+            *g = cells;
+        }
     }
 
     /// Notify that the client has acknowledged the battle scene (0B FA).
@@ -67,6 +83,7 @@ impl BattleHandle {
             id,
             tx,
             ack_notify: Arc::new(tokio::sync::Notify::new()),
+            locked_cells: Arc::new(StdRwLock::new(HashMap::new())),
         }
     }
 }
@@ -217,11 +234,14 @@ impl BattleManager {
         let id = battle.id_battle;
         let (tx, rx) = mpsc::unbounded_channel();
         let ack_notify = Arc::new(tokio::sync::Notify::new());
+        let locked_cells = Arc::new(StdRwLock::new(HashMap::new()));
         let handle = BattleHandle {
             id,
             tx,
             ack_notify: ack_notify.clone(),
+            locked_cells: locked_cells.clone(),
         };
+        let handle_task = handle.clone();
 
         let handshake_dur = if timeout <= std::time::Duration::from_millis(500) {
             timeout.min(std::time::Duration::from_millis(50))
@@ -257,27 +277,33 @@ impl BattleManager {
             loop {
                 out.clear();
 
-                // Step 1: Turn Prompt (34 01) - send to all living player-controlled fighters (Ticket 20)
-                let player_ids: std::collections::HashSet<i64> = (0..4u8)
-                    .flat_map(|r| (0..5u8).map(move |c| (r, c)))
-                    .filter_map(|(r, c)| {
-                        let cell = battle.cell(r, c)?;
-                        if cell.hp > 0 {
-                            if cell.typ == 2 && cell.id > 0 {
-                                return Some(cell.id);
-                            } else if cell.typ == 4 && cell.id_char > 0 {
-                                return Some(cell.id_char);
+                // Compute Turn-Locking Status snapshot and living player IDs in one pass
+                // before Step 1 (34 01) so synchronous 0x32 rejection and collect_commands agree 1-to-1.
+                let mut locked_snapshot: HashMap<(u8, u8), i64> = HashMap::new();
+                let mut player_ids: std::collections::HashSet<i64> =
+                    std::collections::HashSet::new();
+                for r in 0..4u8 {
+                    for c in 0..5u8 {
+                        if let Some(cell) = battle.cell(r, c) {
+                            if let Some(owner) = owner_player_id(cell) {
+                                player_ids.insert(owner);
+                                if will_be_turn_locked(cell) {
+                                    locked_snapshot.insert((r, c), owner);
+                                }
                             }
                         }
-                        None
-                    })
-                    .collect();
+                    }
+                }
+                handle_task.set_locked_cells(locked_snapshot.clone());
+
+                // Step 1: Turn Prompt (34 01) - send to all living player-controlled fighters (Ticket 20)
                 for pid in player_ids {
                     sink.send_to(pid, crate::battle::packets::your_turn());
                 }
 
                 // Step 2: Collect commands with a timeout.
-                let commands = collect_commands(&mut rx, timeout, &battle).await;
+                let commands = collect_commands(&mut rx, timeout, &battle, &locked_snapshot).await;
+                handle_task.set_locked_cells(HashMap::new());
                 let outcome = battle.run_turn(&data, &commands, &mut out);
                 dispatch(&out, sink.as_ref());
                 if outcome != Outcome::Running {
@@ -318,15 +344,19 @@ async fn collect_commands(
     rx: &mut mpsc::UnboundedReceiver<PlayerInput>,
     timeout: std::time::Duration,
     battle: &Battle,
+    locked_cells: &HashMap<(u8, u8), i64>,
 ) -> BattleCommands {
     let mut commands = BattleCommands::new();
     let deadline = tokio::time::Instant::now() + timeout;
     loop {
-        // Every living player-controlled cell needs a command, including
-        // follow-NPC/pet cells (typ=4).
+        // Every living, unlocked player-controlled cell needs a command,
+        // including follow-NPC/pet cells (typ=4).
         let waiting_cells: Vec<(u8, u8)> = (0..4u8)
             .flat_map(|r| (0..5u8).map(move |c| (r, c)))
-            .filter(|&(r, c)| battle.cell(r, c).is_some_and(is_living_player_controlled))
+            .filter(|&(r, c)| {
+                !locked_cells.contains_key(&(r, c))
+                    && battle.cell(r, c).is_some_and(is_living_player_controlled)
+            })
             .collect();
         let all_ready = waiting_cells.iter().all(|cell| commands.contains_key(cell));
         if all_ready {
@@ -340,9 +370,11 @@ async fn collect_commands(
         match tokio::time::timeout(remaining, rx.recv()).await {
             Ok(Some(input)) => {
                 // The owner id remains the authorization identity, while the
-                // source cell is the command identity. Invalid ownership or
-                // malformed source coordinates never satisfy readiness.
-                if owns_commandable_cell(battle, input.player, &input.cmd) {
+                // source cell is the command identity. Invalid ownership,
+                // malformed coordinates, or turn-locked cells never satisfy readiness.
+                if !locked_cells.contains_key(&(input.cmd.row, input.cmd.col))
+                    && owns_commandable_cell(battle, input.player, &input.cmd)
+                {
                     commands.insert((input.cmd.row, input.cmd.col), input.cmd);
                 }
             }
@@ -385,8 +417,32 @@ fn fill_timeout_commands(
     }
 }
 
+/// Predict whether a fighter will be under a Turn-Locking Status (Hard CC Type 3
+/// or Confusion/Berserk `14021 | 20014`) in the upcoming turn, matching `turn_phase1`'s
+/// round-start `-1` decrement and `turn <= 1` expiry rule 1-to-1.
+pub fn will_be_turn_locked(cell: &crate::battle::engine::WarInfo) -> bool {
+    let type3_active = cell.type3_id > 0 && cell.type3_turn.saturating_sub(1) > 1;
+    let berserk_active =
+        crate::battle::engine::is_berserk_status(cell.type15_id) && cell.type15_turn.saturating_sub(1) > 1;
+    type3_active || berserk_active
+}
+
+fn owner_player_id(cell: &crate::battle::engine::WarInfo) -> Option<i64> {
+    if cell.id > 0 && cell.hp > 0 {
+        if cell.typ == 2 {
+            Some(cell.id)
+        } else if cell.typ == 4 && cell.id_char > 0 {
+            Some(cell.id_char)
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
 fn is_living_player_controlled(cell: &crate::battle::engine::WarInfo) -> bool {
-    cell.id > 0 && cell.hp > 0 && (cell.typ == 2 || (cell.typ == 4 && cell.id_char > 0))
+    owner_player_id(cell).is_some()
 }
 
 fn owns_commandable_cell(battle: &Battle, player: i64, cmd: &BattleCommand) -> bool {

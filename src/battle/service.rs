@@ -861,6 +861,14 @@ impl Default for BattleService {
     }
 }
 
+/// Outcome of synchronous battle command submission (`0x32 sub 1/2`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SubmitCommandResult {
+    Accepted,
+    CellLocked,
+    Rejected,
+}
+
 impl BattleService {
     pub fn new(data: Arc<GameData>) -> Self {
         let online = Arc::new(tokio::sync::RwLock::new(HashMap::new()));
@@ -1657,22 +1665,40 @@ impl BattleService {
         crate::server::session::registry_update_if_online(session);
     }
 
-    /// Submit a battle command (op 0x32) to the player's battle.
-    pub fn submit_command(&self, session: &Session, cmd: BattleCommand) -> bool {
+    /// Submit a battle command (op 0x32) to the player's battle, returning a
+    /// structured outcome that distinguishes Turn-Locking Status rejection.
+    pub fn submit_command_checked(
+        &self,
+        session: &Session,
+        cmd: BattleCommand,
+    ) -> SubmitCommandResult {
         if session.battle_id == 0 {
-            return false;
+            return SubmitCommandResult::Rejected;
         }
         let handle = match self.handles.lock() {
             Ok(h) => h.get(&session.battle_id).cloned(),
             Err(_) => None,
         };
-        match handle {
-            Some(h) => h.command(crate::battle::manager::PlayerInput {
-                player: i64::from(session.id),
-                cmd,
-            }),
-            None => false,
+        let Some(h) = handle else {
+            return SubmitCommandResult::Rejected;
+        };
+        let player = i64::from(session.id);
+        if h.is_cell_locked_for(cmd.row, cmd.col, player) {
+            return SubmitCommandResult::CellLocked;
         }
+        if h.command(crate::battle::manager::PlayerInput { player, cmd }) {
+            SubmitCommandResult::Accepted
+        } else {
+            SubmitCommandResult::Rejected
+        }
+    }
+
+    /// Submit a battle command (op 0x32) to the player's battle.
+    pub fn submit_command(&self, session: &Session, cmd: BattleCommand) -> bool {
+        matches!(
+            self.submit_command_checked(session, cmd),
+            SubmitCommandResult::Accepted
+        )
     }
 
     /// Acknowledge the battle scene from the client (0B FA ack - Ticket 20).

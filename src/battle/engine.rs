@@ -28,6 +28,12 @@ pub fn exp_lv_up(texps: &[crate::data::tables::TexpRow], lv: i64, reborn: usize,
     texp_get_lv_up(texps, lv, reborn, texp)
 }
 
+/// Whether a Type 15 status ID is Confusion/Berserk (`14021` Hỗn loạn or `20014` Cuồng nộ),
+/// which belongs to Turn-Locking Status (forced random basic attack, manual input blocked).
+pub fn is_berserk_status(type15_id: i64) -> bool {
+    matches!(type15_id, 14021 | 20014)
+}
+
 /// 20-cell grid keyed by `row-col` (hex). Row 0..3, col 0..4.
 pub fn war_key(row: u8, col: u8) -> String {
     format!("{row:x}{col:x}")

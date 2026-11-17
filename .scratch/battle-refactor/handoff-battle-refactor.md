@@ -1,6 +1,6 @@
 # HANDOFF: Chuẩn hóa Giao thức & Vòng đời Trận đấu (Battle Refactor V2)
 
-- **Ngày cập nhật**: 2026-10-29
+- **Ngày cập nhật**: 2026-11-17
 - **Dự án**: `ts_dream` (Rust game server cho TS Online PC `aLogin.exe`)
 - **Tập tin lưu**: `.scratch/battle-refactor/handoff-battle-refactor.md` (bản sao tại `/tmp/handoff-battle-refactor.md`)
 - **Phiên bản đặc tả hiện tại**: `2.1` (tham chiếu [`.scratch/battle-refactor/spec_new.md`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/.scratch/battle-refactor/spec_new.md) và [`.scratch/battle-refactor/research-combo-rules.md`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/.scratch/battle-refactor/research-combo-rules.md))
@@ -8,9 +8,9 @@
 
 ---
 
-## 1. Tóm Tắt Tiến Độ: ĐÃ HOÀN THÀNH 100% ĐỢT 1, ĐỢT 2 & ĐỢT 3 (Tickets 16 → 24)
+## 1. Tóm Tắt Tiến Độ: ĐÃ HOÀN THÀNH 100% ĐỢT 1, ĐỢT 2 & ĐỢT 3 (Tickets 16 → 25)
 
-Toàn bộ 23/24 ticket của đợt tái cấu trúc đã hoàn tất với bộ test suite xanh 100%:
+Toàn bộ 24/24 ticket triển khai của đợt tái cấu trúc (Tickets 16 → 25) đã hoàn tất với bộ test suite xanh 100%:
 - **Đợt 1 (Protocol Parity & Turn Lifecycle P0)**: 
   - Ticket 19 (kênh lệnh `0x32` & domain enum `BattleAction`)
   - Ticket 20 (barrier handshake `0B FA` & timing mở hiệp `34 01`)
@@ -23,6 +23,7 @@ Toàn bộ 23/24 ticket của đợt tái cấu trúc đã hoàn tất với b�
   - Ticket 22 (chuẩn hóa giải thuật quét ô AoE Isometric `[0, 1, 2, 4, 3]` theo client Delphi `00652454`)
   - Ticket 23 (chuẩn hóa toàn diện Battle Combo Engine V2: Agi gap $\le 11$, LVTB Reborn 200, tỷ lệ suy giảm khi $\Delta \text{LV} < 25$, kích hoạt combo cho kỹ năng Active bao gồm Loạn Kích `13013`, sát thương $\times 1.3$, EXP $+8.6\%$, cách ly split-target)
   - Ticket 24 (hoàn thiện 8 rào chắn thẩm định thu phục NPC / bắt võ tướng `15001`)
+  - Ticket 25 (tự động bỏ qua lượt & chặn chọn hành động `0x32 sub 1/2` khi dính Trạng thái Khóa Lượt, ưu tiên Type 3 > `14021 | 20014`, sửa giảm lượt `id > 0`, đồng bộ `35 01` / `35 0F` / `32 01`)
 
 ---
 
@@ -69,6 +70,25 @@ Toàn bộ 23/24 ticket của đợt tái cấu trúc đã hoàn tất với b�
   - Chuẩn hóa gói tin: khi bắt thành công, gửi `reset_cell` cho ô NPC và phát `Out::Catch`; nếu còn kẻ thù sống thì tiếp tục trận (`Outcome::Running`), nếu hết kẻ thù thì kết thúc thắng (`Outcome::PlayerWin`).
 - **Hồ sơ test**: [`tests/battle_catch_verification_test.rs`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/tests/battle_catch_verification_test.rs) (11 tests).
 
+#### 4. Ticket 25: Tự động bỏ qua lượt & Chặn chọn hành động khi dính Trạng thái Khóa Lượt (`engine.rs`, `manager.rs`, `service.rs`, `handlers/battle.rs`, `runner.rs`)
+- **Đặc tả & Ticket**: [`.scratch/battle-refactor/spec-debuff-turn-skip.md`](file:///D:/VUDT/GIT_PCC/ts_dream/.scratch/battle-refactor/spec-debuff-turn-skip.md) & [`.scratch/battle-refactor/issues/25-debuff-turn-skip-and-input-blocking.md`](file:///D:/VUDT/GIT_PCC/ts_dream/.scratch/battle-refactor/issues/25-debuff-turn-skip-and-input-blocking.md).
+- **Triển khai theo 4 tầng**:
+  1. **Domain & Vòng đời lượt (`engine.rs`, `manager.rs`)**:
+     - Thêm helper `is_berserk_status(type15_id)` (`14021 | 20014`) trong `src/battle/engine.rs` và `will_be_turn_locked(cell)` trong `src/battle/manager.rs` dự đoán nhất quán 1-1 với `turn_phase1` (giảm `1` lượt và giải hạn khi `turn <= 1`).
+     - Duy trì snapshot `locked_cells: Arc<StdRwLock<HashMap<(u8, u8), i64>>>` trên `BattleHandle` (đọc O(1) đồng bộ qua `is_cell_locked_for(row, col, player)`), cập nhật đầu hiệp trước khi phát `34 01` và dọn sạch sau `collect_commands`.
+     - Luôn phát `34 01` cho mọi người chơi còn sống; loại ô khóa lượt khỏi `waiting_cells`, `fill_timeout_commands`, và kiểm tra lại trong `rx.recv()`. Nếu toàn bộ ô phe người chơi đều bị khóa, `collect_commands` thoát sau `0ms` để đi thẳng vào thực thi + `32 02` + Dynamic Skill Delay Pacing.
+  2. **Chặn đồng bộ `0x32 sub 1/2` & Bảo vệ túi đồ (`service.rs`, `handlers/battle.rs`)**:
+     - Bổ sung `SubmitCommandResult` (`Accepted`, `CellLocked`, `Rejected`) và `BattleService::submit_command_checked`.
+     - Trong `handle_battle_command` (qua helper `submit_or_notify_locked`), từ chối đồng bộ cả `0x32 sub 1` và `sub 2` gửi cho ô bị khóa lượt: không đưa vào queue, không phát `35 05` ở `sub 1`, không trừ vật phẩm khỏi `homdo` ở `sub 2`, và gửi `sys_msg_frame("Đang trong trạng thái khống chế, không thể hành động lượt này!")`.
+     - Các **Debuff mềm** (`14015`, `10016..=10019`, `10025`, `20022`, `13011`) không thuộc nhóm khóa lượt và vẫn chọn đủ 6 hành động bình thường.
+  3. **Thực thi lượt (`runner.rs`)**:
+     - Trong `turn_phase1`: sửa điều kiện giảm lượt từ `> 1` sang `> 0` cho `type3_id`, `type4_id`, `type15_id`, `type19_id` để trạng thái có `id == 1` không bị kẹt vĩnh viễn.
+     - Trong `turn_phase2`: ưu tiên `c.type3_turn > 0 || c.id_skill > 0` trước `is_berserk_status(c.type15_id)` để Khống chế cứng luôn hủy lượt hoàn toàn (không chạy `auto_berserk`).
+  4. **Đồng bộ Wire Trạng thái (`runner.rs`)**:
+     - Thay `ts.text_troi: String` bằng `ts.troi_frames: Vec<String>` để không ghi đè khi AoE nhiều mục tiêu; bổ sung phát `35 01` (`troi_start`) ở nhánh gán trực tiếp Type 3 (`apply_status3`) và Type 15 (`apply_status15`).
+     - Trích xuất `apply_attack_hp_and_type3` dùng chung cho `apply_attack` và `apply_magic`: khi `hit != MISS && inflicted_status > 0 && target.type3_id == 0`, phát đầy đủ `32 01` (`HP` + `TYPE3`), `35 01` (`troi_start`), và `35 0F` (`battle_unit_status`).
+- **Hồ sơ test**: [`tests/battle/debuff_turn_skip.rs`](file:///D:/VUDT/GIT_PCC/ts_dream/tests/battle/debuff_turn_skip.rs) (9 integration tests phủ cả 3 seam; `cargo test --all-targets --no-fail-fast` xanh 100%, 0 warnings).
+
 ---
 
 ## 2. Trạng Thái Hiện Tại & Công Việc Tiếp Theo
@@ -87,7 +107,8 @@ Toàn bộ 23/24 ticket của đợt tái cấu trúc đã hoàn tất với b�
 ├── [ĐÃ XONG 100%] ĐỢT 3: BÀN CỜ ISOMETRIC & GAMEPLAY PARITY (P2)
 │   ├── ✅ Ticket 22: issues/22-isometric-grid-aoe-targeting.md
 │   ├── ✅ Ticket 23: issues/23-combo-rules-aoe-threshold.md
-│   └── ✅ Ticket 24: issues/24-capture-validation-gates.md
+│   ├── ✅ Ticket 24: issues/24-capture-validation-gates.md
+│   └── ✅ Ticket 25: issues/25-debuff-turn-skip-and-input-blocking.md
 │
 └── [DÀNH CHO NGƯỜI DÙNG]
     └── ⏸ Ticket 14: issues/14-capture-verification.md (Chạy capture runtime thực tế)

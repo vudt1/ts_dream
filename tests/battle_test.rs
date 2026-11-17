@@ -12,6 +12,8 @@ mod cell_frames;
 mod combo_rules;
 #[path = "battle/command_channel.rs"]
 mod command_channel;
+#[path = "battle/debuff_turn_skip.rs"]
+mod debuff_turn_skip;
 #[path = "battle/dispel_cleanse.rs"]
 mod dispel_cleanse;
 #[path = "battle/finish_generalization.rs"]

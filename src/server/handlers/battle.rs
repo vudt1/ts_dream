@@ -23,6 +23,9 @@
 //! [`BattleService`] which spawns async per-battle tasks and routes frames.
 
 use crate::battle::runner::{BattleAction, BattleCommand};
+use crate::battle::service::SubmitCommandResult;
+
+const TURN_LOCKED_NOTICE: &str = "Đang trong trạng thái khống chế, không thể hành động lượt này!";
 use crate::battle::service::BattleService;
 use crate::protocol::encoder;
 use crate::server::dispatcher::{HandleOutcome, OpcodeCtx};
@@ -283,7 +286,6 @@ fn handle_attack_npc(conn: &mut Conn, payload: &[u8], service: &BattleService) {
 /// sub 0x02: Use Item on battle grid
 pub fn handle_battle_command(ctx: &mut OpcodeCtx) {
     let conn = &mut ctx.conn;
-    let service = ctx.service;
     let sub = ctx.sub;
     let payload = ctx.payload;
 
@@ -324,9 +326,10 @@ pub fn handle_battle_command(ctx: &mut OpcodeCtx) {
                 target_col: dst_slot,
                 action,
             };
-            if service.submit_command(&conn.session, cmd) {
+            if submit_or_notify_locked(ctx.service, &conn.session, ctx.out, cmd) {
                 // Broadcast acting indicator `F44404003505`+row+col (SendSKillingToParty).
-                service.broadcast(format!("F44404003505{:02X}{:02X}", src_grp, src_slot));
+                ctx.service
+                    .broadcast(format!("F44404003505{:02X}{:02X}", src_grp, src_slot));
             }
         }
         // Sub 2: In-battle item use (26001..=27165)
@@ -342,7 +345,7 @@ pub fn handle_battle_command(ctx: &mut OpcodeCtx) {
                 target_col: dst_slot,
                 action: BattleAction::UseItem { item_id },
             };
-            if service.submit_command(&conn.session, cmd) {
+            if submit_or_notify_locked(ctx.service, &conn.session, ctx.out, cmd) {
                 // Accepted by the engine: consume exactly one from the bag.
                 conn.session.remove_homdo_item(item_id as u16, 1);
             } else {
@@ -355,6 +358,22 @@ pub fn handle_battle_command(ctx: &mut OpcodeCtx) {
         other => {
             tracing::debug!(sub = other, "0x32 unknown sub (ignored)");
         }
+    }
+}
+
+fn submit_or_notify_locked(
+    service: &crate::battle::service::BattleService,
+    session: &Session,
+    out: &mut crate::server::dispatcher::HandleOutcome,
+    cmd: BattleCommand,
+) -> bool {
+    match service.submit_command_checked(session, cmd) {
+        SubmitCommandResult::Accepted => true,
+        SubmitCommandResult::CellLocked => {
+            out.send(crate::server::spawn::sys_msg_frame(TURN_LOCKED_NOTICE));
+            false
+        }
+        SubmitCommandResult::Rejected => false,
     }
 }
 

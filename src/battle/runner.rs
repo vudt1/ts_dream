@@ -36,6 +36,60 @@ fn is_mineral_immune(data: &BattleData, attacker: &WarInfo, target: &WarInfo) ->
     is_mineral_target(data, target) && !is_pickaxe(attacker.weapon_id)
 }
 
+/// Apply HP damage on `32 01` and, when a physical/magic attack inflicts a secondary
+/// Type 3 status on a clean target, also emit the `TYPE3` sub-effect, `35 01` `troi_start`,
+/// and `35 0F` `battle_unit_status` so the client locks its menu in sync with the server.
+#[allow(clippy::too_many_arguments)]
+fn apply_attack_hp_and_type3(
+    ts: &mut TurnState,
+    target: &mut WarInfo,
+    hit: i64,
+    adl: u8,
+    dmg: i64,
+    attack: &combat_formula::AttackResult,
+    status_lv: i64,
+) {
+    let (r, c) = (target.row, target.col);
+    let inflicted = hit != miss_status::MISS as i64
+        && attack.inflicted_status > 0
+        && target.type3_id == 0;
+    if inflicted {
+        ts.text10
+            .push_str(&packets::skilling_short(r, c, hit as u8, adl));
+        ts.text10.push_str("02");
+        ts.text10
+            .push_str(&packets::skilling_effect(troi_byte::HP, dmg as u16, 1));
+        ts.text10
+            .push_str(&packets::skilling_effect(troi_byte::TYPE3, 0, 1));
+        target.type3_id = attack.inflicted_status;
+        target.type3_lv = status_lv;
+        target.type3_turn = attack.status_rounds;
+        ts.troi_frames.push(packets::troi_start(
+            r,
+            c,
+            attack.inflicted_status as u16,
+        ));
+        ts.status_frames.push(packets::battle_unit_status(
+            r,
+            c,
+            packets::STATUS_SEAL_RESIST_PCT,
+            attack.status_rounds.clamp(1, 255) as u8,
+            (status_lv * 10).clamp(1, 100) as u16,
+        ));
+    } else {
+        ts.text10.push_str(&packets::skilling_int(
+            r,
+            c,
+            hit as u8,
+            adl,
+            1,
+            troi_byte::HP,
+            dmg as u16,
+            1,
+        ));
+    }
+}
+
 /// If `target` is immune to `attacker` (Mineral NPC hit without a pickaxe),
 /// emits a `MISS` `skilling_int` fragment at `(row, col)` with `troi` and returns `true`.
 fn try_emit_mineral_miss(
@@ -387,7 +441,7 @@ struct TurnState {
     agi_13020: i64,
     combo_cells: Vec<String>,
     killed_npcs: Vec<String>,
-    text_troi: String,
+    troi_frames: Vec<String>,
     text_combo: String,
     text9: String,
     text10: String,
@@ -523,16 +577,16 @@ impl Battle {
                 }
             }
 
-            if c.type3_id > 1 {
+            if c.type3_id > 0 {
                 c.type3_turn -= 1;
             }
-            if c.type4_id > 1 {
+            if c.type4_id > 0 {
                 c.type4_turn -= 1;
             }
-            if c.type15_id > 1 {
+            if c.type15_id > 0 {
                 c.type15_turn -= 1;
             }
-            if c.type19_id > 1 {
+            if c.type19_id > 0 {
                 c.type19_turn -= 1;
             }
 
@@ -715,12 +769,13 @@ impl Battle {
             }
             let mut c = cell;
             if c.hp > 0 {
-                if matches!(c.type15_id, 14021 | 20014) {
-                    self.auto_berserk(data, &mut c);
-                } else if c.type3_turn == 0 && c.id_skill == 0 && matches!(c.typ, 3 | 7) {
-                    self.auto_npc(data, &mut c);
-                } else if c.id_skill > 0 || c.type3_turn > 0 {
+                // Hard CC (Type 3) takes strict priority over Confusion/Berserk (14021 | 20014).
+                if c.type3_turn > 0 || c.id_skill > 0 {
                     c.attacked = true;
+                } else if crate::battle::engine::is_berserk_status(c.type15_id) {
+                    self.auto_berserk(data, &mut c);
+                } else if matches!(c.typ, 3 | 7) {
+                    self.auto_npc(data, &mut c);
                 }
 
                 // Apply a submitted player command (op 0x32 sub 1 / sub 2).
@@ -1325,8 +1380,8 @@ impl Battle {
             self.process_kills(data, ts, &mut attacker, out);
             ts.combo_cells.clear();
 
-            if !ts.text_troi.is_empty() {
-                out.push(Out::Broadcast(std::mem::take(&mut ts.text_troi)));
+            for troi_frame in std::mem::take(&mut ts.troi_frames) {
+                out.push(Out::Broadcast(troi_frame));
             }
             if !ts.text_combo.is_empty() {
                 ts.text_combo = String::new();
@@ -1638,24 +1693,7 @@ impl Battle {
             }
         }
         self.apply_target_hp(target, *num36, out);
-        let (r, c) = (target.row, target.col);
-        ts.text10.push_str(&packets::skilling_int(
-            r,
-            c,
-            hit as u8,
-            adl,
-            1,
-            troi_byte::HP,
-            *num36 as u16,
-            1,
-        ));
-
-        // Binary skill status metadata applies on a clean target.
-        if attack.inflicted_status > 0 && target.type3_id == 0 {
-            target.type3_id = attack.inflicted_status;
-            target.type3_lv = skill_lv;
-            target.type3_turn = attack.status_rounds;
-        }
+        apply_attack_hp_and_type3(ts, target, hit, adl, *num36, &attack, skill_lv);
 
         // Legacy PC status-debuff skills 13007/13029 retain their packet-specific path.
         if matches!(skill, 13007 | 13029) && target.type3_id == 0 {
@@ -1673,8 +1711,8 @@ impl Battle {
             );
             if roll == 1 {
                 ts.text10.push_str(&packets::skilling_short(
-                    r,
-                    c,
+                    target.row,
+                    target.col,
                     miss_status::ATTACK,
                     attack_status::ATTACK,
                 ));
@@ -1906,22 +1944,7 @@ impl Battle {
             }
         }
         self.apply_target_hp(target, *num36, out);
-        let (r, c) = (target.row, target.col);
-        ts.text10.push_str(&packets::skilling_int(
-            r,
-            c,
-            hit as u8,
-            adl,
-            1,
-            troi_byte::HP,
-            *num36 as u16,
-            1,
-        ));
-        if attack.inflicted_status > 0 && target.type3_id == 0 {
-            target.type3_id = attack.inflicted_status;
-            target.type3_lv = 1;
-            target.type3_turn = attack.status_rounds;
-        }
+        apply_attack_hp_and_type3(ts, target, hit, adl, *num36, &attack, 1);
         if matches!(target.type4_id, 10015 | 10031 | 13021) && ts.reflect > 0 {
             self.apply_reflect(attacker, ts, out);
         }
@@ -2027,6 +2050,11 @@ impl Battle {
                     target.type3_id = status_id;
                     target.type3_lv = skill_lv;
                     target.type3_turn = turn;
+                    ts.troi_frames.push(packets::troi_start(
+                        target.row,
+                        target.col,
+                        status_id as u16,
+                    ));
                     ts.status_frames.push(packets::battle_unit_status(
                         target.row,
                         target.col,
@@ -2041,7 +2069,8 @@ impl Battle {
                         attacker.type3_id = skill;
                         attacker.type3_lv = skill_lv;
                         attacker.type3_turn = turn;
-                        ts.text_troi = packets::troi_start(row, col, skill as u16);
+                        ts.troi_frames
+                            .push(packets::troi_start(row, col, skill as u16));
                         ts.status_frames.push(packets::battle_unit_status(
                             row,
                             col,
@@ -2054,6 +2083,11 @@ impl Battle {
                     target.type3_id = status_id;
                     target.type3_lv = skill_lv;
                     target.type3_turn = turn;
+                    ts.troi_frames.push(packets::troi_start(
+                        target.row,
+                        target.col,
+                        status_id as u16,
+                    ));
                     ts.status_frames.push(packets::battle_unit_status(
                         target.row,
                         target.col,
@@ -2622,7 +2656,8 @@ impl Battle {
                         attacker.type15_id = skill;
                         attacker.type15_lv = skill_lv;
                         attacker.type15_turn = turn;
-                        ts.text_troi = packets::troi_start(row, col, skill as u16);
+                        ts.troi_frames
+                            .push(packets::troi_start(row, col, skill as u16));
                         let val = packets::stat_modifier_val(-(skill_lv * 10) as i16);
                         ts.status_frames.push(packets::battle_unit_status(
                             row,
@@ -2639,6 +2674,8 @@ impl Battle {
                     target.type15_id = skill;
                     target.type15_lv = skill_lv;
                     target.type15_turn = turn;
+                    ts.troi_frames
+                        .push(packets::troi_start(target.row, target.col, skill as u16));
                     let val = packets::stat_modifier_val(-(skill_lv * 10) as i16);
                     ts.status_frames.push(packets::battle_unit_status(
                         target.row,
