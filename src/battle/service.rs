@@ -15,7 +15,7 @@
 //! - when the task ends, `battle_ended` runs the quest-win progression for the leader if
 //!   a quest talk is pending and the players won, then cleans up.
 
-use crate::battle::construction::{Battle, StartPacket};
+use crate::battle::construction::{Battle, BattleKind, StartPacket};
 use crate::battle::engine::get_hp_max;
 use crate::battle::manager::{BattleHandle, BattleManager, BattleSink};
 use crate::battle::npc_world::NpcWorld;
@@ -109,9 +109,25 @@ struct BattleSinkImpl {
     /// Parked Eve sessions (`phase == AwaitingBattle`) snapshotted when a player
     /// disconnects or unregisters mid-battle, keyed by `(battle_id, player_id)`.
     offline_eve_sessions: Arc<Mutex<HashMap<(i32, i64), Session>>>,
+    /// Active ListQS spectators mapped `player_id -> battle_id`.
+    spectators: Arc<Mutex<HashMap<i64, i32>>>,
 }
 
 impl BattleSinkImpl {
+    fn remove_spectator(&self, player: i64) -> Option<i32> {
+        let battle_id = self
+            .spectators
+            .lock()
+            .ok()
+            .and_then(|mut s| s.remove(&player))?;
+        if let Ok(mut participants) = self.battle_participants.lock() {
+            if let Some(list) = participants.get_mut(&battle_id) {
+                list.retain(|&pid| pid != player);
+            }
+        }
+        Some(battle_id)
+    }
+
     fn snapshot_offline_eve_session(&self, session: &Session) {
         if session.battle_id <= 0 {
             return;
@@ -365,6 +381,10 @@ impl BattleSink for BattleSinkImpl {
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0);
         let arena_40_challenger = self.active_40_npc.lock().unwrap().remove(&id);
+
+        if let Ok(mut spectators) = self.spectators.lock() {
+            spectators.retain(|_, &mut bid| bid != id);
+        }
 
         // 1. Gather all participant IDs for this battle (online + disconnected)
         //    and drain their parked offline Eve sessions if any.
@@ -892,6 +912,7 @@ impl BattleService {
             active_40_npc: Arc::clone(&active_40_npc),
             battle_participants: Arc::new(Mutex::new(HashMap::new())),
             offline_eve_sessions: Arc::new(Mutex::new(HashMap::new())),
+            spectators: Arc::new(Mutex::new(HashMap::new())),
         });
         BattleService {
             manager: Arc::new(BattleManager::new()),
@@ -1007,6 +1028,7 @@ impl BattleService {
                 self.sink.snapshot_offline_eve_session(&s);
             }
         }
+        self.sink.remove_spectator(player);
         if let Ok(mut members) = self.sink.members.lock() {
             members.remove(&player);
         }
@@ -1026,17 +1048,32 @@ impl BattleService {
         self.next_battle.fetch_add(1, Ordering::SeqCst)
     }
 
-    /// Start an NPC battle.
+    /// Start a Normal NPC battle.
     ///
     /// Returns the new battle id, or 0 if the NPC template is missing.
     pub fn start_npc_battle(&self, session: &mut Session, npc_id: i64, npc_on_map_id: i64, ground: i64) -> i32 {
+        self.start_npc_battle_with_kind(session, npc_id, npc_on_map_id, ground, BattleKind::Normal)
+    }
+
+    /// Start an NPC battle with an explicit lifecycle [`BattleKind`].
+    ///
+    /// Returns the new battle id, or 0 if the NPC template is missing.
+    pub fn start_npc_battle_with_kind(
+        &self,
+        session: &mut Session,
+        npc_id: i64,
+        npc_on_map_id: i64,
+        ground: i64,
+        kind: BattleKind,
+    ) -> i32 {
         let Some(npc) = self.data.npcs.get(&npc_id).cloned() else {
             return 0;
         };
         let id = self.next_battle_id();
         let terrain = if ground > 0 { ground as i32 } else { 112 };
         let battle =
-            Battle::npc_battle(id, session, i64::from(session.id), &npc, npc_on_map_id, terrain);
+            Battle::npc_battle(id, session, i64::from(session.id), &npc, npc_on_map_id, terrain)
+                .with_kind(kind);
         let (extra_players, extra_pets) = self.party_snapshots(session);
         self.spawn_battle(
             battle,
@@ -1091,7 +1128,7 @@ impl BattleService {
         };
         let id = self.next_battle_id();
         let terrain = if ground > 0 { ground as i32 } else { 112 };
-        let mut battle = Battle::new(id, terrain);
+        let mut battle = Battle::new(id, terrain).with_kind(BattleKind::Pk);
         battle.add_player(session, i64::from(session.id), 3, 2);
         battle.load_leader_pets(session, i64::from(session.id), 3);
         let opp_guard = match opp.try_read() {
@@ -1581,25 +1618,63 @@ impl BattleService {
         (id, leader_packets)
     }
 
-    /// Register a player in an existing battle (op 0x0B sub 4 join).
+    fn sync_online_session(&self, player: i64, update: impl FnOnce(&mut Session)) {
+        if let Some(online) =
+            try_read_online_with_retry(&self.online, 10, std::time::Duration::from_millis(2))
+        {
+            if let Some(p) = online.get(&player) {
+                if let Some(mut s) =
+                    try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2))
+                {
+                    update(&mut s);
+                }
+            }
+        }
+    }
+
+    /// Register a player in an existing battle as a ListQS spectator (op 0x0B sub 2 kind 4).
     pub fn join_battle(&self, session: &mut Session, battle_id: i32) -> bool {
         if session.battle_id != 0 || !self.battle_exists(battle_id) || self.is_north_star_battle(battle_id) {
             return false;
         }
+        let pid = i64::from(session.id);
         session.battle_id = battle_id;
+        if let Ok(mut spectators) = self.sink.spectators.lock() {
+            spectators.insert(pid, battle_id);
+        }
         if let Ok(mut members) = self.sink.members.lock() {
-            members.insert(i64::from(session.id));
+            members.insert(pid);
         }
         if let Ok(mut participants) = self.sink.battle_participants.lock() {
             participants
                 .entry(battle_id)
                 .or_default()
-                .push(i64::from(session.id));
+                .push(pid);
         }
+        self.sync_online_session(pid, |s| s.battle_id = battle_id);
+        crate::server::session::registry_update_if_online(session);
         let join = self.build_join_frame(session, battle_id);
-        self.sink.send_to(i64::from(session.id), join);
+        self.sink.send_to(pid, join);
+        self.sink.send_to(pid, packets::battle_trailer());
+        true
+    }
+
+    /// Whether `player` is currently registered as a ListQS spectator.
+    pub fn is_spectator(&self, player: i64) -> bool {
         self.sink
-            .send_to(i64::from(session.id), packets::battle_trailer());
+            .spectators
+            .lock()
+            .map(|s| s.contains_key(&player))
+            .unwrap_or(false)
+    }
+
+    /// Leave a battle ONLY if the player is a ListQS spectator (`0x0B 01 03`).
+    /// Combatants are rejected and return `false`.
+    pub fn leave_spectate(&self, session: &mut Session) -> bool {
+        if session.battle_id == 0 || !self.is_spectator(i64::from(session.id)) {
+            return false;
+        }
+        self.leave_battle(session);
         true
     }
 
@@ -1626,7 +1701,8 @@ impl BattleService {
             (112, empty)
         });
         let mut text = format!(
-            "0402{}{}{}{}{}{}{:02X}{:02X}",
+            "{:02X}02{}{}{}{}{}{}{:02X}{:02X}",
+            packets::BATTLE_ROLE_SPECTATOR,
             encoder::le32(session.id),
             "000000000000FFFF",
             encoder::le16(session.hp_max),
@@ -1640,9 +1716,10 @@ impl BattleService {
         crate::protocol::frame(&format!("0BFA{}", encoder::le16(diahinh as u16)), &text)
     }
 
-    /// Leave the current battle (op 0x0B sub 1 or sub 5).
+    /// Leave the current battle (internal teardown: disconnect, character delete, spectate leave).
     pub fn leave_battle(&self, session: &mut Session) {
         self.sink.snapshot_offline_eve_session(session);
+        self.sink.remove_spectator(i64::from(session.id));
         let now_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis() as u64)
@@ -1653,15 +1730,11 @@ impl BattleService {
         if let Ok(mut members) = self.sink.members.lock() {
             members.remove(&i64::from(session.id));
         }
-        if let Some(online) = try_read_online_with_retry(&self.online, 10, std::time::Duration::from_millis(2)) {
-            if let Some(p) = online.get(&i64::from(session.id)) {
-                if let Some(mut s) = try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2)) {
-                    s.battle_id = 0;
-                    s.last_battle_end_ms = now_ms;
-                    s.encounter_steps = 0;
-                }
-            }
-        }
+        self.sync_online_session(i64::from(session.id), |s| {
+            s.battle_id = 0;
+            s.last_battle_end_ms = now_ms;
+            s.encounter_steps = 0;
+        });
         crate::server::session::registry_update_if_online(session);
     }
 

@@ -26,6 +26,7 @@ use crate::battle::runner::{BattleAction, BattleCommand};
 use crate::battle::service::SubmitCommandResult;
 
 const TURN_LOCKED_NOTICE: &str = "Đang trong trạng thái khống chế, không thể hành động lượt này!";
+const LEAVE_BATTLE_CONFIRM: u8 = 3;
 use crate::battle::service::BattleService;
 use crate::protocol::encoder;
 use crate::server::dispatcher::{HandleOutcome, OpcodeCtx};
@@ -163,7 +164,8 @@ fn log_map_action(sub: u8, payload: &[u8]) {
     );
 }
 
-/// Sub 1 — leave battle (`data[6] == 3`).
+/// Sub 1 — leave battle (`0B 01 03`), restricted exclusively to ListQS spectators.
+/// Active combatants must exit through the turn-based Flee command (`0x32 01 18001`).
 fn handle_leave_battle(
     conn: &mut Conn,
     payload: &[u8],
@@ -171,7 +173,7 @@ fn handle_leave_battle(
     out: &mut HandleOutcome,
 ) {
     let confirm = payload.first().copied().unwrap_or(0);
-    if confirm != 3 {
+    if confirm != LEAVE_BATTLE_CONFIRM {
         // Contract from `00590ba8:160`: the leave-battle button sends `03`.
         // Any other value is logged and ignored — never treated as a leave.
         tracing::debug!(
@@ -184,7 +186,14 @@ fn handle_leave_battle(
     if conn.session.battle_id == 0 {
         return;
     }
-    service.leave_battle(&mut conn.session);
+    if !service.leave_spectate(&mut conn.session) {
+        tracing::debug!(
+            player_id = conn.session.id,
+            battle_id = conn.session.battle_id,
+            "0x0B sub 1 confirm=3 rejected: combatant cannot bypass turn-based Flee"
+        );
+        return;
+    }
     let smoke_clear = crate::battle::packets::hide_from_map(conn.session.id);
     service.send_map(i64::from(conn.session.id), smoke_clear.clone());
     out.send(smoke_clear);
@@ -256,8 +265,10 @@ fn handle_pk_challenge(
     }
 }
 
-/// Sub 2 sub 3 — attack NPC. Gates: not in battle; blocked for quest-flag/doll
-/// NPC ranges; else start an NPC battle (DiaHinh from data[7..9] / payload[5..7], default 112).
+/// Sub 2 sub 3 — PK attack NPC (`FUN_00642720`). Gates: not in battle; blocked
+/// for quest-flag/doll NPC ranges; decodes trailing u16 as `npc_on_map_id`
+/// (`1..=100`), sets default DiaHinh `112`, and starts `BattleKind::Pk`
+/// regardless of the player's Option PK switch.
 fn handle_attack_npc(conn: &mut Conn, payload: &[u8], service: &BattleService) {
     if conn.session.battle_id != 0 || payload.len() < 5 {
         return;
@@ -269,12 +280,19 @@ fn handle_attack_npc(conn: &mut Conn, payload: &[u8], service: &BattleService) {
     {
         return;
     }
-    let ground = if payload.len() >= 7 {
-        encoder::u16_le(payload[5], payload[6]) as i64
+    let npc_on_map_id = if payload.len() >= 7 {
+        i64::from(encoder::u16_le(payload[5], payload[6]))
     } else {
-        112
+        0
     };
-    service.start_npc_battle(&mut conn.session, i64::from(npc_id), 0, ground);
+    let ground = i64::from(crate::battle::construction::trigger_diahinh::PK_AND_NPC);
+    service.start_npc_battle_with_kind(
+        &mut conn.session,
+        i64::from(npc_id),
+        npc_on_map_id,
+        ground,
+        crate::battle::construction::BattleKind::Pk,
+    );
 }
 
 /// Dispatch Opcode 0x32 — the battle-command channel (Ticket 19 / ADR 0006).

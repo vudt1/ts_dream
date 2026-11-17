@@ -20,6 +20,27 @@ fn equipped_weapon_id(session: &Session, slot: u8) -> u16 {
         .unwrap_or(0)
 }
 
+/// Lifecycle classification of a battle instance, independent of Eve `fight_type`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum BattleKind {
+    /// Standard PvE battle (random encounters, Eve scripts, Active-NPC, TeamDef,
+    /// 40-NPC, North Star quiz). Grants Drop, Gold, Player/Pet EXP, and deducts `Stat::God`.
+    #[default]
+    Normal,
+    /// PK battle (PvP or player-initiated map-NPC PK via `0x0B 02 03`).
+    /// Shares combat, status, combo, capture, and respawn mechanics, but suppresses
+    /// Drop, Gold, Player/Pet EXP, and `Stat::God` deduction.
+    Pk,
+}
+
+impl BattleKind {
+    /// Returns `true` when post-hit/post-battle rewards and `Stat::God` deduction apply.
+    #[inline]
+    pub const fn allows_rewards(self) -> bool {
+        matches!(self, Self::Normal)
+    }
+}
+
 /// One battle-start packet, tagged with its recipient routing.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StartPacket {
@@ -63,6 +84,8 @@ pub struct Battle {
     pub is_40_npc: bool,
     /// `EveFightData::fight_type` for scripted Eve encounters (`0` otherwise).
     pub fight_type: u8,
+    /// Lifecycle classification (`Normal` vs `Pk`), independent of `fight_type`.
+    pub kind: BattleKind,
 }
 
 impl Battle {
@@ -85,6 +108,7 @@ impl Battle {
             challenger_id: 0,
             is_40_npc: false,
             fight_type: 0,
+            kind: BattleKind::Normal,
         };
 
         // Create 20 cells (row 0..3, col 0..4)
@@ -119,6 +143,12 @@ impl Battle {
     /// Set an opening NPC dialogue ID builder-style.
     pub fn with_opening_dialog(mut self, dialog_id: u16) -> Self {
         self.opening_dialog = Some(dialog_id);
+        self
+    }
+
+    /// Set the battle lifecycle kind builder-style.
+    pub fn with_kind(mut self, kind: BattleKind) -> Self {
+        self.kind = kind;
         self
     }
 
@@ -587,8 +617,8 @@ impl Battle {
     ///
     /// Packet order: show leader → show other members → the `0BFA`
     /// frame → map broadcast of self → own pet entity → enemy entities.
-    /// Markers inside the frame: `04`+self, `03`+leader(+leader pet),
-    /// `64`+each other member(+their pet).
+    /// Markers inside the frame: `05`+self (member role, ADR 0006 §2.6),
+    /// `03`+leader(+leader pet), `64`+each other member(+their pet).
     pub fn member_battle_frame(&self, diahinh: i32, member_id: i64) -> Vec<StartPacket> {
         let mut out: Vec<StartPacket> = Vec::new();
         let Some(cell) = self.list_war.values().find(|c| c.id == member_id) else {
@@ -611,13 +641,11 @@ impl Battle {
         }
 
         let mut text = String::new();
-        // Self record marker `04`, not `05`: the client writes the record's
-        // `kind` byte straight into `player+0x376` (`006438ac:262`); only
-        // `0x376 == 4` unlocks the "leave battle" button (`00590ba8:159`) and
-        // the `0x376 = 0` reset inside `0B 00` (`00641fa4:69-76`). A `05` here
-        // traps the member in the battle. Non-self markers below stay
-        // `03`/`64` (entity type, never read into `+0x376`).
-        text.push_str("04");
+        // Self record marker `05` (member role, ADR 0006 §2.6): combatants must
+        // receive `03` (leader) or `05` (member) so the UI Run button routes
+        // through `0x32 01 18001` rather than `0x0B 01 03` (`00590ba8:159`);
+        // `04` is reserved for ListQS spectators. Non-self markers stay `03`/`64`.
+        text.push_str(&format!("{:02X}", packets::BATTLE_ROLE_MEMBER));
         text.push_str(&self_packet);
 
         // Leader block: (row,2) then (row^1,2)

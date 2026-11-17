@@ -1,9 +1,9 @@
-//! Ticket 13 — `battle_open_leader` computes its wire length from the payload
-//! instead of hardcoding `F4441C`, and the byte output stays identical.
+//! Ticket 13 & Ticket 26 — `battle_open_leader` computes its wire length from the
+//! payload instead of hardcoding `F4441C`, and emits self marker `0x03` (ADR 0006 §2.6).
 //!
 //! `0B FA` layout (`01_battle_start_scene.md §2.1`): after the `F444` magic +
-//! LE16 length, the payload is `0BFA` + `le16(diahinh)` + `04` (leader `kind`
-//! marker, ticket 15) + the 23-byte `_Packet` snapshot, then the `0B 0A 01`
+//! LE16 length, the payload is `0BFA` + `le16(diahinh)` + `03` (leader `kind`
+//! marker, ticket 26) + the 23-byte `_Packet` snapshot, then the `0B 0A 01`
 //! trailer.
 
 use ts_dream::battle::packets;
@@ -18,15 +18,15 @@ fn battle_open_leader_is_byte_identical_to_hardcoded_form() {
     let frame = packets::battle_open_leader(diahinh, LEADER_PACKET);
 
     // Old hardcoded form (length literal `1C`, i.e. 28 bytes); the self record
-    // marker is `04` (ticket 15).
+    // marker is `03` (leader role, Ticket 26 / ADR 0006 §2.6).
     let expected = format!(
-        "F4441C000BFA{}04{}F44403000B0A01",
+        "F4441C000BFA{}03{}F44403000B0A01",
         le16(diahinh),
         LEADER_PACKET
     );
     assert_eq!(frame, expected);
 
-    // Sanity: payload = 0BFA(2) + diahinh(2) + 04(1) + record(23) = 28 bytes.
+    // Sanity: payload = 0BFA(2) + diahinh(2) + 03(1) + record(23) = 28 bytes.
     assert_eq!(&frame[4..8], "1C00");
 }
 
@@ -35,7 +35,7 @@ fn battle_open_leader_length_tracks_payload() {
     let diahinh: u16 = 1;
     let frame = packets::battle_open_leader(diahinh, LEADER_PACKET);
 
-    let payload = format!("0BFA{}04{}", le16(diahinh), LEADER_PACKET);
+    let payload = format!("0BFA{}03{}", le16(diahinh), LEADER_PACKET);
     let declared = u16::from_le_bytes([
         u8::from_str_radix(&frame[4..6], 16).unwrap(),
         u8::from_str_radix(&frame[6..8], 16).unwrap(),

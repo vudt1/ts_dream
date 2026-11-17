@@ -5,21 +5,30 @@
 
 use crate::protocol::encoder;
 
-/// Battle board open: `F444` + LE16(payload len) + `0BFA` + LE16(diahinh) + `04`
+/// Self record role markers in `0B FA` (`player+0x376`, ADR 0006 §2.6).
+pub const BATTLE_ROLE_LEADER: u8 = 0x03;
+pub const BATTLE_ROLE_SPECTATOR: u8 = 0x04;
+pub const BATTLE_ROLE_MEMBER: u8 = 0x05;
+
+/// Battle board open: `F444` + LE16(payload len) + `0BFA` + LE16(diahinh) + `03`
 /// + `_Packet` + trailer.
 ///
-/// The self record marker is `04`, **not** `03`/`05`: the client writes the
-/// record's `kind` byte straight into `player+0x376` (`006438ac:262`) and only
-/// `0x376 == 4` unlocks the "leave battle" button (`00590ba8:159`) and the
-/// `0x376 = 0` reset inside `0B 00` (`00641fa4:69-76`). Sending `03`/`05` traps
-/// the client in the battle — do not change back.
+/// The self record marker is `03` (party leader / solo combatant, ADR 0006 §2.6):
+/// the client writes the record's `kind` byte into `player+0x376` (`006438ac:262`),
+/// so combatants receive `03` (leader) or `05` (member) to route the UI Run button
+/// through `0x32 01 18001` instead of direct `0x0B 01 03` (`00590ba8:159`), while
+/// `04` is reserved exclusively for ListQS spectators.
 ///
 /// The frame length is computed from the payload (as [`battle_open_text`] and
 /// [`battle_open_pk_member`] already do) instead of the former hardcoded `1C`.
-/// With the current 23-byte leader snapshot the payload is 28 bytes (`0x1C`),
-/// so the emitted bytes are unchanged.
+/// With the current 23-byte leader snapshot the payload is 28 bytes (`0x1C`).
 pub fn battle_open_leader(diahinh: u16, leader_packet: &str) -> String {
-    let payload = format!("0BFA{}04{}", encoder::le16(diahinh), leader_packet);
+    let payload = format!(
+        "0BFA{}{:02X}{}",
+        encoder::le16(diahinh),
+        BATTLE_ROLE_LEADER,
+        leader_packet
+    );
     let payload_len = payload.len() / 2;
     format!(
         "F444{}{}F44403000B0A01",

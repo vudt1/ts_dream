@@ -2,6 +2,8 @@
 
 mod common;
 
+#[path = "battle/battle_kind_and_roles.rs"]
+mod battle_kind_and_roles;
 #[path = "battle/buff_debuff_lifecycle.rs"]
 mod buff_debuff_lifecycle;
 #[path = "battle/catch_verification.rs"]

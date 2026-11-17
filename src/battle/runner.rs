@@ -2961,6 +2961,9 @@ impl Battle {
     }
 
     fn note_npc_hit(&self, ts: &mut TurnState, attacker: &mut WarInfo, npc: &WarInfo) {
+        if !self.kind.allows_rewards() {
+            return;
+        }
         if npc.typ == 7 || npc.typ == 3 {
             let entry = format!("{}.{}/{}", npc.row, npc.col, npc.lv);
             if !ts.killed_npcs.contains(&entry) {
@@ -2985,6 +2988,11 @@ impl Battle {
         attacker: &mut WarInfo,
         out: &mut Vec<Out>,
     ) {
+        if !self.kind.allows_rewards() {
+            ts.killed_npcs.clear();
+            ts.combo_cells.clear();
+            return;
+        }
         let kills = std::mem::take(&mut ts.killed_npcs);
         for entry in &kills {
             let (npc_row, npc_col, npc_lv) = parse_cell_entry(entry);
@@ -3167,7 +3175,7 @@ impl Battle {
 
             // Player exp.
             let exp_raw = per_exp * cell.exp;
-            if !fled && cell.hp > 0 && cell.lv < 200 && exp_raw > 0 {
+            if self.kind.allows_rewards() && !fled && cell.hp > 0 && cell.lv < 200 && exp_raw > 0 {
                 let mut exp = exp_raw;
                 if cell.reborn == 2 {
                     exp = damage::banker_round(exp as f64 / 2.0) as i64;
@@ -3198,7 +3206,7 @@ impl Battle {
             }
 
             // Decrement God of Fortune buff on victory
-            if won && !fled && cell.hp > 0 && snap.god > 0 {
+            if self.kind.allows_rewards() && won && !fled && cell.hp > 0 && snap.god > 0 {
                 let new_god = snap.god.saturating_sub(1);
                 out.push(Out::Db(DbUpdate {
                     target: DbTarget::Player(player),
@@ -3219,7 +3227,7 @@ impl Battle {
             // Active-pet exp: every pet cell of our side owned by this player.
             // Ownership (`id_char`) routes the grant to the pet's owner, so a
             // pet is awarded exactly once even with several player rows.
-            if !fled {
+            if self.kind.allows_rewards() && !fled {
                 let pets: Vec<WarInfo> = self
                     .keys
                     .iter()

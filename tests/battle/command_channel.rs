@@ -194,31 +194,62 @@ async fn sub5_is_not_a_flee_branch() {
     assert!(out.outgoing.is_empty());
 }
 
-/// Sub 1 with confirm == 3 leaves the battle; any other confirm is ignored.
+/// Sub 1 (`0x0B 01 03`) allows only ListQS spectators to leave directly;
+/// active combatants are rejected and any confirm != 3 is ignored.
 #[tokio::test]
-async fn sub1_confirm_three_leaves_and_other_values_are_ignored() {
+async fn sub1_confirm_three_leaves_only_for_spectator_and_rejects_combatant() {
     let (data, service) = npc_battle_setup();
 
-    // confirm == 3 → leave battle.
-    let mut conn = Conn::default();
-    conn.session.id = 30;
-    conn.session.battle_id = 55;
-    let mut out = HandleOutcome::default();
-    let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 0x0B, 1, &[3]);
-    battle::handle_battle(&mut ctx);
-    assert_eq!(conn.session.battle_id, 0, "confirm 3 must leave the battle");
-    assert!(out.outgoing.iter().any(|f| f.frame.contains("0504")));
-    assert!(out.outgoing.iter().any(|f| f.frame.contains("1408")));
+    // Start a real battle so a combatant is actively fighting.
+    let mut leader_conn = Conn::default();
+    leader_conn.session.id = 30;
+    let bid = service.start_npc_battle(&mut leader_conn.session, 1001, 0, 112);
+    assert_ne!(bid, 0);
 
-    // confirm != 3 → unchanged, no frames.
-    let mut conn2 = Conn::default();
-    conn2.session.id = 31;
-    conn2.session.battle_id = 55;
+    // Combatant sending 0x0B 01 03 must be rejected (must use 0x32 Flee).
+    let mut combatant_out = HandleOutcome::default();
+    let mut combatant_ctx = test_ctx(
+        &mut leader_conn,
+        &data,
+        &service,
+        &mut combatant_out,
+        0x0B,
+        1,
+        &[3],
+    );
+    battle::handle_battle(&mut combatant_ctx);
+    assert_eq!(
+        leader_conn.session.battle_id, bid,
+        "combatant must not leave directly via 0x0B 01 03"
+    );
+    assert!(
+        combatant_out.outgoing.is_empty(),
+        "rejected 0x0B 01 03 must emit no exit frames"
+    );
+
+    // ListQS spectator joins the battle via 0x0B 02 04.
+    let mut spec_conn = Conn::default();
+    spec_conn.session.id = 31;
+    let mut join_out = HandleOutcome::default();
+    let join_payload = action_body(4, bid as u32, 0);
+    let mut join_ctx = test_ctx(
+        &mut spec_conn,
+        &data,
+        &service,
+        &mut join_out,
+        0x0B,
+        2,
+        &join_payload,
+    );
+    battle::handle_battle(&mut join_ctx);
+    assert_eq!(spec_conn.session.battle_id, bid);
+
+    // confirm != 3 on spectator → unchanged, no frames.
     let mut out2 = HandleOutcome::default();
     for confirm in [0u8, 1, 2, 4] {
         let frame = [confirm];
         let mut ctx2 = test_ctx(
-            &mut conn2,
+            &mut spec_conn,
             &data,
             &service,
             &mut out2,
@@ -228,8 +259,28 @@ async fn sub1_confirm_three_leaves_and_other_values_are_ignored() {
         );
         battle::handle_battle(&mut ctx2);
     }
-    assert_eq!(conn2.session.battle_id, 55);
+    assert_eq!(spec_conn.session.battle_id, bid);
     assert!(out2.outgoing.is_empty());
+
+    // confirm == 3 on ListQS spectator → leaves battle cleanly.
+    let mut spec_out = HandleOutcome::default();
+    let mut spec_ctx = test_ctx(
+        &mut spec_conn,
+        &data,
+        &service,
+        &mut spec_out,
+        0x0B,
+        1,
+        &[3],
+    );
+    battle::handle_battle(&mut spec_ctx);
+    assert_eq!(
+        spec_conn.session.battle_id, 0,
+        "ListQS spectator confirm 3 must leave the battle"
+    );
+    assert!(spec_out.outgoing.iter().any(|f| f.frame.contains("0B00")));
+    assert!(spec_out.outgoing.iter().any(|f| f.frame.contains("0504")));
+    assert!(spec_out.outgoing.iter().any(|f| f.frame.contains("1408")));
 }
 
 /// Opcode 0x32 is dispatched as the C->S battle-command channel (Ticket 19 / ADR 0006).
