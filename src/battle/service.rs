@@ -16,7 +16,6 @@
 //!   a quest talk is pending and the players won, then cleans up.
 
 use crate::battle::construction::{Battle, BattleKind, StartPacket};
-use crate::battle::engine::get_hp_max;
 use crate::battle::manager::{BattleHandle, BattleManager, BattleSink};
 use crate::battle::npc_world::NpcWorld;
 use crate::battle::npc_world::{WorldPlayer, WorldSink};
@@ -223,35 +222,59 @@ impl BattleSink for BattleSinkImpl {
                 doben: 100,
                 ..Default::default()
             };
-            // The dropped item must actually reach the client bag: build the
-            // single shared `17 06` add-item frame and send it to the owner.
-            let frame = crate::server::inventory::item_added_frame(&item);
+            let is_bag_full = |homdo: &[crate::server::session::InventoryItem]| {
+                homdo.iter().filter(|i| (1..=25).contains(&i.slot) && i.id > 0).count() >= 25
+            };
+
+            let mut affected = Vec::new();
+            let mut bag_was_full = false;
             if let Some(online) = try_read_online_with_retry(&self.online, 10, std::time::Duration::from_millis(2)) {
                 if let Some(p) = online.get(&owner) {
                     if let Some(mut s) = try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2)) {
-                        s.add_homdo_item(item.clone());
+                        if is_bag_full(&s.homdo) {
+                            bag_was_full = true;
+                        } else {
+                            affected = s.add_homdo_item(item.clone());
+                        }
                     }
                 }
             }
             let mut map = crate::server::session::lock_online_sessions();
             if let Some(s) = map.get_mut(&(owner as u32)) {
-                s.add_homdo_item(item);
+                if is_bag_full(&s.homdo) {
+                    bag_was_full = true;
+                } else {
+                    let aff = s.add_homdo_item(item.clone());
+                    if affected.is_empty() {
+                        affected = aff;
+                    }
+                }
             }
-            self.send_to(owner, frame);
+
+            if bag_was_full || affected.is_empty() {
+                self.send_to(
+                    owner,
+                    crate::server::spawn::sys_msg_frame("Hành trang đã đầy, không thể nhận vật phẩm."),
+                );
+            } else {
+                let frame = crate::server::inventory::item_added_frame(&item);
+                self.send_to(owner, frame);
+            }
         }
     }
 
     fn apply_catch(&self, owner: i64, npc_id: i64) {
+        let npc = self.data.npcs.get(&npc_id);
         if let Some(online) = try_read_online_with_retry(&self.online, 10, std::time::Duration::from_millis(2)) {
             if let Some(p) = online.get(&owner) {
                 if let Some(mut s) = try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2)) {
-                    add_pet_to_session(&mut s, npc_id as u16);
+                    add_pet_to_session(&mut s, npc_id as u16, npc);
                 }
             }
         }
         let mut map = crate::server::session::lock_online_sessions();
         if let Some(s) = map.get_mut(&(owner as u32)) {
-            add_pet_to_session(s, npc_id as u16);
+            add_pet_to_session(s, npc_id as u16, npc);
         }
     }
 
@@ -872,9 +895,8 @@ fn clamp_u16(v: i64) -> u16 {
     v.clamp(0, 0xFFFF) as u16
 }
 
-fn add_pet_to_session(s: &mut Session, npc_id: u16) {
-    let hp_max = get_hp_max(0, 0, 1, 0) as u16;
-    crate::server::pet_box::add_caught(&mut s.pets, npc_id, hp_max);
+fn add_pet_to_session(s: &mut Session, npc_id: u16, npc: Option<&crate::data::tables::Npc>) {
+    crate::server::pet_box::add_caught(&mut s.pets, npc, npc_id);
 }
 
 /// The server-side battle service.

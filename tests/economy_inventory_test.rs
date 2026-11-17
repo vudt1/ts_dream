@@ -18,5 +18,9 @@ mod pet_equip_unequip;
 mod pet_hotkey_flow;
 #[path = "economy_inventory/pet_recall_13_02.rs"]
 mod pet_recall_13_02;
+#[path = "economy_inventory/pet_trade_active_recall.rs"]
+mod pet_trade_active_recall;
+#[path = "economy_inventory/summon_item_sync.rs"]
+mod summon_item_sync;
 #[path = "economy_inventory/pet_stat_frame.rs"]
 mod pet_stat_frame;

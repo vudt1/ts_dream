@@ -199,3 +199,194 @@ async fn killed_npc_drop_reaches_owner_as_17_06() {
     );
     assert_eq!(u16::from_le_bytes([content[4], content[5]]), 1);
 }
+
+/// When player's bag has all 25 slots filled with non-stackable items,
+/// the dropped item is rejected: no 17 06 is sent, and a red system alert is delivered.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn killed_npc_drop_blocked_when_bag_full_receives_sys_msg() {
+    let mut service = BattleService::new(Arc::new(data_with_drop_npc()));
+    service.set_input_timeout(std::time::Duration::from_millis(40));
+
+    let mut homdo = Vec::new();
+    for slot in 1..=25 {
+        homdo.push(InventoryItem {
+            slot,
+            id: 9000 + slot as u16, // Different IDs so cannot stack
+            count: 1,
+            ..Default::default()
+        });
+    }
+
+    let sess = Arc::new(RwLock::new(Session {
+        id: 9004,
+        map_id: 1,
+        id_leader: 9004,
+        level: 50,
+        agi: 1000,
+        hp: 5000,
+        hp_max: 5000,
+        sp: 500,
+        sp_max: 500,
+        homdo,
+        ..Default::default()
+    }));
+    let mut rx = service.register(9004, sess.clone());
+    lock_online_sessions().insert(9004, sess.read().await.clone());
+
+    {
+        let mut guard = sess.write().await;
+        let bid = service.start_npc_battle_seeded(&mut guard, 1001, 0, 4, 1, 1);
+        assert_ne!(bid, 0, "seeded NPC battle must start");
+    }
+
+    let cmd = BattleCommand {
+        row: 3,
+        col: 2,
+        target_row: 0,
+        target_col: 2,
+        action: BattleAction::NormalAttack,
+    };
+    let snapshot = sess.read().await.clone();
+    assert!(service.submit_command(&snapshot, cmd));
+
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_millis(1500);
+    loop {
+        if sess.read().await.battle_id == 0 {
+            break;
+        }
+        assert!(
+            tokio::time::Instant::now() <= deadline,
+            "battle did not finish in time"
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+    }
+
+    let mut frames = Vec::new();
+    while let Ok(frame) = rx.try_recv() {
+        frames.push(frame);
+    }
+    lock_online_sessions().remove(&9004);
+
+    let has_1706 = frames.iter().any(|f| f.starts_with("F4440E001706"));
+    assert!(!has_1706, "owner must NOT receive 17 06 when bag is full; got frames: {:?}", frames);
+
+    let has_sys_msg = frames.iter().any(|f| {
+        let expected = ts_dream::server::spawn::sys_msg_frame("Hành trang đã đầy, không thể nhận vật phẩm.");
+        f == &expected
+    });
+    assert!(has_sys_msg, "owner must receive full-bag system alert; frames: {:?}", frames);
+
+    // Verify bag is still exactly 25 items
+    let final_sess = sess.read().await;
+    assert_eq!(final_sess.homdo.len(), 25);
+    assert!(final_sess.homdo.iter().all(|i| i.id != 5001), "dropped item 5001 was not added");
+}
+
+/// Boundary transition test:
+/// Starting with 24 items in homdo:
+/// - 1st battle drop fills slot 25 successfully (17 06 received).
+/// - 2nd battle drop is blocked because bag is now 25/25 (sys alert received, no 17 06).
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn killed_npc_drop_at_boundary_24_to_25_accepted_then_subsequent_blocked() {
+    let mut service = BattleService::new(Arc::new(data_with_drop_npc()));
+    service.set_input_timeout(std::time::Duration::from_millis(40));
+
+    let mut homdo = Vec::new();
+    for slot in 1..=24 {
+        homdo.push(InventoryItem {
+            slot,
+            id: 8000 + slot as u16,
+            count: 1,
+            ..Default::default()
+        });
+    }
+
+    let sess = Arc::new(RwLock::new(Session {
+        id: 9005,
+        map_id: 1,
+        id_leader: 9005,
+        level: 50,
+        agi: 1000,
+        hp: 5000,
+        hp_max: 5000,
+        sp: 500,
+        sp_max: 500,
+        homdo,
+        ..Default::default()
+    }));
+    let mut rx = service.register(9005, sess.clone());
+    lock_online_sessions().insert(9005, sess.read().await.clone());
+
+    // Battle 1: 24 items -> 1st drop fills slot 25
+    {
+        let mut guard = sess.write().await;
+        let bid = service.start_npc_battle_seeded(&mut guard, 1001, 0, 4, 1, 1);
+        assert_ne!(bid, 0);
+    }
+    let cmd = BattleCommand {
+        row: 3,
+        col: 2,
+        target_row: 0,
+        target_col: 2,
+        action: BattleAction::NormalAttack,
+    };
+    let snapshot = sess.read().await.clone();
+    assert!(service.submit_command(&snapshot, cmd));
+
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_millis(1500);
+    loop {
+        if sess.read().await.battle_id == 0 {
+            break;
+        }
+        assert!(tokio::time::Instant::now() <= deadline);
+        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+    }
+
+    let mut frames_1 = Vec::new();
+    while let Ok(frame) = rx.try_recv() {
+        frames_1.push(frame);
+    }
+    let has_1706_first = frames_1.iter().any(|f| f.starts_with("F4440E001706"));
+    assert!(has_1706_first, "1st drop should fill slot 25; got: {:?}", frames_1);
+    assert_eq!(sess.read().await.homdo.len(), 25, "homdo must have 25 items now");
+
+    // Battle 2: 25 items -> 2nd drop must be blocked
+    {
+        let mut guard = sess.write().await;
+        let bid = service.start_npc_battle_seeded(&mut guard, 1001, 0, 4, 1, 1);
+        assert_ne!(bid, 0);
+    }
+    let cmd = BattleCommand {
+        row: 3,
+        col: 2,
+        target_row: 0,
+        target_col: 2,
+        action: BattleAction::NormalAttack,
+    };
+    let snapshot = sess.read().await.clone();
+    assert!(service.submit_command(&snapshot, cmd));
+
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_millis(1500);
+    loop {
+        if sess.read().await.battle_id == 0 {
+            break;
+        }
+        assert!(tokio::time::Instant::now() <= deadline);
+        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+    }
+
+    let mut frames_2 = Vec::new();
+    while let Ok(frame) = rx.try_recv() {
+        frames_2.push(frame);
+    }
+    lock_online_sessions().remove(&9005);
+
+    let has_1706_second = frames_2.iter().any(|f| f.starts_with("F4440E001706"));
+    assert!(!has_1706_second, "2nd drop must NOT be received when bag is full; frames: {:?}", frames_2);
+    let has_sys_msg_second = frames_2.iter().any(|f| {
+        let expected = ts_dream::server::spawn::sys_msg_frame("Hành trang đã đầy, không thể nhận vật phẩm.");
+        f == &expected
+    });
+    assert!(has_sys_msg_second, "owner must receive full-bag system alert on 2nd drop; frames: {:?}", frames_2);
+    assert_eq!(sess.read().await.homdo.len(), 25);
+}

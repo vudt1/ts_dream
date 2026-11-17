@@ -179,7 +179,7 @@ fn empty_pet_offer_frame(gold: u32) -> String {
 }
 
 
-fn received_pet_frame(pet: &PetState) -> String {
+pub fn received_pet_frame(pet: &PetState) -> String {
     frame(
         "0F07",
         &format!(
@@ -194,11 +194,11 @@ fn received_pet_frame(pet: &PetState) -> String {
     )
 }
 
-fn removed_pet_frame(owner_id: u32, stt: u8) -> String {
+pub fn removed_pet_frame(owner_id: u32, stt: u8) -> String {
     format!("F44407000F02{}{:02X}", encoder::le32(owner_id), stt)
 }
 
-fn pet_presence_frame(owner_id: u32, pet: &PetState) -> String {
+pub fn pet_presence_frame(owner_id: u32, pet: &PetState) -> String {
     format!(
         "F4440C000F01{}{:02X}{}{:02X}",
         encoder::le32(owner_id),
@@ -619,6 +619,10 @@ pub async fn handle_trade(ctx: &mut OpcodeCtx<'_>) {
                 .map(|p| p.id);
             let current_offered_stt = current_before.trade.pets.first().copied();
             let partner_offered_stt = partner_before.trade.pets.first().copied();
+            let current_was_active_traded = current_offered_stt
+                .is_some_and(|stt| stt == current_before.active_pet_stt);
+            let partner_was_active_traded = partner_offered_stt
+                .is_some_and(|stt| stt == partner_before.active_pet_stt);
             match pet_trade_settle(&mut ctx.conn.session, &mut partner) {
                 Ok(())
                     if persist::persist_sessions_transaction(
@@ -644,6 +648,16 @@ pub async fn handle_trade(ctx: &mut OpcodeCtx<'_>) {
                         ctx.out.send(pet_presence_frame(ctx.conn.session.id, pet));
                     }
                     ctx.out.send("F4440300190B04");
+                    if current_was_active_traded {
+                        ctx.out.send(crate::server::handlers::pet_actions::PET_RECALL_FRAME);
+                        persist::update_player(
+                            ctx.env.pool,
+                            ctx.conn.session.id,
+                            "SttPetXuatchien",
+                            0,
+                        )
+                        .await;
+                    }
                     if let Some(hub) = ctx.env.hub {
                         hub.send_to(
                             partner_id,
@@ -660,6 +674,16 @@ pub async fn handle_trade(ctx: &mut OpcodeCtx<'_>) {
                             hub.send_to(partner_id, &received_pet_frame(pet)).await;
                             hub.send_to(partner_id, &pet_presence_frame(partner_id, pet))
                                 .await;
+                        }
+                        if partner_was_active_traded {
+                            hub.send_to(partner_id, crate::server::handlers::pet_actions::PET_RECALL_FRAME).await;
+                            persist::update_player(
+                                ctx.env.pool,
+                                partner_id,
+                                "SttPetXuatchien",
+                                0,
+                            )
+                            .await;
                         }
                         hub.send_to(partner_id, "F4440300190B04").await;
                     }

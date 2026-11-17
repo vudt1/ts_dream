@@ -358,3 +358,48 @@ fn test_catch_target_already_cleared_safely_ignored() {
 
     assert!(!out.iter().any(|o| matches!(o, Out::Catch { .. })));
 }
+
+#[test]
+fn test_add_caught_hydrates_npc_template_stats_at_level_1() {
+    let mut pets = Vec::new();
+    let npc = Npc {
+        id: 10001,
+        name: b"Truong Giac".to_vec(),
+        lv: 120,
+        thuoctinh: 1,
+        hp: 1299,
+        sp: 591,
+        hpx: 30,
+        spx: 44,
+        int1: 70,
+        atk: 30,
+        def: 46,
+        agi: 50,
+        skill: [10006, 10008, 10013, 0],
+        ..Default::default()
+    };
+
+    let stt = ts_dream::server::pet_box::add_caught(&mut pets, Some(&npc), 10001);
+    assert_eq!(stt, Some(1));
+    assert_eq!(pets.len(), 1);
+
+    let pet = &pets[0];
+    assert_eq!(pet.id, 10001);
+    assert_eq!(pet.level, 1, "caught pet must start at level 1 per decision");
+    assert_eq!(pet.thuoctinh, 1);
+    assert_eq!(pet.hp_max, 1299);
+    assert_eq!(pet.hp, 1299);
+    assert_eq!(pet.sp_max, 591);
+    assert_eq!(pet.sp, 591);
+    assert_eq!(pet.int1, 70);
+    assert_eq!(pet.atk, 30);
+    assert_eq!(pet.def, 46);
+    assert_eq!(pet.agi, 50);
+    assert_eq!(pet.hpx, 30);
+    assert_eq!(pet.spx, 44);
+    assert_eq!(pet.fai, 60, "default loyalty must be 60");
+    assert_eq!(pet.skills[0], (10006, 1));
+    assert_eq!(pet.skills[1], (10008, 1));
+    assert_eq!(pet.skills[2], (10013, 1));
+    assert_eq!(pet.skills[3], (0, 0));
+}

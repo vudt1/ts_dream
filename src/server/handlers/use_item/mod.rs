@@ -308,30 +308,41 @@ async fn dispatch(ctx: &mut UseCtx<'_>) {
             ctx.red("Ban da co pet nay roi");
             return;
         }
-        if crate::server::pet_box::next_active_slot(&ctx.conn.session.pets).is_none() {
-            ctx.red("Pet box full");
-            return;
-        }
-        {
-            let stt = (1..=4)
-                .find(|s| !ctx.conn.session.pets.iter().any(|p| p.stt == *s))
-                .unwrap_or(1);
-            ctx.conn
-                .session
-                .pets
-                .push(crate::server::session::PetState {
-                    stt,
-                    id: pet_id,
-                    level: 1,
-                    hp: 100,
-                    hp_max: 100,
-                    sp: 100,
-                    sp_max: 100,
-                    ..Default::default()
-                });
-            ctx.consume().await;
-            return;
-        }
+        let stt = match crate::server::pet_box::next_active_slot(&ctx.conn.session.pets) {
+            Some(s) => s,
+            None => {
+                ctx.red("Pet box full");
+                return;
+            }
+        };
+        let pet_name = ctx
+            .data
+            .npcs
+            .get(&(pet_id as i64))
+            .map(|n| n.name.clone())
+            .unwrap_or_default();
+        let pet = crate::server::session::PetState {
+            stt,
+            id: pet_id,
+            name: pet_name,
+            level: 1,
+            hp: 100,
+            hp_max: 100,
+            sp: 100,
+            sp_max: 100,
+            fai: 60,
+            ..Default::default()
+        };
+        ctx.conn.session.pets.push(pet.clone());
+        crate::db::persist::upsert_pet(ctx.pool, ctx.conn.session.id, &pet).await;
+        ctx.out.send(crate::server::handlers::trade_storage::received_pet_frame(&pet));
+        ctx.out.send(crate::server::handlers::trade_storage::pet_presence_frame(
+            ctx.conn.session.id,
+            &pet,
+        ));
+        ctx.consume().await;
+        crate::server::session::registry_update_if_online(&ctx.conn.session);
+        return;
     }
 
     // --- 3. Leader-only sleep item (46167). ---

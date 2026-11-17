@@ -97,7 +97,7 @@ pub(crate) fn pet_at(s: &Session, stt: u8) -> Option<PetState> {
 
 /// Pet-trade settlement with duplicate-pet rejection (`Err("duplicate")`),
 /// capacity guards (`Err("full")`) and the same gold-cap rules as items.
-pub(crate) fn pet_trade_settle(a: &mut Session, b: &mut Session) -> Result<(), &'static str> {
+pub fn pet_trade_settle(a: &mut Session, b: &mut Session) -> Result<(), &'static str> {
     if a.trade.gold > a.gold || b.trade.gold > b.gold {
         return Err("gold");
     }
@@ -118,6 +118,9 @@ pub(crate) fn pet_trade_settle(a: &mut Session, b: &mut Session) -> Result<(), &
         return Err("full");
     }
     if let Some(p) = ap {
+        if a.active_pet_stt == a_stt {
+            a.active_pet_stt = 0;
+        }
         a.pets.retain(|x| x.stt != a_stt);
         let mut p = p;
         p.stt = crate::server::pet_box::next_active_slot(&b.pets)
@@ -126,6 +129,9 @@ pub(crate) fn pet_trade_settle(a: &mut Session, b: &mut Session) -> Result<(), &
         b.pets.push(p);
     }
     if let Some(p) = bp {
+        if b.active_pet_stt == b_stt {
+            b.active_pet_stt = 0;
+        }
         b.pets.retain(|x| x.stt != b_stt);
         let mut p = p;
         p.stt = crate::server::pet_box::next_active_slot(&a.pets)

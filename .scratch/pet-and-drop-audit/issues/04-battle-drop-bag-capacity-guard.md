@@ -5,15 +5,15 @@ Khi một NPC bị tiêu diệt và rơi vật phẩm trong trận đấu (Battl
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] Trong `BattleService::apply_drop` ([src/battle/service.rs](file:///D:/VUDT/GIT_PCC/ts_dream/src/battle/service.rs)), bổ sung bước kiểm tra sức chứa hòm đồ của người nhận (`owner`):
+- [x] Trong `BattleService::apply_drop` ([src/battle/service.rs](file:///D:/VUDT/GIT_PCC/ts_dream/src/battle/service.rs)), bổ sung bước kiểm tra sức chứa hòm đồ của người nhận (`owner`):
   Đếm số lượng ô occupied trong `session.homdo` (ô có `1 <= slot <= 25` và `id > 0`).
-- [ ] Nếu số ô occupied $\ge 25$:
+- [x] Nếu số ô occupied $\ge 25$:
   - Hủy xử lý `add_homdo_item`.
   - Không gửi frame nạp đồ `17 06`.
   - Gửi thông điệp cảnh báo chữ đỏ qua `sys_msg_frame("Hành trang đã đầy, không thể nhận vật phẩm.")` tới client của `owner`.
-- [ ] Nếu số ô occupied $< 25$: Tiếp tục luồng cấp đồ và gửi frame `17 06` bình thường.
-- [ ] Có unit test kiểm thử:
+- [x] Nếu số ô occupied $< 25$: Tiếp tục luồng cấp đồ và gửi frame `17 06` bình thường.
+- [x] Có unit test kiểm thử:
   1. Người chơi có 24/25 ô $\rightarrow$ nhặt đồ thành công, túi tăng lên 25 ô, nhận frame `17 06`.
   2. Người chơi có 25/25 ô $\rightarrow$ không được nạp thêm đồ, túi giữ nguyên 25 ô, nhận thông báo lỗi hệ thống chữ đỏ.

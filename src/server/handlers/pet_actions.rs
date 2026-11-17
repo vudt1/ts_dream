@@ -23,6 +23,9 @@ use crate::server::dispatcher::OpcodeCtx;
 use crate::server::pet_box::{ACTIVE_SLOTS, STABLE_SLOTS};
 use crate::server::session::{Conn, PetState};
 
+/// Wire frame for pet recall (Opcode 0x13, Subcode 0x02).
+pub const PET_RECALL_FRAME: &str = "F44402001302";
+
 /// True when `stt` lies in the player's fight roster (`1..=4`).
 pub fn is_roster(stt: u8) -> bool {
     ACTIVE_SLOTS.contains(&stt)
@@ -452,7 +455,7 @@ pub async fn handle_pet_summon(ctx: &mut OpcodeCtx<'_>) {
                 return;
             }
             ctx.conn.session.active_pet_stt = 0;
-            ctx.out.send("F44402001302");
+            ctx.out.send(PET_RECALL_FRAME);
             db::persist::update_player(ctx.env.pool, ctx.conn.session.id, "SttPetXuatchien", 0)
                 .await;
         }

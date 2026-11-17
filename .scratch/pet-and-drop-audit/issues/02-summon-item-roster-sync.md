@@ -5,9 +5,9 @@ Khi người chơi sử dụng vật phẩm triệu hồi sủng vật (`add_pet
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] Trong `use_item/mod.rs` (nhánh `add_pet > 10000`), ngay sau khi push `PetState` vào `session.pets`, thực thi lưu bản ghi sủng vật xuống database thông qua `persist::upsert_pet`.
-- [ ] Xây dựng và gửi frame dữ liệu chi tiết sủng vật `0F 07` (`pet_info_frame` layout: `0F 07 <pet_id: 4B LE><stt: 1B><pet_id: 4B LE><quest: 1B><name_len: 1B><name>`) về client.
-- [ ] Gửi frame hiện diện sủng vật `0F 01` (`0F 01 <owner_id: 4B LE><stt: 1B><pet_id: 4B LE><quest: 1B>`) về client.
-- [ ] Có unit test kiểm thử: Sử dụng vật phẩm có `add_pet > 10000` $\rightarrow$ kiểm tra vật phẩm bị tiêu hao (`homdo` giảm 1), sủng vật được ghi nhận trong DB, và client nhận được cả 2 frame `0F 07` và `0F 01`.
+- [x] Trong `use_item/mod.rs` (nhánh `add_pet > 10000`), ngay sau khi push `PetState` vào `session.pets`, thực thi lưu bản ghi sủng vật xuống database thông qua `persist::upsert_pet`.
+- [x] Xây dựng và gửi frame dữ liệu chi tiết sủng vật `0F 07` (`pet_info_frame` layout: `0F 07 <pet_id: 4B LE><stt: 1B><pet_id: 4B LE><quest: 1B><name_len: 1B><name>`) về client.
+- [x] Gửi frame hiện diện sủng vật `0F 01` (`0F 01 <owner_id: 4B LE><stt: 1B><pet_id: 4B LE><quest: 1B>`) về client.
+- [x] Có unit test kiểm thử: Sử dụng vật phẩm có `add_pet > 10000` $\rightarrow$ kiểm tra vật phẩm bị tiêu hao (`homdo` giảm 1), sủng vật được ghi nhận trong DB, và client nhận được cả 2 frame `0F 07` và `0F 01`.
