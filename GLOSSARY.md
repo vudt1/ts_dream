@@ -111,6 +111,14 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
   - Máu NPC phải dưới 50% MaxHP.
   - Nếu NPC có thuộc tính đặc biệt (`FUN_00625128 == 0x16`), người chơi bắt buộc phải đã học kỹ năng Triệu gọi `14026`.
   - Không áp dụng cho **Quái Khoáng (Mineral NPC)**: mọi Quái Khoáng đều bị cấm thu phục (kể cả các NPC ngoại lệ như `22010`, `22011`).
+  - **Khởi tạo Sủng vật mới bắt**: Giữ cấp độ `level = 1`, nạp đầy đủ thuộc tính Element, MaxHP, MaxSP, INT, ATK, DEF, AGI và 3-4 kỹ năng mặc định từ bản mẫu NPC (`Npc.dat`), người chơi tự luyện từ cấp 1.
+
+### Quản lý Sủng vật & Giao dịch (Pet Storage & Trade Invariants)
+- **Định nghĩa**: Các quy tắc toàn vẹn dữ liệu cho sủng vật trong kho đồ `character_pets` và giao dịch người chơi (P2P Trade).
+- **Ràng buộc (Invariants)**:
+  - **Thu hồi sủng vật xuất chiến khi giao dịch**: Khi giao dịch thành công một sủng vật đang ở trạng thái Xuất chiến (`active_pet_stt == stt`), server tự động thu hồi (`active_pet_stt = 0`, cập nhật SQLite `character_pets.isactive = 0` và phát frame `13 02` về client người bán).
+  - **Đồng bộ khi dùng thẻ triệu hồi sủng vật (`add_pet > 10000`)**: Ngay khi tiêu hao thẻ, server lưu ngay vào SQLite (`upsert_pet`) và gửi ngay gói tin đồng bộ `0F 07` (thông tin sủng) + `0F 01` (hiện diện sủng) về client để sủng hiển thị tức thì trong danh sách.
+  - **Kiểm soát sức chứa hòm đồ khi rơi vật phẩm Battle**: Kiểm tra số ô occupied trong `homdo` của người nhận. Nếu đã đạt 25/25 ô, server hủy lượt nạp vật phẩm và gửi thông báo chữ đỏ *"Hành trang đã đầy, không thể nhận vật phẩm"*.
 
 ### Quái Khoáng (Mineral NPC) & Vũ khí Cuốc (Pickaxe)
 - **Định nghĩa**:
@@ -128,6 +136,7 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
   - Tiêu chí kỹ năng tham gia hợp kích: **Phụ thuộc 100% vào thuộc tính `skill_type == 1` (`Active`)** hoặc Đòn đánh thường (`10000`/`0`). Các kỹ năng Active nhiều mục tiêu (như Loạn kích `13013` 4 mục tiêu, Hỏa tiễn `12003` 3 mục tiêu, Ném đá `10005` 3 mục tiêu, Dương viêm `12031` 2 mục tiêu) đều được phép tham gia và kết nối combo bình thường.
   - Các kỹ năng có `skill_type != 1` (Phép thuật/Buff `skill_type == 2` như Phi sa, Hồng thủy, Thiên băng; Debuff `skill_type == 3` như Băng phong, Cây tinh; Hồi máu `skill_type == 4` như Thanh lưu) **bị vô hiệu hóa combo hoàn toàn**.
   - Hệ số dồn sát thương $\times 1.3$ áp dụng cho ô mục tiêu chính được khóa chung (`row_attack`, `col_attack`).
+  - **Phần thưởng Vật phẩm & Tiền vàng khi Hợp kích**: Tỷ lệ trúng thưởng rơi đồ giữ nguyên theo bảng xác suất tĩnh (~7.6%). Mỗi ô tham gia hợp kích kết liễu NPC thành công đều sinh một phần thưởng vật phẩm/vàng độc lập nạp vào hòm đồ (`homdo`) của người chơi sở hữu ô đó (sủng vật chuyển quyền nhận về cho chủ nhân do sủng không có homdo).
 
 ### Chuỗi Hợp kích & Ngưỡng Agi Chuỗi (Combo Chain & Agi Span)
 - **Định nghĩa**: Một chuỗi liên kích gồm các đấu sĩ cùng phe xếp kề nhau trong thứ tự lượt đấu (`Agi DESC`) cùng tấn công một mục tiêu còn sống.
