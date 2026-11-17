@@ -56,6 +56,7 @@ cargo build --release
 | `TS_DATABASE_URL` | `mysql://user:pass@localhost:3306/ts_dream` | Chuỗi kết nối MySQL (deprecated) |
 | `TS_PEREXP_DEFAULT` | `0` | Giá trị PerEXP ban đầu runtime |
 | `TS_DB_AUTO_CREATE` | `true` | Tự tạo database khi chưa tồn tại (`true`/`false`) |
+| `TS_PACKET_LOGGING` | `false` | Bật ghi log gói tin C2S/S2C lên Live SSE Terminal (`true`/`false`) |
 
 Ví dụ:
 ```bash

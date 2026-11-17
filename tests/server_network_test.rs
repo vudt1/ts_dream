@@ -24,6 +24,8 @@ mod login_char_flow;
 mod movement_warp;
 #[path = "server_network/p0_p1_p2_roadmap.rs"]
 mod p0_p1_p2_roadmap;
+#[path = "server_network/packet_logging.rs"]
+mod packet_logging;
 #[path = "server_network/relogin_flags.rs"]
 mod relogin_flags;
 #[path = "server_network/relogin_stats_items.rs"]

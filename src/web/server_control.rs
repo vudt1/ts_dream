@@ -51,6 +51,8 @@ pub struct ServerControl {
     pub events: Arc<crate::server::events::EventLifecycleManager>,
     /// Host or IP address to bind (defaults to "127.0.0.1" for tests; production sets "0.0.0.0").
     pub bind_host: String,
+    /// Enable Live SSE terminal packet logging (C2S and S2C frames).
+    pub packet_logging: bool,
 }
 
 impl ServerControl {
@@ -89,7 +91,14 @@ impl ServerControl {
             outbound_queue_capacity: crate::config::Config::default().outbound_queue_capacity,
             events,
             bind_host: "127.0.0.1".to_string(),
+            packet_logging: false,
         }
+    }
+
+    /// Override packet logging toggle (used by config wiring and tests).
+    pub fn with_packet_logging(mut self, enabled: bool) -> Self {
+        self.packet_logging = enabled;
+        self
     }
 
     /// Override the bind host (defaults to "127.0.0.1" for tests; production sets "0.0.0.0").
@@ -600,8 +609,16 @@ impl ServerControl {
 async fn drain_outbound(
     rx: &mut mpsc::Receiver<String>,
     write_half: &mut tokio::net::tcp::OwnedWriteHalf,
+    app: &Arc<RwLock<AppState>>,
+    peer_ip: &str,
+    packet_logging: bool,
 ) {
     while let Ok(frame_hex) = rx.try_recv() {
+        if packet_logging {
+            app.write()
+                .await
+                .push_log("s2c", format!("[{peer_ip}] {frame_hex}"));
+        }
         if let Ok(wire) = frame::encode_to_wire(&frame_hex) {
             if write_half.write_all(&wire).await.is_err() {
                 break;
@@ -697,6 +714,11 @@ async fn handle_client_connection(
                             if !frame::check_magic(&decoded) {
                                 tracing::warn!("dropping frame without F4 44 magic from {peer_ip}");
                                 continue;
+                            }
+                            if control.packet_logging {
+                                app.write()
+                                    .await
+                                    .push_log("c2s", format!("[{peer_ip}] {frame_hex}"));
                             }
                             let mut operation_ids = vec![logined_id];
                             if decoded.get(4) == Some(&0x17) && decoded.get(5) == Some(&33) {
@@ -801,7 +823,7 @@ async fn handle_client_connection(
                                     "system",
                                     format!("Shutting down connection from {peer_ip}"),
                                 );
-                                drain_outbound(&mut rx, &mut write_half).await;
+                                drain_outbound(&mut rx, &mut write_half, &app, &peer_ip, control.packet_logging).await;
                                 let _ = write_half.shutdown().await;
                                 close = true;
                                 break;
@@ -815,6 +837,11 @@ async fn handle_client_connection(
                 }
             }
             Some(frame_hex) = rx.recv() => {
+                if control.packet_logging {
+                    app.write()
+                        .await
+                        .push_log("s2c", format!("[{peer_ip}] {frame_hex}"));
+                }
                 if let Ok(wire) = frame::encode_to_wire(&frame_hex) {
                     if write_half.write_all(&wire).await.is_err() {
                         close = true;
@@ -825,7 +852,7 @@ async fn handle_client_connection(
                 // Idle timeout: tell the client why, flush the alert onto the
                 // socket, then close so the normal teardown below runs.
                 let _ = tx.try_send(SystemAlertReason::ConnectionLost.to_hex());
-                drain_outbound(&mut rx, &mut write_half).await;
+                drain_outbound(&mut rx, &mut write_half, &app, &peer_ip, control.packet_logging).await;
                 let _ = write_half.shutdown().await;
                 tracing::warn!(
                     peer_ip = %peer_ip,
@@ -833,7 +860,7 @@ async fn handle_client_connection(
                     "idle timeout: closing silent connection"
                 );
                 app.write().await.push_log(
-                    "warn",
+                    "warning",
                     format!("Idle timeout ({}s) from {peer_ip}; connection closed", idle.as_secs()),
                 );
                 close = true;
@@ -841,7 +868,7 @@ async fn handle_client_connection(
         }
     }
 
-    drain_outbound(&mut rx, &mut write_half).await;
+    drain_outbound(&mut rx, &mut write_half, &app, &peer_ip, control.packet_logging).await;
     let _ = write_half.shutdown().await;
 
     if logined_id > 0 {

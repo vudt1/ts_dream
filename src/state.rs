@@ -64,7 +64,7 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(perexp_default: u32) -> Self {
-        let (tx, _rx) = broadcast::channel(256);
+        let (tx, _rx) = broadcast::channel(1024);
         let (dtx, _drx) = broadcast::channel(16);
         Self {
             online: Vec::new(),

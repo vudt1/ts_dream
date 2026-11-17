@@ -46,6 +46,16 @@ fn main() {
     } else {
         let _ = fs::create_dir_all(profile_dir.join("DB"));
     }
+
+    // Package ts_dream.toml next to the produced binary.
+    let toml_src = manifest.join("ts_dream.toml");
+    if toml_src.exists() {
+        println!("cargo:rerun-if-changed=ts_dream.toml");
+        let toml_dst = profile_dir.join("ts_dream.toml");
+        if needs_copy(&toml_src, &toml_dst) {
+            let _ = fs::copy(&toml_src, &toml_dst);
+        }
+    }
 }
 
 fn sync_dir(src: &Path, dst: &Path, skip_names: &[&str]) {

@@ -28,6 +28,9 @@ pub struct Config {
     /// Capacity of the outbound frame channel for each client connection
     /// (default: 1024 frames; env `TS_OUTBOUND_QUEUE_CAPACITY`).
     pub outbound_queue_capacity: usize,
+    /// Enable Live SSE terminal packet logging (C2S and S2C frames).
+    /// (default: `false`; env `TS_PACKET_LOGGING`).
+    pub packet_logging: bool,
 }
 
 impl Default for Config {
@@ -44,6 +47,7 @@ impl Default for Config {
             sqlite_cache_size_kb: 64000,
             idle_timeout_secs: 300,
             outbound_queue_capacity: 1024,
+            packet_logging: false,
         }
     }
 }
@@ -133,6 +137,8 @@ impl Config {
             parse_usize,
         )
         .map_err(|e| TsError::Config(format!("TS_OUTBOUND_QUEUE_CAPACITY: {e}")))?;
+        cfg.packet_logging = env_override("TS_PACKET_LOGGING", cfg.packet_logging, parse_bool)
+            .map_err(|e| TsError::Config(format!("TS_PACKET_LOGGING: {e}")))?;
         if let Ok(raw) = std::env::var("TS_DATA_DIR") {
             cfg.data_dir = PathBuf::from(raw);
         }

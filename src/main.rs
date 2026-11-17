@@ -149,7 +149,8 @@ async fn main() -> anyhow::Result<()> {
         )
         .with_bind_host(cfg.game_host.clone())
         .with_idle_timeout(std::time::Duration::from_secs(cfg.idle_timeout_secs))
-        .with_outbound_queue_capacity(cfg.outbound_queue_capacity),
+        .with_outbound_queue_capacity(cfg.outbound_queue_capacity)
+        .with_packet_logging(cfg.packet_logging),
     );
 
     // 6. Spawn web server (always up once DB is reachable).

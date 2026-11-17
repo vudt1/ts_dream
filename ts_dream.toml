@@ -1,0 +1,39 @@
+# Cấu hình ts_dream (ts_dream.toml)
+# Biến môi trường tương ứng có tiền tố TS_* (ví dụ: TS_PACKET_LOGGING=true)
+
+# Địa chỉ IP/host lắng nghe cho Game TCP và Web Dashboard
+game_host = "127.0.0.1"
+
+# Cổng Game TCP server (mặc định: 6414)
+game_port = 6414
+
+# Cổng Web Admin Dashboard (mặc định: 8090)
+web_port = 8090
+
+# Thư mục dữ liệu tĩnh Data/
+data_dir = "./Data"
+
+# Chuỗi kết nối cơ sở dữ liệu SQLite
+database_url = "sqlite://DB/ts_dream.db"
+
+# Giá trị PerEXP ban đầu runtime
+perexp_default = 0
+
+# Tự động khởi tạo schema SQLite khi chưa tồn tại
+db_auto_create = true
+
+# Chu kỳ flush WAL checkpoint SQLite (giây)
+wal_checkpoint_interval_secs = 300
+
+# Dung lượng cache SQLite mỗi connection (KiB)
+sqlite_cache_size_kb = 64000
+
+# Thời gian idle timeout đóng kết nối im lặng (giây)
+idle_timeout_secs = 300
+
+# Dung lượng hàng đợi gói tin gửi đi cho mỗi client connection
+outbound_queue_capacity = 1024
+
+# Ghi log gói tin C2S/S2C ra Live SSE Terminal trên Dashboard (mặc định: false)
+# Có thể ghi đè qua biến môi trường TS_PACKET_LOGGING (ví dụ: TS_PACKET_LOGGING=true hoặc 1)
+packet_logging = false
