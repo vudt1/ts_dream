@@ -169,16 +169,8 @@ pub struct EveNpcPlacement {
     pub events: Vec<u8>,
     pub x: i32,
     pub y: i32,
-    pub close: bool,
-    pub motion_type: u8,
-    pub motion_back: u8,
-    pub motion_cycle_num: u8,
     pub direction: u8,
-    pub motion_suspend_ms: u16,
-    pub motion_speed_lv: u8,
-    pub motion_nodes: Vec<(i32, i32)>,
-    pub trace_radius: u16,
-    pub can_grow: u8,
+    pub close: bool,
 }
 
 /// Warp door placement on scene map (`Eve_DoorData.lua`).
@@ -481,22 +473,17 @@ impl EveDataLoader {
             reader.skip(sale_kind_count);
 
             let motion_node_count = reader.read_u8() as usize;
-            if (motion_node_count + 1) * 8 > reader.remaining() {
+            let motion_bytes = (motion_node_count + 1) * 8;
+            if motion_bytes > reader.remaining() {
                 return Err(TsError::Data("invalid motion_node_count in npc".into()));
             }
-            let mut motion_nodes = Vec::with_capacity(motion_node_count + 1);
-            for _ in 0..=motion_node_count {
-                let nx = reader.read_i32();
-                let ny = reader.read_i32();
-                motion_nodes.push((nx, ny));
-            }
+            reader.skip(motion_bytes);
 
-            let motion_type = reader.read_u8();
-            let motion_back = reader.read_u8();
-            let motion_cycle_num = reader.read_u8();
+            // motion_type (1B) + motion_back (1B) + motion_cycle_num (1B)
+            reader.skip(3);
             let direction = reader.read_u8();
-            let motion_suspend_ms = reader.read_u16();
-            let motion_speed_lv = reader.read_u8();
+            // motion_suspend_ms (2B) + motion_speed_lv (1B)
+            reader.skip(3);
 
             // roleGrid (16B) + moveOffsetGrid (8B)
             reader.skip(24);
@@ -504,15 +491,14 @@ impl EveDataLoader {
             let pos_x = reader.read_i32();
             let pos_y = reader.read_i32();
 
-            reader.skip(2); // isHide + isVisible
-            reader.skip(2); // rideNpcId
-            let can_grow = reader.read_u8();
-            reader.skip(1); // isLie
+            // isHide (1B) + isVisible (1B) + rideNpcId (2B) + can_grow (1B) + isLie (1B)
+            reader.skip(6);
 
             // innerNode (16B) + outerNode (16B)
             reader.skip(32);
 
-            let trace_radius = reader.read_u16();
+            // trace_radius (2B)
+            reader.skip(2);
             let close = reader.read_u8() != 0;
 
             if id > 0 {
@@ -524,16 +510,8 @@ impl EveDataLoader {
                         events,
                         x: pos_x,
                         y: pos_y,
-                        close,
-                        motion_type,
-                        motion_back,
-                        motion_cycle_num,
                         direction,
-                        motion_suspend_ms,
-                        motion_speed_lv,
-                        motion_nodes,
-                        trace_radius,
-                        can_grow,
+                        close,
                     },
                 );
             }
