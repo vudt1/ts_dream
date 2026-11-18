@@ -23,7 +23,6 @@ pub mod data {
 
 pub mod db {
     pub mod accounts;
-    pub mod catalog;
     pub mod domain;
     pub mod item_code;
     pub mod modern;
