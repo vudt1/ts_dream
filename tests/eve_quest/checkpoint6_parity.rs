@@ -53,6 +53,16 @@ fn test_synthetic_data() -> GameData {
             ..Default::default()
         },
     );
+    scene.scene_infos.insert(
+        WARP_ID as u16,
+        EveSceneInfo {
+            eve_no: WARP_ID as u16,
+            dest_map_id: DEST_MAP,
+            player_appear_x: 25,
+            player_appear_y: 30,
+            ..Default::default()
+        },
+    );
     data.scene_eve_data.insert(u32::from(TEST_MAP), scene);
     data
 }
@@ -397,27 +407,27 @@ fn test_party_door_warp_relocates_leader_and_all_members() {
 
     // 1. Leader relocated in session and registry
     assert_eq!(leader_session.map_id, DEST_MAP);
-    assert_eq!(leader_session.map_x, 500);
-    assert_eq!(leader_session.map_y, 600);
+    assert_eq!(leader_session.map_x, 490);
+    assert_eq!(leader_session.map_y, 590);
 
     // 2. Members relocated in online_sessions() registry
     let reg = lock_online_sessions();
     let m1 = reg.get(&member1_id).expect("member 1 in registry");
     assert_eq!(m1.map_id, DEST_MAP);
-    assert_eq!(m1.map_x, 500);
-    assert_eq!(m1.map_y, 600);
+    assert_eq!(m1.map_x, 490);
+    assert_eq!(m1.map_y, 590);
 
     let m2 = reg.get(&member2_id).expect("member 2 in registry");
     assert_eq!(m2.map_id, DEST_MAP);
-    assert_eq!(m2.map_x, 500);
-    assert_eq!(m2.map_y, 600);
+    assert_eq!(m2.map_x, 490);
+    assert_eq!(m2.map_y, 590);
     drop(reg);
 
     // 3. Leader received fade (14 07) and relocate packet
     assert_eq!(out.outgoing[0].frame, "F44402001407");
     assert_eq!(
         out.outgoing[1].frame,
-        spawn::build_relocate_packet(leader_id, DEST_MAP, 500, 600, WARP_ID as u8)
+        spawn::build_relocate_packet(leader_id, DEST_MAP, 490, 590, WARP_ID as u8)
     );
 
     // 4. Direct messages queued for both party members (fade + relocate)
@@ -431,7 +441,7 @@ fn test_party_door_warp_relocates_leader_and_all_members() {
     assert_eq!(m1_msgs[0], "F44402001407");
     assert_eq!(
         m1_msgs[1],
-        spawn::build_relocate_packet(member1_id, DEST_MAP, 500, 600, WARP_ID as u8)
+        spawn::build_relocate_packet(member1_id, DEST_MAP, 490, 590, WARP_ID as u8)
     );
 
     let m2_msgs: Vec<_> = out
@@ -444,7 +454,7 @@ fn test_party_door_warp_relocates_leader_and_all_members() {
     assert_eq!(m2_msgs[0], "F44402001407");
     assert_eq!(
         m2_msgs[1],
-        spawn::build_relocate_packet(member2_id, DEST_MAP, 500, 600, WARP_ID as u8)
+        spawn::build_relocate_packet(member2_id, DEST_MAP, 490, 590, WARP_ID as u8)
     );
 
     // 5. Hide broadcast sent on old map for leader and both members
@@ -478,13 +488,13 @@ fn test_party_door_warp_relocates_leader_and_all_members() {
 
     // Member 1 session and registry are synchronized at DEST_MAP
     assert_eq!(member1_conn.session.map_id, DEST_MAP);
-    assert_eq!(member1_conn.session.map_x, 500);
-    assert_eq!(member1_conn.session.map_y, 600);
+    assert_eq!(member1_conn.session.map_x, 490);
+    assert_eq!(member1_conn.session.map_y, 590);
     let reg = lock_online_sessions();
     let m1_after = reg.get(&member1_id).unwrap();
     assert_eq!(m1_after.map_id, DEST_MAP);
-    assert_eq!(m1_after.map_x, 500);
-    assert_eq!(m1_after.map_y, 600);
+    assert_eq!(m1_after.map_x, 490);
+    assert_eq!(m1_after.map_y, 590);
     drop(reg);
 
     // Cleanup

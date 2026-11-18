@@ -378,6 +378,10 @@ pub struct Session {
     pub horse_pet_id: u16,
     pub trade: TradeState,
     pub talking_battle: i32,
+    /// Active `(map_id, door_id)` BattleGate battle awaiting post-battle resolution.
+    pub pending_battle_gate: Option<(u16, u16)>,
+    /// `(map_id, door_id)` BattleGates defeated in this session (prevents infinite re-trigger).
+    pub passed_battle_gates: std::collections::HashSet<(u16, u16)>,
     /// Completed `(map, object/warp)` quest keys — the `[REQUIRES] Quests` gate
     /// source, populated on battle win (`quest::mark_quest_done`).
     pub completed_quests: Vec<(i64, i64)>,
@@ -523,6 +527,8 @@ impl Default for Session {
             horse_pet_id: 0,
             trade: TradeState::default(),
             talking_battle: 0,
+            pending_battle_gate: None,
+            passed_battle_gates: std::collections::HashSet::new(),
             completed_quests: Vec::new(),
             click_npc_id: 0,
             id_mem: [0; 4],

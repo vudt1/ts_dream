@@ -27,7 +27,7 @@ use ts_dream::protocol::codecs::npc_talk::NpcTalkCodec;
 use ts_dream::protocol::encoder;
 use ts_dream::server::dispatcher::{dispatch, HandleOutcome, ServerEnv};
 use ts_dream::server::handlers::npc_event::set_eve_events_enabled;
-use ts_dream::server::handlers::quest::perform_party_warp_and_persist;
+use ts_dream::server::handlers::quest::{perform_party_warp_with_resolved, resolve_door_warp};
 use ts_dream::server::handlers::talk::execute_event_step;
 use ts_dream::server::session::{
     lock_online_sessions, registry_get, registry_register_for_login, Conn, InventoryItem,
@@ -440,7 +440,8 @@ async fn test_registry_sync_atomic_party_tx_and_warp_rollback() {
     registry_register_for_login(&s1);
 
     let mut warp_out = HandleOutcome::default();
-    let warped = perform_party_warp_and_persist(&mut s1, &data_warp, Some(&pool), 1, &mut warp_out).await;
+    let resolved = resolve_door_warp(&data_warp, &s1, s1.map_id, 1).expect("warp must resolve");
+    let warped = perform_party_warp_with_resolved(&mut s1, resolved, Some(&pool), &mut warp_out).await;
     assert!(!warped, "party warp must return false on DB error");
     assert_eq!(s1.map_id, 12001, "RAM map_id must rollback on DB error");
     assert_eq!(s1.map_x, 100, "RAM map_x must rollback on DB error");
@@ -465,6 +466,16 @@ async fn test_warp_event_count_and_walkstep_autochain_and_menu() {
         },
     );
     let mut scene = SceneEveData::default();
+    scene.scene_infos.insert(
+        1,
+        ts_dream::data::loaders::EveSceneInfo {
+            eve_no: 1,
+            dest_map_id: 12002,
+            player_appear_x: 10,
+            player_appear_y: 10,
+            ..Default::default()
+        },
+    );
     scene.encounters.push(EveEncounterPlacement {
         id: 77,
         events: vec![10, 11],
@@ -698,6 +709,16 @@ async fn test_battle_ended_offline_parked_warp_persistence() {
         },
     );
     let mut scene = SceneEveData::default();
+    scene.scene_infos.insert(
+        1,
+        ts_dream::data::loaders::EveSceneInfo {
+            eve_no: 1,
+            dest_map_id: 12002,
+            player_appear_x: 18,
+            player_appear_y: 23,
+            ..Default::default()
+        },
+    );
     scene.fight_datas.insert(
         1,
         EveFightData {

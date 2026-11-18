@@ -27,7 +27,7 @@ use ts_dream::eve::auto_chain::{
 use ts_dream::eve::state::PlayerEventState;
 use ts_dream::server::dispatcher::{dispatch, HandleOutcome, ServerEnv};
 use ts_dream::server::handlers::npc_event::set_eve_events_enabled;
-use ts_dream::server::handlers::quest::resolve_warp_destination;
+use ts_dream::server::handlers::quest::{resolve_door_warp, resolve_scene_info_warp};
 use ts_dream::server::session::{
     lock_online_sessions, registry_get, registry_register_for_login, Conn, Session,
 };
@@ -708,11 +708,12 @@ async fn ticket12_post_battle_deferred_warp_uses_eve_scene_info() {
         ..Default::default()
     };
     let mut out = HandleOutcome::default();
-    let warped = ts_dream::server::handlers::quest::perform_party_warp_for_locked_session(
+    let resolved = resolve_scene_info_warp(&data, session.map_id, 9)
+        .expect("scene_info 9 must resolve");
+    let warped = ts_dream::server::handlers::quest::perform_party_warp_locked_with_resolved(
         &mut session,
-        &data,
+        resolved,
         None,
-        9,
         &mut out,
     )
     .await;
@@ -804,8 +805,13 @@ async fn ticket12_negative_missing_both_or_zero_dest_map_id_skips_safely() {
         },
     );
 
-    assert!(resolve_warp_destination(&data, 9001, 10).is_none());
-    assert!(resolve_warp_destination(&data, 9001, 11).is_none());
+    let probe_session = Session {
+        map_id: 9001,
+        ..Default::default()
+    };
+    assert!(resolve_scene_info_warp(&data, 9001, 10).is_none());
+    assert!(resolve_door_warp(&data, &probe_session, 9001, 10).is_none());
+    assert!(resolve_door_warp(&data, &probe_session, 9001, 11).is_none());
 
     let data_arc = Arc::new(data);
     let service = BattleService::new(Arc::clone(&data_arc));

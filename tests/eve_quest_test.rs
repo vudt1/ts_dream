@@ -38,5 +38,7 @@ mod tickets_14_15;
 mod tickets_16_17;
 #[path = "eve_quest/ticket_18.rs"]
 mod ticket_18;
+#[path = "eve_quest/warp_door_sceneinfo_parity.rs"]
+mod warp_door_sceneinfo_parity;
 #[path = "eve_quest/wire_codec_14_18.rs"]
 mod wire_codec_14_18;

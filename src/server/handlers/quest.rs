@@ -908,7 +908,7 @@ pub fn perform_warp(session: &mut Session, warp: &crate::data::tables::Warp, out
     }
 }
 
-/// Resolved warp destination from `EveSceneInfo` (PC `eve.emg`) or legacy `Warps.txt`.
+/// Resolved warp destination from `EveSceneInfo` (PC `eve.emg`) or `Warps.txt`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ResolvedWarp {
     pub dest_map: u16,
@@ -917,34 +917,17 @@ pub struct ResolvedWarp {
     pub wire_warp_id: u8,
 }
 
-/// Resolve warp destination for `(map_id, warp_id)`:
-/// 1. Check `scene_eve_data[map_id].scene_infos[warp_id]` first. If present,
-///    require `dest_map_id > 0` and positive appear coordinates (converting
-///    grid tile to pixel via `tile * 20 - 10`); if invalid, return `None`
-///    without falling back to `Warps.txt`.
-/// 2. Only when `scene_infos` has no entry for `warp_id`, fall back to
-///    `data.warps` (`Warps.txt`).
-pub fn resolve_warp_destination(
-    data: &GameData,
-    map_id: u16,
-    warp_id: u16,
-) -> Option<ResolvedWarp> {
-    if let Some(scene) = data.scene_eve_data.get(&u32::from(map_id)) {
-        if let Some(info) = scene.scene_infos.get(&warp_id) {
-            if info.dest_map_id > 0 && info.player_appear_x > 0 && info.player_appear_y > 0 {
-                let dest_x = u16::try_from(info.player_appear_x * 20 - 10).ok()?;
-                let dest_y = u16::try_from(info.player_appear_y * 20 - 10).ok()?;
-                return Some(ResolvedWarp {
-                    dest_map: info.dest_map_id,
-                    dest_x,
-                    dest_y,
-                    wire_warp_id: (warp_id & 0xFF) as u8,
-                });
-            }
-            return None;
-        }
-    }
-    let warp = data.warps.get(&(i64::from(map_id), i64::from(warp_id)))?;
+/// Approved `(map_id, door_id)` entries in `Warps.txt` that override `eve.emg`
+/// (1 upstream `eve.emg` bug fix + 3 approved custom/event warps per ADR 0010).
+const WARP_OVERRIDE_KEYS: &[(u16, u16)] = &[
+    (25303, 2),
+    (59401, 2),
+    (11000, 20),
+    (27000, 2),
+];
+
+fn resolve_warps_txt_row(data: &GameData, map_id: u16, door_id: u16) -> Option<ResolvedWarp> {
+    let warp = data.warps.get(&(i64::from(map_id), i64::from(door_id)))?;
     if warp.map2 <= 0 {
         return None;
     }
@@ -956,33 +939,131 @@ pub fn resolve_warp_destination(
     })
 }
 
+/// Resolve an Eve `result_type == 2` warp directly by `SceneInfo ID` (`eve_no`).
+///
+/// Used exclusively by Eve script execution (`eve_runner` and `BattleService`
+/// post-battle `eve_warp`), where `parameter` is a `SceneInfo.eve_no`, NOT a `Door.id`.
+pub fn resolve_scene_info_warp(
+    data: &GameData,
+    map_id: u16,
+    scene_info_id: u16,
+) -> Option<ResolvedWarp> {
+    let scene = data.scene_eve_data.get(&u32::from(map_id))?;
+    let info = scene.scene_infos.get(&scene_info_id)?;
+    if info.dest_map_id > 0 && info.player_appear_x > 0 && info.player_appear_y > 0 {
+        let dest_x = u16::try_from(info.player_appear_x * 20 - 10).ok()?;
+        let dest_y = u16::try_from(info.player_appear_y * 20 - 10).ok()?;
+        return Some(ResolvedWarp {
+            dest_map: info.dest_map_id,
+            dest_x,
+            dest_y,
+            wire_warp_id: (scene_info_id & 0xFF) as u8,
+        });
+    }
+    None
+}
+
+/// Resolve a `Door ID` warp (`Talk-Warp 0x14 08` and `BattleGate` destination)
+/// following `ADR 0010` (`Eve-first` + explicit overrides + fail-closed):
+///
+/// 1. Explicit override table (`WARP_OVERRIDE_KEYS` in `data.warps`).
+/// 2. `Door[door_id] -> NpcEvent (full condition evaluation) -> rt=2 -> SceneInfo[param]`.
+///    If the `Door` has at least one `rt=2` result in `eve.emg` but no branch
+///    satisfies the player's current state, returns `None` (fail-closed; never
+///    falls back to `Warps.txt`).
+/// 3. Fallback to `data.warps` only when the `Door` / scene is absent or has no
+///    `rt=2` result in `eve.emg`.
+pub fn resolve_door_warp(
+    data: &GameData,
+    session: &Session,
+    map_id: u16,
+    door_id: u16,
+) -> Option<ResolvedWarp> {
+    if WARP_OVERRIDE_KEYS.contains(&(map_id, door_id)) {
+        if let Some(resolved) = resolve_warps_txt_row(data, map_id, door_id) {
+            return Some(resolved);
+        }
+    }
+
+    if let Some(scene) = data.scene_eve_data.get(&u32::from(map_id)) {
+        let door_events: Vec<u16> = if let Some(evs) = scene
+            .door_events_by_door
+            .get(&door_id)
+            .filter(|v| !v.is_empty())
+        {
+            evs.clone()
+        } else if let Some(door) = scene.doors.get(&door_id) {
+            door.events.iter().map(|&e| u16::from(e)).collect()
+        } else {
+            Vec::new()
+        };
+
+        if !door_events.is_empty() {
+            let door_has_rt2 = door_events.iter().any(|eve_no| {
+                scene.npc_events.get(eve_no).is_some_and(|ev| {
+                    ev.conditions
+                        .iter()
+                        .any(|c| c.results.iter().any(|r| r.result_type == 2))
+                })
+            });
+
+            let state = crate::server::handlers::npc_event::snapshot_state_with_data(
+                session,
+                Some(data),
+                None,
+            );
+            let seed = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as i32)
+                .unwrap_or(12345);
+            let mut rng = crate::battle::rng::DotNetRandom::new(seed);
+
+            for eve_no in door_events {
+                let Some(event_data) = scene.npc_events.get(&eve_no) else {
+                    continue;
+                };
+                let Some(planned) = crate::eve::planner::plan_chain(
+                    event_data,
+                    &state,
+                    &scene.group_datas,
+                    &mut rng,
+                    None,
+                ) else {
+                    continue;
+                };
+                for effect in planned.effects {
+                    if let crate::eve::planner::DomainEffect::Warp { warp_id } = effect {
+                        if let Some(resolved) = resolve_scene_info_warp(data, map_id, warp_id) {
+                            return Some(resolved);
+                        }
+                    }
+                }
+            }
+
+            if door_has_rt2 {
+                return None;
+            }
+        }
+    }
+
+    resolve_warps_txt_row(data, map_id, door_id)
+}
+
 /// Two-Phase State Lock + atomic SQLite write-through Door Warp for solo or party.
 ///
-/// 1. Resolves `(session.map_id, warp_id)` via [`resolve_warp_destination`]
-///    (`EveSceneInfo` first, fallback `Warps.txt`) and refuses independent warp
-///    by a following party member.
+/// 1. Refuses independent warp by a following party member.
 /// 2. Acquires `lock_player_operations` in ascending player-ID order **before**
 ///    reading any party member from `registry_get`.
 /// 3. Updates leader & online members' `(map_id, map_x, map_y)`, calls
 ///    `registry_update_if_online`, and emits `14 07` + `0x0C` + `hide_from_map`.
 /// 4. Persists leader & all warped members via `persist_sessions_transaction`
 ///    (Door Warp write-through checkpoint).
-pub async fn perform_party_warp_and_persist(
+pub async fn perform_party_warp_with_resolved(
     session: &mut Session,
-    data: &GameData,
+    resolved: ResolvedWarp,
     pool: Option<&crate::db::pool::DbPool>,
-    warp_id: u16,
     out: &mut HandleOutcome,
 ) -> bool {
-    let Some(resolved) = resolve_warp_destination(data, session.map_id, warp_id) else {
-        tracing::debug!(
-            map_id = session.map_id,
-            warp_id,
-            "Door Warp refused: no valid EveSceneInfo or Warps.txt row"
-        );
-        return false;
-    };
-
     let id = session.id;
     let id_leader = session.id_leader;
     if id_leader > 0 && id_leader != id {
@@ -1015,21 +1096,12 @@ pub async fn perform_party_warp_and_persist(
 
 /// Execute party warp + atomic DB persistence while the caller already holds
 /// `lock_player_operations` for the leader and all party members.
-pub async fn perform_party_warp_for_locked_session(
+pub async fn perform_party_warp_locked_with_resolved(
     session: &mut Session,
-    data: &GameData,
+    resolved: ResolvedWarp,
     pool: Option<&crate::db::pool::DbPool>,
-    warp_id: u16,
     out: &mut HandleOutcome,
 ) -> bool {
-    let Some(resolved) = resolve_warp_destination(data, session.map_id, warp_id) else {
-        tracing::debug!(
-            map_id = session.map_id,
-            warp_id,
-            "Door Warp refused: warp_id not found in EveSceneInfo or Warps.txt"
-        );
-        return false;
-    };
     if session.id_leader > 0 && session.id_leader != session.id {
         return false;
     }
@@ -1135,6 +1207,33 @@ async fn perform_party_warp_locked(
     true
 }
 
+/// Check if `(map_id, door_id)` is an unpassed `BattleGate.txt` gate and,
+/// if so, arm `session.pending_battle_gate` and return a `BattleTrigger`.
+pub fn try_trigger_battle_gate(
+    session: &mut Session,
+    data: &GameData,
+    map_id: u16,
+    door_id: u16,
+) -> Option<BattleTrigger> {
+    if session.id_leader > 0 && session.id_leader != session.id {
+        return None;
+    }
+    if session.passed_battle_gates.contains(&(map_id, door_id)) {
+        return None;
+    }
+    let gate = data.battle_gates.get(&(i64::from(map_id), i64::from(door_id)))?;
+    if gate.diahinh <= 0 {
+        return None;
+    }
+    let mut teamdef = vec![gate.diahinh];
+    teamdef.extend_from_slice(&gate.defenders);
+    session.pending_battle_gate = Some((map_id, door_id));
+    Some(BattleTrigger {
+        teamdef,
+        diahinh: gate.diahinh as i32,
+    })
+}
+
 /// Handle warp-talk (H8) completion: confirm warp into 0x0C flow.
 pub async fn handle_warp_confirm(
     conn: &mut Conn,
@@ -1208,29 +1307,19 @@ pub async fn handle_warp_confirm(
         return;
     }
 
-    // Lookup warp data
-    let warp_key = (map_id as i64, idtalking as i64);
+    // Lookup warp data by Door ID (Eve-first + overrides + fail-closed)
     let warp_id_u16 = u16::try_from(idtalking).unwrap_or(0);
-    if resolve_warp_destination(data, map_id, warp_id_u16).is_some()
-        || data.warps.contains_key(&warp_key)
-    {
-        // Check if this warp has a battle gate
-        if let Some(gate) = data.battle_gates.get(&warp_key) {
-            if gate.diahinh > 0 {
-                // Trigger battle gate battle
-                let mut teamdef = vec![gate.diahinh];
-                teamdef.extend_from_slice(&gate.defenders);
-                conn.session.talking_battle = idtalking;
-                out.battle_trigger = Some(BattleTrigger {
-                    teamdef,
-                    diahinh: gate.diahinh as i32,
-                });
-                return;
-            }
+    if conn.session.id_leader > 0 && conn.session.id_leader != conn.session.id {
+        end_talk(conn, out);
+        return;
+    }
+    if let Some(resolved) = resolve_door_warp(data, &conn.session, map_id, warp_id_u16) {
+        if let Some(trigger) = try_trigger_battle_gate(&mut conn.session, data, map_id, warp_id_u16) {
+            out.battle_trigger = Some(trigger);
+            return;
         }
 
-        let warp_id_u16 = u16::try_from(idtalking).unwrap_or(0);
-        if !perform_party_warp_and_persist(&mut conn.session, data, _env.pool, warp_id_u16, out).await {
+        if !perform_party_warp_with_resolved(&mut conn.session, resolved, _env.pool, out).await {
             end_talk(conn, out);
             return;
         }

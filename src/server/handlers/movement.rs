@@ -36,7 +36,7 @@ pub async fn handle_move_dispatch(ctx: &mut OpcodeCtx<'_>) {
         participant_ids.sort_unstable();
         participant_ids.dedup();
         // Hold Two-Phase State Lock only across position sync; drop before MeetDoor/WalkStep
-        // so downstream `perform_party_warp_and_persist` can re-acquire without deadlocking.
+        // so downstream `perform_party_warp_with_resolved` can re-acquire without deadlocking.
         let _guards = crate::server::session::lock_player_operations(participant_ids).await;
         handle_move_inner(ctx)
     } else {
@@ -88,6 +88,16 @@ pub async fn handle_move_dispatch(ctx: &mut OpcodeCtx<'_>) {
 
     // 1. MeetDoor: check closest door within ±60 px of new coordinates.
     if let Some((door_id, _)) = closest_door {
+        let map_id = ctx.conn.session.map_id;
+        if let Some(trigger) = crate::server::handlers::quest::try_trigger_battle_gate(
+            &mut ctx.conn.session,
+            ctx.data,
+            map_id,
+            door_id,
+        ) {
+            ctx.out.battle_trigger = Some(trigger);
+            return;
+        }
         if let Some(event_session) =
             crate::server::handlers::npc_event::resolve_npc_event_with_filter_and_state(
                 &ctx.conn.session,

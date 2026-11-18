@@ -88,6 +88,16 @@ fn synthetic_data() -> GameData {
             ..Default::default()
         },
     );
+    scene.scene_infos.insert(
+        WARP_ID as u16,
+        EveSceneInfo {
+            eve_no: WARP_ID as u16,
+            dest_map_id: DEST_MAP,
+            player_appear_x: 2,
+            player_appear_y: 2,
+            ..Default::default()
+        },
+    );
     data.scene_eve_data.insert(u32::from(SOURCE_MAP), scene);
     data.ground_terrains.insert(u32::from(SOURCE_MAP), 55);
 
@@ -444,8 +454,8 @@ fn door_warps_then_finishes_session() {
 
     assert_eq!(
         (session.map_id, session.map_x, session.map_y),
-        (DEST_MAP, 12, 34),
-        "Door must relocate through the Warps.txt row"
+        (DEST_MAP, 30, 30),
+        "Door must relocate through EveSceneInfo"
     );
     assert_eq!(
         out.outgoing[0].frame, "F44402001407",
@@ -453,7 +463,7 @@ fn door_warps_then_finishes_session() {
     );
     assert_eq!(
         out.outgoing[1].frame,
-        spawn::build_relocate_packet(5555, DEST_MAP, 12, 34, WARP_ID as u8),
+        spawn::build_relocate_packet(5555, DEST_MAP, 30, 30, WARP_ID as u8),
     );
     // Vấn đề 3 (Fix): Eve Door must NOT emit 14 08 or unlock before map load completes.
     assert_eq!(out.outgoing.len(), 2);
@@ -475,7 +485,7 @@ fn door_warps_then_finishes_session() {
 
     let reg = lock_online_sessions();
     let online = reg.get(&5555).expect("registry entry");
-    assert_eq!((online.map_id, online.map_x, online.map_y), (DEST_MAP, 12, 34));
+    assert_eq!((online.map_id, online.map_x, online.map_y), (DEST_MAP, 30, 30));
     drop(reg);
     lock_online_sessions().remove(&5555);
 }

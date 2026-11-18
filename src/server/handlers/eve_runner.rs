@@ -913,23 +913,21 @@ async fn execute_event_step_core(
         };
 
         if let DomainEffect::Warp { warp_id } = first_effect {
-            if crate::server::handlers::quest::resolve_warp_destination(
+            let Some(resolved) = crate::server::handlers::quest::resolve_scene_info_warp(
                 data,
                 session.map_id,
                 warp_id,
-            )
-            .is_none()
-            {
+            ) else {
                 tracing::debug!(
                     map_id = session.map_id,
                     warp_id,
-                    "Eve Door result has no EveSceneInfo or Warps.txt row; skipping"
+                    "Eve Door result has no EveSceneInfo row; skipping"
                 );
                 if let Some(ev) = session.current_event_session.as_mut() {
                     ev.current_index = ev.current_index.saturating_add(1);
                 }
                 continue;
-            }
+            };
 
             let trailing = session
                 .current_event_session
@@ -951,8 +949,8 @@ async fn execute_event_step_core(
                 session.current_event_session = None;
                 return;
             }
-            if crate::server::handlers::quest::perform_party_warp_and_persist(
-                session, data, pool, warp_id, out,
+            if crate::server::handlers::quest::perform_party_warp_with_resolved(
+                session, resolved, pool, out,
             )
             .await
             {

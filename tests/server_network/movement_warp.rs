@@ -247,9 +247,9 @@ async fn test_warp_confirm_and_teleport_confirm_cycle() {
         .insert(3001, conn.session.clone());
 
     // Step 1: Client triggers warp gate 1 at map 49902
-    // (EveSceneInfo (49902, 1) takes priority over Warps.txt)
-    let expected_warp = ts_dream::server::handlers::quest::resolve_warp_destination(&data, 49902, 1)
-        .expect("warp (49902, 1) must resolve");
+    let expected_warp =
+        ts_dream::server::handlers::quest::resolve_door_warp(&data, &conn.session, 49902, 1)
+            .expect("warp (49902, 1) must resolve");
     let decoded_gate = [0xF4, 0x44, 0x04, 0x00, 0x14, 0x08, 0x01, 0x00];
     let out_gate = dispatch(&mut conn, &decoded_gate, &data, &service, &env).await;
 
@@ -345,9 +345,10 @@ async fn test_party_warp_follow() {
 
     let env = ServerEnv::none();
 
-    // Leader triggers warp at gate 1 (EveSceneInfo (49902, 1) -> map 49901)
-    let expected_warp = ts_dream::server::handlers::quest::resolve_warp_destination(&data, 49902, 1)
-        .expect("warp (49902, 1) must resolve");
+    // Leader triggers warp at gate 1 (Door 1 at 49902 -> map 49901)
+    let expected_warp =
+        ts_dream::server::handlers::quest::resolve_door_warp(&data, &leader_conn.session, 49902, 1)
+            .expect("warp (49902, 1) must resolve");
     let decoded_gate = [0xF4, 0x44, 0x04, 0x00, 0x14, 0x08, 0x01, 0x00];
     let out = dispatch(&mut leader_conn, &decoded_gate, &data, &service, &env).await;
 

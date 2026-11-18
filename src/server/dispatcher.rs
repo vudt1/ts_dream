@@ -153,7 +153,7 @@ pub struct HandleOutcome {
     pub eve_battle: Option<(u16, i32)>,
     /// If set when Eve execution defers `DomainEffect::Warp` (e.g. inside
     /// `BattleService::battle_ended` while `lock_player_operations` is held),
-    /// the caller runs `perform_party_warp_and_persist` after releasing its locks.
+    /// the caller runs `perform_party_warp_with_resolved` after releasing its locks.
     pub eve_warp: Option<u16>,
     pub map_broadcast: Vec<MapBroadcast>,
     pub direct_messages: Vec<(u32, String)>,

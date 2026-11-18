@@ -11,7 +11,6 @@ use ts_dream::data::loader::GameData;
 use ts_dream::data::loaders::{
     EveCondition, EveDoorPlacement, EveEncounterPlacement, EveResult, NpcEventData, SceneEveData,
 };
-use ts_dream::data::tables::Warp;
 use ts_dream::db::modern::sqlite::SqliteRepositories;
 use ts_dream::db::modern::traits::CharacterSeed;
 use ts_dream::db::pool::DbPool;
@@ -184,21 +183,21 @@ fn build_door_test_data(require_quest: Option<u16>, valid_warp: bool) -> GameDat
         },
     );
 
-    scene.build_indices();
-    data.scene_eve_data.insert(12001, scene);
-
     if valid_warp {
-        data.warps.insert(
-            (12001, 77),
-            Warp {
-                map1: 12001,
-                warpid: 77,
-                map2: 12002,
-                x: 820,
-                y: 940,
+        scene.scene_infos.insert(
+            77,
+            ts_dream::data::loaders::EveSceneInfo {
+                eve_no: 77,
+                dest_map_id: 12002,
+                player_appear_x: 42,
+                player_appear_y: 48,
+                ..Default::default()
             },
         );
     }
+
+    scene.build_indices();
+    data.scene_eve_data.insert(12001, scene);
     data
 }
 
@@ -235,25 +234,25 @@ async fn e2e_click_door_party_warp_locks_syncs_and_persists_db() {
 
     let out = dispatch(&mut conn, &click_door_frame(10), &data, &service, &env).await;
 
-    assert_eq!((conn.session.map_id, conn.session.map_x, conn.session.map_y), (12002, 820, 940));
+    assert_eq!((conn.session.map_id, conn.session.map_x, conn.session.map_y), (12002, 830, 950));
     assert!(has_relocate_frame(&outgoing_hexes(&out), leader_id as u32, 12002));
     assert!(has_relocate_frame(&direct_hexes(&out, member_id as u32), member_id as u32, 12002));
 
     let reg_leader = registry_get(leader_id as u32).expect("leader in registry");
     let reg_member = registry_get(member_id as u32).expect("member in registry");
-    assert_eq!((reg_leader.map_id, reg_leader.map_x, reg_leader.map_y), (12002, 820, 940));
-    assert_eq!((reg_member.map_id, reg_member.map_x, reg_member.map_y), (12002, 820, 940));
+    assert_eq!((reg_leader.map_id, reg_leader.map_x, reg_leader.map_y), (12002, 830, 950));
+    assert_eq!((reg_member.map_id, reg_member.map_x, reg_member.map_y), (12002, 830, 950));
 
     // Verify SQLite write-through for BOTH Leader and Member
     let mut db_leader = Session::new();
     db_leader.id = leader_id as u32;
     assert!(repos.sessions().load(leader_id, &mut db_leader).await.unwrap());
-    assert_eq!((db_leader.map_id, db_leader.map_x, db_leader.map_y), (12002, 820, 940));
+    assert_eq!((db_leader.map_id, db_leader.map_x, db_leader.map_y), (12002, 830, 950));
 
     let mut db_member = Session::new();
     db_member.id = member_id as u32;
     assert!(repos.sessions().load(member_id, &mut db_member).await.unwrap());
-    assert_eq!((db_member.map_id, db_member.map_x, db_member.map_y), (12002, 820, 940));
+    assert_eq!((db_member.map_id, db_member.map_x, db_member.map_y), (12002, 830, 950));
 
     // Verify bare `F4 44 02 00 14 04` remains EndTalk
     let out_end = dispatch(&mut conn, &[0xF4, 0x44, 0x02, 0x00, 0x14, 0x04], &data, &service, &env).await;
@@ -306,14 +305,14 @@ async fn e2e_meet_door_party_warp_and_walkstep_event() {
 
     // 2. MeetDoor by walking onto door 10 proximity (310, 405) -> warps Leader & Member to 12002
     let out_meet = dispatch(&mut conn, &move_frame(1, 310, 405), &data, &service, &env).await;
-    assert_eq!((conn.session.map_id, conn.session.map_x, conn.session.map_y), (12002, 820, 940));
+    assert_eq!((conn.session.map_id, conn.session.map_x, conn.session.map_y), (12002, 830, 950));
     assert!(has_relocate_frame(&outgoing_hexes(&out_meet), leader_id as u32, 12002));
     assert!(has_relocate_frame(&direct_hexes(&out_meet, member_id as u32), member_id as u32, 12002));
 
     let mut db_member = Session::new();
     db_member.id = member_id as u32;
     assert!(repos.sessions().load(member_id, &mut db_member).await.unwrap());
-    assert_eq!((db_member.map_id, db_member.map_x, db_member.map_y), (12002, 820, 940));
+    assert_eq!((db_member.map_id, db_member.map_x, db_member.map_y), (12002, 830, 950));
 
     {
         let mut sessions = lock_online_sessions();

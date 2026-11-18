@@ -605,17 +605,20 @@ async fn eve_fight_data_loads_right_enemies_diahinh_fallback_and_direct_map_broa
 
     // 2. Verify start_eve_encounter + battle_ended preserves direct_messages & map_broadcast
     //    when post-battle Eve step executes a party Warp
-    data.warps.insert(
-        (12001, 9001),
-        ts_dream::data::tables::Warp {
-            warpid: 9001,
-            map1: 12001,
-            map2: 12002,
-            x: 300,
-            y: 300,
-            ..Default::default()
-        },
-    );
+    data.scene_eve_data
+        .get_mut(&12001)
+        .unwrap()
+        .scene_infos
+        .insert(
+            9001,
+            EveSceneInfo {
+                eve_no: 9001,
+                dest_map_id: 12002,
+                player_appear_x: 15,
+                player_appear_y: 15,
+                ..Default::default()
+            },
+        );
     let service = BattleService::new(Arc::new(data));
     let mut leader = Session::new();
     leader.id = 9851;

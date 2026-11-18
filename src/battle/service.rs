@@ -506,9 +506,9 @@ impl BattleSink for BattleSinkImpl {
             let pool_opt = self.pool.read().await.clone();
             let mut ended_sessions: Vec<Session> = Vec::new();
             let mut eve_followups: Vec<(i64, Session, u16, i32)> = Vec::new();
-            let mut eve_warps: Vec<(
+            let mut post_battle_warps: Vec<(
                 i64,
-                u16,
+                crate::server::handlers::quest::ResolvedWarp,
                 Option<Arc<tokio::sync::RwLock<Session>>>,
                 Option<mpsc::Sender<String>>,
             )> = Vec::new();
@@ -566,7 +566,29 @@ impl BattleSink for BattleSinkImpl {
                         eve_followups.push((pid, s.clone(), fight_id, diahinh));
                     }
                     if let Some(warp_id) = eve_warp {
-                        eve_warps.push((pid, warp_id, Some(Arc::clone(sess_arc)), Some(tx.clone())));
+                        if let Some(resolved) = crate::server::handlers::quest::resolve_scene_info_warp(
+                            self.data.as_ref(),
+                            s.map_id,
+                            warp_id,
+                        ) {
+                            post_battle_warps.push((
+                                pid,
+                                resolved,
+                                Some(Arc::clone(sess_arc)),
+                                Some(tx.clone()),
+                            ));
+                        }
+                    }
+
+                    if let Some(resolved) =
+                        resolve_battle_gate_win(self.data.as_ref(), &mut s, outcome)
+                    {
+                        post_battle_warps.push((
+                            pid,
+                            resolved,
+                            Some(Arc::clone(sess_arc)),
+                            Some(tx.clone()),
+                        ));
                     }
 
                     if s.talking_battle > 0 {
@@ -621,7 +643,7 @@ impl BattleSink for BattleSinkImpl {
                         eve_followups.push((pid, s.clone(), fight_id, diahinh));
                     }
                     if let Some(warp_id) = eve_warp {
-                        if let Some(resolved) = crate::server::handlers::quest::resolve_warp_destination(
+                        if let Some(resolved) = crate::server::handlers::quest::resolve_scene_info_warp(
                             self.data.as_ref(),
                             s.map_id,
                             warp_id,
@@ -630,6 +652,19 @@ impl BattleSink for BattleSinkImpl {
                             s.map_x = resolved.dest_x;
                             s.map_y = resolved.dest_y;
                         }
+                    }
+                    if let Some(resolved) =
+                        resolve_battle_gate_win(self.data.as_ref(), &mut s, outcome)
+                    {
+                        post_battle_warps.push((
+                            pid,
+                            resolved,
+                            Some(Arc::new(tokio::sync::RwLock::new(s.clone()))),
+                            None,
+                        ));
+                        s.map_id = resolved.dest_map;
+                        s.map_x = resolved.dest_x;
+                        s.map_y = resolved.dest_y;
                     }
                     crate::server::session::registry_update_if_online(&s);
                     ended_sessions.push(s);
@@ -641,7 +676,7 @@ impl BattleSink for BattleSinkImpl {
                         .resume_eve_for_participant(pid, &mut offline_s, outcome, pool_opt.as_ref())
                         .await;
                     if let Some(warp_id) = eve_warp {
-                        if let Some(resolved) = crate::server::handlers::quest::resolve_warp_destination(
+                        if let Some(resolved) = crate::server::handlers::quest::resolve_scene_info_warp(
                             self.data.as_ref(),
                             offline_s.map_id,
                             warp_id,
@@ -650,6 +685,19 @@ impl BattleSink for BattleSinkImpl {
                             offline_s.map_x = resolved.dest_x;
                             offline_s.map_y = resolved.dest_y;
                         }
+                    }
+                    if let Some(resolved) =
+                        resolve_battle_gate_win(self.data.as_ref(), &mut offline_s, outcome)
+                    {
+                        post_battle_warps.push((
+                            pid,
+                            resolved,
+                            Some(Arc::new(tokio::sync::RwLock::new(offline_s.clone()))),
+                            None,
+                        ));
+                        offline_s.map_id = resolved.dest_map;
+                        offline_s.map_x = resolved.dest_x;
+                        offline_s.map_y = resolved.dest_y;
                     }
                     ended_sessions.push(offline_s);
                 }
@@ -670,16 +718,15 @@ impl BattleSink for BattleSinkImpl {
                 }
             }
 
-            for (pid, warp_id, sess_arc_opt, tx_opt) in eve_warps {
+            for (pid, resolved, sess_arc_opt, tx_opt) in post_battle_warps {
                 if let Some(sess_arc) = sess_arc_opt {
                     let mut warp_out = crate::server::dispatcher::HandleOutcome::default();
                     let (warped, leader_coords, member_ids) = {
                         let mut s = sess_arc.write().await;
-                        let ok = crate::server::handlers::quest::perform_party_warp_for_locked_session(
+                        let ok = crate::server::handlers::quest::perform_party_warp_locked_with_resolved(
                             &mut s,
-                            self.data.as_ref(),
+                            resolved,
                             pool_opt.as_ref(),
-                            warp_id,
                             &mut warp_out,
                         )
                         .await;
@@ -804,6 +851,21 @@ fn push(online: &tokio::sync::RwLock<OnlineMap>, player: i64, frame: String) {
             let _ = p.frames.try_send(frame);
         }
     }
+}
+
+/// Consume `pending_battle_gate` on a participant session; on `PlayerWin`,
+/// record the gate as passed and resolve the Door destination.
+fn resolve_battle_gate_win(
+    data: &GameData,
+    session: &mut Session,
+    outcome: Outcome,
+) -> Option<crate::server::handlers::quest::ResolvedWarp> {
+    let (gate_map, gate_door) = session.pending_battle_gate.take()?;
+    if outcome != Outcome::PlayerWin {
+        return None;
+    }
+    session.passed_battle_gates.insert((gate_map, gate_door));
+    crate::server::handlers::quest::resolve_door_warp(data, session, gate_map, gate_door)
 }
 
 /// Send `frame` to every online player whose session sits on `map_id`

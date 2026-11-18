@@ -472,3 +472,20 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
   - **Vai trò `0B FA`**: Khung mở bàn cờ gán dấu bản thân `0x03` cho Đội trưởng, `0x05` cho Thành viên tổ đội, và chỉ dành `0x04` cho *ListQS / Người quan sát*. Chỉ *ListQS* mang dấu `0x04` mới được rời trận tức thì qua `0x0B 01 03`; chiến đấu viên bắt buộc dùng *Kênh Lệnh Chiến Đấu* `0x32 01 18001` hoặc `14002`.
   - **Quy tắc tỷ lệ & Phạm vi thoát trận**: Tỷ lệ thành công tính theo chênh lệch cấp độ giữa người thực hiện với mục tiêu đối phương và LVTB hai đội, cộng thêm `+20%` khi dùng *Thuật đào tẩu* (`14002`, không bypass 100%). Nếu Đội trưởng (hoặc *Sủng vật* của Đội trưởng, kể cả ở một trong hai phe của trận PvP) chạy trốn thành công thì toàn bộ trận/đội thoát ngay; nếu Thành viên (hoặc *Sủng vật* của Thành viên) chạy trốn thành công thì chỉ riêng Thành viên đó cùng các *Sủng vật* của họ rời lưới chiến trận, các đồng đội còn lại tiếp tục đánh.
 - **Tránh dùng các từ mơ hồ**: *Leave Battle* (chỉ dành cho *ListQS* thoát quan chiến qua `0x0B 01 03`), `14003` (*Thuật mua bán* bị động, không liên quan đến Flee).
+
+### Cửa Bản Đồ (Door) vs Điểm Xuất Hiện (`SceneInfo`) & Dịch Chuyển Cổng (`Talk-Warp 0x14 08`)
+- **Định nghĩa**: Hai thực thể định danh tách biệt trong chuỗi chuyển cảnh của kịch bản Eve (`Data/eve.emg`), kết nối qua sự kiện `NpcEvent` có kết quả chuyển cảnh (`result_type == 2`):
+  - **`Door ID` (`Door.id`)**: Định danh cổng đặt trên bản đồ hiện tại (`Section 3`). Khi người chơi chạm (`MeetDoor`), nhấp (`ClickDoor`), hoặc gửi xác nhận dịch chuyển `C→S 0x14 08` (`idtalking`), mã mà Client và `Data/Warps.txt` / `Data/BattleGate.txt` dùng là **`Door ID`**.
+  - **`SceneInfo ID` (`eve_no`)**: Định danh bản ghi điểm đến (`Section 6`: bản đồ đích, tọa độ tile xuất hiện `(x, y)` quy đổi pixel `tile * 20 - 10`, hướng mặt). Giá trị `parameter` của kết quả `result_type == 2` trỏ tới **`SceneInfo ID`**, không phải `Door ID`.
+- **Ràng buộc (Invariants)**:
+  - **Không đồng nhất khóa**: `Door ID` và `SceneInfo ID` là hai không gian khóa độc lập cục bộ trong mỗi `scene_id` (nhiều cổng có `Door ID != SceneInfo ID`). Tuyệt đối không dùng `Door ID` để tra trực tiếp vào bảng `SceneInfo`.
+  - **Thứ tự phân giải cho `Talk-Warp 0x14 08`**: Bắt buộc đi theo chuỗi `Door ID → NpcEvent (đánh giá đầy đủ điều kiện trên trạng thái người chơi) → result_type == 2 → SceneInfo ID`. Không fallback sang `Warps.txt` nếu `Door` có nhánh `result_type == 2` nhưng người chơi chưa thỏa điều kiện nhiệm vụ/hội thoại; chỉ dùng `Warps.txt` cho các cổng thiếu `result_type == 2` hoặc ngoại lệ override đã phê duyệt.
+- **Tránh dùng các từ mơ hồ**: *warp_id* dùng chung không phân biệt `Door ID` hay `SceneInfo ID`; *Warp.Dat* (danh mục truyền tống 28 thành thị lớn gắn `Mark.dat` `11804..11831`, không liên quan tới chuyển cổng bản đồ).
+
+### Cửa Ải Chiến Đấu (BattleGate)
+- **Định nghĩa**: Cổng chuyển cảnh có đội quân thủ ải chặn đường (`Data/BattleGate.txt`), yêu cầu người chơi/đội trưởng chiến thắng trận chiến trước khi đi qua.
+- **Ràng buộc (Invariants)**:
+  - **Nguồn chân lý**: Các cổng đã có trận chiến kịch bản (`result_type == 3`) trong `Data/eve.emg` do kịch bản Eve toàn quyền điều phối; `BattleGate.txt` chỉ giữ lại phần cổng ngoại lệ chưa có `result_type == 3` trong `eve.emg` (như chuỗi tháp `49901..49908` và các cửa ải đặc thù).
+  - **Nhất quán giữa `MeetDoor` và `0x14 08`**: Với các cổng còn lại trong `BattleGate.txt`, chốt chặn phải được kiểm tra đồng nhất ở cả luồng va chạm `MeetDoor` và luồng `Talk-Warp 0x14 08`.
+  - **Hậu chiến cửa ải**: Khi chiến thắng trận chiến từ `BattleGate.txt`, hệ thống tự động dịch chuyển cả đội qua đích của cổng ngay sau trận và ghi nhận trạng thái đã vượt ải (hoặc chuyển sang bản đồ tầng kế tiếp) để tránh lặp trận vô hạn.
+- **Tránh dùng các từ mơ hồ**: *Boss Gate* chung chung hoặc nhầm lẫn với cổng chỉ có điều kiện hội thoại không chiến đấu.

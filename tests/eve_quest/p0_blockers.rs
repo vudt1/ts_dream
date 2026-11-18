@@ -60,6 +60,16 @@ fn test_game_data() -> GameData {
             ..Default::default()
         },
     );
+    scene.scene_infos.insert(
+        WARP_ID as u16,
+        EveSceneInfo {
+            eve_no: WARP_ID as u16,
+            dest_map_id: DEST_MAP,
+            player_appear_x: 11,
+            player_appear_y: 16,
+            ..Default::default()
+        },
+    );
     data.scene_eve_data.insert(u32::from(TEST_MAP), scene);
     data.ground_terrains.insert(u32::from(TEST_MAP), 110);
     data
@@ -443,15 +453,15 @@ fn test_eve_door_warp_does_not_send_early_14_08_or_unlock() {
 
     // Verify coordinates and map relocated:
     assert_eq!(session.map_id, DEST_MAP);
-    assert_eq!(session.map_x, 200);
-    assert_eq!(session.map_y, 300);
+    assert_eq!(session.map_x, 210);
+    assert_eq!(session.map_y, 310);
 
     // Exactly 2 frames: 14 07 (Fade screen) and Relocate packet (0x0C)
     assert_eq!(out.outgoing.len(), 2, "Must emit exactly 2 frames: fade and relocate");
     assert_eq!(out.outgoing[0].frame, "F44402001407", "Frame 0 must be screen fade (14 07)");
     assert_eq!(
         out.outgoing[1].frame,
-        spawn::build_relocate_packet(6677, DEST_MAP, 200, 300, WARP_ID as u8),
+        spawn::build_relocate_packet(6677, DEST_MAP, 210, 310, WARP_ID as u8),
         "Frame 1 must be relocate packet (Opcode 0x0C)"
     );
 
