@@ -33,6 +33,14 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 - **Định nghĩa**: Gói tin thông báo lỗi hệ thống, ngắt kết nối hoặc cảnh báo người chơi từ Server gửi xuống Client (Opcode `0x00`, cấu trúc `F4 44` + độ dài + `0x00` + status `0..57`). Riêng chiều Client → Server, khung payload rỗng `F4 44 01 00 00` được dùng làm **liveness ACK** (server chỉ làm mới `last_seen`, không phản hồi).
 - **Ràng buộc (Invariants)**: Mọi cảnh báo/ngắt kết nối chỉ đi một chiều Server → Client (S → C); ở chiều Client → Server chỉ chấp nhận liveness ACK không mang thông điệp nghiệp vụ.
 
+### Server Greeting & Reconnect / Relog Lifecycle (Chào mừng & Vòng đời Đăng nhập / Tái kết nối)
+- **Định nghĩa**: Gói tin S → C do Server chủ động gửi ngay sau khi bắt tay TCP thành công (Opcode `0x01`, Sub `0x09`, cấu trúc `F4 44 03 00 01 09 <sceneMode>`). Phía Client (`aLogin.exe`) hoàn toàn thụ động không gửi tin nhắn trước mà chờ gói này để kích hoạt luồng giao diện đăng nhập (đồng thời client gửi phản hồi liveness ACK `F4 44 01 00 00`).
+- **Quy cách Phân biệt Clean Login vs Reconnect / Relog**:
+  - **Kết nối mới (Clean Login / First Connect)**: Bắt buộc gửi `sceneMode % 100 ∉ [90..99]` (chuẩn là `0x01`, frame `F4 44 03 00 01 09 01`). Khi đó điều kiện thẩm định `FUN_00504c9c` tại client trả về `FALSE`, kích hoạt `TFrmLogin.Show()` mở form đăng nhập trống với con trỏ nhấp nháy để người chơi tự nhập `player_id` và mật khẩu.
+  - **Tái kết nối / Đăng nhập lại (Reconnect / Auto-Relog)**: Khi người chơi đã từng đăng nhập trước đó và thông tin tài khoản/mật khẩu đang được lưu trong cấu trúc `TPlayer` (`DAT_0092530c + 0x644`/`+ 0x648`), Server gửi `sceneMode % 100 ∈ [90..99]` (ví dụ `0x5A` = 90 decimal). Khi đó `FUN_00504c9c` trả về `TRUE`, client tự động lấy thông tin từ RAM điền vào form và gọi `FUN_007095c0` submit auth ngay lập tức mà không cần người dùng thao tác.
+  - **Cảnh báo lỗi Invariant**: Tuyệt đối **không** gửi `sceneMode ∈ [90..99]` trong lần kết nối đầu tiên khi RAM client chưa có dữ liệu tài khoản (`_LStrLen < 3`), vì client sẽ fail validation trong `FUN_007095c0`, kích hoạt toast lỗi `DAT_007098b8` ("iD không chính xác") và đứng im tại màn hình chọn server.
+
+
 
 ### Dispatcher (Bộ điều phối nghiệp vụ)
 - **Định nghĩa**: Dịch vụ miền (Domain Service) có nhiệm vụ tiếp nhận Gói tin Opcode đã giải mã, phân tích mã lệnh (Opcode/Subcode) và điều phối tới các Handler xử lý logic tương ứng.

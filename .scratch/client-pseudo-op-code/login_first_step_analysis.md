@@ -114,30 +114,34 @@ Server Rust vào ngay `read_half.read(&mut buf)`. Do Client không gửi gì tr�
   - Byte 2: `sceneMode` (Mã số cảnh).
 
 #### Bảng so sánh Frame Plaintext vs Frame XOR 0xAD trên dây cáp:
-Với mã cảnh đăng nhập chuẩn `sceneMode = 90` (`0x5A` hex):
 
+1. **Khung tin Đăng nhập từ đầu (Clean Login Greeting) — `sceneMode = 1` (`0x01` hex, Khuyên dùng khi vừa mở socket)**:
 | Thành phần | Ý nghĩa giao thức | Giá trị Plaintext (Hex) | Công thức XOR `0xAD` | Giá trị trên Wire TCP (Hex) |
 | :--- | :--- | :---: | :---: | :---: |
-| **Token[0]** | Magic Byte 1 | `F4` | `0xF4 ^ 0xAD` | `59` |
-| **Token[1]** | Magic Byte 2 | `44` | `0x44 ^ 0xAD` | `E9` |
-| **Length[0]**| Payload Length LSB | `03` | `0x03 ^ 0xAD` | `AE` |
-| **Length[1]**| Payload Length MSB | `00` | `0x00 ^ 0xAD` | `AD` |
-| **Payload[0]**| Main Opcode (0x01) | `01` | `0x01 ^ 0xAD` | `AC` |
-| **Payload[1]**| Sub Opcode (0x09) | `09` | `0x09 ^ 0xAD` | `A4` |
-| **Payload[2]**| Scene Mode (`0x5A` = 90) | `5A` | `0x5A ^ 0xAD` | `F7` |
+| **Token[0..1]** | Magic Byte 1 & 2 | `F4 44` | `F4^AD, 44^AD` | `59 E9` |
+| **Length[0..1]**| Payload Length LE (3 bytes) | `03 00` | `03^AD, 00^AD` | `AE AD` |
+| **Payload[0..2]**| `[0x01] [0x09] [0x01]` | `01 09 01` | `01^AD, 09^AD, 01^AD` | `AC A4 AC` |
 
-*Chuỗi byte truyền thực tế trên socket:* `59 E9 AE AD AC A4 F7` (7 bytes).
+*Chuỗi byte truyền thực tế trên socket:* `59 E9 AE AD AC A4 AC` (7 bytes, Frame hex: `F4440300010901`).
 
-#### Phân tích hằng số `HELLO_REPLY` trong Rust:
-Trong `src/server/spawn.rs:44`:
+2. **Khung tin Tái kết nối tự động (Reconnect / Auto-Relog Greeting) — `sceneMode = 90` (`0x5A` hex)**:
+| Thành phần | Ý nghĩa giao thức | Giá trị Plaintext (Hex) | Công thức XOR `0xAD` | Giá trị trên Wire TCP (Hex) |
+| :--- | :--- | :---: | :---: | :---: |
+| **Token[0..1]** | Magic Byte 1 & 2 | `F4 44` | `F4^AD, 44^AD` | `59 E9` |
+| **Length[0..1]**| Payload Length LE (3 bytes) | `03 00` | `03^AD, 00^AD` | `AE AD` |
+| **Payload[0..2]**| `[0x01] [0x09] [0x5A]` | `01 09 5A` | `01^AD, 09^AD, 5A^AD` | `AC A4 F7` |
+
+*Chuỗi byte truyền thực tế trên socket:* `59 E9 AE AD AC A4 F7` (7 bytes, Frame hex: `F444030001095A`).
+
+#### Phân tích hằng số `HELLO_REPLY` và `LOGIN_SCENE_GREETING` trong Rust:
+Trong `src/server/spawn.rs`:
 ```rust
 pub const HELLO_REPLY: &str = "F4440300010901";
+pub const LOGIN_SCENE_GREETING: &str = "F4440300010901";
 ```
-Có hai vấn đề kỹ thuật nghiêm trọng với hằng số này:
-1. **Bị bỏ quên hoàn toàn**: `grep_search` toàn bộ thư mục `src/` cho thấy `HELLO_REPLY` chỉ xuất hiện đúng 1 lần tại nơi khai báo, không có bất kỳ dòng mã nào sử dụng nó để gửi xuống client.
-2. **Độ lệch giá trị Scene Mode (`0x01` vs `0x5A`)**:
-   - `HELLO_REPLY` định nghĩa `sceneMode = 0x01`.
-   - Gói tin chuẩn mở màn hình đăng nhập yêu cầu `sceneMode = 0x5A` (90 decimal). Phân tích ở Bước 3 sẽ giải thích rõ sự khác biệt hành vi của máy khách giữa hai giá trị này.
+- **Ý nghĩa giá trị Scene Mode (`0x01` vs `0x5A`)**:
+  - `sceneMode = 0x01`: Chỉ thị mở màn hình Đăng nhập từ đầu (Clean Login). Client gọi `TFrmLogin.Show()` mở form trống để người chơi nhập ID và mật khẩu.
+  - `sceneMode = 0x5A`: Chỉ thị Reconnect / Auto-relog. Client tự động điền ID và Pass từ RAM `TPlayer` (`DAT_0092530c`) và tự động submit. Nếu gửi giá trị này khi kết nối lần đầu (RAM trống), client sẽ báo lỗi "iD không chính xác".
 
 ---
 
@@ -199,19 +203,22 @@ bool FUN_00504c9c(undefined4 param_1, byte param_2) {
 }
 ```
 
-##### Chứng minh toán học:
+##### Chứng minh toán học & Phân biệt First Connect vs Reconnect:
 Trong số học bù 2 trên trường 8-bit unsigned (`uint8_t`):
 $$\text{local\_9} + \mathtt{0xA6} \equiv \text{local\_9} - 90 \pmod{256}$$
 Biểu thức `(byte)(local_9 + 0xA6) < 10` là phép tối ưu hoá của trình biên dịch Delphi cho mệnh đề:
 $$\text{local\_9} \in [90, 99]$$
-* **Trường hợp `sceneMode = 90` (`0x5A`)**:
-  $$(90 + 166) = 256 \equiv 0 \pmod{256} \implies 0 < 10 \quad (\mathbf{TRUE})$$
-  Client xác nhận đây là **Login Scene**. Nếu người chơi đã lưu tài khoản/mật khẩu trước đó (trong cấu trúc `TPlayer` tại `DAT_0092530c`), máy khách sẽ tự động điền và kích hoạt **Auto-Login** ngay tức khắc mà không cần người dùng can thiệp! Nếu chưa lưu thông tin, `FUN_007095c0` kiểm tra thấy rỗng sẽ hiển thị Form Login cho người dùng nhập.
-* **Trường hợp `sceneMode = 1` (`0x01`, như trong `HELLO_REPLY` hiện tại)**:
-  $$(1 + 166) = 167 \ge 10 \implies (\mathbf{FALSE})$$
-  Hàm trả về `false`. Client không thực hiện chu trình điền tự động mà nhảy thẳng vào hiển thị form đăng nhập trống (`TFrmLogin.Show`).
 
-**Đánh giá**: Mặc dù `sceneMode = 1` cũng mở được form đăng nhập thông qua nhánh fallback `if (!bVar4)`, nhưng chuẩn thiết kế của giao thức TS Online quy định toàn bộ dải `90..99` là các cảnh thuộc phân hệ đăng nhập / tạo nhân vật / chọn cụm máy chủ. Do đó, gửi `sceneMode = 90` (`0x5A`) là phương án chính xác và tương thích toàn diện nhất.
+Từ kết quả này, giao thức phân chia rõ 2 kịch bản vận hành:
+* **Trường hợp 1: Đăng nhập từ đầu (First Connect / Clean Login) — `sceneMode = 1` (`0x01`)**:
+  $$(1 + 166) = 167 \ge 10 \implies (\mathbf{FALSE})$$
+  Hàm trả về `false`. Client **không** thực hiện chu trình auto-fill mà nhảy vào nhánh `if (!bVar4)`: gọi `TFrmLogin.Show()` (`+0x20`) để hiển thị Form đăng nhập trống, con trỏ nhấp nháy tại ô tài khoản chờ người dùng tự gõ ID và mật khẩu. **Đây là giá trị bắt buộc phải gửi khi vừa thiết lập kết nối TCP**.
+* **Trường hợp 2: Tái kết nối tự động (Reconnect / Auto-Relog) — `sceneMode = 90` (`0x5A`)**:
+  $$(90 + 166) = 256 \equiv 0 \pmod{256} \implies 0 < 10 \quad (\mathbf{TRUE})$$
+  Client xác nhận đây là phiên Reconnect của tài khoản đã từng đăng nhập trước đó: máy khách tự động lấy tài khoản và mật khẩu đang lưu trong RAM (`DAT_0092530c + 0x644`/`+ 0x648`) điền vào form và tự động submit qua `FUN_007095c0` mà không cần người dùng thao tác.
+  
+> [!WARNING]
+> **Cảnh báo lỗi Invariant**: Nếu Server gửi `sceneMode = 90` (`0x5A`) trong lần kết nối đầu tiên khi RAM `DAT_0092530c` chưa có dữ liệu tài khoản (`_LStrLen < 3`), hàm `FUN_007095c0` sẽ bị fail validation, kích hoạt toast lỗi `DAT_007098b8` (**"iD không chính xác"**) và client đứng im tại màn hình chọn server! Do đó, gói Greeting khởi đầu bắt buộc phải dùng `sceneMode = 0x01` (`F4 44 03 00 01 09 01`).
 
 ---
 
@@ -415,9 +422,9 @@ pub async fn handle_login(ctx: &mut OpcodeCtx<'_>) {
 | Giai đoạn nghiệp vụ | Điểm thực thi Client (`aLogin.exe`) | Điểm thực thi Server (`ts_dream`) | Gói tin & Dữ liệu trên đường truyền | Nhận xét tương thích |
 | :--- | :--- | :--- | :--- | :--- |
 | **1. TCP Establish** | `0x0050CF4C`<br/>`TForm1.ClientSocket1Connect`<br/>(Ghi log, không gửi dữ liệu) | [`src/web/server_control.rs:347`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/src/web/server_control.rs#L347)<br/>`handle_client_connection` | Không có | **LỆCH**: Server Rust cần chủ động gửi `HELLO_REPLY` ngay sau khi accept, không chờ client. |
-| **2. Server Greeting**| `0x0050CD6C`<br/>`TForm1.ClientSocket1Read`<br/>Nhận và khử khung XOR `0xAD` | [`src/server/spawn.rs:44`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/src/server/spawn.rs#L44)<br/>`pub const HELLO_REPLY` | `F4 44 03 00 01 09 5A`<br/>Wire XOR: `59 E9 AE AD AC A4 F7` | Cần cập nhật `sceneMode` từ `01` thành `5A` (90) và gọi gửi trong `server_control.rs`. |
-| **3. Dispatch Scene** | `0x0078A89C` $\to$ `0x0078B149`<br/>`case 9:` gọi `0x0051AAE0` | Không áp dụng (Client nội bộ) | Payload: `01 09 5A` | Hoàn toàn khớp với luồng xử lý `switch(SubOp)` của client. |
-| **4. Check Scene** | `0x00504C9C`<br/>`FUN_00504c9c`<br/>Kiểm tra `sceneMode % 100 in [90..99]` | Không áp dụng (Client nội bộ) | `sceneMode = 90` | Trả về `true`, mở đường cho auto-fill và auto-login của client. |
+| **2. Server Greeting**| `0x0050CD6C`<br/>`TForm1.ClientSocket1Read`<br/>Nhận và khử khung XOR `0xAD` | [`src/server/spawn.rs:60`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/src/server/spawn.rs#L60)<br/>`LOGIN_SCENE_GREETING` | `F4 44 03 00 01 09 01`<br/>Wire XOR: `59 E9 AE AD AC A4 AC` | Chuẩn cho First Connect: `sceneMode = 01` để mở form đăng nhập trống. Với Reconnect dùng `sceneMode = 5A`. |
+| **3. Dispatch Scene** | `0x0078A89C` $\to$ `0x0078B149`<br/>`case 9:` gọi `0x0051AAE0` | Không áp dụng (Client nội bộ) | Payload: `01 09 01` (hoặc `01 09 5A`) | Hoàn toàn khớp với luồng xử lý `switch(SubOp)` của client. |
+| **4. Check Scene** | `0x00504C9C`<br/>`FUN_00504c9c`<br/>Kiểm tra `sceneMode % 100 in [90..99]` | Không áp dụng (Client nội bộ) | `sceneMode = 1` (First Connect) / `90` (Reconnect) | First Connect: trả về `false`, gọi `TFrmLogin.Show()` mở form nhập. Reconnect: trả về `true`, auto-fill từ RAM. |
 | **5. Client Send Auth** | `0x0077F414` (Case 1)<br/>`FUN_0077f414`<br/>Gửi `SendCommand(1)` | [`src/server/dispatcher.rs:189`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/src/server/dispatcher.rs#L189)<br/>`dispatch` bóc tách opcode | Khung: `F4 44 [Len] 01 [lenPw] [ID 4B LE] [prefix 2B] [BC 00] [pw]` | Rust bóc `opcode=0x01`, `sub=lenPw`, `payload=[ID..pw]`. Hoàn toàn khớp cấu trúc. |
 | **6. Verify Auth** | Chờ phản hồi kết quả từ Server | [`src/server/handlers/login.rs:17`](file:///mnt/d/VUDT/GIT_PCC/ts_dream/src/server/handlers/login.rs#L17)<br/>`handle_login` & `login_db` | `LOGIN_WRONG_PASS` (`F44402000106`) hoặc Chuỗi gói tin `Logined1` | Khớp chuẩn 100% với giao thức phản hồi sau xác thực. |
 

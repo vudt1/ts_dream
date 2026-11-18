@@ -232,47 +232,11 @@
             </form>
         </div>
 
-        <!-- Special Events Card -->
-        <div class="card" id="special-events-card" style="margin-bottom: 24px;">
-            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-                <span>Special Events Control Plane</span>
-                <span style="font-size: 12px; color: var(--text-muted);">Strict Mutex & 120m Starvation Watchdog</span>
-            </div>
-            <div style="margin-bottom: 16px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px; display: flex; align-items: center; gap: 16px;">
-                <label style="font-size: 13px; font-weight: 600; color: var(--text-secondary);">North Star Encounter Rate: <span id="rate-display">{{ north_star_rate }}%</span></label>
-                <input type="range" name="rate" min="1" max="30" value="{{ north_star_rate }}" style="flex: 1;" hx-post="/api/events/north_star/rate" hx-trigger="change" hx-swap="none" oninput="document.getElementById('rate-display').innerText = this.value + '%'">
-            </div>
-            <table class="data-table" style="width: 100%;">
-                <thead>
-                    <tr>
-                        <th>Event ID</th>
-                        <th>Name</th>
-                        <th>Status</th>
-                        <th>Participants</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for e in events %}
-                    <tr>
-                        <td style="font-weight: 600;">{{ e.id }}</td>
-                        <td>{{ e.name }}</td>
-                        <td><span class="status-badge {{ e.badge_class() }}">{{ e.phase }}</span></td>
-                        <td>{{ e.participants }}</td>
-                        <td>
-                            <button class="btn btn-green" style="padding: 4px 10px; font-size: 12px;" hx-post="/api/events/{{ e.id }}/start" hx-target="#special-events-card" hx-swap="outerHTML">Start</button>
-                            <button class="btn btn-red" style="padding: 4px 10px; font-size: 12px; margin-left: 6px;" hx-post="/api/events/{{ e.id }}/stop" hx-target="#special-events-card" hx-swap="outerHTML">Stop</button>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
         <!-- Main Navigation Tabs -->
         <div class="tab-nav">
             <button class="tab-btn active" onclick="showTab('tab-log', this)">Live SSE Terminal</button>
             <button class="tab-btn" onclick="showTab('tab-accounts', this)">Accounts Manager</button>
+            <button class="tab-btn" onclick="showTab('tab-events', this)">Special Events ({{ events.len() }})</button>
             <button class="tab-btn" onclick="showTab('tab-online', this)">Online Players</button>
             <button class="tab-btn" onclick="showTab('tab-npcs', this)">NPC Database ({{ npcs_count }})</button>
             <button class="tab-btn" onclick="showTab('tab-assets', this)">Data Integrity ({{ assets.len() }})</button>
@@ -330,7 +294,16 @@
                     {% for acc in accounts %}
                     <tr>
                         <td><strong>{{ acc.player_id }}</strong></td>
-                        <td>{% if acc.gm_level > 0 %}yes{% else %}no{% endif %}</td>
+                        <td>
+                            <button class="status-badge {% if acc.gm_level > 0 %}status-online{% else %}status-offline{% endif %}"
+                                    style="cursor: pointer; font-size: 12px; padding: 2px 12px; border: 1px solid currentColor;"
+                                    hx-post="/api/accounts/{{ acc.player_id }}/toggle_gm"
+                                    hx-target="closest td"
+                                    hx-swap="outerHTML"
+                                    title="Click to toggle GM Level">
+                                {% if acc.gm_level > 0 %}yes{% else %}no{% endif %}
+                            </button>
+                        </td>
                         <td>{% if acc.is_suspended %}yes{% else %}no{% endif %}</td>
                     </tr>
                     {% endfor %}
@@ -338,7 +311,46 @@
             </table>
         </div>
 
-        <!-- Tab 3: Online Players -->
+        <!-- Tab 3: Special Events -->
+        <div id="tab-events" class="tab-content">
+            <div class="card" id="special-events-card" style="margin-bottom: 24px;">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Special Events Control Plane</span>
+                    <span style="font-size: 12px; color: var(--text-muted);">Strict Mutex & 120m Starvation Watchdog</span>
+                </div>
+                <div style="margin-bottom: 16px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px; display: flex; align-items: center; gap: 16px;">
+                    <label style="font-size: 13px; font-weight: 600; color: var(--text-secondary);">North Star Encounter Rate: <span id="rate-display">{{ north_star_rate }}%</span></label>
+                    <input type="range" name="rate" min="1" max="30" value="{{ north_star_rate }}" style="flex: 1;" hx-post="/api/events/north_star/rate" hx-trigger="change" hx-swap="none" oninput="document.getElementById('rate-display').innerText = this.value + '%'">
+                </div>
+                <table class="data-table" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Event ID</th>
+                            <th>Name</th>
+                            <th>Status</th>
+                            <th>Participants</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for e in events %}
+                        <tr>
+                            <td style="font-weight: 600;">{{ e.id }}</td>
+                            <td>{{ e.name }}</td>
+                            <td><span class="status-badge {{ e.badge_class() }}">{{ e.phase }}</span></td>
+                            <td>{{ e.participants }}</td>
+                            <td>
+                                <button class="btn btn-green" style="padding: 4px 10px; font-size: 12px;" hx-post="/api/events/{{ e.id }}/start" hx-target="#special-events-card" hx-swap="outerHTML">Start</button>
+                                <button class="btn btn-red" style="padding: 4px 10px; font-size: 12px; margin-left: 6px;" hx-post="/api/events/{{ e.id }}/stop" hx-target="#special-events-card" hx-swap="outerHTML">Stop</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab 4: Online Players -->
         <div id="tab-online" class="tab-content">
             <table class="data-table">
                 <thead>
@@ -360,7 +372,7 @@
             </table>
         </div>
 
-        <!-- Tab 4: NPC Database -->
+        <!-- Tab 5: NPC Database -->
         <div id="tab-npcs" class="tab-content">
             <input type="text" class="form-input search-bar" id="npc-search" placeholder="Search NPC by ID or Name..." onkeyup="filterNpcs()">
             <table class="data-table" id="npc-table">
@@ -395,7 +407,7 @@
             </table>
         </div>
 
-        <!-- Tab 5: Binary Data Integrity -->
+        <!-- Tab 6: Binary Data Integrity -->
         <div id="tab-assets" class="tab-content">
             <div class="card">
                 <div class="card-header">Accepted Binary Assets (.dat / .emg / .mng)</div>
@@ -411,7 +423,7 @@
             </div>
         </div>
 
-        <!-- Tab 6: Guilds -->
+        <!-- Tab 7: Guilds -->
         <div id="tab-guilds" class="tab-content">
             <div class="card">
                 <div class="card-header">Guild Administration</div>
@@ -426,7 +438,7 @@
             </div>
         </div>
 
-        <!-- Tab 7: World Bosses -->
+        <!-- Tab 8: World Bosses -->
         <div id="tab-bosses" class="tab-content">
             <div class="card">
                 <div class="card-header">World Boss Operations</div>

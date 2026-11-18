@@ -397,3 +397,49 @@ async fn test_dashboard_renders_special_events_card() {
     assert!(body_str.contains("/api/events/north_star/stop"), "dashboard must have stop button");
 }
 
+#[tokio::test]
+async fn test_toggle_account_gm_level_api() {
+    let db = setup_test_db().await;
+    let acc_id = ts_dream::db::accounts::create(&db, "testpass1", "testpass2")
+        .await
+        .expect("create test account");
+
+    let app = Arc::new(RwLock::new(AppState::new(1)));
+    let state = WebState {
+        app: app.clone(),
+        pool: Some(db.clone()),
+        data: None,
+        server_control: None,
+    };
+
+    // Toggle 0 -> 1 (yes)
+    let req1 = Request::builder()
+        .uri(format!("/api/accounts/{acc_id}/toggle_gm"))
+        .method("POST")
+        .header("hx-request", "true")
+        .body(Body::empty())
+        .unwrap();
+
+    let resp1 = router(state.clone()).oneshot(req1).await.unwrap();
+    assert_eq!(resp1.status(), StatusCode::OK);
+    let bytes1 = to_bytes(resp1.into_body(), usize::MAX).await.unwrap();
+    let body_str1 = String::from_utf8_lossy(&bytes1);
+    assert!(body_str1.contains("yes"), "must render yes button");
+    assert!(body_str1.contains("status-online"), "must have status-online badge");
+
+    // Toggle 1 -> 0 (no)
+    let req2 = Request::builder()
+        .uri(format!("/api/accounts/{acc_id}/toggle_gm"))
+        .method("POST")
+        .header("hx-request", "true")
+        .body(Body::empty())
+        .unwrap();
+
+    let resp2 = router(state.clone()).oneshot(req2).await.unwrap();
+    assert_eq!(resp2.status(), StatusCode::OK);
+    let bytes2 = to_bytes(resp2.into_body(), usize::MAX).await.unwrap();
+    let body_str2 = String::from_utf8_lossy(&bytes2);
+    assert!(body_str2.contains("no"), "must render no button");
+    assert!(body_str2.contains("status-offline"), "must have status-offline badge");
+}
+

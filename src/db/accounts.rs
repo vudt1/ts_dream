@@ -107,3 +107,46 @@ pub async fn change_pass(
     tx.commit().await?;
     Ok(true)
 }
+
+/// Toggle GM level between 0 (player) and 1 (GM). Returns the new `gm_level`
+/// or `None` if the account does not exist.
+pub async fn toggle_gm_level(pool: &DbPool, player_id: i64) -> Result<Option<i32>, sqlx::Error> {
+    let mut tx = pool.write.begin().await?;
+    let current: Option<(i32,)> = sqlx::query_as("SELECT gmlevel FROM accounts WHERE playerid = ?")
+        .bind(player_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+    let Some((gm_level,)) = current else {
+        return Ok(None);
+    };
+
+    let new_level = if gm_level > 0 { 0 } else { 1 };
+    let now = chrono::Utc::now().timestamp_millis();
+    sqlx::query("UPDATE accounts SET gmlevel = ?, updatedat = ? WHERE playerid = ?")
+        .bind(new_level)
+        .bind(now)
+        .bind(player_id)
+        .execute(&mut *tx)
+        .await?;
+
+    tx.commit().await?;
+    Ok(Some(new_level))
+}
+
+/// Explicitly set GM level for a player account.
+pub async fn set_gm_level(pool: &DbPool, player_id: i64, gm_level: i32) -> Result<bool, sqlx::Error> {
+    let mut tx = pool.write.begin().await?;
+    let now = chrono::Utc::now().timestamp_millis();
+    let res = sqlx::query("UPDATE accounts SET gmlevel = ?, updatedat = ? WHERE playerid = ?")
+        .bind(gm_level)
+        .bind(now)
+        .bind(player_id)
+        .execute(&mut *tx)
+        .await?;
+    if res.rows_affected() != 1 {
+        return Ok(false);
+    }
+    tx.commit().await?;
+    Ok(true)
+}

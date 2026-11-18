@@ -67,19 +67,24 @@ Mỗi frame trên đường truyền TCP giữa Server và Client có cấu trú
    * Key tĩnh không thay đổi theo vị trí, không có rolling state, không phụ thuộc session.
 
 #### Bảng minh họa byte thô (Raw Frame vs Wire XOR Frame):
-Giả sử Server gửi lệnh chuyển sang Login Scene `sceneMode = 90` (`0x5A`):
 
-| Phần tử | Ý nghĩa | Giá trị trước XOR (Plain) | Giá trị trên Wire (Plain XOR 0xAD) |
+1. **Trường hợp Đăng nhập từ đầu (Clean Login) — `sceneMode = 0x01` (Khuyên dùng khi bắt đầu kết nối)**:
+| Phần tử | Ý nghĩa | Giá trị Plaintext | Giá trị trên Wire (Plain XOR 0xAD) |
 | :--- | :--- | :---: | :---: |
-| **Token[0]** | Token byte 1 | `0xF4` | `0xF4 ^ 0xAD = 0x59` |
-| **Token[1]** | Token byte 2 | `0x44` | `0x44 ^ 0xAD = 0xE9` |
-| **Length[0]** | Payload len LSB | `0x03` | `0x03 ^ 0xAD = 0xAE` |
-| **Length[1]** | Payload len MSB | `0x00` | `0x00 ^ 0xAD = 0xAD` |
-| **Payload[0]**| Main OP | `0x01` | `0x01 ^ 0xAD = 0xAC` |
-| **Payload[1]**| Sub OP | `0x09` | `0x09 ^ 0xAD = 0xA4` |
-| **Payload[2]**| Scene Mode | `0x5A` (90) | `0x5A ^ 0xAD = 0xF7` |
+| **Token[0..1]** | Token `0xF4, 0x44` | `F4 44` | `59 E9` |
+| **Length[0..1]**| Payload len LE (3 bytes) | `03 00` | `AE AD` |
+| **Payload[0..2]**| `[0x01] [0x09] [0x01]` | `01 09 01` | `AC A4 AC` |
 
-*Chuỗi byte trên wire thực tế:* `59 E9 AE AD AC A4 F7` (7 bytes).
+*Chuỗi byte trên wire thực tế:* `59 E9 AE AD AC A4 AC` (7 bytes, Frame hex: `F4440300010901`).
+
+2. **Trường hợp Tái kết nối (Reconnect / Auto-Relog khi đã lưu Session RAM) — `sceneMode = 0x5A` (90)**:
+| Phần tử | Ý nghĩa | Giá trị Plaintext | Giá trị trên Wire (Plain XOR 0xAD) |
+| :--- | :--- | :---: | :---: |
+| **Token[0..1]** | Token `0xF4, 0x44` | `F4 44` | `59 E9` |
+| **Length[0..1]**| Payload len LE (3 bytes) | `03 00` | `AE AD` |
+| **Payload[0..2]**| `[0x01] [0x09] [0x5A]` | `01 09 5A` | `AC A4 F7` |
+
+*Chuỗi byte trên wire thực tế:* `59 E9 AE AD AC A4 F7` (7 bytes, Frame hex: `F444030001095A`).
 
 ---
 
@@ -234,7 +239,17 @@ Xét bảng giá trị của $x \in [0, 99]$:
 3. **Khi $x = 100$**:  
    $$100 + 166 = 266 \equiv 10 \pmod{256} \not< 10 \implies$ **FALSE**.
 
-**KẾT LUẬN**: Hàm `FUN_00504c9c` trả về `TRUE` khi và chỉ khi `sceneMode % 100 ∈ [90..99]`. Trong giao thức client TS Online, toàn bộ các mã cảnh từ **90 đến 99** là các cảnh thuộc phân hệ Đăng nhập / Chọn nhân vật / Đăng nhập lại (Login Scenes).
+**KẾT LUẬN**: Hàm `FUN_00504c9c` trả về `TRUE` khi và chỉ khi `sceneMode % 100 ∈ [90..99]`. Trong giao thức client TS Online, điều này phân biệt 2 kịch bản mạng quan trọng:
+
+1. **Kịch bản 1: Đăng nhập từ đầu (First Connect / Clean Login)**:
+   - Server gửi `sceneMode % 100 ∉ [90..99]` (chuẩn là `sceneMode = 0x01`, Frame: `F4 44 03 00 01 09 01`).
+   - `FUN_00504c9c(1)` trả về `FALSE`.
+   - Client nhảy vào nhánh `if (!bVar4)`: gọi `TFrmLogin.Show()` (`VMT + 0x20`), hiển thị form đăng nhập với các ô nhập trống và con trỏ nhấp nháy, chờ người chơi gõ ID và mật khẩu.
+2. **Kịch bản 2: Tái kết nối / Tự động đăng nhập lại (Reconnect / Auto-Relog)**:
+   - Server gửi `sceneMode % 100 ∈ [90..99]` (ví dụ `sceneMode = 0x5A` = 90, Frame: `F4 44 03 00 01 09 5A`).
+   - `FUN_00504c9c(90)` trả về `TRUE`.
+   - Client hiểu đây là phiên reconnect của tài khoản đã từng đăng nhập: client tự động lấy tài khoản/mật khẩu đang lưu trong RAM `DAT_0092530c` (`TPlayer`) điền vào form và submit tự động qua `FUN_007095c0`.
+   - **LƯU Ý QUAN TRỌNG**: Nếu server gửi `sceneMode = 0x5A` trong lần kết nối đầu tiên khi RAM `DAT_0092530c` chưa có dữ liệu (`_LStrLen < 3`), hàm `FUN_007095c0` sẽ bị fail validation, kích hoạt toast lỗi `DAT_007098b8` (**"iD không chính xác"**) và client đứng im tại màn hình chọn server!
 
 ---
 
@@ -290,16 +305,15 @@ Trong [`0051aae0_FUN_0051aae0.c:58-73`](file:///mnt/d/VUDT/GIT_PCC/test/ts_decom
   *(undefined1 *)(DAT_009264a4 + 0x1e) = 0;
 ```
 
-#### So sánh 2 trường hợp:
+#### Bảng so sánh 3 trường hợp thực tế:
 
-| Tiêu chí | Trường hợp 1: Đã lưu Tài khoản / Mật khẩu | Trường hợp 2: Chưa lưu Tài khoản / Mật khẩu (Trống) |
-| :--- | :--- | :--- |
-| **Trạng thái tại `DAT_0092530c`** | `+0x644` chứa chuỗi tài khoản hợp lệ (vd: `"AP123456"`); `+0x648` chứa mật khẩu hợp lệ. | `+0x644` rỗng (`NIL` hoặc `""`); `+0x648` rỗng (`\0`). |
-| **Điền vào Form** | Cả hai ô nhập `+0x13c` và `+0x140` được gán chuỗi tương ứng. | Cả hai ô nhập `+0x13c` và `+0x140` bị gán chuỗi rỗng. |
-| **Thực thi trong `FUN_007095c0`** | Kiểm tra tiền tố và số hợp lệ $\to$ Password không rỗng $\to$ Pass validation. | Kiểm tra độ dài tài khoản: `_LStrLen < 3` $\to$ **Fail validation**. |
-| **Hành vi Toast** | Không hiển thị toast lỗi nào. | Hiện toast lỗi `DAT_007098b8` (3000ms), gọi `FUN_007b37b0` focus vào ô tài khoản. |
-| **Gửi gói tin `SendCommand(1)`** | **Tự động gọi `FUN_0077f414(..., 1)` ngay lập tức** (Auto-Login). | **Không gọi `FUN_0077f414`**, thoát khỏi hàm. |
-| **Trạng thái hiển thị Form** | Form gọi `VMT + 0x24` (`Hide`), biến mất khỏi màn hình. | Form tiếp tục **hiển thị trên màn hình (`Show`)**, con trỏ nhấp nháy tại ô tài khoản chờ người dùng gõ phím. |
+| Tiêu chí | Kịch bản A: Đăng nhập từ đầu (`sceneMode = 0x01`) | Kịch bản B: Reconnect hợp lệ (`sceneMode = 0x5A`) | Kịch bản C: Gửi nhầm `0x5A` khi kết nối lần đầu |
+| :--- | :--- | :--- | :--- |
+| **Giá trị `FUN_00504c9c`** | **`FALSE`** (`bVar4 = false`) | **`TRUE`** (`bVar4 = true`) | **`TRUE`** (`bVar4 = true`) |
+| **Trạng thái tại `DAT_0092530c`** | Rỗng hoặc không quan tâm | `+0x644` có ID, `+0x648` có Pass hợp lệ | `+0x644` rỗng (`NIL` hoặc `""`), `+0x648` rỗng |
+| **Hành vi Form Login** | **Gọi `TFrmLogin.Show()` (`+0x20`)**, form mở trên màn hình chờ nhập | Form tự điền thông tin và ẩn đi sau khi gửi | Form tự điền chuỗi rỗng |
+| **Thực thi `FUN_007095c0`** | **Chưa chạy** (chờ người dùng bấm nút) | Chạy ngay lập tức $\to$ Hợp lệ | Chạy ngay lập tức $\to$ **Thất bại** (`_LStrLen < 3`) |
+| **Hành vi Toast & Mạng** | Không có toast lỗi, sẵn sàng nhận phím | Gửi `SendCommand(1)` (Auth), vào game mượt mà | **Bật Toast "iD không chính xác" (`DAT_007098b8`)**, client treo/đứng im |
 
 ---
 

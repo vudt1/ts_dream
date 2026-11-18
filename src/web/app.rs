@@ -162,6 +162,7 @@ pub fn router(state: WebState) -> axum::Router {
             get(server_announce).post(server_announce),
         )
         .route("/api/accounts", get(list_accounts).post(create_account))
+        .route("/api/accounts/{player_id}/toggle_gm", axum::routing::post(toggle_account_gm))
         .route("/api/guilds", get(list_guilds))
         .route("/api/world-bosses", get(list_world_bosses))
         .route("/api/npcs", get(list_npcs))
@@ -400,14 +401,73 @@ async fn create_account(
         &headers,
         || {
             format!(
-                "<tr><td><strong>{}</strong></td><td>no</td><td>no</td></tr>",
-                player_id
+                "<tr><td><strong>{}</strong></td>{}<td>no</td></tr>",
+                player_id,
+                render_gm_level_cell(player_id, false)
             )
         },
         json!({
             "player_id": player_id,
             "gm_level": 0,
             "is_suspended": false
+        }),
+    )
+}
+
+pub fn render_gm_level_cell(player_id: i64, is_gm: bool) -> String {
+    let (label, badge_class) = if is_gm {
+        ("yes", "status-online")
+    } else {
+        ("no", "status-offline")
+    };
+    format!(
+        r#"<td><button class="status-badge {}" style="cursor: pointer; font-size: 12px; padding: 2px 12px; border: 1px solid currentColor;" hx-post="/api/accounts/{}/toggle_gm" hx-target="closest td" hx-swap="outerHTML" title="Click to toggle GM Level">{}</button></td>"#,
+        badge_class, player_id, label
+    )
+}
+
+async fn toggle_account_gm(
+    State(s): State<WebState>,
+    axum::extract::Path(player_id): axum::extract::Path<i64>,
+    headers: HeaderMap,
+) -> Response {
+    let pool = match s.pool {
+        Some(ref p) => p,
+        None => return StatusCode::SERVICE_UNAVAILABLE.into_response(),
+    };
+
+    let new_level = match db::accounts::toggle_gm_level(pool, player_id).await {
+        Ok(Some(lvl)) => lvl,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+
+    // If online, update live session in registry immediately
+    if let Some(mut sess) = crate::server::session::registry_get(player_id as u32) {
+        sess.gm_level = new_level;
+        crate::server::session::registry_update_if_online(&sess);
+    }
+
+    // Write audit log
+    let details = format!("gm_level={new_level}");
+    let _ = crate::db::domain::write_audit(
+        pool,
+        Some(1),
+        "gm_level_change",
+        Some("account"),
+        Some(player_id),
+        Some(&details),
+    )
+    .await;
+
+    let is_gm = new_level > 0;
+    htmx_or_json(
+        &headers,
+        || render_gm_level_cell(player_id, is_gm),
+        json!({
+            "player_id": player_id,
+            "gm_level": new_level,
+            "is_gm": is_gm,
         }),
     )
 }

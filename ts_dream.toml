@@ -17,7 +17,7 @@ data_dir = "./Data"
 database_url = "sqlite://DB/ts_dream.db"
 
 # Giá trị PerEXP ban đầu runtime
-perexp_default = 0
+perexp_default = 25
 
 # Tự động khởi tạo schema SQLite khi chưa tồn tại
 db_auto_create = true

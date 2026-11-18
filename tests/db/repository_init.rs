@@ -85,6 +85,19 @@ async fn test_account_creation_and_auth() {
         .await
         .expect("verify new pass1");
     assert!(new_pass1_ok);
+
+    // Test toggle GM level
+    let new_lvl1 = ts_dream::db::accounts::toggle_gm_level(&pool, account_id)
+        .await
+        .expect("toggle gm level")
+        .expect("account exists");
+    assert_eq!(new_lvl1, 1, "0 -> 1");
+
+    let new_lvl0 = ts_dream::db::accounts::toggle_gm_level(&pool, account_id)
+        .await
+        .expect("toggle gm level")
+        .expect("account exists");
+    assert_eq!(new_lvl0, 0, "1 -> 0");
 }
 
 #[tokio::test]
