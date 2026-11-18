@@ -22,7 +22,6 @@ pub const EVENT_ARENA: &str = "arena";
 pub const EVENT_GUILD_SIEGE: &str = "guild_siege";
 pub const EVENT_WATER_WAR: &str = "water_war";
 pub const EVENT_DRAGON_BOAT: &str = "dragon_boat";
-pub const EVENT_SEASONAL_FESTIVAL: &str = "seasonal_festival";
 
 /// The 5 formal lifecycle phases of a special event.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -168,7 +167,6 @@ impl EventLifecycleManager {
             (EVENT_GUILD_SIEGE, "Công Thành Chiến", 0),
             (EVENT_WATER_WAR, "Thủy Chiến Hải Tặc", 0),
             (EVENT_DRAGON_BOAT, "Đua Thuyền Rồng", 0),
-            (EVENT_SEASONAL_FESTIVAL, "Lễ Hội Theo Mùa", 0),
         ];
 
         for (id, name, rate) in default_events {

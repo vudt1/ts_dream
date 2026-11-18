@@ -758,10 +758,9 @@ fn test_north_star_questions_json_canonical_bank() {
 // Ticket 08: Seasonal Festivals & Static Dat Parity
 // =========================================================================
 
-use ts_dream::data::loaders::festival::{FestivalDatLoader, FESTIVAL_PARITY_DATE_DWORD};
+use ts_dream::data::loaders::festival::FestivalDatLoader;
 use ts_dream::server::handlers::festival::{
-    build_festival_ui_trigger_raw, build_seasonal_announcement_raw,
-    festival_ui_trigger_frame, seasonal_announcement_frame,
+    build_festival_ui_trigger_raw, festival_ui_trigger_frame, SeasonalNotice,
 };
 
 #[test]
@@ -771,10 +770,6 @@ fn test_festival_dat_static_loader_and_record_parity() {
 
     let records = FestivalDatLoader::load(&bytes).expect("parse Festival.Dat");
     assert_eq!(records.len(), 7, "must load exactly 7 active seasonal festival records (records 1..=7)");
-
-    // Parity timestamp check: 19000110 / 0x0121EAC6
-    assert_eq!(FESTIVAL_PARITY_DATE_DWORD, 0x0121EAC6);
-    assert_eq!(format!("{:08X}", FESTIVAL_PARITY_DATE_DWORD), "0121EAC6");
 
     let expected_titles = [
         (1, "T?t Nguyen ?an"),
@@ -791,6 +786,12 @@ fn test_festival_dat_static_loader_and_record_parity() {
         assert_eq!(def.id, id);
         assert_eq!(def.raw_data.len(), 2031, "record raw data must be exactly 2031 bytes");
         assert_eq!(def.date_time, 11.0, "Delphi TDateTime timestamp must be 11.0");
+        assert_eq!(def.lookup_key, Some(11), "lookup_key must be derived as Some(11)");
+        assert_eq!(
+            def.unique_lore_key,
+            if id == 1 { Some(11) } else { None },
+            "only record #1 owns unique_lore_key 11 on unpatched Festival.Dat"
+        );
         assert_eq!(def.word_flag, 0xB4C2, "word flag must be 0xB4C2");
         assert_eq!(def.title, expected_title, "decrypted VISCII title must match");
         assert!(!def.text1.is_empty(), "decrypted lore text1 must not be empty");
@@ -800,32 +801,29 @@ fn test_festival_dat_static_loader_and_record_parity() {
 
 #[test]
 fn test_festival_ui_trigger_frame_date_dword_parity() {
-    // Parity: S→C 24 19 [date DWORD 19000110 (0x0121EAC6, LE = C6 EA 21 01)]
-    let raw = build_festival_ui_trigger_raw(None);
+    // Parity: S→C 24 19 [key u32 LE = 11 (0B 00 00 00)] matching client (double)u32 == 11.0
+    let raw = build_festival_ui_trigger_raw(11);
     assert_eq!(raw[0..2], [0xF4, 0x44]);
-    assert_eq!(raw[2..4], [0x06, 0x00], "len must be 6 (opcode 24, sub 19, 4-byte date DWORD)");
+    assert_eq!(raw[2..4], [0x06, 0x00], "len must be 6 (opcode 24, sub 19, 4-byte u32 key)");
     assert_eq!(raw[4], 0x24);
     assert_eq!(raw[5], 0x19);
-    assert_eq!(raw[6..10], [0xC6, 0xEA, 0x21, 0x01], "0x0121EAC6 in Little Endian");
+    assert_eq!(raw[6..10], [0x0B, 0x00, 0x00, 0x00], "11 in Little Endian");
 
-    let hex_frame = festival_ui_trigger_frame(None);
-    assert_eq!(hex_frame, "F44406002419C6EA2101");
+    let hex_frame = festival_ui_trigger_frame(11);
+    assert_eq!(hex_frame, "F444060024190B000000");
 }
 
 #[test]
 fn test_seasonal_announcements_17_39_format_and_breadth() {
-    // 74 seasonal announcements across the annual festival calendar
-    for code in 1..=74 {
-        let raw = build_seasonal_announcement_raw(code);
-        assert_eq!(raw[0..2], [0xF4, 0x44]);
-        assert_eq!(raw[2..4], [0x03, 0x00], "len must be 3");
-        assert_eq!(raw[4], 0x17, "opcode must be 0x17");
-        assert_eq!(raw[5], 0x39, "sub-opcode must be 0x39");
-        assert_eq!(raw[6], code, "announcement id must match");
+    // 1-byte sub2 festival notice
+    let raw_1 = SeasonalNotice::TetCountdownStart.to_raw_frame();
+    assert_eq!(raw_1, vec![0xF4, 0x44, 0x03, 0x00, 0x17, 0x39, 0x01]);
+    assert_eq!(SeasonalNotice::TetCountdownStart.to_frame().frame, "F4440300173901");
 
-        let hex_frame = seasonal_announcement_frame(code);
-        assert_eq!(hex_frame, format!("F44403001739{:02X}", code));
-    }
+    // 2-byte sub2 + sub3 festival notice (Niên Thú 0x44 sub3 = 1)
+    let raw_2 = SeasonalNotice::NianBeast(1).to_raw_frame();
+    assert_eq!(raw_2, vec![0xF4, 0x44, 0x04, 0x00, 0x17, 0x39, 0x44, 0x01]);
+    assert_eq!(SeasonalNotice::NianBeast(1).to_frame().frame, "F444040017394401");
 }
 
 // =========================================================================

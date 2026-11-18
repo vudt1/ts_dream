@@ -49,6 +49,8 @@ pub struct ServerControl {
     pub outbound_queue_capacity: usize,
     /// Special events lifecycle manager
     pub events: Arc<crate::server::events::EventLifecycleManager>,
+    /// Seasonal festivals lifecycle manager (ADR 0011, exempt from 120m watchdog)
+    pub festivals: Arc<crate::server::seasonal_festival::SeasonalFestivalManager>,
     /// Host or IP address to bind (defaults to "127.0.0.1" for tests; production sets "0.0.0.0").
     pub bind_host: String,
     /// Enable Live SSE terminal packet logging (C2S and S2C frames).
@@ -65,6 +67,11 @@ impl ServerControl {
         let events = Arc::new(crate::server::events::EventLifecycleManager::from_data_dir(
             std::path::Path::new("Data"),
         ));
+        let festivals = Arc::new(
+            crate::server::seasonal_festival::SeasonalFestivalManager::from_data_dir(
+                std::path::Path::new("Data"),
+            ),
+        );
         let gd = data.clone().unwrap_or_else(|| Arc::new(GameData::default()));
         let mut svc = BattleService::new(gd).with_events(events.clone());
         if let Some(p) = pool.as_ref() {
@@ -90,6 +97,7 @@ impl ServerControl {
             idle_timeout: Duration::from_secs(crate::config::Config::default().idle_timeout_secs),
             outbound_queue_capacity: crate::config::Config::default().outbound_queue_capacity,
             events,
+            festivals,
             bind_host: "127.0.0.1".to_string(),
             packet_logging: false,
         }
@@ -216,6 +224,12 @@ impl ServerControl {
             ),
         );
         drop(app);
+
+        if let Some(ref pool) = self.pool {
+            if let Err(e) = self.festivals.hydrate_from_db(pool).await {
+                tracing::warn!("Failed to hydrate seasonal_festival_state from SQLite: {e}");
+            }
+        }
 
         let app_clone = self.app.clone();
         let data_clone = self.data.clone();

@@ -99,6 +99,7 @@ pub struct DashboardTemplate {
     pub initial_logs: Vec<LogEvent>,
     pub events: Vec<crate::server::events::SpecialEvent>,
     pub north_star_rate: u8,
+    pub festivals: Vec<crate::server::seasonal_festival::SeasonalFestivalInfo>,
 }
 
 impl IntoResponse for DashboardTemplate {
@@ -176,6 +177,11 @@ pub fn router(state: WebState) -> axum::Router {
         .route("/api/events/{id}/start", axum::routing::post(start_special_event))
         .route("/api/events/{id}/stop", axum::routing::post(stop_special_event))
         .route("/api/events/north_star/rate", axum::routing::post(set_north_star_encounter_rate))
+        .route("/api/festivals", get(list_festivals))
+        .route("/api/festivals/firework", axum::routing::post(trigger_festival_firework))
+        .route("/api/festivals/{id}/start", axum::routing::post(start_festival))
+        .route("/api/festivals/{id}/stop", axum::routing::post(stop_festival))
+        .route("/api/festivals/{id}/lore", axum::routing::post(trigger_festival_lore))
         .with_state(s)
 }
 
@@ -214,9 +220,13 @@ async fn index(State(s): State<WebState>) -> Response {
         None => Vec::new(),
     };
 
-    let (events, north_star_rate) = match &s.server_control {
-        Some(control) => (control.events.list_events(), control.events.get_north_star_rate()),
-        None => (Vec::new(), 5),
+    let (events, north_star_rate, festivals) = match &s.server_control {
+        Some(control) => (
+            control.events.list_events(),
+            control.events.get_north_star_rate(),
+            control.festivals.list_festivals(),
+        ),
+        None => (Vec::new(), 5, Vec::new()),
     };
 
     let template = DashboardTemplate {
@@ -233,6 +243,7 @@ async fn index(State(s): State<WebState>) -> Response {
         initial_logs,
         events,
         north_star_rate,
+        festivals,
     };
 
     template.into_response()
@@ -783,6 +794,297 @@ pub fn render_events_card(mgr: &crate::server::events::EventLifecycleManager) ->
                 </td>
             </tr>"##,
             e.id, e.name, badge_class, e.phase, e.participants, e.id, e.id
+        ));
+    }
+    html.push_str(r##"</tbody></table></div>"##);
+    html
+}
+
+async fn list_festivals(State(s): State<WebState>, headers: HeaderMap) -> Response {
+    if let Some(ref control) = s.server_control {
+        let festivals = control.festivals.list_festivals();
+        htmx_or_json(
+            &headers,
+            || render_festivals_card(&control.festivals),
+            json!(festivals),
+        )
+    } else {
+        htmx_or_json(&headers, || String::new(), json!([]))
+    }
+}
+
+async fn start_festival(
+    State(s): State<WebState>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    handle_festival_transition(s, id, headers, true).await
+}
+
+async fn stop_festival(
+    State(s): State<WebState>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    handle_festival_transition(s, id, headers, false).await
+}
+
+async fn handle_festival_transition(
+    s: WebState,
+    id: String,
+    headers: HeaderMap,
+    is_start: bool,
+) -> Response {
+    let Some(ref control) = s.server_control else {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({ "error": "Game server is stopped. Please start the server first" })),
+        )
+            .into_response();
+    };
+
+    let is_running = control.is_running().await;
+    let res = if is_start {
+        control
+            .festivals
+            .start_festival(&id, is_running, s.pool.as_ref())
+            .await
+    } else {
+        control
+            .festivals
+            .stop_festival(&id, is_running, s.pool.as_ref())
+            .await
+    };
+
+    match res {
+        Ok(info) => {
+            let notice = if is_start {
+                crate::server::handlers::festival::start_notice_for_festival(&info.id)
+            } else {
+                crate::server::handlers::festival::stop_notice_for_festival(&info.id)
+            };
+            if let Some(notice) = notice {
+                control.broadcast_packet(&notice.to_frame().frame).await;
+            }
+            if let Some(ref pool) = s.pool {
+                let action = if is_start {
+                    "festival_start"
+                } else {
+                    "festival_stop"
+                };
+                let details = format!("{}:season={}", info.id, info.season_seq);
+                let _ = crate::db::domain::write_audit(
+                    pool,
+                    Some(1),
+                    action,
+                    Some("seasonal_festival"),
+                    None,
+                    Some(&details),
+                )
+                .await;
+            }
+            htmx_or_json(
+                &headers,
+                || render_festivals_card(&control.festivals),
+                json!({
+                    "ok": true,
+                    "festival": info.id,
+                    "is_active": info.is_active,
+                    "season_seq": info.season_seq,
+                }),
+            )
+        }
+        Err((code, msg)) => (code, Json(json!({ "error": msg }))).into_response(),
+    }
+}
+
+#[derive(serde::Deserialize, Default)]
+struct FireworkRequest {
+    sub: Option<u8>,
+    x: Option<u16>,
+    y: Option<u16>,
+    count: Option<u8>,
+}
+
+async fn trigger_festival_lore(
+    State(s): State<WebState>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    let Some(ref control) = s.server_control else {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({ "error": "Game server is stopped. Please start the server first" })),
+        )
+            .into_response();
+    };
+    if !control.is_running().await {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({ "error": "Game server is stopped. Please start the server first" })),
+        )
+            .into_response();
+    }
+
+    let Some(info) = control.festivals.get_festival(&id) else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": format!("Festival '{id}' does not exist") })),
+        )
+            .into_response();
+    };
+
+    let Some(lore_key) = info.unique_lore_key else {
+        let msg = if info.lore_collision {
+            format!(
+                "Festival '{id}' has a lore key collision on unpatched Data/Festival.Dat (only #1 owns key 11)"
+            )
+        } else {
+            format!("Festival '{id}' has no Festival.Dat lore record available")
+        };
+        return (StatusCode::CONFLICT, Json(json!({ "error": msg }))).into_response();
+    };
+
+    let frame = crate::server::handlers::festival::festival_ui_trigger_frame(lore_key);
+    control.broadcast_packet(&frame).await;
+
+    if let Some(ref pool) = s.pool {
+        let details = format!("{}:key={lore_key}", info.id);
+        let _ = crate::db::domain::write_audit(
+            pool,
+            Some(1),
+            "festival_lore",
+            Some("seasonal_festival"),
+            None,
+            Some(&details),
+        )
+        .await;
+    }
+
+    htmx_or_json(
+        &headers,
+        || render_festivals_card(&control.festivals),
+        json!({
+            "ok": true,
+            "festival": info.id,
+            "lore_key": lore_key,
+        }),
+    )
+}
+
+async fn trigger_festival_firework(
+    State(s): State<WebState>,
+    headers: HeaderMap,
+    body: axum::body::Bytes,
+) -> Response {
+    let Some(ref control) = s.server_control else {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({ "error": "Game server is stopped. Please start the server first" })),
+        )
+            .into_response();
+    };
+    if !control.is_running().await {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({ "error": "Game server is stopped. Please start the server first" })),
+        )
+            .into_response();
+    }
+
+    let req: FireworkRequest = if body.is_empty() {
+        FireworkRequest::default()
+    } else {
+        serde_json::from_slice(&body).unwrap_or_default()
+    };
+    let sub = req.sub.unwrap_or(1);
+    let x = req.x.unwrap_or(500);
+    let y = req.y.unwrap_or(400);
+    let count = req.count.unwrap_or(5);
+
+    let frame = crate::server::handlers::festival::firework_effect_frame(sub, x, y, count);
+    control.broadcast_packet(&frame).await;
+
+    if let Some(ref pool) = s.pool {
+        let details = format!("sub={sub},x={x},y={y},count={count}");
+        let _ = crate::db::domain::write_audit(
+            pool,
+            Some(1),
+            "festival_firework",
+            Some("seasonal_festival"),
+            None,
+            Some(&details),
+        )
+        .await;
+    }
+
+    htmx_or_json(
+        &headers,
+        || render_festivals_card(&control.festivals),
+        json!({
+            "ok": true,
+            "sub": sub,
+            "x": x,
+            "y": y,
+            "count": count,
+        }),
+    )
+}
+
+pub fn render_festivals_card(mgr: &crate::server::seasonal_festival::SeasonalFestivalManager) -> String {
+    let festivals = mgr.list_festivals();
+    let mut html = String::from(
+        r##"<div class="card" id="seasonal-festivals-card" style="margin-bottom: 24px;">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>Seasonal Festivals Control Plane</span>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="font-size: 12px; color: var(--text-muted);">Manual Control &middot; Watchdog Exempt &middot; Persistent season_seq</span>
+                <button class="btn btn-primary" style="padding: 4px 10px; font-size: 12px;" hx-post="/api/festivals/firework" hx-target="#seasonal-festivals-card" hx-swap="outerHTML">Trigger Fireworks (17 46)</button>
+            </div>
+        </div>
+        <table class="data-table" style="width: 100%;">
+            <thead>
+                <tr>
+                    <th>Festival ID</th>
+                    <th>Name</th>
+                    <th>Status</th>
+                    <th>Season Seq</th>
+                    <th>Lore Key</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>"##,
+    );
+    for f in festivals {
+        let lore_disabled = if f.unique_lore_key.is_none() {
+            " disabled title=\"Lore unavailable on unpatched Festival.Dat\""
+        } else {
+            ""
+        };
+        html.push_str(&format!(
+            r##"<tr>
+                <td style="font-weight: 600;">{}</td>
+                <td>{}</td>
+                <td><span class="status-badge {}">{}</span></td>
+                <td>{}</td>
+                <td><span class="status-badge {}">{}</span></td>
+                <td>
+                    <button class="btn btn-green" style="padding: 4px 10px; font-size: 12px;" hx-post="/api/festivals/{}/start" hx-target="#seasonal-festivals-card" hx-swap="outerHTML">Start</button>
+                    <button class="btn btn-red" style="padding: 4px 10px; font-size: 12px; margin-left: 6px;" hx-post="/api/festivals/{}/stop" hx-target="#seasonal-festivals-card" hx-swap="outerHTML">Stop</button>
+                    <button class="btn btn-primary" style="padding: 4px 10px; font-size: 12px; margin-left: 6px;" hx-post="/api/festivals/{}/lore" hx-target="#seasonal-festivals-card" hx-swap="outerHTML"{}>Lore (24 19)</button>
+                </td>
+            </tr>"##,
+            f.id,
+            f.name,
+            f.badge_class(),
+            f.status_label(),
+            f.season_seq,
+            f.lore_badge_class(),
+            f.lore_status_label(),
+            f.id,
+            f.id,
+            f.id,
+            lore_disabled
         ));
     }
     html.push_str(r##"</tbody></table></div>"##);

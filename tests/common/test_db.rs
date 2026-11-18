@@ -20,6 +20,7 @@ pub const TEST_DB_URL_ENV: &str = "TS_TEST_DB_URL";
 const DB_LOCK_TIMEOUT: Duration = Duration::from_secs(15);
 const SCHEMA: &str = include_str!("../../migrations/0001_init.sql");
 const MIGRATION_0002: &str = include_str!("../../migrations/0002_eve_quest_persistence.sql");
+const MIGRATION_0003: &str = include_str!("../../migrations/0003_seasonal_festivals.sql");
 
 fn db_lock() -> Arc<Mutex<()>> {
     static LOCK: OnceLock<Arc<Mutex<()>>> = OnceLock::new();
@@ -152,4 +153,9 @@ async fn reset_schema(pool: &DbPool) {
         .execute(&pool.write)
         .await
         .expect("execute 0002_eve_quest_persistence.sql migration");
+
+    sqlx::raw_sql(MIGRATION_0003)
+        .execute(&pool.write)
+        .await
+        .expect("execute 0003_seasonal_festivals.sql migration");
 }

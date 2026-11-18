@@ -37,7 +37,7 @@ pub use eve::{
     SceneEveData,
 };
 pub use evo_status::{EVOStatusDatLoader, EVOStatusDef};
-pub use festival::{FestivalDatLoader, FestivalDef, FESTIVAL_PARITY_DATE_DWORD};
+pub use festival::{FestivalDatLoader, FestivalDef};
 pub use formula::{FormulaDatLoader, FormulaParams};
 pub use ground::{GroundMapMeta, GroundMmgLoader};
 pub use item::ItemDatLoader;

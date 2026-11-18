@@ -348,6 +348,44 @@
                     </tbody>
                 </table>
             </div>
+
+            <div class="card" id="seasonal-festivals-card" style="margin-bottom: 24px;">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Seasonal Festivals Control Plane</span>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="font-size: 12px; color: var(--text-muted);">Manual Control &middot; Watchdog Exempt &middot; Persistent season_seq</span>
+                        <button class="btn btn-primary" style="padding: 4px 10px; font-size: 12px;" hx-post="/api/festivals/firework" hx-target="#seasonal-festivals-card" hx-swap="outerHTML">Trigger Fireworks (17 46)</button>
+                    </div>
+                </div>
+                <table class="data-table" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Festival ID</th>
+                            <th>Name</th>
+                            <th>Status</th>
+                            <th>Season Seq</th>
+                            <th>Lore Key</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for f in festivals %}
+                        <tr>
+                            <td style="font-weight: 600;">{{ f.id }}</td>
+                            <td>{{ f.name }}</td>
+                            <td><span class="status-badge {{ f.badge_class() }}">{{ f.status_label() }}</span></td>
+                            <td>{{ f.season_seq }}</td>
+                            <td><span class="status-badge {{ f.lore_badge_class() }}">{{ f.lore_status_label() }}</span></td>
+                            <td>
+                                <button class="btn btn-green" style="padding: 4px 10px; font-size: 12px;" hx-post="/api/festivals/{{ f.id }}/start" hx-target="#seasonal-festivals-card" hx-swap="outerHTML">Start</button>
+                                <button class="btn btn-red" style="padding: 4px 10px; font-size: 12px; margin-left: 6px;" hx-post="/api/festivals/{{ f.id }}/stop" hx-target="#seasonal-festivals-card" hx-swap="outerHTML">Stop</button>
+                                <button class="btn btn-primary" style="padding: 4px 10px; font-size: 12px; margin-left: 6px;" hx-post="/api/festivals/{{ f.id }}/lore" hx-target="#seasonal-festivals-card" hx-swap="outerHTML"{% if f.unique_lore_key.is_none() %} disabled title="Lore unavailable on unpatched Festival.Dat"{% endif %}>Lore (24 19)</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <!-- Tab 4: Online Players -->

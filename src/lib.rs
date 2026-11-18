@@ -42,6 +42,7 @@ pub mod server {
     pub mod pet_box;
     pub mod player_state;
     pub mod response;
+    pub mod seasonal_festival;
     pub mod session;
     pub mod spawn;
     pub mod trade_system;
