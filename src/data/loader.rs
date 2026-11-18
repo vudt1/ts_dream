@@ -64,7 +64,6 @@ pub struct GameData {
     pub astrolabes: HashMap<u8, AstrolabeDef>,
     pub evo_statuses: HashMap<u8, EVOStatusDef>,
     pub city_ex: Vec<CityExDef>,
-    pub item_defs: HashMap<u16, ItemDef>,
     pub npc_defs: HashMap<u16, NpcDef>,
     pub warp_defs: HashMap<usize, WarpDef>,
     pub scene_eve_data: HashMap<u32, SceneEveData>,
@@ -172,10 +171,7 @@ impl GameData {
         if let Some(p) = resolve_data_file(data_dir, "Item.dat") {
             let bytes = std::fs::read(&p)
                 .map_err(|e| TsError::Data(format!("read {}: {}", p.display(), e)))?;
-            d.item_defs = ItemDatLoader::load(&bytes)?;
-            for def in d.item_defs.values() {
-                d.items.insert(def.id as i64, def.to_item());
-            }
+            d.items = ItemDatLoader::load(&bytes)?;
         } else if let Some(p) = resolve_data_file(data_dir, "Items.txt") {
             d.load_items(&p)?;
         } else {
@@ -323,10 +319,7 @@ impl GameData {
         })?;
         let item_bytes = std::fs::read(&item_path)
             .map_err(|e| TsError::Data(format!("read {}: {}", item_path.display(), e)))?;
-        self.item_defs = ItemDatLoader::load(&item_bytes)?;
-        for def in self.item_defs.values() {
-            self.items.insert(def.id as i64, def.to_item());
-        }
+        self.items = ItemDatLoader::load(&item_bytes)?;
 
         let npc_path = resolve_data_file(data_dir, "Npc.dat").ok_or_else(|| {
             TsError::Data(format!("missing binary Npc.dat in {}", data_dir.display()))
@@ -639,6 +632,8 @@ impl GameData {
                 add_pet: num_at(24, &f, "Items.txt")?,
                 compound_material: 0,
                 compound_rank: 0,
+                price: 0,
+                sell_price: 0,
                 garble: encoding::compute_garble(name),
             };
             self.items.insert(item.id, item);

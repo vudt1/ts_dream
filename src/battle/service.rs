@@ -24,7 +24,6 @@ use crate::battle::runner::{
     BattleCommand, DbTarget, DbUpdate, Out, Outcome, PlayerSnapshot, Stat,
 };
 use crate::data::loader::GameData;
-use crate::data::tables::TexpRow;
 use crate::protocol::{encoder, GOLD_CAP};
 use crate::server::handlers::quest::BattleTrigger;
 use crate::server::session::Session;
@@ -2227,14 +2226,10 @@ impl BattleService {
         players.extend(extra_players);
         pet_slots.extend(extra_pets);
 
-        let npcs = Arc::new(self.data.npcs.clone());
-        let skills = Arc::new(self.data.skills.clone());
-        let binary_skills = Arc::new(self.data.binary_skill_defs.clone());
-        let items = Arc::new(self.data.items.clone());
+        let game_data = Arc::clone(&self.data);
         let pet_slots = Arc::new(pet_slots);
         let players = Arc::new(players);
         let player_skills = Arc::new(player_skills);
-        let texps: Arc<Vec<TexpRow>> = Arc::new(self.data.texps.clone());
 
         if let Ok(mut members) = self.sink.members.lock() {
             members.insert(lid);
@@ -2258,16 +2253,12 @@ impl BattleService {
         let world = self.world.clone();
         let talking_battle = i64::from(session.talking_battle);
         let map_id = i64::from(session.map_id);
-        let handle = manager.spawn_timeout_with_skills(
+        let handle = manager.spawn_with_game_data(
             battle,
-            npcs,
-            skills,
-            binary_skills,
-            items,
+            game_data,
             pet_slots,
             players,
             Some(player_skills),
-            texps,
             self.per_exp,
             world,
             talking_battle,

@@ -176,7 +176,7 @@ pub fn resolve_npc_shop_item(
             if let Some(surface) = scene.surface_datas.get(&sid) {
                 if let Some(sentence) = surface.sentences.get(&item_index) {
                     let item_id = sentence.data_id;
-                    let price = data.item_defs.get(&item_id).map(|d| d.price as u32).unwrap_or(0);
+                    let price = data.items.get(&i64::from(item_id)).map(|d| d.price).unwrap_or(0);
                     if price > 0 {
                         return Some((item_id, price));
                     }
@@ -186,7 +186,12 @@ pub fn resolve_npc_shop_item(
     }
     // 2. Fallback to transcribed price list
     if let Some((item_id, fallback_price)) = get_npc_shop_price(idtalking, map_id, item_index) {
-        let price = data.item_defs.get(&item_id).map(|d| d.price as u32).filter(|&p| p > 0).unwrap_or(fallback_price);
+        let price = data
+            .items
+            .get(&i64::from(item_id))
+            .map(|d| d.price)
+            .filter(|&p| p > 0)
+            .unwrap_or(fallback_price);
         return Some((item_id, price));
     }
     None
@@ -196,7 +201,7 @@ pub fn resolve_npc_shop_item(
 ///
 /// Dispatches on `ctx.sub`:
 /// - `NPC_SHOP_SUB_BUY` (1): Buy item. Reads `item_index: u8` and `count: u16 LE`.
-///   Resolves item/price from `scene_eve_data` and `item_defs`, deducting gold and sending
+///   Resolves item/price from `scene_eve_data` and `items`, deducting gold and sending
 ///   `1A 02`, `1A 04`, `17 06`, and `1B 01 00`.
 /// - `NPC_SHOP_SUB_SELL` (2): Sell item. Reads `slot: u8` and `qty: u8`.
 ///   Credits gold based on `qty * sell_price` (clamped to 9,999,999) and sends
@@ -373,9 +378,9 @@ pub async fn handle_npc_shop(ctx: &mut OpcodeCtx<'_>) {
             }
 
             let unit_sell_price = data
-                .item_defs
-                .get(&item.id)
-                .map(|d| d.sell_price as u32)
+                .items
+                .get(&i64::from(item.id))
+                .map(|d| d.sell_price)
                 .unwrap_or(1);
             let revenue = (unit_sell_price as u64).saturating_mul(u64::from(qty));
             if (u64::from(conn.session.gold)).saturating_add(revenue) > u64::from(GOLD_CAP) {

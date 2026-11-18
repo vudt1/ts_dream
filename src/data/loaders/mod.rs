@@ -40,7 +40,7 @@ pub use evo_status::{EVOStatusDatLoader, EVOStatusDef};
 pub use festival::{FestivalDatLoader, FestivalDef, FESTIVAL_PARITY_DATE_DWORD};
 pub use formula::{FormulaDatLoader, FormulaParams};
 pub use ground::{GroundMapMeta, GroundMmgLoader};
-pub use item::{ItemDatLoader, ItemDef};
+pub use item::ItemDatLoader;
 pub use leaderboard::LeaderboardDatLoader;
 pub use mark::MarkDatLoader;
 pub use mount::MountDatLoader;

@@ -123,29 +123,28 @@ fn test_hydrate_templates_across_all_containers() {
 }
 
 #[test]
-fn test_pickaxe_itemdef_preserves_kind_39_and_equip_pos_3() {
-    use ts_dream::data::loaders::item::ItemDef;
+fn test_pickaxe_item_preserves_kind_39_and_equip_pos_3() {
+    use ts_dream::data::tables::Item;
 
-    let pickaxe_def = ItemDef {
+    let pickaxe = Item {
         id: 10534,
-        kind: 39,
-        fit_type: 3,
+        loai: 39,
+        equip_pos: 3,
         level: 110,
-        attr1_kind: 210, // atk1
-        attr1_value: 25,
+        atk1: 25,
         ..Default::default()
     };
-    let tool_def = ItemDef {
+    let tool = Item {
         id: 29335,
-        kind: 27,
-        fit_type: 0,
+        loai: 27,
+        equip_pos: 0,
         level: 0,
         ..Default::default()
     };
 
     let mut data = GameData::default();
-    data.items.insert(10534, pickaxe_def.to_item());
-    data.items.insert(29335, tool_def.to_item());
+    data.items.insert(10534, pickaxe);
+    data.items.insert(29335, tool);
 
     let mut session = Session::default();
     session.homdo.push(InventoryItem {
@@ -193,19 +192,20 @@ fn test_real_item_dat_pickaxes_and_tools_equip_pos() {
     let path = Path::new("Data/Item.dat");
     assert!(path.exists(), "Data/Item.dat must exist");
     let bytes = std::fs::read(path).expect("read Item.dat");
-    let defs = ItemDatLoader::load(&bytes).expect("load Item.dat");
+    let items = ItemDatLoader::load(&bytes).expect("load Item.dat");
 
     let mut data = GameData::default();
-    for (&id, def) in &defs {
-        data.items.insert(id as i64, def.to_item());
-    }
+    data.items = items;
 
     let mut session = Session::default();
     let pickaxe_ids: [u16; 6] = [10001, 10530, 10531, 10532, 10533, 10534];
     for (idx, &id) in pickaxe_ids.iter().enumerate() {
-        let def = defs.get(&id).unwrap_or_else(|| panic!("pickaxe {id} missing from Item.dat"));
-        assert_eq!(def.kind, 39, "pickaxe {id} kind in Item.dat");
-        assert_eq!(def.fit_type, 3, "pickaxe {id} fit_type in Item.dat");
+        let item = data
+            .items
+            .get(&i64::from(id))
+            .unwrap_or_else(|| panic!("pickaxe {id} missing from Item.dat"));
+        assert_eq!(item.loai, 39, "pickaxe {id} kind in Item.dat");
+        assert_eq!(item.equip_pos, 3, "pickaxe {id} fit_type in Item.dat");
         session.homdo.push(InventoryItem {
             slot: (idx + 1) as u8,
             id,
@@ -215,10 +215,10 @@ fn test_real_item_dat_pickaxes_and_tools_equip_pos() {
     }
 
     // 29335 (Cuốc đào) & 31007 (Vé đoái hoán tâm) must be non-equippable (fit_type = 0)
-    let tool_def = defs.get(&29335).expect("29335 missing from Item.dat");
-    assert_eq!(tool_def.fit_type, 0, "29335 must have fit_type=0");
-    let ticket_def = defs.get(&31007).expect("31007 missing from Item.dat");
-    assert_eq!(ticket_def.fit_type, 0, "31007 must have fit_type=0");
+    let tool = data.items.get(&29335).expect("29335 missing from Item.dat");
+    assert_eq!(tool.equip_pos, 0, "29335 must have fit_type=0");
+    let ticket = data.items.get(&31007).expect("31007 missing from Item.dat");
+    assert_eq!(ticket.equip_pos, 0, "31007 must have fit_type=0");
 
     session.homdo.push(InventoryItem { slot: 7, id: 29335, count: 1, ..Default::default() });
     session.homdo.push(InventoryItem { slot: 8, id: 31007, count: 1, ..Default::default() });

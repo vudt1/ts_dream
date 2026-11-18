@@ -60,9 +60,9 @@ pub fn execute_compound(
 
     for (k, slot) in slots.iter().enumerate() {
         if slot.item_id > 0 && slot.qty > 0 {
-            if let Some(def) = game_data.item_defs.get(&slot.item_id) {
-                raw_mat[k] = def.compound_material;
-                raw_rank[k] = def.compound_rank;
+            if let Some(item) = game_data.items.get(&i64::from(slot.item_id)) {
+                raw_mat[k] = item.compound_material as u8;
+                raw_rank[k] = item.compound_rank as u8;
                 raw_qty[k] = slot.qty;
             }
         }
@@ -108,11 +108,11 @@ pub fn execute_compound(
         let pick = rng.random_int(valid_slots.len() as i32) as usize;
         let chosen_slot = valid_slots[pick].1;
         let chosen_item = game_data
-            .item_defs
-            .get(&chosen_slot.item_id)
+            .items
+            .get(&i64::from(chosen_slot.item_id))
             .ok_or(CraftError::InvalidItemForCompound)?;
 
-        recipe_candidates.push(chosen_item.kind as u16);
+        recipe_candidates.push(chosen_item.loai as u16);
         target_rank = 1; // Fallback forces target rank to 1
     }
 
@@ -138,10 +138,12 @@ pub fn execute_compound(
 
     // 9. Scan Item.dat for items with (kind == chosen_kind && compound_rank == target_rank)
     let mut item_candidates: Vec<u16> = game_data
-        .item_defs
+        .items
         .values()
-        .filter(|item| item.kind as u16 == chosen_kind && item.compound_rank == target_rank)
-        .map(|item| item.id)
+        .filter(|item| {
+            item.loai == i64::from(chosen_kind) && item.compound_rank == i64::from(target_rank)
+        })
+        .filter_map(|item| u16::try_from(item.id).ok())
         .collect();
 
     // Sort item IDs ascending to match sequential scan of Item.dat

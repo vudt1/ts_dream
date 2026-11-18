@@ -155,22 +155,22 @@ fn test_execute_compound_with_real_game_data() {
 
     // Find two valid mineral items with compound_material > 0 deterministically
     let mineral_1 = game_data
-        .item_defs
+        .items
         .values()
-        .filter(|i| i.id >= 10001 && i.id <= 50000 && i.compound_material > 0 && i.compound_rank > 0 && i.kind >= 15)
+        .filter(|i| i.id >= 10001 && i.id <= 50000 && i.compound_material > 0 && i.compound_rank > 0 && i.loai >= 15)
         .min_by_key(|i| i.id)
         .expect("must find a valid mineral");
 
     let mineral_2 = game_data
-        .item_defs
+        .items
         .values()
-        .filter(|i| i.id > mineral_1.id && i.id <= 50000 && i.compound_material > 0 && i.compound_rank > 0 && i.kind >= 15)
+        .filter(|i| i.id > mineral_1.id && i.id <= 50000 && i.compound_material > 0 && i.compound_rank > 0 && i.loai >= 15)
         .min_by_key(|i| i.id)
         .expect("must find another mineral");
 
     let inputs = [
-        CraftInputSlot::new(1, mineral_1.id, 5),
-        CraftInputSlot::new(2, mineral_2.id, 5),
+        CraftInputSlot::new(1, mineral_1.id as u16, 5),
+        CraftInputSlot::new(2, mineral_2.id as u16, 5),
         CraftInputSlot::new(3, 0, 0),
     ];
 
@@ -199,19 +199,19 @@ fn test_compound_fallback_when_unmatched() {
 
     // Use two items that exist with valid id 10001..=50000
     let item1 = game_data
-        .item_defs
+        .items
         .values()
-        .find(|i| i.id >= 10001 && i.id <= 50000 && (1..=14).contains(&i.kind))
+        .find(|i| i.id >= 10001 && i.id <= 50000 && (1..=14).contains(&i.loai))
         .unwrap();
     let item2 = game_data
-        .item_defs
+        .items
         .values()
-        .find(|i| i.id != item1.id && i.id >= 10001 && i.id <= 50000 && (1..=14).contains(&i.kind))
+        .find(|i| i.id != item1.id && i.id >= 10001 && i.id <= 50000 && (1..=14).contains(&i.loai))
         .unwrap();
 
     let inputs = [
-        CraftInputSlot::new(1, item1.id, 1),
-        CraftInputSlot::new(2, item2.id, 1),
+        CraftInputSlot::new(1, item1.id as u16, 1),
+        CraftInputSlot::new(2, item2.id as u16, 1),
         CraftInputSlot::new(3, 0, 0),
     ];
 
@@ -222,7 +222,10 @@ fn test_compound_fallback_when_unmatched() {
     // Fallback forces target_rank = 1
     assert_eq!(outcome.target_rank, 1);
     // Output must be rank 1 item
-    let result_item = game_data.item_defs.get(&outcome.item_id).expect("result item must exist");
+    let result_item = game_data
+        .items
+        .get(&i64::from(outcome.item_id))
+        .expect("result item must exist");
     assert_eq!(result_item.compound_rank, 1);
 }
 
@@ -338,15 +341,15 @@ async fn test_handle_compound_wire_and_db_flow() {
 
     // Find two valid minerals with compound_material > 0 deterministically
     let mineral_1 = game_data
-        .item_defs
+        .items
         .values()
-        .filter(|i| i.id >= 10001 && i.id <= 50000 && i.compound_material > 0 && i.compound_rank > 0 && i.kind >= 15)
+        .filter(|i| i.id >= 10001 && i.id <= 50000 && i.compound_material > 0 && i.compound_rank > 0 && i.loai >= 15)
         .min_by_key(|i| i.id)
         .unwrap();
     let mineral_2 = game_data
-        .item_defs
+        .items
         .values()
-        .filter(|i| i.id > mineral_1.id && i.id <= 50000 && i.compound_material > 0 && i.compound_rank > 0 && i.kind >= 15)
+        .filter(|i| i.id > mineral_1.id && i.id <= 50000 && i.compound_material > 0 && i.compound_rank > 0 && i.loai >= 15)
         .min_by_key(|i| i.id)
         .unwrap();
 
@@ -354,9 +357,9 @@ async fn test_handle_compound_wire_and_db_flow() {
     // Setup slots 1 & 2 for compound, and slots 3 & 4 as adjacent collateral test slots
     sqlx::query("INSERT INTO inventories (playerid, storagetype, slot, itemid, quantity) VALUES (?, 1, 1, ?, 5), (?, 1, 2, ?, 5), (?, 1, 3, 10003, 7), (?, 1, 4, 10004, 13)")
         .bind(char_id)
-        .bind(mineral_1.id as i64)
+        .bind(mineral_1.id)
         .bind(char_id)
-        .bind(mineral_2.id as i64)
+        .bind(mineral_2.id)
         .bind(char_id)
         .bind(char_id)
         .execute(&pool.write)
@@ -368,13 +371,13 @@ async fn test_handle_compound_wire_and_db_flow() {
     conn.session.db_character_id = char_id;
     conn.session.homdo.push(InventoryItem {
         slot: 1,
-        id: mineral_1.id,
+        id: mineral_1.id as u16,
         count: 5,
         ..Default::default()
     });
     conn.session.homdo.push(InventoryItem {
         slot: 2,
-        id: mineral_2.id,
+        id: mineral_2.id as u16,
         count: 5,
         ..Default::default()
     });
@@ -436,6 +439,19 @@ async fn test_handle_compound_wire_and_db_flow() {
     assert_eq!(created_item.slot, 5);
     assert!(created_item.id >= 10001);
     assert!(created_item.count > 0);
+    let expected_name = game_data
+        .items
+        .get(&i64::from(created_item.id))
+        .expect("created item in GameData.items")
+        .utf8_name();
+    let expected_toast = ts_dream::server::spawn::sys_msg_frame(&format!(
+        "Hợp thành thành công: {}",
+        expected_name
+    ));
+    assert!(
+        frames.iter().any(|f| f == &expected_toast),
+        "Must emit exact sys_msg_frame with on-demand UTF-8 item name"
+    );
 
     // 3. Verify SQLite DB state
     let row1: (i64,) = sqlx::query_as("SELECT quantity FROM inventories WHERE playerid = ? AND storagetype = 1 AND slot = 1")
@@ -579,6 +595,19 @@ async fn test_handle_select_feather_wire_and_db_flow() {
     assert_eq!(conn.session.homdo.len(), 1);
     assert_eq!(conn.session.homdo[0].id, 24021);
     assert_eq!(conn.session.homdo[0].slot, 1);
+    let feather_name = game_data
+        .items
+        .get(&24021)
+        .expect("feather 24021 in GameData.items")
+        .utf8_name();
+    let expected_feather_toast = ts_dream::server::spawn::sys_msg_frame(&format!(
+        "Nhận được bảo vật: {}",
+        feather_name
+    ));
+    assert!(
+        frames1.iter().any(|f| f == &expected_feather_toast),
+        "Must emit exact sys_msg_frame with on-demand UTF-8 feather name"
+    );
 
     // Verify DB persistence
     let db_item: (i64, i64) = sqlx::query_as("SELECT itemid, quantity FROM inventories WHERE playerid = ? AND storagetype = 1 AND slot = 1")
@@ -653,9 +682,9 @@ async fn test_handle_socket_feather_wire_and_db_flow() {
 
     // Find a weapon or armor item (kind 1..=14)
     let equip_def = game_data
-        .item_defs
+        .items
         .values()
-        .find(|i| (1..=14).contains(&i.kind) && i.id >= 10001 && i.id <= 50000)
+        .find(|i| (1..=14).contains(&i.loai) && i.id >= 10001 && i.id <= 50000)
         .unwrap();
 
     let feather_id = 24021; // Earth feather
@@ -663,7 +692,7 @@ async fn test_handle_socket_feather_wire_and_db_flow() {
     // Put weapon in slot 1, feather in slot 2, and collateral slots 3 and 4 in DB
     sqlx::query("INSERT INTO inventories (playerid, storagetype, slot, itemid, quantity, element, elementvalue) VALUES (?, 1, 1, ?, 1, 0, 0), (?, 1, 2, ?, 1, 0, 0), (?, 1, 3, 10003, 5, 0, 0), (?, 1, 4, 10004, 9, 0, 0)")
         .bind(char_id)
-        .bind(equip_def.id as i64)
+        .bind(equip_def.id)
         .bind(char_id)
         .bind(feather_id as i64)
         .bind(char_id)
@@ -677,7 +706,7 @@ async fn test_handle_socket_feather_wire_and_db_flow() {
     conn.session.db_character_id = char_id;
     conn.session.homdo.push(InventoryItem {
         slot: 1,
-        id: equip_def.id,
+        id: equip_def.id as u16,
         count: 1,
         long_val: 0,
         giatri_long: 0,
@@ -903,9 +932,9 @@ async fn test_handle_socket_feather_level_10_and_max_level_wire() {
         .expect("insert character");
 
     let equip_def = game_data
-        .item_defs
+        .items
         .values()
-        .find(|i| (1..=14).contains(&i.kind) && i.id >= 10001 && i.id <= 50000)
+        .find(|i| (1..=14).contains(&i.loai) && i.id >= 10001 && i.id <= 50000)
         .unwrap();
 
     let mut conn = Conn::default();
@@ -914,7 +943,7 @@ async fn test_handle_socket_feather_level_10_and_max_level_wire() {
     // Equip already at +10
     conn.session.homdo.push(InventoryItem {
         slot: 1,
-        id: equip_def.id,
+        id: equip_def.id as u16,
         count: 1,
         long_val: 1,
         giatri_long: 10,
@@ -1263,29 +1292,29 @@ async fn test_collateral_slot_preservation_on_compound_and_socketing() {
         .expect("insert character");
 
     let mineral_1 = game_data
-        .item_defs
+        .items
         .values()
-        .filter(|i| i.id >= 10001 && i.id <= 50000 && i.compound_material > 0 && i.compound_rank > 0 && i.kind >= 15)
+        .filter(|i| i.id >= 10001 && i.id <= 50000 && i.compound_material > 0 && i.compound_rank > 0 && i.loai >= 15)
         .min_by_key(|i| i.id)
         .unwrap();
     let mineral_2 = game_data
-        .item_defs
+        .items
         .values()
-        .filter(|i| i.id > mineral_1.id && i.id <= 50000 && i.compound_material > 0 && i.compound_rank > 0 && i.kind >= 15)
+        .filter(|i| i.id > mineral_1.id && i.id <= 50000 && i.compound_material > 0 && i.compound_rank > 0 && i.loai >= 15)
         .min_by_key(|i| i.id)
         .unwrap();
     let equip_def = game_data
-        .item_defs
+        .items
         .values()
-        .find(|i| (1..=14).contains(&i.kind) && i.id >= 10001 && i.id <= 50000)
+        .find(|i| (1..=14).contains(&i.loai) && i.id >= 10001 && i.id <= 50000)
         .unwrap();
 
     // Setup collateral slots 3 (id 10003, qty 7), 4 (id 10004, qty 13), 5 (id 10005, qty 19)
     sqlx::query("INSERT INTO inventories (playerid, storagetype, slot, itemid, quantity, element, elementvalue) VALUES (?, 1, 1, ?, 5, 0, 0), (?, 1, 2, ?, 5, 0, 0), (?, 1, 3, 10003, 7, 0, 0), (?, 1, 4, 10004, 13, 0, 0), (?, 1, 5, 10005, 19, 0, 0)")
         .bind(char_id)
-        .bind(mineral_1.id as i64)
+        .bind(mineral_1.id)
         .bind(char_id)
-        .bind(mineral_2.id as i64)
+        .bind(mineral_2.id)
         .bind(char_id)
         .bind(char_id)
         .bind(char_id)
@@ -1296,8 +1325,8 @@ async fn test_collateral_slot_preservation_on_compound_and_socketing() {
     let mut conn = Conn::default();
     conn.session.id = char_id as u32;
     conn.session.db_character_id = char_id;
-    conn.session.homdo.push(InventoryItem { slot: 1, id: mineral_1.id, count: 5, ..Default::default() });
-    conn.session.homdo.push(InventoryItem { slot: 2, id: mineral_2.id, count: 5, ..Default::default() });
+    conn.session.homdo.push(InventoryItem { slot: 1, id: mineral_1.id as u16, count: 5, ..Default::default() });
+    conn.session.homdo.push(InventoryItem { slot: 2, id: mineral_2.id as u16, count: 5, ..Default::default() });
     conn.session.homdo.push(InventoryItem { slot: 3, id: 10003, count: 7, ..Default::default() });
     conn.session.homdo.push(InventoryItem { slot: 4, id: 10004, count: 13, ..Default::default() });
     conn.session.homdo.push(InventoryItem { slot: 5, id: 10005, count: 19, ..Default::default() });
@@ -1341,11 +1370,11 @@ async fn test_collateral_slot_preservation_on_compound_and_socketing() {
 
     // 2. Setup socketing: slot 1 is equip, slot 2 is Earth feather level 1 (24021)
     conn.session.homdo.retain(|i| i.slot != 1 && i.slot != 2);
-    conn.session.homdo.push(InventoryItem { slot: 1, id: equip_def.id, count: 1, ..Default::default() });
+    conn.session.homdo.push(InventoryItem { slot: 1, id: equip_def.id as u16, count: 1, ..Default::default() });
     conn.session.homdo.push(InventoryItem { slot: 2, id: 24021, count: 1, ..Default::default() });
 
     sqlx::query("UPDATE inventories SET itemid = ?, quantity = 1, element = 0, elementvalue = 0 WHERE playerid = ? AND storagetype = 1 AND slot = 1")
-        .bind(equip_def.id as i64)
+        .bind(equip_def.id)
         .bind(char_id)
         .execute(&pool.write)
         .await
@@ -1412,8 +1441,8 @@ async fn test_compound_with_arbitrary_box_positions() {
     let game_data = std::sync::Arc::clone(common::shared_game_data());
     let service = BattleService::default();
 
-    let mineral_1 = game_data.item_defs.values().filter(|i| (23..=37).contains(&i.kind)).min_by_key(|i| i.id).unwrap();
-    let mineral_2 = game_data.item_defs.values().filter(|i| (23..=37).contains(&i.kind) && i.id != mineral_1.id).min_by_key(|i| i.id).unwrap();
+    let mineral_1 = game_data.items.values().filter(|i| (23..=37).contains(&i.loai)).min_by_key(|i| i.id).unwrap();
+    let mineral_2 = game_data.items.values().filter(|i| (23..=37).contains(&i.loai) && i.id != mineral_1.id).min_by_key(|i| i.id).unwrap();
 
     let acc_id = ts_dream::db::accounts::create(&pool, "pass1", "pass2")
         .await
@@ -1429,8 +1458,8 @@ async fn test_compound_with_arbitrary_box_positions() {
     let mut conn = Conn::default();
     conn.session.id = char_id as u32;
     conn.session.db_character_id = char_id;
-    conn.session.homdo.push(InventoryItem { slot: 1, id: mineral_1.id, count: 5, ..Default::default() });
-    conn.session.homdo.push(InventoryItem { slot: 2, id: mineral_2.id, count: 5, ..Default::default() });
+    conn.session.homdo.push(InventoryItem { slot: 1, id: mineral_1.id as u16, count: 5, ..Default::default() });
+    conn.session.homdo.push(InventoryItem { slot: 2, id: mineral_2.id as u16, count: 5, ..Default::default() });
 
     // 1. Box 1 & Box 3 filled, Box 2 is empty: payload = [1, 2, 0, 0, 2, 2]
     let payload_1_3 = vec![1, 2, 0, 0, 2, 2];

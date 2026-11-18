@@ -232,10 +232,10 @@ pub async fn handle_compound(ctx: &mut OpcodeCtx<'_>) {
     // Toast notification
     let item_name = ctx
         .data
-        .item_defs
-        .get(&new_item.id)
-        .map(|d| d.name.as_str())
-        .unwrap_or("Vật phẩm mới");
+        .items
+        .get(&i64::from(new_item.id))
+        .map(|d| d.utf8_name())
+        .unwrap_or_else(|| "Vật phẩm mới".to_string());
     ctx.out.send(sys_msg_frame(&format!("Hợp thành thành công: {}", item_name)));
 }
 
@@ -356,10 +356,10 @@ pub async fn handle_select_feather(ctx: &mut OpcodeCtx<'_>) {
 
     let item_name = ctx
         .data
-        .item_defs
-        .get(&feather_id)
-        .map(|d| d.name.as_str())
-        .unwrap_or("Lông vũ");
+        .items
+        .get(&i64::from(feather_id))
+        .map(|d| d.utf8_name())
+        .unwrap_or_else(|| "Lông vũ".to_string());
     ctx.out.send(sys_msg_frame(&format!("Nhận được bảo vật: {}", item_name)));
 }
 
@@ -410,9 +410,9 @@ pub async fn handle_socket_feather(ctx: &mut OpcodeCtx<'_>) {
 
     let equip_kind = ctx
         .data
-        .item_defs
-        .get(&equip.id)
-        .map(|d| d.kind)
+        .items
+        .get(&i64::from(equip.id))
+        .map(|d| d.loai as u8)
         .unwrap_or(0);
 
     // Roll RNG using deterministic Delphi PRNG (0..99)

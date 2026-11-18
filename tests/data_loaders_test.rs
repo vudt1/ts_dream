@@ -6,6 +6,8 @@ mod common;
 mod encoding;
 #[path = "data_loaders/ground.rs"]
 mod ground;
+#[path = "data_loaders/item.rs"]
+mod item;
 #[path = "data_loaders/max_hp_sp_formula.rs"]
 mod max_hp_sp_formula;
 #[path = "data_loaders/rank.rs"]

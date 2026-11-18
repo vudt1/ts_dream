@@ -596,7 +596,7 @@ fn test_pet_summary_wire_format_includes_10_byte_equipment() {
 
 #[tokio::test]
 async fn test_player_and_pet_pickaxe_equip_swap_unequip_and_rejections() {
-    use ts_dream::data::loaders::item::ItemDef;
+    use ts_dream::data::tables::Item;
 
     let pool = setup_test_db().await;
     let repos = SqliteRepositories::new(pool.clone());
@@ -620,44 +620,41 @@ async fn test_player_and_pet_pickaxe_equip_swap_unequip_and_rejections() {
         .expect("create character");
 
     let mut data = ts_dream::data::loader::GameData::default();
-    let defs = [
-        ItemDef {
+    let pickaxes = [
+        Item {
             id: 10001,
-            kind: 39,
-            fit_type: 3,
+            loai: 39,
+            equip_pos: 3,
             level: 0,
-            attr1_kind: 210,
-            attr1_value: 5,
+            atk1: 5,
             ..Default::default()
         },
-        ItemDef {
+        Item {
             id: 10530,
-            kind: 39,
-            fit_type: 3,
+            loai: 39,
+            equip_pos: 3,
             level: 90,
-            attr1_kind: 210,
-            attr1_value: 15,
+            atk1: 15,
             ..Default::default()
         },
-        ItemDef {
+        Item {
             id: 10534,
-            kind: 39,
-            fit_type: 3,
+            loai: 39,
+            equip_pos: 3,
             level: 110,
-            attr1_kind: 210,
-            attr1_value: 30,
+            atk1: 30,
             ..Default::default()
         },
-        ItemDef {
+        Item {
             id: 29335, // Cuốc đào (non-equippable)
-            kind: 27,
-            fit_type: 0,
+            loai: 27,
+            equip_pos: 0,
             level: 0,
             ..Default::default()
         },
     ];
-    for d in &defs {
-        data.items.insert(i64::from(d.id), d.to_item());
+    for item in pickaxes {
+        data.items.insert(item.id, item);
     }
 
     let mut session = Session {
@@ -881,9 +878,8 @@ async fn test_party_member_pickaxe_equip_syncs_online_sessions_for_battle() {
     use tokio::sync::RwLock;
     use ts_dream::battle::runner::{BattleAction, BattleCommand};
     use ts_dream::battle::service::BattleService;
-    use ts_dream::data::loaders::item::ItemDef;
     use ts_dream::data::loaders::{EveFightData, EveFightEnemy};
-    use ts_dream::data::tables::Npc;
+    use ts_dream::data::tables::{Item, Npc};
     use ts_dream::protocol::{
         encoder, ITEM_SUB_EQUIP, ITEM_SUB_PET_EQUIP, ITEM_SUB_PET_UNEQUIP, ITEM_SUB_UNEQUIP,
         OP_BATTLE, OP_ITEM,
@@ -893,28 +889,26 @@ async fn test_party_member_pickaxe_equip_syncs_online_sessions_for_battle() {
     };
 
     let mut data = ts_dream::data::loader::GameData::default();
-    let pickaxe_defs = [
-        ItemDef {
+    let pickaxes = [
+        Item {
             id: 10001,
-            kind: 39,
-            fit_type: 3,
+            loai: 39,
+            equip_pos: 3,
             level: 0,
-            attr1_kind: 210,
-            attr1_value: 25,
+            atk1: 25,
             ..Default::default()
         },
-        ItemDef {
+        Item {
             id: 10534,
-            kind: 39,
-            fit_type: 3,
+            loai: 39,
+            equip_pos: 3,
             level: 50,
-            attr1_kind: 210,
-            attr1_value: 30,
+            atk1: 30,
             ..Default::default()
         },
     ];
-    for def in &pickaxe_defs {
-        data.items.insert(i64::from(def.id), def.to_item());
+    for item in pickaxes {
+        data.items.insert(item.id, item);
     }
     data.npcs.insert(
         25002,

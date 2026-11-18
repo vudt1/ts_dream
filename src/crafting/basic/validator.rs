@@ -45,13 +45,13 @@ pub fn validate_compound_inputs(
         }
 
         // Must exist in Item.dat catalog
-        let def = game_data
-            .item_defs
-            .get(&slot.item_id)
+        let item = game_data
+            .items
+            .get(&i64::from(slot.item_id))
             .ok_or(CraftError::InvalidItemForCompound)?;
 
         // Prohibited item kinds: {20, 21, 22}
-        if (20..=22).contains(&def.kind) {
+        if (20..=22).contains(&item.loai) {
             return Err(CraftError::InvalidItemForCompound);
         }
 

@@ -67,6 +67,8 @@ pub struct Item {
     pub add_pet: i64,
     pub compound_material: i64,
     pub compound_rank: i64,
+    pub price: u32,
+    pub sell_price: u32,
     /// Bug-for-bug garble override (Chapter 4 §4.3/§4.6) — 99 item names.
     pub garble: Option<crate::encoding::GarbleSpec>,
 }
@@ -76,6 +78,11 @@ impl Item {
     /// `Some` is the exact wire hex to emit (garble override, else clean bytes).
     pub fn wire_name_hex(&self) -> Option<String> {
         crate::encoding::name_wire_hex(&self.name, &self.garble)
+    }
+
+    /// Decode `name` (VISCII 1.1 bytes) into a UTF-8 `String` on demand.
+    pub fn utf8_name(&self) -> String {
+        encoding::viscii_decode(&self.name)
     }
 }
 

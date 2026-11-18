@@ -14,7 +14,7 @@
 
 use ts_dream::battle::service::BattleService;
 use ts_dream::data::loader::GameData;
-use ts_dream::data::loaders::item::ItemDef;
+use ts_dream::data::tables::Item;
 use ts_dream::db::modern::sqlite::SqliteRepositories;
 use ts_dream::protocol::{
     encoder, GOLD_CAP, NPC_SHOP_BUY_BAG_FULL, NPC_SHOP_BUY_DISRUPTED,
@@ -153,8 +153,8 @@ async fn test_npc_shop_buy_flow_and_errors() {
             data: &data,
             service: &service,
             out: &mut out,
-            opcode: 0x1B,
-            sub: 1, // Buy
+            opcode: ts_dream::protocol::OP_NPC_SHOP,
+            sub: ts_dream::protocol::NPC_SHOP_SUB_BUY, // Buy
             payload: &payload,
             decoded: &[],
             env,
@@ -191,6 +191,36 @@ async fn test_npc_shop_buy_flow_and_errors() {
         "Must send 1B 01 00 on success"
     );
 
+    // Case A2: GameData.items.price overrides transcribed fallback price when > 0
+    let mut custom_data = GameData::default();
+    custom_data.items.insert(
+        10001,
+        Item {
+            id: 10001,
+            price: 45,
+            sell_price: 10,
+            ..Default::default()
+        },
+    );
+    let mut conn_priced = create_test_conn(2007, 2007);
+    conn_priced.session.gold = 200;
+    let mut out_priced = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn_priced,
+            data: &custom_data,
+            service: &service,
+            out: &mut out_priced,
+            opcode: ts_dream::protocol::OP_NPC_SHOP,
+            sub: ts_dream::protocol::NPC_SHOP_SUB_BUY,
+            payload: &[0x00, 0x02, 0x00], // index 0 (item 10001), count 2 -> 2 * 45 = 90
+            decoded: &[],
+            env,
+        };
+        handle_npc_shop(&mut ctx).await;
+    }
+    assert_eq!(conn_priced.session.gold, 110, "Buy must use Item.price from GameData.items");
+
     // Case B: Insufficient gold
     let mut conn_poor = create_test_conn(2002, 2002);
     conn_poor.session.gold = 5; // cannot afford 30 gold
@@ -201,8 +231,8 @@ async fn test_npc_shop_buy_flow_and_errors() {
             data: &data,
             service: &service,
             out: &mut out_poor,
-            opcode: 0x1B,
-            sub: 1,
+            opcode: ts_dream::protocol::OP_NPC_SHOP,
+            sub: ts_dream::protocol::NPC_SHOP_SUB_BUY,
             payload: &payload,
             decoded: &[],
             env,
@@ -236,8 +266,8 @@ async fn test_npc_shop_buy_flow_and_errors() {
             data: &data,
             service: &service,
             out: &mut out_full,
-            opcode: 0x1B,
-            sub: 1,
+            opcode: ts_dream::protocol::OP_NPC_SHOP,
+            sub: ts_dream::protocol::NPC_SHOP_SUB_BUY,
             payload: &payload,
             decoded: &[],
             env,
@@ -262,8 +292,8 @@ async fn test_npc_shop_buy_flow_and_errors() {
             data: &data,
             service: &service,
             out: &mut out_inv,
-            opcode: 0x1B,
-            sub: 1,
+            opcode: ts_dream::protocol::OP_NPC_SHOP,
+            sub: ts_dream::protocol::NPC_SHOP_SUB_BUY,
             payload: &inv_payload,
             decoded: &[],
             env,
@@ -288,8 +318,8 @@ async fn test_npc_shop_buy_flow_and_errors() {
             data: &data,
             service: &service,
             out: &mut out_zero,
-            opcode: 0x1B,
-            sub: 1,
+            opcode: ts_dream::protocol::OP_NPC_SHOP,
+            sub: ts_dream::protocol::NPC_SHOP_SUB_BUY,
             payload: &zero_payload,
             decoded: &[],
             env,
@@ -327,8 +357,8 @@ async fn test_npc_shop_starter_bundle_npc7_map9999() {
             data: &data,
             service: &service,
             out: &mut out,
-            opcode: 0x1B,
-            sub: 1,
+            opcode: ts_dream::protocol::OP_NPC_SHOP,
+            sub: ts_dream::protocol::NPC_SHOP_SUB_BUY,
             payload: &payload,
             decoded: &[],
             env,
@@ -356,9 +386,9 @@ async fn test_npc_shop_starter_bundle_npc7_map9999() {
 async fn test_npc_shop_sell_flow_and_errors() {
     let mut data = GameData::default();
     // Register item 10001 with sell_price = 25
-    data.item_defs.insert(
+    data.items.insert(
         10001,
-        ItemDef {
+        Item {
             id: 10001,
             sell_price: 25,
             price: 50,
@@ -1662,8 +1692,8 @@ async fn test_npc_shop_bulk_buy_all_or_nothing() {
             data: &data,
             service: &service,
             out: &mut out,
-            opcode: 0x1B,
-            sub: 1,
+            opcode: ts_dream::protocol::OP_NPC_SHOP,
+            sub: ts_dream::protocol::NPC_SHOP_SUB_BUY,
             payload: &payload,
             decoded: &[],
             env,
@@ -1693,8 +1723,8 @@ async fn test_npc_shop_bulk_buy_all_or_nothing() {
             data: &data,
             service: &service,
             out: &mut out_tight,
-            opcode: 0x1B,
-            sub: 1,
+            opcode: ts_dream::protocol::OP_NPC_SHOP,
+            sub: ts_dream::protocol::NPC_SHOP_SUB_BUY,
             payload: &payload,
             decoded: &[],
             env,
@@ -1716,8 +1746,8 @@ async fn test_npc_shop_bulk_buy_all_or_nothing() {
             data: &data,
             service: &service,
             out: &mut out_1250,
-            opcode: 0x1B,
-            sub: 1,
+            opcode: ts_dream::protocol::OP_NPC_SHOP,
+            sub: ts_dream::protocol::NPC_SHOP_SUB_BUY,
             payload: &payload_1250,
             decoded: &[],
             env,
@@ -1897,8 +1927,8 @@ async fn test_zero_020b_red_message_toast() {
             data: &data,
             service: &service,
             out: &mut out1,
-            opcode: 0x1B,
-            sub: 1,
+            opcode: ts_dream::protocol::OP_NPC_SHOP,
+            sub: ts_dream::protocol::NPC_SHOP_SUB_BUY,
             payload: &[0x00, 0x05, 0x00],
             decoded: &[],
             env,

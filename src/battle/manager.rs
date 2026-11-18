@@ -11,6 +11,7 @@ use crate::battle::npc_world::NpcWorld;
 use crate::battle::runner::{
     BattleAction, BattleCommand, BattleCommands, BattleData, DbUpdate, Out, Outcome, PlayerSnapshot,
 };
+use crate::data::loader::GameData;
 use crate::data::tables::{BinarySkillDef, Item, Npc, Skill, TexpRow};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI32, Ordering};
@@ -84,6 +85,52 @@ impl BattleHandle {
             tx,
             ack_notify: Arc::new(tokio::sync::Notify::new()),
             locked_cells: Arc::new(StdRwLock::new(HashMap::new())),
+        }
+    }
+}
+
+enum BattleTables {
+    Split {
+        npcs: Arc<HashMap<i64, Npc>>,
+        skills: Arc<HashMap<i64, Skill>>,
+        binary_skills: Arc<HashMap<u16, BinarySkillDef>>,
+        items: Arc<HashMap<i64, Item>>,
+        texps: Arc<Vec<TexpRow>>,
+    },
+    Shared(Arc<GameData>),
+}
+
+impl BattleTables {
+    fn as_refs(
+        &self,
+    ) -> (
+        &HashMap<i64, Npc>,
+        &HashMap<i64, Skill>,
+        &HashMap<u16, BinarySkillDef>,
+        &HashMap<i64, Item>,
+        &[TexpRow],
+    ) {
+        match self {
+            BattleTables::Split {
+                npcs,
+                skills,
+                binary_skills,
+                items,
+                texps,
+            } => (
+                npcs.as_ref(),
+                skills.as_ref(),
+                binary_skills.as_ref(),
+                items.as_ref(),
+                texps.as_slice(),
+            ),
+            BattleTables::Shared(data) => (
+                &data.npcs,
+                &data.skills,
+                &data.binary_skill_defs,
+                &data.items,
+                data.texps.as_slice(),
+            ),
         }
     }
 }
@@ -231,6 +278,73 @@ impl BattleManager {
         timeout: std::time::Duration,
         sink: Arc<dyn BattleSink>,
     ) -> BattleHandle {
+        self.spawn_inner(
+            battle,
+            BattleTables::Split {
+                npcs,
+                skills,
+                binary_skills,
+                items,
+                texps,
+            },
+            pet_slots,
+            players,
+            player_skills,
+            per_exp,
+            world,
+            talking_battle,
+            map_id,
+            timeout,
+            sink,
+        )
+    }
+
+    /// Spawn a battle sharing immutable static tables via `Arc<GameData>` (zero table clones).
+    #[allow(clippy::too_many_arguments)]
+    pub fn spawn_with_game_data(
+        self: &Arc<Self>,
+        battle: Battle,
+        game_data: Arc<GameData>,
+        pet_slots: Arc<HashMap<i64, [i64; 4]>>,
+        players: Arc<HashMap<i64, PlayerSnapshot>>,
+        player_skills: Option<Arc<HashMap<i64, Vec<u16>>>>,
+        per_exp: i64,
+        world: Option<Arc<StdRwLock<NpcWorld>>>,
+        talking_battle: i64,
+        map_id: i64,
+        timeout: std::time::Duration,
+        sink: Arc<dyn BattleSink>,
+    ) -> BattleHandle {
+        self.spawn_inner(
+            battle,
+            BattleTables::Shared(game_data),
+            pet_slots,
+            players,
+            player_skills,
+            per_exp,
+            world,
+            talking_battle,
+            map_id,
+            timeout,
+            sink,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn spawn_inner(
+        self: &Arc<Self>,
+        battle: Battle,
+        tables: BattleTables,
+        pet_slots: Arc<HashMap<i64, [i64; 4]>>,
+        players: Arc<HashMap<i64, PlayerSnapshot>>,
+        player_skills: Option<Arc<HashMap<i64, Vec<u16>>>>,
+        per_exp: i64,
+        world: Option<Arc<StdRwLock<NpcWorld>>>,
+        talking_battle: i64,
+        map_id: i64,
+        timeout: std::time::Duration,
+        sink: Arc<dyn BattleSink>,
+    ) -> BattleHandle {
         let id = battle.id_battle;
         let (tx, rx) = mpsc::unbounded_channel();
         let ack_notify = Arc::new(tokio::sync::Notify::new());
@@ -253,19 +367,20 @@ impl BattleManager {
         tokio::spawn(async move {
             let mut battle = battle;
             let mut rx = rx;
-            // Build the per-task data from the tables it now owns.
+            let (npcs, skills, binary_skills, items, texps) = tables.as_refs();
+            // Build the per-task data from the shared tables it owns.
             let mut data = BattleData::new(
-                &npcs,
-                &skills,
-                &items,
+                npcs,
+                skills,
+                items,
                 &pet_slots,
                 &players,
-                &texps,
+                texps,
                 world.as_ref().map(|w| w.as_ref()),
                 talking_battle,
                 map_id,
             )
-            .with_binary_skills(&binary_skills);
+            .with_binary_skills(binary_skills);
             if let Some(ref ps) = player_skills {
                 data = data.with_player_skills(ps.as_ref());
             }
