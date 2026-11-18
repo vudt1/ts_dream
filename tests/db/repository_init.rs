@@ -251,6 +251,7 @@ async fn test_session_load_and_save() {
         savemap: 10817,
         savemap_x: 0,
         savemap_y: 0,
+        pending_evacuate_map: None,
         color: String::new(),
         skills: vec![(10001, 3), (10002, 1)],
         hotkeys: [
@@ -405,6 +406,7 @@ async fn test_session_load_and_save() {
         savemap: 0,
         savemap_x: 0,
         savemap_y: 0,
+        pending_evacuate_map: None,
         color: String::new(),
         skills: vec![],
         hotkeys: [HotkeySlot::empty(); 11],
@@ -759,6 +761,7 @@ async fn test_nonexistent_and_edge_cases() {
         savemap: 0,
         savemap_x: 0,
         savemap_y: 0,
+        pending_evacuate_map: None,
         color: String::new(),
         skills: vec![],
         hotkeys: [HotkeySlot::empty(); 11],

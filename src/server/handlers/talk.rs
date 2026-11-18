@@ -89,9 +89,10 @@ pub async fn handle_talk(ctx: &mut OpcodeCtx<'_>) {
     let data = ctx.data;
     let pool = ctx.env.pool;
     let (sub, payload) = (ctx.sub, ctx.payload);
+    let festivals = ctx.env.hub.map(|h| h.festivals.as_ref());
     match sub {
-        1 => handle_talk_start(conn, payload, data, Some(ctx.service), pool, out).await,
-        4 => handle_talk_click_door(conn, payload, data, pool, out).await,
+        1 => handle_talk_start(conn, payload, data, Some(ctx.service), pool, festivals, out).await,
+        4 => handle_talk_click_door(conn, payload, data, pool, festivals, out).await,
         6 => handle_talk_continue(conn, payload, data, pool, out).await,
         8 => handle_talk_warp(conn, payload, data, &ctx.env, out).await,
         9 => handle_talk_select_menu(conn, payload, data, pool, out).await,
@@ -131,6 +132,7 @@ async fn handle_talk_start(
     data: &GameData,
     service: Option<&crate::battle::service::BattleService>,
     pool: Option<&DbPool>,
+    festivals: Option<&crate::server::seasonal_festival::SeasonalFestivalManager>,
     out: &mut HandleOutcome,
 ) {
     if payload.len() < 2 {
@@ -138,6 +140,13 @@ async fn handle_talk_start(
         return;
     }
     let map_object_id = encoder::u16_le(payload[0], payload[1]) as i32;
+    if let (Some(fest), Ok(npc_place_u16)) = (festivals, u16::try_from(map_object_id)) {
+        if let Err(msg) = fest.check_npc_access(conn.session.map_id, npc_place_u16) {
+            out.send(crate::server::spawn::sys_msg_frame(msg));
+            end_talk(conn, out);
+            return;
+        }
+    }
     conn.session.idtalking = map_object_id;
     conn.session.talk_type = "NPC".to_string();
     conn.session.talk_count = 0;
@@ -202,6 +211,15 @@ async fn handle_talk_start(
         NpcTrigger::ClickNpc(map_object_id),
         &mut rng,
     ) {
+        if let Some(fest) = festivals {
+            if let Err(msg) =
+                check_event_session_quest_access(fest, conn.session.map_id, &event_session)
+            {
+                out.send(crate::server::spawn::sys_msg_frame(msg));
+                end_talk(conn, out);
+                return;
+            }
+        }
         activate_event_session(&mut conn.session, event_session, data, pool, out).await;
         return;
     }
@@ -330,6 +348,7 @@ async fn handle_talk_click_door(
     payload: &[u8],
     data: &GameData,
     pool: Option<&DbPool>,
+    festivals: Option<&crate::server::seasonal_festival::SeasonalFestivalManager>,
     out: &mut HandleOutcome,
 ) {
     if payload.len() < 2 {
@@ -341,6 +360,21 @@ async fn handle_talk_click_door(
         end_talk(conn, out);
         return;
     }
+    if let (Some(fest), Ok(door_u16)) = (festivals, u16::try_from(door_id)) {
+        let target_map_id = crate::server::handlers::quest::resolve_door_warp(
+            data,
+            &conn.session,
+            conn.session.map_id,
+            door_u16,
+        )
+        .map(|r| r.dest_map)
+        .unwrap_or(0);
+        if let Err(msg) = fest.check_door_access(conn.session.map_id, door_u16, target_map_id) {
+            out.send(crate::server::spawn::sys_msg_frame(msg));
+            end_talk(conn, out);
+            return;
+        }
+    }
     let mut rng = DotNetRandom::new(eve_rng_seed());
     if let Some(event_session) = npc_event::resolve_npc_event(
         &conn.session,
@@ -348,6 +382,15 @@ async fn handle_talk_click_door(
         NpcTrigger::ClickDoor(door_id),
         &mut rng,
     ) {
+        if let Some(fest) = festivals {
+            if let Err(msg) =
+                check_event_session_quest_access(fest, conn.session.map_id, &event_session)
+            {
+                out.send(crate::server::spawn::sys_msg_frame(msg));
+                end_talk(conn, out);
+                return;
+            }
+        }
         conn.session.idtalking = door_id;
         conn.session.talk_type = "DOOR".to_string();
         conn.session.talk_count = 0;
@@ -355,6 +398,20 @@ async fn handle_talk_click_door(
         return;
     }
     end_talk(conn, out);
+}
+
+/// Check all quest operations in an `EventSession` against `SeasonalFestivalManager::check_quest_access`.
+pub fn check_event_session_quest_access(
+    festivals: &crate::server::seasonal_festival::SeasonalFestivalManager,
+    map_id: u16,
+    event_session: &crate::eve::EventSession,
+) -> Result<(), &'static str> {
+    for effect in &event_session.planned_effects {
+        if let crate::eve::planner::DomainEffect::UpdateQuest(op) = effect {
+            festivals.check_quest_access(map_id, u32::from(op.quest_id()))?;
+        }
+    }
+    Ok(())
 }
 
 async fn handle_talk_warp(

@@ -354,6 +354,11 @@ fn text_banner(sub: u8, msg: &str) -> String {
     crate::protocol::frame(&format!("02{:02X}", sub), &body)
 }
 
+/// Build S→C `16 01` NPC appear frame (`F44405001601<id:u8>0000`).
+pub fn npc_appear_frame(npc_place_id: u16) -> String {
+    format!("F44405001601{:02X}0000", (npc_place_id & 0xFF) as u8)
+}
+
 /// Build system message frame via channel `020102` (`F444 + len + 0201 + 02 + msg`).
 pub fn sys_msg_frame(msg: &str) -> String {
     let visc = crate::encoding::viscii_encode(msg);

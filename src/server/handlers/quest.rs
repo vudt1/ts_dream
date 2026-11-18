@@ -1238,11 +1238,26 @@ pub fn try_trigger_battle_gate(
 pub async fn handle_warp_confirm(
     conn: &mut Conn,
     data: &GameData,
-    _env: &crate::server::dispatcher::ServerEnv<'_>,
+    env: &crate::server::dispatcher::ServerEnv<'_>,
     out: &mut HandleOutcome,
 ) {
     let map_id = conn.session.map_id;
     let idtalking = conn.session.idtalking;
+
+    if let Some(hub) = env.hub {
+        let warp_id_u16 = u16::try_from(idtalking).unwrap_or(0);
+        let target_map_id = resolve_door_warp(data, &conn.session, map_id, warp_id_u16)
+            .map(|r| r.dest_map)
+            .unwrap_or(0);
+        if let Err(msg) = hub
+            .festivals
+            .check_door_access(map_id, warp_id_u16, target_map_id)
+        {
+            out.send(crate::server::spawn::sys_msg_frame(msg));
+            end_talk(conn, out);
+            return;
+        }
+    }
 
     // Check the WARP-type talk data first. When a per-step entry exists we
     // drive its dialogs / TEAMDEF / OnWin directly and do NOT fall through to
@@ -1319,7 +1334,7 @@ pub async fn handle_warp_confirm(
             return;
         }
 
-        if !perform_party_warp_with_resolved(&mut conn.session, resolved, _env.pool, out).await {
+        if !perform_party_warp_with_resolved(&mut conn.session, resolved, env.pool, out).await {
             end_talk(conn, out);
             return;
         }

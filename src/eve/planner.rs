@@ -66,6 +66,22 @@ pub enum QuestOp {
     },
 }
 
+impl QuestOp {
+    /// Return the target `quest_id` affected by this quest operation.
+    #[must_use]
+    pub fn quest_id(&self) -> u16 {
+        match *self {
+            Self::Decrement { quest_id, .. }
+            | Self::Advance { quest_id, .. }
+            | Self::Subtract { quest_id, .. }
+            | Self::Drop { quest_id }
+            | Self::ExplicitMark { quest_id, .. }
+            | Self::MarkDont { quest_id }
+            | Self::Unsupported { quest_id, .. } => quest_id,
+        }
+    }
+}
+
 /// Typed player attribute / savemap / EXP / shop operation parsed from `rt = 0, rc = 7`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PlayerOp {

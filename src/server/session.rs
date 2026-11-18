@@ -330,6 +330,9 @@ pub struct Session {
     pub savemap: u16,
     pub savemap_x: u16,
     pub savemap_y: u16,
+    /// Deferred evacuation target map set when a Seasonal Festival is stopped
+    /// while this player is mid-battle (`battle_id > 0`).
+    pub pending_evacuate_map: Option<u16>,
     /// Equipped-colour hex string (`_My_Color`), e.g. `"0000000000000000"`.
     pub color: String,
 
@@ -495,6 +498,7 @@ impl Default for Session {
             savemap: 0,
             savemap_x: 0,
             savemap_y: 0,
+            pending_evacuate_map: None,
             color: "0000000000000000".to_string(),
 
             skills: Vec::new(),

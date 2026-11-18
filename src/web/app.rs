@@ -866,6 +866,11 @@ async fn handle_festival_transition(
             if let Some(notice) = notice {
                 control.broadcast_packet(&notice.to_frame().frame).await;
             }
+            if is_start {
+                control.broadcast_festival_dynamic_npcs(&info.id).await;
+            } else {
+                control.evacuate_festival_players(&info.id).await;
+            }
             if let Some(ref pool) = s.pool {
                 let action = if is_start {
                     "festival_start"

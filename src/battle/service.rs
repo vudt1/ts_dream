@@ -300,12 +300,14 @@ impl BattleSink for BattleSinkImpl {
         let mut fled_session: Option<Session> = None;
 
         // 2. Update their session in self.online with retry
+        let mut fled_evac: Option<(u16, u16, u16, u16)> = None;
         if let Some(online) = try_read_online_with_retry(&self.online, 10, std::time::Duration::from_millis(2)) {
             if let Some(p) = online.get(&player) {
                 if let Some(mut s) = try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2)) {
                     s.battle_id = 0;
                     s.last_battle_end_ms = now_ms;
                     s.encounter_steps = 0;
+                    fled_evac = apply_pending_evacuation(&mut s);
                     fled_session = Some(s.clone());
                     let mut map = crate::server::session::lock_online_sessions();
                     if let Some(global_s) = map.get_mut(&(player as u32)) {
@@ -322,8 +324,24 @@ impl BattleSink for BattleSinkImpl {
                 s.battle_id = 0;
                 s.last_battle_end_ms = now_ms;
                 s.encounter_steps = 0;
+                fled_evac = apply_pending_evacuation(s);
                 fled_session = Some(s.clone());
             }
+        }
+
+        if let Some((_old_map, target_map, target_x, target_y)) = fled_evac {
+            self.send_to(player, "F44402001407".to_string());
+            self.send_to(
+                player,
+                crate::server::spawn::build_relocate_packet(
+                    player as u32,
+                    target_map,
+                    target_x,
+                    target_y,
+                    0,
+                ),
+            );
+            self.send_map(player, crate::battle::packets::hide_from_map(player as u32));
         }
 
         // 4. Persist fled session to DB so stats and pet status are saved
@@ -664,6 +682,22 @@ impl BattleSink for BattleSinkImpl {
                         s.map_id = resolved.dest_map;
                         s.map_x = resolved.dest_x;
                         s.map_y = resolved.dest_y;
+                    }
+                    if let Some((_old_map, target_map, target_x, target_y)) =
+                        apply_pending_evacuation(&mut s)
+                    {
+                        self.send_to(pid, "F44402001407".to_string());
+                        self.send_to(
+                            pid,
+                            crate::server::spawn::build_relocate_packet(
+                                pid as u32,
+                                target_map,
+                                target_x,
+                                target_y,
+                                0,
+                            ),
+                        );
+                        self.send_map(pid, crate::battle::packets::hide_from_map(pid as u32));
                     }
                     crate::server::session::registry_update_if_online(&s);
                     ended_sessions.push(s);
@@ -1821,7 +1855,7 @@ impl BattleService {
         (id, leader_packets)
     }
 
-    fn sync_online_session(&self, player: i64, update: impl FnOnce(&mut Session)) {
+    pub fn sync_online_session(&self, player: i64, update: impl FnOnce(&mut Session)) {
         if let Some(online) =
             try_read_online_with_retry(&self.online, 10, std::time::Duration::from_millis(2))
         {
@@ -1930,6 +1964,7 @@ impl BattleService {
         session.battle_id = 0;
         session.last_battle_end_ms = now_ms;
         session.encounter_steps = 0;
+        let _ = apply_pending_evacuation(session);
         if let Ok(mut members) = self.sink.members.lock() {
             members.remove(&i64::from(session.id));
         }
@@ -1937,6 +1972,7 @@ impl BattleService {
             s.battle_id = 0;
             s.last_battle_end_ms = now_ms;
             s.encounter_steps = 0;
+            let _ = apply_pending_evacuation(s);
         });
         crate::server::session::registry_update_if_online(session);
     }
@@ -2359,4 +2395,28 @@ impl WorldSink for BattleService {
         };
         self.start_teamdef_battle(&mut s, &trigger);
     }
+}
+
+/// Consume any deferred festival evacuation target set on `s` (or its global registry
+/// snapshot) when a battle ends, updating `s.map_id`/`map_x`/`map_y` and returning
+/// `(old_map, target_map, target_x, target_y)`.
+fn apply_pending_evacuation(s: &mut Session) -> Option<(u16, u16, u16, u16)> {
+    let target_map = s.pending_evacuate_map.take().or_else(|| {
+        crate::server::session::registry_get(s.id).and_then(|r| r.pending_evacuate_map)
+    })?;
+    let old_map = s.map_id;
+    let target_x = if s.savemap == target_map && s.savemap_x > 0 {
+        s.savemap_x
+    } else {
+        500
+    };
+    let target_y = if s.savemap == target_map && s.savemap_y > 0 {
+        s.savemap_y
+    } else {
+        500
+    };
+    s.map_id = target_map;
+    s.map_x = target_x;
+    s.map_y = target_y;
+    Some((old_map, target_map, target_x, target_y))
 }

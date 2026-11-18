@@ -12,6 +12,7 @@
 use crate::protocol::encoder;
 use crate::server::dispatcher::{OpcodeCtx, OutFrame};
 use crate::server::seasonal_festival::{
+    has_festival_claim, record_festival_claim, season_period_key, CLAIM_TYPE_LORE_SHOWN,
     FESTIVAL_DOAN_NGO, FESTIVAL_GIANG_SINH, FESTIVAL_HALLOWEEN, FESTIVAL_TET_NGUYEN_DAN,
     FESTIVAL_TET_NGUYEN_TIEU, FESTIVAL_THAT_TICH, FESTIVAL_TRUNG_THU, FESTIVAL_VALENTINE,
 };
@@ -291,6 +292,81 @@ pub async fn handle_festival(ctx: &mut OpcodeCtx<'_>) {
             });
         if let Some(key) = lore_key {
             ctx.out.send(festival_ui_trigger_frame(key));
+        }
+    }
+}
+
+/// Emit seasonal festival login sync frames on login completion (`OP_LOGIN_COMPLETE`):
+/// 1. `S→C 0x17 0x39` for all currently `Active` seasonal festivals that have a notice.
+/// 2. At most `1` `S→C 0x24 0x19` lore popup for the first `Active` festival with a valid
+///    `unique_lore_key` not yet claimed (`lore_shown`) in `character_festival_claims` for
+///    `season-<season_seq>`, persisting the claim to SQLite.
+pub async fn emit_login_festival_sync(ctx: &mut OpcodeCtx<'_>, player_id: u32) {
+    let Some(hub) = ctx.env.hub else {
+        return;
+    };
+
+    let active_festivals: Vec<_> = hub
+        .festivals
+        .list_festivals()
+        .into_iter()
+        .filter(|f| f.is_active)
+        .collect();
+
+    for fest in &active_festivals {
+        if let Some(notice) = start_notice_for_festival(&fest.id) {
+            ctx.out.send(notice.to_frame().frame);
+        }
+    }
+
+    let Some(pool) = ctx.env.pool else {
+        return;
+    };
+
+    for fest in &active_festivals {
+        let Some(lore_key) = fest
+            .lore_record_id
+            .and_then(|rec_id| ctx.data.festivals.get(&rec_id))
+            .and_then(|def| def.unique_lore_key)
+        else {
+            continue;
+        };
+
+        let period_key = season_period_key(fest.season_seq);
+        match has_festival_claim(pool, player_id, &fest.id, &period_key, CLAIM_TYPE_LORE_SHOWN)
+            .await
+        {
+            Ok(false) => {
+                ctx.out.send(festival_ui_trigger_frame(lore_key));
+                if let Err(e) = record_festival_claim(
+                    pool,
+                    player_id,
+                    &fest.id,
+                    &period_key,
+                    CLAIM_TYPE_LORE_SHOWN,
+                )
+                .await
+                {
+                    tracing::warn!(
+                        player_id,
+                        festival_id = %fest.id,
+                        period_key = %period_key,
+                        error = %e,
+                        "Failed to persist festival lore_shown claim"
+                    );
+                }
+                break;
+            }
+            Ok(true) => continue,
+            Err(e) => {
+                tracing::warn!(
+                    player_id,
+                    festival_id = %fest.id,
+                    period_key = %period_key,
+                    error = %e,
+                    "Failed to query festival lore_shown claim"
+                );
+            }
         }
     }
 }

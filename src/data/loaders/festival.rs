@@ -18,7 +18,7 @@
 //! - `+0x0407`: `[u8]` VISCII lore text 2 (null-terminated, up to 999 bytes)
 
 use crate::encoding;
-use crate::error::Result;
+use crate::error::{Result, TsError};
 use std::collections::HashMap;
 
 /// A seasonal festival definition parsed and decrypted from `Festival.Dat`.
@@ -157,5 +157,154 @@ impl FestivalDatLoader {
         }
 
         Ok(map)
+    }
+}
+
+fn default_word_flag() -> u16 {
+    0xB4C2
+}
+
+/// JSON/config input record for appending or building entries in `Festival.Dat`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FestivalRecordInput {
+    pub key: u32,
+    #[serde(default = "default_word_flag")]
+    pub word_flag: u16,
+    pub title: String,
+    pub text1: String,
+    pub text2: String,
+}
+
+/// Dual-XOR binary encoder for `Festival.Dat` (`0x7EF` byte records, max `0x16E = 366` records).
+pub struct FestivalDatEncoder;
+
+impl FestivalDatEncoder {
+    pub const RECORD_SIZE: usize = FestivalDatLoader::RECORD_SIZE;
+    pub const MAX_RECORDS: usize = 0x16E; // 366
+
+    /// Extract `(key_a, key_b)` from the trailing 2 records of an existing `Festival.Dat`.
+    pub fn extract_keys(
+        bytes: &[u8],
+    ) -> Result<([u8; Self::RECORD_SIZE], [u8; Self::RECORD_SIZE])> {
+        let n = bytes.len() / Self::RECORD_SIZE;
+        if n < 3 {
+            return Err(TsError::Data(
+                "Festival.Dat has fewer than 3 records; cannot extract XOR keys".to_string(),
+            ));
+        }
+        let a_off = (n - 2) * Self::RECORD_SIZE;
+        let b_off = (n - 1) * Self::RECORD_SIZE;
+        let key_a: [u8; Self::RECORD_SIZE] = bytes[a_off..a_off + Self::RECORD_SIZE]
+            .try_into()
+            .map_err(|_| TsError::Data("Invalid keyA slice".to_string()))?;
+        let key_b: [u8; Self::RECORD_SIZE] = bytes[b_off..b_off + Self::RECORD_SIZE]
+            .try_into()
+            .map_err(|_| TsError::Data("Invalid keyB slice".to_string()))?;
+        Ok((key_a, key_b))
+    }
+
+    /// Encode a single decrypted `0x7EF`-byte `FestivalDef` record in VISCII 1.1.
+    pub fn encode_record(def: &FestivalDef) -> [u8; Self::RECORD_SIZE] {
+        let mut buf = [0u8; Self::RECORD_SIZE];
+        if def.raw_data.len() == Self::RECORD_SIZE {
+            buf.copy_from_slice(&def.raw_data);
+            buf[0..8].copy_from_slice(&def.date_time.to_le_bytes());
+            buf[8..10].copy_from_slice(&def.word_flag.to_le_bytes());
+            return buf;
+        }
+
+        buf[0..8].copy_from_slice(&def.date_time.to_le_bytes());
+        buf[8..10].copy_from_slice(&def.word_flag.to_le_bytes());
+
+        let title_bytes = encoding::viscii_encode(&def.title);
+        let title_len = title_bytes.len().min(0x1F - 0x0B); // <= 20 bytes
+        buf[0x0A] = title_len as u8;
+        buf[0x0B..0x0B + title_len].copy_from_slice(&title_bytes[..title_len]);
+
+        let text1_bytes = encoding::viscii_encode(&def.text1);
+        let t1_len = text1_bytes.len().min(0x407 - 0x1F - 1); // <= 999 bytes + NUL
+        buf[0x1F..0x1F + t1_len].copy_from_slice(&text1_bytes[..t1_len]);
+
+        let text2_bytes = encoding::viscii_encode(&def.text2);
+        let t2_len = text2_bytes.len().min(Self::RECORD_SIZE - 0x407 - 1); // <= 999 bytes + NUL
+        buf[0x407..0x407 + t2_len].copy_from_slice(&text2_bytes[..t2_len]);
+
+        buf
+    }
+
+    /// Encode records `1..=count` with dual-XOR `key_a` (even) and `key_b` (odd).
+    pub fn encode(
+        records: &[FestivalDef],
+        key_a: &[u8; Self::RECORD_SIZE],
+        key_b: &[u8; Self::RECORD_SIZE],
+    ) -> Result<Vec<u8>> {
+        if records.len() > Self::MAX_RECORDS {
+            return Err(TsError::Data(format!(
+                "Festival.Dat record count {} exceeds MAX_RECORDS {}",
+                records.len(),
+                Self::MAX_RECORDS
+            )));
+        }
+
+        let count = records.len();
+        let total_records = count + 3;
+        let mut out = vec![0u8; total_records * Self::RECORD_SIZE];
+
+        for (idx, def) in records.iter().enumerate() {
+            let rec_idx = idx + 1;
+            let mut plain = Self::encode_record(def);
+            let key = if (rec_idx & 1) != 0 { key_b } else { key_a };
+            for (b, k) in plain.iter_mut().zip(key.iter()) {
+                *b ^= *k;
+            }
+            let off = rec_idx * Self::RECORD_SIZE;
+            out[off..off + Self::RECORD_SIZE].copy_from_slice(&plain);
+        }
+
+        let key_a_off = (count + 1) * Self::RECORD_SIZE;
+        let key_b_off = (count + 2) * Self::RECORD_SIZE;
+        out[key_a_off..key_a_off + Self::RECORD_SIZE].copy_from_slice(key_a);
+        out[key_b_off..key_b_off + Self::RECORD_SIZE].copy_from_slice(key_b);
+
+        Ok(out)
+    }
+
+    /// Patch `date_time` keys `1..=count` onto records loaded from an existing `Festival.Dat`
+    /// and optionally append extra records (e.g. `8..=11`).
+    pub fn patch_festival_dat(
+        original_bytes: &[u8],
+        extra: &[FestivalRecordInput],
+    ) -> Result<Vec<u8>> {
+        let loaded = FestivalDatLoader::load(original_bytes)?;
+        let (key_a, key_b) = Self::extract_keys(original_bytes)?;
+
+        let mut ids: Vec<u32> = loaded.keys().copied().collect();
+        ids.sort_unstable();
+
+        let mut defs: Vec<FestivalDef> = Vec::with_capacity(ids.len() + extra.len());
+        for id in ids {
+            if let Some(mut def) = loaded.get(&id).cloned() {
+                def.date_time = id as f64;
+                def.lookup_key = Some(id);
+                def.unique_lore_key = Some(id);
+                defs.push(def);
+            }
+        }
+
+        for item in extra {
+            defs.push(FestivalDef {
+                id: item.key,
+                date_time: item.key as f64,
+                lookup_key: Some(item.key),
+                unique_lore_key: Some(item.key),
+                word_flag: item.word_flag,
+                title: item.title.clone(),
+                text1: item.text1.clone(),
+                text2: item.text2.clone(),
+                raw_data: Vec::new(),
+            });
+        }
+
+        Self::encode(&defs, &key_a, &key_b)
     }
 }

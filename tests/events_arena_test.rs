@@ -4,6 +4,10 @@ mod common;
 
 #[path = "events_arena/arena.rs"]
 mod arena;
+#[path = "events_arena/festival_gating_and_evacuation.rs"]
+mod festival_gating_and_evacuation;
+#[path = "events_arena/festival_login_and_encoder.rs"]
+mod festival_login_and_encoder;
 #[path = "events_arena/festival_quiz.rs"]
 mod festival_quiz;
 #[path = "events_arena/festival_wire_parity.rs"]

@@ -89,6 +89,23 @@ pub async fn handle_move_dispatch(ctx: &mut OpcodeCtx<'_>) {
     // 1. MeetDoor: check closest door within ±60 px of new coordinates.
     if let Some((door_id, _)) = closest_door {
         let map_id = ctx.conn.session.map_id;
+        if let Some(hub) = ctx.env.hub {
+            let target_map_id = crate::server::handlers::quest::resolve_door_warp(
+                ctx.data,
+                &ctx.conn.session,
+                map_id,
+                door_id,
+            )
+            .map(|r| r.dest_map)
+            .unwrap_or(0);
+            if let Err(msg) = hub
+                .festivals
+                .check_door_access(map_id, door_id, target_map_id)
+            {
+                ctx.out.send(crate::server::spawn::sys_msg_frame(msg));
+                return;
+            }
+        }
         if let Some(trigger) = crate::server::handlers::quest::try_trigger_battle_gate(
             &mut ctx.conn.session,
             ctx.data,
@@ -108,6 +125,16 @@ pub async fn handle_move_dispatch(ctx: &mut OpcodeCtx<'_>) {
                 cached_state.as_ref(),
             )
         {
+            if let Some(hub) = ctx.env.hub {
+                if let Err(msg) = crate::server::handlers::talk::check_event_session_quest_access(
+                    &hub.festivals,
+                    map_id,
+                    &event_session,
+                ) {
+                    ctx.out.send(crate::server::spawn::sys_msg_frame(msg));
+                    return;
+                }
+            }
             ctx.conn.session.idtalking = i32::from(door_id);
             ctx.conn.session.talk_type = "DOOR".to_string();
             ctx.conn.session.talk_count = 0;

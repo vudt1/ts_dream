@@ -141,6 +141,15 @@ impl ServerControl {
         self
     }
 
+    /// Override the Seasonal Festival Manager (used by tests).
+    pub fn with_festivals(
+        mut self,
+        festivals: Arc<crate::server::seasonal_festival::SeasonalFestivalManager>,
+    ) -> Self {
+        self.festivals = festivals;
+        self
+    }
+
     pub async fn is_running(&self) -> bool {
         self.app.read().await.running
     }
@@ -554,6 +563,124 @@ impl ServerControl {
         if let Some(tx) = clients.get(&player_id) {
             if tx.try_send(hex_frame.to_string()).is_err() {
                 tracing::debug!("Failed to send to player {player_id}");
+            }
+        }
+    }
+
+    /// Broadcast `16 01` frames for all dynamic NPCs of `festival_id` to online
+    /// players currently standing on those maps.
+    pub async fn broadcast_festival_dynamic_npcs(&self, festival_id: &str) {
+        let npcs = self.festivals.dynamic_npcs_for_festival(festival_id);
+        if npcs.is_empty() {
+            return;
+        }
+        let targets: Vec<(u32, String)> = {
+            let sessions = lock_online_sessions();
+            let mut out = Vec::new();
+            for (pid, sess) in sessions.iter() {
+                for npc in &npcs {
+                    if sess.map_id == npc.map_id {
+                        out.push((*pid, crate::server::spawn::npc_appear_frame(npc.npc_place_id)));
+                    }
+                }
+            }
+            out
+        };
+        if targets.is_empty() {
+            return;
+        }
+        let clients = self.clients.lock().await;
+        for (pid, frame) in targets {
+            if let Some(tx) = clients.get(&pid) {
+                let _ = tx.try_send(frame);
+            }
+        }
+    }
+
+    /// Evacuate all online players currently standing in `exclusive_maps` of `festival_id`
+    /// to their `savemap` (or `12001` fallback when `savemap == 0`).
+    /// Players currently in battle (`battle_id > 0`) are marked with `pending_evacuate_map`
+    /// instead of being yanked mid-battle.
+    pub async fn evacuate_festival_players(&self, festival_id: &str) {
+        let evac_maps = self.festivals.evacuable_maps_on_stop(festival_id);
+        if evac_maps.is_empty() {
+            return;
+        }
+        let mut immediate: Vec<(u32, u16, u16, u16, u16, crate::server::session::Session)> =
+            Vec::new();
+        let mut deferred: Vec<(u32, u16)> = Vec::new();
+        {
+            let mut sessions = lock_online_sessions();
+            for (&pid, s) in sessions.iter_mut() {
+                if !evac_maps.contains(&s.map_id) {
+                    continue;
+                }
+                let target_map = if s.savemap > 0 { s.savemap } else { 12001 };
+                let target_x = if s.savemap > 0 && s.savemap_x > 0 {
+                    s.savemap_x
+                } else {
+                    500
+                };
+                let target_y = if s.savemap > 0 && s.savemap_y > 0 {
+                    s.savemap_y
+                } else {
+                    500
+                };
+                if s.battle_id > 0 {
+                    s.pending_evacuate_map = Some(target_map);
+                    deferred.push((pid, target_map));
+                } else {
+                    let old_map = s.map_id;
+                    s.map_id = target_map;
+                    s.map_x = target_x;
+                    s.map_y = target_y;
+                    s.pending_evacuate_map = None;
+                    immediate.push((pid, old_map, target_map, target_x, target_y, s.clone()));
+                }
+            }
+        }
+
+        for (pid, target_map) in deferred {
+            self.battle_service
+                .sync_online_session(i64::from(pid), |bs| {
+                    bs.pending_evacuate_map = Some(target_map);
+                });
+        }
+
+        for (pid, old_map, target_map, target_x, target_y, updated) in immediate {
+            self.battle_service
+                .sync_online_session(i64::from(pid), |bs| {
+                    bs.map_id = target_map;
+                    bs.map_x = target_x;
+                    bs.map_y = target_y;
+                    bs.pending_evacuate_map = None;
+                });
+            self.send_to(pid, "F44402001407").await;
+            self.send_to(
+                pid,
+                &crate::server::spawn::build_relocate_packet(
+                    pid, target_map, target_x, target_y, 0,
+                ),
+            )
+            .await;
+            self.broadcast_map(
+                pid,
+                &[dispatcher::MapBroadcast {
+                    subject: pid,
+                    map_id: Some(old_map),
+                    frame: crate::battle::packets::hide_from_map(pid),
+                }],
+            )
+            .await;
+            if let Some(ref pool) = self.pool {
+                if updated.db_character_id > 0 {
+                    let _ = crate::db::persist::persist_sessions_transaction(
+                        Some(pool),
+                        &[&updated],
+                        &[],
+                    )
+                    .await;
+                }
             }
         }
     }

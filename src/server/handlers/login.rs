@@ -305,9 +305,16 @@ pub async fn handle_login_complete(ctx: &mut OpcodeCtx<'_>) {
     // 4. Synchronize NPCs on this map to this client
     for npc in &ctx.data.npc_on_map {
         if npc.map_id == i64::from(map_id) {
-            let npc_frame = format!("F44405001601{:02X}0000", (npc.id & 0xFF) as u8);
-            out.send(npc_frame);
+            out.send(crate::server::spawn::npc_appear_frame(npc.id as u16));
         }
     }
+    if let Some(hub) = ctx.env.hub {
+        for npc in hub.festivals.active_dynamic_npcs_for_map(map_id) {
+            out.send(crate::server::spawn::npc_appear_frame(npc.npc_place_id));
+        }
+    }
+
+    // 5. Seasonal festival login sync (17 39 notices + at most 1x 24 19 lore popup per season_seq)
+    super::festival::emit_login_festival_sync(ctx, my_id).await;
 }
 

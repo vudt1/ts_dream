@@ -285,8 +285,12 @@ pub fn handle_teleport_confirm(ctx: &mut OpcodeCtx) {
     // 5. Synchronize NPCs on this map to this client
     for npc in &ctx.data.npc_on_map {
         if npc.map_id == i64::from(map_id) {
-            let npc_frame = format!("F44405001601{:02X}0000", (npc.id & 0xFF) as u8);
-            out.send(npc_frame);
+            out.send(crate::server::spawn::npc_appear_frame(npc.id as u16));
+        }
+    }
+    if let Some(hub) = ctx.env.hub {
+        for npc in hub.festivals.active_dynamic_npcs_for_map(map_id) {
+            out.send(crate::server::spawn::npc_appear_frame(npc.npc_place_id));
         }
     }
 
