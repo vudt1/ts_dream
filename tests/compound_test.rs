@@ -422,7 +422,7 @@ async fn test_handle_compound_wire_and_db_flow() {
     // New item added frame (1706)
     assert!(frames.iter().any(|f| f.starts_with("F4440E001706")), "Must emit 1706 item added");
     // Toast sys msg (020102)
-    assert!(frames.iter().any(|f| f.contains("020102")), "Must emit sys msg toast");
+    assert!(frames.iter().any(|f| f.contains("020C")), "Must emit sys msg toast");
 
     // 2. Verify RAM session
     let item1 = conn.session.homdo.iter().find(|i| i.slot == 1).unwrap();
@@ -512,7 +512,7 @@ async fn test_handle_compound_wire_and_db_flow() {
         handle_compound(&mut ctx_full).await;
     }
     let full_frames: Vec<String> = out_full.outgoing.into_iter().map(|f| f.frame).collect();
-    assert!(full_frames.iter().any(|f| f.contains("020102")), "Bag full must emit toast");
+    assert!(full_frames.iter().any(|f| f.contains("020C")), "Bag full must emit toast");
     assert!(!full_frames.iter().any(|f| f == SOUND_BLACKSMITH), "Bag full must not emit SFX");
 }
 
@@ -570,7 +570,7 @@ async fn test_handle_select_feather_wire_and_db_flow() {
         handle_select_feather(&mut ctx0).await;
     }
     let frames0: Vec<String> = out0.outgoing.into_iter().map(|f| f.frame).collect();
-    assert!(frames0.iter().any(|f| f.contains("020102")), "Choice 0 must emit error toast");
+    assert!(frames0.iter().any(|f| f.contains("020C")), "Choice 0 must emit error toast");
     assert!(conn.session.homdo.is_empty(), "No item added for choice 0");
 
     // Case 2: Choice 1 (Earth -> 24021)
@@ -644,7 +644,7 @@ async fn test_handle_select_feather_wire_and_db_flow() {
         handle_select_feather(&mut ctx_full).await;
     }
     let frames_full: Vec<String> = out_full.outgoing.into_iter().map(|f| f.frame).collect();
-    assert!(frames_full.iter().any(|f| f.contains("020102")), "Bag full must emit toast");
+    assert!(frames_full.iter().any(|f| f.contains("020C")), "Bag full must emit toast");
 }
 
 // =========================================================================
@@ -754,7 +754,7 @@ async fn test_handle_socket_feather_wire_and_db_flow() {
     assert!(frames.iter().any(|f| f == SOUND_BLACKSMITH), "Must emit SFX WA0014");
     assert!(frames.iter().any(|f| f == "F444040017090200"), "Must deduct feather from slot 2");
     assert!(frames.iter().any(|f| f.starts_with("F4440E001706")), "Must emit updated item frame for slot 1");
-    assert!(frames.iter().any(|f| f.contains("020102")), "Must emit sys msg toast");
+    assert!(frames.iter().any(|f| f.contains("020C")), "Must emit sys msg toast");
 
     // Verify RAM session
     let equip_item = conn.session.homdo.iter().find(|i| i.slot == 1).unwrap();
@@ -976,7 +976,7 @@ async fn test_handle_socket_feather_level_10_and_max_level_wire() {
 
     let frames: Vec<String> = out.outgoing.into_iter().map(|f| f.frame).collect();
     // Must emit max level toast
-    assert!(frames.iter().any(|f| f.contains("020102")), "Must emit max level toast");
+    assert!(frames.iter().any(|f| f.contains("020C")), "Must emit max level toast");
     // Feather must NOT be consumed on max level rejection
     assert_eq!(conn.session.homdo.len(), 2, "Feather must remain in bag");
 }

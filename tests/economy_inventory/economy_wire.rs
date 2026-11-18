@@ -1978,10 +1978,10 @@ async fn test_zero_020b_red_message_toast() {
         assert!(!f.frame.contains("020B"), "Bank overflow must not contain 020B: {}", f.frame);
     }
 
-    // 4. sys_msg_frame must emit channel 020102 and never 020B
+    // 4. sys_msg_frame must emit channel 020C (CHAT_SUB_SYSTEM) and never 020B
     let sys_msg = ts_dream::server::spawn::sys_msg_frame("Thong bao he thong");
     assert!(!sys_msg.contains("020B"), "sys_msg_frame must not contain 020B: {}", sys_msg);
-    assert!(sys_msg.contains("020102"), "sys_msg_frame must use channel 020102: {}", sys_msg);
+    assert!(sys_msg.contains("020C"), "sys_msg_frame must use channel 020C: {}", sys_msg);
 }
 
 #[tokio::test]

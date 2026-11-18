@@ -33,7 +33,7 @@
   - Âm thanh hiệu ứng rèn đúc: `F4 44 02 00 17 0F` (kích hoạt phát file `sound\WA0014.wav`).
   - Gói trừ/xóa slot nguyên liệu tiêu hao: `17 09 <slot> <qty_left>` (hoặc xóa ô nếu hết).
   - Gói cấp phát thành phẩm mới: `17 06 <slot> <item_id> <qty> ...`.
-  - Thông báo hệ thống qua kênh chuẩn: `02 01 02 <len> <nội dung VISCII>` (`sys_msg_frame`).
+  - Thông báo hệ thống qua kênh chuẩn: `02 0C <nội dung VISCII>` (`sys_msg_frame`).
 
 ### 2.3. Quy tắc Kiểm tra Ô trống (Probe-First All-or-Nothing)
 - Đồng bộ tuyệt đối với logic Client UI (`FUN_00768D38`): Server kiểm tra `free_slots >= 1` ngay đầu handler trước khi tiêu hao bất kỳ nguyên liệu nào.

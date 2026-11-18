@@ -34,10 +34,10 @@ Khi thực hiện bất kỳ giao dịch nào tương tác giữa 2 người ch�
 ## 2. Wire Protocol Parity Standards (Quy chuẩn Định dạng Giao thức)
 
 ### 2.1 Kênh Thông báo Hệ thống (System Notice Channel)
-- **Kênh Chat Hệ thống `020102`**: Sử dụng duy nhất hàm chuẩn hóa tại [`src/server/spawn.rs::sys_msg_frame(msg)`](src/server/spawn.rs).
+- **Kênh Chat Hệ thống `020C` (`CHAT_SUB_SYSTEM`, không 4-byte `id`)**: Sử dụng duy nhất hàm chuẩn hóa tại [`src/server/spawn.rs::sys_msg_frame(msg)`](src/server/spawn.rs); thông báo quảng bá toàn server dùng kênh `0200` (`CHAT_SUB_BROADCAST`, `id = 0`) qua [`src/server/spawn.rs::announce_frame(msg)`](src/server/spawn.rs).
 - **Tuyệt đối cấm**:
-  - Tự định nghĩa các hàm cục bộ trùng lặp (như `red_message`, `red`) tự sinh byte `020102`.
-  - Sử dụng opcode `02 0B` làm thông báo chữ đỏ (trong client Delphi, `02 0B` là lệnh mở giao diện tạo Quân Đoàn `TFCreateOrganize`).
+  - Tự định nghĩa các hàm cục bộ trùng lặp (như `red_message`, `red`) tự sinh byte `020102` hoặc `020C`.
+  - Sử dụng opcode `02 0B` làm thông báo chữ đỏ (trong client Delphi, `02 0B` là form memo/Quân Đoàn; còn `02 01` là kênh Thiên thần đọc `id: 4B LE`).
 
 ### 2.2 Xử lý Lỗi Giao thức (Error Response Parity)
 - Khi một yêu cầu từ client bị từ chối hoặc thất bại, server **phải** trả về đúng mã phản hồi gốc (native error frame) của opcode đó:

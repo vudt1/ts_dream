@@ -358,6 +358,12 @@ impl GameData {
         ];
         for (file_name, _) in optional_binary {
             let Some(path) = resolve_data_file(data_dir, file_name) else {
+                if file_name.eq_ignore_ascii_case("eve.emg") {
+                    tracing::warn!(
+                        data_dir = %data_dir.display(),
+                        "optional data file eve.emg not found; Eve NPC/door scenarios will be disabled"
+                    );
+                }
                 continue;
             };
             let bytes = std::fs::read(&path)
@@ -365,7 +371,15 @@ impl GameData {
             match file_name.to_ascii_lowercase().as_str() {
                 "skill.dat" => self.binary_skill_defs = SkillDatLoaderPc::load(&bytes)?,
                 "skill_c.dat" => self.binary_skill_defs = SkillDatLoader::load(&bytes)?,
-                "eve.emg" => self.scene_eve_data = EveDataLoader::load(&bytes)?,
+                "eve.emg" => {
+                    self.scene_eve_data = EveDataLoader::load(&bytes)?;
+                    if self.scene_eve_data.is_empty() {
+                        tracing::warn!(
+                            path = %path.display(),
+                            "eve.emg loaded 0 scenes; Eve NPC/door scenarios will be empty"
+                        );
+                    }
+                }
                 "mark.dat" => self.quest_marks = MarkDatLoader::load(&bytes)?,
                 "compound.dat" => self.compounds = CompoundDatLoader::load(&bytes)?,
                 "festival.dat" => self.festivals = crate::data::loaders::festival::FestivalDatLoader::load(&bytes)?,

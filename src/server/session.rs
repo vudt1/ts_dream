@@ -129,7 +129,7 @@ impl HotkeySlot {
 }
 
 /// One pet entry owned by player.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct PetState {
     pub stt: u8, // 1..4 (active list), 5..8 (stable)
     pub storage_type: PetStorageType,
@@ -227,7 +227,7 @@ impl PetState {
 }
 
 /// An item listed in player shop.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct ShopItem {
     pub slot: u8,
     pub item_id: u16,
@@ -236,7 +236,7 @@ pub struct ShopItem {
 }
 
 /// Player shop state.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct PlayerShopState {
     pub active: bool,
     pub image: u8,
@@ -411,9 +411,13 @@ pub struct Session {
     /// 5-second anti-spam cooldown (`CHAT_COOLDOWN_MS` in `handlers::chat`).
     /// Runtime-only; never persisted.
     pub last_chat_ms: u64,
+    /// Monotonic in-memory revision bumped by [`registry_update_if_online`] and
+    /// [`ServerControl`] post-dispatch sync to detect concurrent cross-player updates.
+    /// Runtime-only; never persisted.
+    pub sync_revision: u64,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct TradeState {
     pub active: bool,
     pub partner_id: u32,
@@ -544,6 +548,7 @@ impl Default for Session {
             encounter_threshold: 20,
             last_battle_end_ms: 0,
             last_chat_ms: 0,
+            sync_revision: 0,
         }
     }
 }
@@ -817,12 +822,147 @@ pub fn registry_get(id: u32) -> Option<Session> {
     lock_online_sessions().get(&id).cloned()
 }
 
-/// Updates an online player session in the central registry if they are currently online.
+/// Updates an online player session in the central registry if they are currently online,
+/// bumping [`Session::sync_revision`] so concurrent connection loops can detect the change.
 pub fn registry_update_if_online(s: &Session) {
     let mut sessions = lock_online_sessions();
-    if sessions.contains_key(&s.id) {
-        sessions.insert(s.id, s.clone());
+    if let Some(existing) = sessions.get_mut(&s.id) {
+        let mut next = s.clone();
+        next.sync_revision = existing.sync_revision.wrapping_add(1);
+        *existing = next;
     }
+}
+
+/// Merge local post-dispatch `Session` changes with a concurrently updated `remote`
+/// registry snapshot using `base` (the pre-dispatch snapshot) as the common ancestor.
+///
+/// For any field that only `local` modified (`local.f != base.f && remote.f == base.f`),
+/// the local value is preserved; if `remote` also modified the field under
+/// `lock_player_operations`, `remote` wins so cross-player transactions are never lost.
+pub fn merge_post_dispatch(base: &Session, local: &Session, remote: &Session) -> Session {
+    macro_rules! apply_if_local_only_changed {
+        ($merged:ident, $base:ident, $local:ident, $remote:ident, [$($field:ident),* $(,)?]) => {
+            $(
+                if $local.$field != $base.$field && $remote.$field == $base.$field {
+                    $merged.$field = $local.$field.clone();
+                }
+            )*
+        };
+    }
+
+    let mut merged = remote.clone();
+    apply_if_local_only_changed!(
+        merged,
+        base,
+        local,
+        remote,
+        [
+            logined,
+            in_world,
+            authed,
+            pending_pass,
+            pending_new_char_name,
+            open_shop_id,
+            last_chat_ms,
+            idtalking,
+            idnpctalking,
+            talk_count,
+            talk_type,
+            select_menu,
+            warp_finish,
+            talk_locked,
+            talking_battle,
+            click_npc_id,
+            map_id,
+            map_x,
+            map_y,
+            gocnhin,
+            dongtac,
+            encounter_steps,
+            encounter_threshold,
+            boat_last_paddle,
+            boat_paddle_tokens,
+            boat_last_paddle_ms,
+            gold,
+            bank_gold,
+            shop_point,
+            homdo,
+            trangbi,
+            tientrang,
+            tuideo,
+            luulang,
+            shop,
+            pets,
+            active_pet_stt,
+            horse_pet_id,
+            quest_tasks,
+            quest_dont,
+            bit_flags,
+            completed_eve_counts,
+            role_count_values,
+            completed_quests,
+            quest_steps,
+            warp_steps,
+            id_mem,
+            id_leader,
+            id_qs,
+            guild_id,
+            pending_guild_invite,
+            trade,
+            battle_id,
+            pending_battle_gate,
+            passed_battle_gates,
+            pending_evacuate_map,
+            savemap,
+            savemap_x,
+            savemap_y,
+            hp,
+            hp_max,
+            sp,
+            sp_max,
+            point,
+            skill_point,
+            level,
+            reborn,
+            job,
+            texp,
+            int1,
+            atk,
+            def,
+            hpx,
+            spx,
+            agi,
+            int2,
+            atk2,
+            def2,
+            hpx2,
+            spx2,
+            agi2,
+            skills,
+            ball_point,
+            dragon_balls,
+            skill_rb2,
+            hotkeys,
+            boat_inventory,
+            hp_store,
+            sp_store,
+            newbie,
+            tiengtam,
+            god,
+            ghost,
+            pk,
+            tham_chien,
+            color,
+            last_battle_end_ms,
+        ]
+    );
+    if local.current_event_session.is_some() != base.current_event_session.is_some()
+        && remote.current_event_session.is_some() == base.current_event_session.is_some()
+    {
+        merged.current_event_session = local.current_event_session.clone();
+    }
+    merged.sync_revision = remote.sync_revision.wrapping_add(1);
+    merged
 }
 
 /// Registers a player session into the central online registry for login / test setup.

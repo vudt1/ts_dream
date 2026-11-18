@@ -173,7 +173,7 @@ impl UseCtx<'_> {
         self.out.send("F4440200170F".to_string());
     }
 
-    /// Send a system message frame via channel `020102` using `spawn::sys_msg_frame`.
+    /// Send a system message frame via channel `020C` (`CHAT_SUB_SYSTEM`) using `spawn::sys_msg_frame`.
     pub fn sys_msg(&mut self, msg: &str) {
         self.out.send(crate::server::spawn::sys_msg_frame(msg));
     }

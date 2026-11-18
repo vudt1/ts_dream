@@ -343,15 +343,12 @@ pub fn long_memo_frames(id: u32, chat_raw: &[u8], chunk: usize) -> Vec<String> {
         .collect()
 }
 
-/// Shared banner builder for server-authored text (op 0x02 sub 0x0B/0x0C).
-///
-/// Encodes proper-Unicode Vietnamese as single-byte VISCII on the wire
-/// (Đ→0xD0, not `'?'`) — the same treatment banners and `/where` replies get.
-fn text_banner(sub: u8, msg: &str) -> String {
+/// Build system broadcast banner packet (`02 00 00000000 <visc>` — `CHAT_SUB_BROADCAST` with `id = 0`).
+pub fn announce_frame(msg: &str) -> String {
     let visc = crate::encoding::viscii_encode(msg);
     let mut body = String::from("00000000");
     body.push_str(&encoder::strhex(&visc));
-    crate::protocol::frame(&format!("02{:02X}", sub), &body)
+    crate::protocol::frame(&format!("02{:02X}", CHAT_SUB_BROADCAST), &body)
 }
 
 /// Build S→C `16 01` NPC appear frame (`F44405001601<id:u8>0000`).
@@ -359,16 +356,10 @@ pub fn npc_appear_frame(npc_place_id: u16) -> String {
     format!("F44405001601{:02X}0000", (npc_place_id & 0xFF) as u8)
 }
 
-/// Build system message frame via channel `020102` (`F444 + len + 0201 + 02 + msg`).
+/// Build system message frame (`02 0C <visc>` — `CHAT_SUB_SYSTEM`, no 4-byte `id`).
 pub fn sys_msg_frame(msg: &str) -> String {
     let visc = crate::encoding::viscii_encode(msg);
-    let body = format!("02{}", encoder::strhex(&visc));
-    crate::protocol::frame("0201", &body)
-}
-
-/// Build announcement packet (op 0x02 sub 0x0C).
-pub fn announce_frame(msg: &str) -> String {
-    text_banner(CHAT_SUB_SYSTEM, msg)
+    crate::protocol::frame(&format!("02{:02X}", CHAT_SUB_SYSTEM), &encoder::strhex(&visc))
 }
 
 /// Build server name packet (op 0x27/OP_GUILD sub 0x09).

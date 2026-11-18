@@ -117,11 +117,14 @@ async fn main() -> anyhow::Result<()> {
         }
     };
     tracing::info!(
-        "data loaded: {} npcs, {} items, {} skills, {} talks (data_dir={})",
+        "data loaded: {} npcs, {} items, {} skills, {} eve_scenes, {} quest_marks, {} legacy_talks, eve_events={} (data_dir={})",
         data.npcs.len(),
         data.items.len(),
         data.skills.len(),
+        data.scene_eve_data.len(),
+        data.quest_marks.len(),
         data.talks.len(),
+        ts_dream::server::handlers::npc_event::eve_events_enabled(),
         data_dir.display()
     );
 

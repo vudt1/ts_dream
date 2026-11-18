@@ -253,7 +253,7 @@ async fn test_shared_and_exclusive_map_gating_through_dispatcher() {
     };
     let out_main = dispatch(&mut conn, &click_main_npc, &data, &service, &env).await;
     assert!(
-        !out_main.outgoing.iter().any(|f| f.frame.starts_with("F444") && f.frame.contains("020102")),
+        !out_main.outgoing.iter().any(|f| f.frame.starts_with("F444") && f.frame.contains("020C")),
         "main-story NPC on shared map 12001 must not trigger festival sys_msg"
     );
 

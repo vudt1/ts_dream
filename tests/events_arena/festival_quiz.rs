@@ -181,7 +181,7 @@ async fn test_consumable_46180_cai_van_phu() {
         handle_inventory(&mut ctx).await;
         assert_eq!(conn.session.ghost, 0);
         assert_eq!(conn.session.homdo[0].count, 1, "item must not be consumed");
-        let has_toast = out.outgoing.iter().any(|f| f.contains("Ban khong bi ma theo") || f.contains("020102"));
+        let has_toast = out.outgoing.iter().any(|f| f.contains("Ban khong bi ma theo") || f.contains("020C"));
         assert!(has_toast, "must send system message rejecting exorcism");
     }
 }
@@ -248,7 +248,7 @@ async fn test_npc_1752_exorcism_dialog() {
         handle_talk(&mut ctx).await;
         assert_eq!(conn.session.ghost, 1, "ghost must remain");
         assert_eq!(conn.session.gold, 200, "gold must not be deducted");
-        let has_err = out.outgoing.iter().any(|f| f.contains("Khong du tien") || f.contains("020102"));
+        let has_err = out.outgoing.iter().any(|f| f.contains("Khong du tien") || f.contains("020C"));
         assert!(has_err, "must toast insufficient gold error");
     }
 
@@ -277,7 +277,7 @@ async fn test_npc_1752_exorcism_dialog() {
         handle_talk(&mut ctx).await;
         assert_eq!(conn.session.ghost, 0);
         assert_eq!(conn.session.gold, 1000, "gold must not be deducted");
-        let has_toast = out.outgoing.iter().any(|f| f.contains("Ban khong bi ma theo") || f.contains("020102"));
+        let has_toast = out.outgoing.iter().any(|f| f.contains("Ban khong bi ma theo") || f.contains("020C"));
         assert!(has_toast, "must toast player is not ghosted");
     }
 }

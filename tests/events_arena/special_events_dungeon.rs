@@ -133,7 +133,7 @@ async fn test_40_npc_entry_gating() {
         handle_talk(&mut ctx).await;
         assert_eq!(conn.session.map_id, 12001, "must remain on map 12001");
         assert_eq!(conn.session.gold, 999, "gold must remain untouched");
-        let has_err = out.outgoing.iter().any(|f| f.contains("Khong du tien hoac ve loi dai") || f.contains("020102"));
+        let has_err = out.outgoing.iter().any(|f| f.contains("Khong du tien hoac ve loi dai") || f.contains("020C"));
         assert!(has_err, "must toast rejection error message");
     }
 }
@@ -322,7 +322,7 @@ async fn test_rescue_2k_party_size_gating() {
 
         handle_talk(&mut ctx).await;
         assert_eq!(conn.session.map_id, 12003, "must remain on map 12003");
-        let has_err = out.outgoing.iter().any(|f| f.contains("Chi cho phep to doi 1 nguoi hoac 5 nguoi") || f.contains("020102"));
+        let has_err = out.outgoing.iter().any(|f| f.contains("Chi cho phep to doi 1 nguoi hoac 5 nguoi") || f.contains("020C"));
         assert!(has_err, "must toast party size error");
     }
 
@@ -350,7 +350,7 @@ async fn test_rescue_2k_party_size_gating() {
 
         handle_talk(&mut ctx).await;
         assert_eq!(conn.session.map_id, 12003, "must remain on map 12003");
-        let has_err = out.outgoing.iter().any(|f| f.contains("Chi doi truong moi co the dang ky") || f.contains("020102"));
+        let has_err = out.outgoing.iter().any(|f| f.contains("Chi doi truong moi co the dang ky") || f.contains("020C"));
         assert!(has_err, "must toast non-leader error");
     }
 }
@@ -423,7 +423,7 @@ async fn test_cuu_thien_gating_and_quota_reset() {
 
         handle_talk(&mut ctx).await;
         assert_eq!(conn.session.map_id, 33033, "must remain on map 33033");
-        let has_err = out.outgoing.iter().any(|f| f.contains("Can phai co Hau Ton di theo") || f.contains("020102"));
+        let has_err = out.outgoing.iter().any(|f| f.contains("Can phai co Hau Ton di theo") || f.contains("020C"));
         assert!(has_err, "must toast missing follower error");
     }
 
@@ -457,7 +457,7 @@ async fn test_cuu_thien_gating_and_quota_reset() {
 
         handle_talk(&mut ctx).await;
         assert_eq!(conn.session.map_id, 33033, "must remain on map 33033");
-        let has_err = out.outgoing.iter().any(|f| f.contains("Can phai co Hau Ton di theo") || f.contains("020102"));
+        let has_err = out.outgoing.iter().any(|f| f.contains("Can phai co Hau Ton di theo") || f.contains("020C"));
         assert!(has_err, "must toast missing follower error when pet is inactive in roster");
     }
 
@@ -490,7 +490,7 @@ async fn test_cuu_thien_gating_and_quota_reset() {
 
         handle_talk(&mut ctx).await;
         assert_eq!(conn.session.map_id, 33033, "must remain on map 33033");
-        let has_err = out.outgoing.iter().any(|f| f.contains("Hien tai van chua den luc") || f.contains("020102"));
+        let has_err = out.outgoing.iter().any(|f| f.contains("Hien tai van chua den luc") || f.contains("020C"));
         assert!(has_err, "must toast weekly quota already consumed");
     }
 
@@ -530,7 +530,7 @@ async fn test_cuu_thien_gating_and_quota_reset() {
             conn.session.homdo.iter().all(|i| i.id != 46644 || i.count == 0),
             "flag item must be consumed"
         );
-        let has_toast = out.outgoing.iter().any(|f| f.contains("Da thiet lap lai luot Chinh Phuc Cuu Thien") || f.contains("020102"));
+        let has_toast = out.outgoing.iter().any(|f| f.contains("Da thiet lap lai luot Chinh Phuc Cuu Thien") || f.contains("020C"));
         assert!(has_toast, "must toast quota reset confirmation");
 
         // Now entry with Hầu Tôn succeeds!
@@ -695,7 +695,7 @@ async fn test_40_npc_wave_challenger_npc_14628_registration_gate() {
         let expected = ts_dream::server::spawn::sys_msg_frame("Chua dang ky tham gia loi dai 40 NPC!");
         assert!(
             out.outgoing.iter().any(|f| f.contains(&expected) || f == &expected),
-            "must emit registration rejection sys_msg_frame (020102)"
+            "must emit registration rejection sys_msg_frame (020C)"
         );
     }
 

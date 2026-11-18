@@ -216,7 +216,7 @@ fn test_eve_script_skill_reward() {
     // Verify system chat toast was emitted
     let toast_frame = frames
         .iter()
-        .find(|f| f.starts_with("F444") && f[8..12] == *"0201")
+        .find(|f| f.starts_with("F444") && f[8..12] == *"020C")
         .expect("Sys msg toast must be emitted");
     assert!(toast_frame.len() > 14);
 
@@ -755,7 +755,7 @@ async fn test_respec_memory_manual_and_careful_pouch_opcode_0x2a() {
     }
     assert_eq!(conn.session.skill_point, 3, "Skill points must not change on failure");
     let fail_frames: Vec<String> = out_fail.outgoing.iter().map(|f| f.frame.clone()).collect();
-    assert!(fail_frames.iter().any(|f| f.contains("020102")), "Must emit system warning frame on failure");
+    assert!(fail_frames.iter().any(|f| f.contains("020C")), "Must emit system warning frame on failure");
 }
 
 #[tokio::test]
@@ -800,7 +800,7 @@ async fn test_respec_attr_floor_enforcement() {
 
     let frames: Vec<String> = out.outgoing.iter().map(|f| f.frame.clone()).collect();
     assert!(
-        frames.iter().any(|f| f.contains("020102")),
+        frames.iter().any(|f| f.contains("020C")),
         "System warning toast must be sent upon floor rejection"
     );
 }

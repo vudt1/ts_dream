@@ -875,46 +875,70 @@ async fn handle_client_connection(
                                     .await
                                     .push_log("c2s", format!("[{peer_ip}] {frame_hex}"));
                             }
-                            let mut operation_ids = vec![logined_id];
-                            if decoded.get(4) == Some(&0x17) && decoded.get(5) == Some(&33) {
-                                operation_ids.push(conn.session.open_shop_id);
-                            }
-                            if decoded.get(4) == Some(&0x19) {
-                                let sub = decoded.get(5).copied().unwrap_or(0);
-                                let partner = if matches!(sub, 1 | 10) {
-                                    decoded.get(6..10).and_then(|p| p.try_into().ok()).map(u32::from_le_bytes).unwrap_or(0)
-                                } else if sub == 20 {
-                                    decoded.get(10..14).and_then(|p| p.try_into().ok()).map(u32::from_le_bytes).unwrap_or(0)
-                                } else {
-                                    conn.session.trade.partner_id
-                                };
-                                operation_ids.push(partner);
-                            }
-                            let _operation_guards =
-                                crate::server::session::lock_player_operations(operation_ids).await;
                             let env = ServerEnv {
                                 pool: pool.as_ref(),
                                 repos: repos.as_ref(),
                                 hub: Some(&control),
                                 sender: Some(&tx),
                             };
-                            // Pull the authoritative snapshot (a buyer may have
-                            // mutated us through the player shop registry).
-                            if logined_id > 0 {
+                            // Pull the authoritative snapshot under a short lock
+                            // before dispatch; do NOT hold `lock_player_operations`
+                            // across `dispatcher::dispatch`, because inner handlers
+                            // (party warp, Eve, shops, trade, crafting, guild)
+                            // acquire deterministic Two-Phase State Locks themselves.
+                            let pre_snapshot = if logined_id > 0 {
+                                let _guard =
+                                    crate::server::session::lock_player_operations([logined_id])
+                                        .await;
                                 if let Some(snapshot) =
-                                    lock_online_sessions().get(&logined_id).cloned()
+                                    crate::server::session::registry_get(logined_id)
                                 {
-                                    conn.session = snapshot;
+                                    conn.session = snapshot.clone();
+                                    Some(snapshot)
+                                } else {
+                                    None
                                 }
-                            }
-                            let out = dispatcher::dispatch(&mut conn, &decoded, &data, &service, &env).await;
+                            } else {
+                                None
+                            };
+                            let out =
+                                dispatcher::dispatch(&mut conn, &decoded, &data, &service, &env)
+                                    .await;
                             let id = conn.session.id;
                             if logined_id > 0 {
-                                lock_online_sessions()
-                                    .insert(logined_id, conn.session.clone());
+                                let _guard =
+                                    crate::server::session::lock_player_operations([logined_id])
+                                        .await;
+                                let merged = {
+                                    let mut sessions = lock_online_sessions();
+                                    let next = match (
+                                        pre_snapshot.as_ref(),
+                                        sessions.get(&logined_id),
+                                    ) {
+                                        (Some(base), Some(remote))
+                                            if remote.sync_revision != base.sync_revision =>
+                                        {
+                                            crate::server::session::merge_post_dispatch(
+                                                base,
+                                                &conn.session,
+                                                remote,
+                                            )
+                                        }
+                                        _ => {
+                                            let mut next = conn.session.clone();
+                                            next.sync_revision = sessions
+                                                .get(&logined_id)
+                                                .map_or(0, |s| s.sync_revision.wrapping_add(1));
+                                            next
+                                        }
+                                    };
+                                    sessions.insert(logined_id, next.clone());
+                                    next
+                                };
+                                conn.session = merged.clone();
                                 service.register_sender(
                                     i64::from(logined_id),
-                                    Arc::new(tokio::sync::RwLock::new(conn.session.clone())),
+                                    Arc::new(tokio::sync::RwLock::new(merged)),
                                     tx.clone(),
                                 );
                             }
@@ -953,8 +977,18 @@ async fn handle_client_connection(
                             if let Some((fight_id, diahinh)) = out.eve_battle {
                                 service.start_eve_encounter(&mut conn.session, fight_id, diahinh);
                                 if logined_id > 0 {
-                                    lock_online_sessions()
-                                        .insert(logined_id, conn.session.clone());
+                                    let _guard = crate::server::session::lock_player_operations([
+                                        logined_id,
+                                    ])
+                                    .await;
+                                    crate::server::session::registry_update_if_online(
+                                        &conn.session,
+                                    );
+                                    if let Some(synced) =
+                                        crate::server::session::registry_get(logined_id)
+                                    {
+                                        conn.session = synced.clone();
+                                    }
                                     service.register_sender(
                                         i64::from(logined_id),
                                         Arc::new(tokio::sync::RwLock::new(conn.session.clone())),

@@ -12,6 +12,8 @@ mod code_review_remediation;
 mod create_char_atomic;
 #[path = "server_network/double_login.rs"]
 mod double_login;
+#[path = "server_network/eve_tcp_and_sysmsg.rs"]
+mod eve_tcp_and_sysmsg;
 #[path = "server_network/idle_timeout.rs"]
 mod idle_timeout;
 #[path = "server_network/kick_reasons.rs"]

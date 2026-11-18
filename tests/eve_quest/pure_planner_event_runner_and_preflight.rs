@@ -294,7 +294,7 @@ async fn preflight_all_or_nothing_rejects_full_homdo_and_full_quest_ledger() {
     assert_eq!(conn_full_bag.session.homdo.len(), 25);
     assert_eq!(conn_full_bag.session.homdo[0].count, 3, "adjacent slot intact");
     assert!(
-        out_bag.outgoing.iter().any(|f| f.frame.contains("020102")),
+        out_bag.outgoing.iter().any(|f| f.frame.contains("020C")),
         "full homdo must emit bag-full system toast"
     );
 

@@ -490,7 +490,7 @@ async fn pk_challenge_0b_02_02_guards_reject_invalid_targets_and_emit_210101_whe
         let mut ctx = pk_test_ctx(&mut challenger_conn, &data, &service, &mut out, &payload);
         battle::handle_battle(&mut ctx);
         assert_eq!(challenger_conn.session.battle_id, 0, "different map PK must be blocked");
-        assert!(out.outgoing.iter().any(|f| f.contains("020102")), "must emit sys_msg_frame");
+        assert!(out.outgoing.iter().any(|f| f.contains("020C")), "must emit sys_msg_frame");
         target_sess.write().await.map_id = 12001;
     }
 
@@ -503,7 +503,7 @@ async fn pk_challenge_0b_02_02_guards_reject_invalid_targets_and_emit_210101_whe
         let mut ctx = pk_test_ctx(&mut challenger_conn, &data, &service, &mut out, &payload);
         battle::handle_battle(&mut ctx);
         assert_eq!(challenger_conn.session.battle_id, 0, "same party PK must be blocked");
-        assert!(out.outgoing.iter().any(|f| f.contains("020102")), "must emit sys_msg_frame");
+        assert!(out.outgoing.iter().any(|f| f.contains("020C")), "must emit sys_msg_frame");
         challenger_conn.session.id_leader = 0;
         target_sess.write().await.id_leader = 0;
     }
@@ -516,7 +516,7 @@ async fn pk_challenge_0b_02_02_guards_reject_invalid_targets_and_emit_210101_whe
         let mut ctx = pk_test_ctx(&mut challenger_conn, &data, &service, &mut out, &payload);
         battle::handle_battle(&mut ctx);
         assert_eq!(challenger_conn.session.battle_id, 0, "GM target PK must be blocked");
-        assert!(out.outgoing.iter().any(|f| f.contains("020102")), "must emit sys_msg_frame");
+        assert!(out.outgoing.iter().any(|f| f.contains("020C")), "must emit sys_msg_frame");
         target_sess.write().await.gm_level = 0;
     }
 
@@ -528,7 +528,7 @@ async fn pk_challenge_0b_02_02_guards_reject_invalid_targets_and_emit_210101_whe
         let mut ctx = pk_test_ctx(&mut challenger_conn, &data, &service, &mut out, &payload);
         battle::handle_battle(&mut ctx);
         assert_eq!(challenger_conn.session.battle_id, 0, "active shop target PK must be blocked");
-        assert!(out.outgoing.iter().any(|f| f.contains("020102")), "must emit sys_msg_frame");
+        assert!(out.outgoing.iter().any(|f| f.contains("020C")), "must emit sys_msg_frame");
         target_sess.write().await.shop.active = false;
     }
 
