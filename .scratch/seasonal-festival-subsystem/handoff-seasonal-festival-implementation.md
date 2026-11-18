@@ -1,19 +1,19 @@
-# HANDOFF: Phân Hệ Lễ Hội Theo Mùa (`SeasonalFestival`) — Tiến Độ Ticket 01–04 & Bàn Giao Ticket 05
+# HANDOFF: Phân Hệ Lễ Hội Theo Mùa (`SeasonalFestival`) — Hoàn Tất Toàn Bộ 5 Tickets (01–05)
 
 * **Dự án:** `ts_dream` (Rust Game Server parity với Client TS Online `aLogin.exe`)
 * **Thời điểm cập nhật:** 2026-11-18
 * **Vị trí tài liệu:** `.scratch/seasonal-festival-subsystem/handoff-seasonal-festival-implementation.md`
 * **Trạng thái hiện tại:**
-  * **Tickets 01, 02, 03, 04 đã hoàn thành (`Status: completed`)**, đã qua **Code Review 2 trục (Standards & Spec)** và pass toàn bộ **677 tests** (`cargo test --all-targets --no-fail-fast`).
+  * **Toàn bộ 5/5 Tickets (`01`, `02`, `03`, `04`, `05`) đã hoàn thành (`Status: completed`)**, đã qua **Code Review 2 trục (Standards & Spec)** và pass toàn bộ **683 tests** (`cargo test --all-targets --no-fail-fast`).
   * Thay đổi đang được giữ nguyên tại working tree (không commit theo quy tắc `AGENTS.md` để user tự commit thủ công).
-  * **Điểm bắt đầu tiếp theo (Frontier duy nhất còn lại):** **Ticket 05** (`05-seasonal-battle-drops-antifarm-and-exp.md`).
+  * **Frontier:** Không còn ticket mở (`0` open tickets). Phân hệ `SeasonalFestival` đã hoàn chỉnh từ đầu đến cuối.
 
 ---
 
 ## 1. Suggested Skills & Quy Tắc Bắt Buộc Cho Agent Tiếp Theo
 
 1. **`tdd`**: Thực hiện theo vòng lặp Red → Green → Refactor theo vertical slice tại các seam công khai trong `tests/events_arena/` (đăng ký trong `tests/events_arena_test.rs`).
-2. **`code-review`**: Sau khi hoàn thành Ticket 05, chạy review 2 trục **Standards** (`CODING_STANDARDS.md`, `GLOSSARY.md`, `ADR 0011`) và **Spec** (`spec.md` + `issues/05-*.md`).
+2. **`code-review`**: Đối chiếu diff theo 2 trục **Standards** (`CODING_STANDARDS.md`, `GLOSSARY.md`, `ADR 0011`) và **Spec** (`spec.md` + `issues/01..05-*.md`).
 3. **Ràng buộc kỹ thuật & công cụ (`AGENTS.md` + `CODING_STANDARDS.md`)**:
    * **KHÔNG** đặt `#[cfg(test)]` hoặc pub test helpers trong `src/` (`tests/architecture_guardrails_test.rs`).
    * **KHÔNG** gọi trực tiếp `.insert(...)` vào `lock_online_sessions()` trong handlers hoặc tests; dùng `registry_update_if_online(&Session)` / `registry_register_for_login(&Session)`.
@@ -23,7 +23,7 @@
 
 ---
 
-## 2. Tóm Tắt Tiến Độ Đã Hoàn Thành (Tickets 01–04)
+## 2. Tóm Tắt Toàn Bộ 5 Tickets Đã Hoàn Thành (01–05)
 
 ### Ticket 01 — `SeasonalFestivalManager`, `season_seq` & Web Admin Control Plane (`completed`)
 * **`src/server/events.rs`**: Gỡ `EVENT_SEASONAL_FESTIVAL` / `"seasonal_festival"`, đưa bảng `SpecialEvent` về đúng `8` sự kiện (giữ `dragon_boat` độc lập với `doan_ngo`).
@@ -51,22 +51,20 @@
 * **`src/server/session.rs`, `src/web/server_control.rs`, `src/web/app.rs`, `src/battle/service.rs`**: Thêm `pending_evacuate_map`, `evacuate_festival_players` (đồng bộ `BattleService::sync_online_session`, `registry_update_if_online`, SQLite về `savemap` hoặc `12001`), và `apply_pending_evacuation` khi kết thúc trận (`on_player_fled`, `on_battle_ended`, `leave_battle`, kèm `hide_from_map`).
 * **Tests:** `tests/events_arena/festival_gating_and_evacuation.rs` (5 tests dùng `registry_register_for_login`).
 
-### Kết quả kiểm chứng sau Ticket 04
-* `cargo test --all-targets --no-fail-fast`: **677 passed, 0 failed** trên toàn bộ 11 test suites (`architecture_guardrails_test`: **8**, `battle_test`: **186**, `compound_test`: **21**, `data_loaders_test`: **40**, `db_test`: **21**, `economy_inventory_test`: **59**, `eve_quest_test`: **137**, `events_arena_test`: **82**, `server_network_test`: **103**, `server_stop_test`: **1**, `skill_job_system_test`: **19**).
+### Ticket 05 — Phần thưởng Battle Drop Theo mùa Chống Farm & Hệ số EXP Lễ hội (`completed`)
+* **`src/server/seasonal_festival.rs`**: Thêm `SeasonalBonusDrop` (`item_id`, `drop_rate_pct`, `min_enemy_level`, `daily_drop_cap`), `bonus_drops: Vec<SeasonalBonusDrop>`, `exp_multiplier_pct: Option<u32>` (`Some(200)` cho `tet_nguyen_tieu`, `None` cho các lễ hội khác), `utc7_date_key`, `drop_claim_type`, `get_festival_claim_count`, `active_exp_multiplier_pct`, `active_bonus_drops`.
+* **`src/battle/combat_formula.rs`, `src/battle/construction.rs`, `src/battle/runner.rs`**: Thêm `apply_exp_multipliers` nhân `effective_festival_exp_pct` cùng `per_exp`, `FGod` (`1.5x`) và `FGhost` (`0.5x`) cho EXP nhân vật (không nhân Pet EXP), đánh giá trạng thái lễ hội trực tiếp tại thời điểm kết thúc trận `Battle::finish`.
+* **`src/battle/service.rs` & `src/web/server_control.rs`**: Nối `SeasonalFestivalManager` vào `BattleService`; triển khai `stage_seasonal_bonus_drops` tại kết thúc thắng trận PvE `Normal` (tuyệt đối không áp dụng cho `PKBattle`) trên cả hai nhánh `online_entries` và `registry_get`, kiểm tra `min_enemy_level`, roll `DotNetRandom`, kiểm tra `can_add_item` trước khi tính `daily_drop_cap`, và chỉ ghi `character_festival_claims` + phát khung `17 06` sau khi `persist_sessions_transaction` thành công (rollback `homdo` nếu ghi DB lỗi).
+* **Tests:** `tests/events_arena/festival_battle_drops_and_exp.rs` (6 tests bao phủ positive + negative: `PKBattle`, dưới `min_enemy_level`, `daily_drop_cap` theo ngày `UTC+7` & reset sang ngày mới, và full bag).
 
 ---
 
-## 3. Điểm Bắt Đầu Tiếp Theo (Frontier): Ticket 05
+## 3. Kết Quả Kiểm Chứng Cuối Cùng
 
-* **File ticket:** [`.scratch/seasonal-festival-subsystem/issues/05-seasonal-battle-drops-antifarm-and-exp.md`](file:///D:/VUDT/GIT_PCC/ts_dream/.scratch/seasonal-festival-subsystem/issues/05-seasonal-battle-drops-antifarm-and-exp.md)
-* **Mục tiêu cốt lõi:**
-  1. Mở rộng `FestivalProfile` (`src/server/seasonal_festival.rs`) với `bonus_drops` (`item_id`, `drop_rate_pct`, `min_enemy_level`, `daily_drop_cap`) — lưu ý `exp_multiplier_pct: Option<u32>` đã có sẵn trên `FestivalProfile`.
-  2. Nối `SeasonalFestivalManager` vào `BattleService` (`src/battle/service.rs` / `src/web/server_control.rs` — kiểm tra cách `BattleService` được khởi tạo trong `ServerControl` và `src/server/`).
-  3. Tại luồng thắng trận PvE `Normal` (tuyệt đối **không** chạy cho `PKBattle`):
-     * Áp dụng `exp_multiplier_pct` nhất quán cùng `perexp`, *Thần Tài (`FGod`)* và *Con Ma (`FGhost`)*.
-     * Kiểm tra `min_enemy_level`, roll tỷ lệ `drop_rate_pct` bằng `DotNetRandom`, kiểm tra & tăng bộ đếm `daily_drop_cap` theo ngày `UTC+7` (`YYYY-MM-DD`) trong `character_festival_claims`.
-     * Cộng vật phẩm qua quy trình túi đồ chuẩn (All-or-Nothing + khung `17 06` + `registry_update_if_online` + ghi SQLite nguyên tử); túi đầy thì bỏ qua an toàn.
-  4. Viết Positive + Negative tests trong `tests/events_arena/` (bao gồm `PKBattle`, quái dưới `min_enemy_level`, chạm `daily_drop_cap` ngày `UTC+7` và mở lại sang ngày mới), chạy `cargo test --test events_arena_test`, `cargo test --test architecture_guardrails_test`, và `cargo test --all-targets --no-fail-fast`.
+* `cargo test --test events_arena_test`: **88 passed, 0 failed**
+* `cargo test --test battle_test`: **186 passed, 0 failed**
+* `cargo test --test architecture_guardrails_test`: **8 passed, 0 failed**
+* `cargo test --all-targets --no-fail-fast`: **683 passed, 0 failed** trên toàn bộ 11 test suites (`architecture_guardrails_test`: **8**, `battle_test`: **186**, `compound_test`: **21**, `data_loaders_test`: **40**, `db_test`: **21**, `economy_inventory_test`: **59**, `eve_quest_test`: **137**, `events_arena_test`: **88**, `server_network_test`: **103**, `server_stop_test`: **1**, `skill_job_system_test`: **19**).
 
 ---
 

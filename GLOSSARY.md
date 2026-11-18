@@ -489,3 +489,29 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
   - **Nhất quán giữa `MeetDoor` và `0x14 08`**: Với các cổng còn lại trong `BattleGate.txt`, chốt chặn phải được kiểm tra đồng nhất ở cả luồng va chạm `MeetDoor` và luồng `Talk-Warp 0x14 08`.
   - **Hậu chiến cửa ải**: Khi chiến thắng trận chiến từ `BattleGate.txt`, hệ thống tự động dịch chuyển cả đội qua đích của cổng ngay sau trận và ghi nhận trạng thái đã vượt ải (hoặc chuyển sang bản đồ tầng kế tiếp) để tránh lặp trận vô hạn.
 - **Tránh dùng các từ mơ hồ**: *Boss Gate* chung chung hoặc nhầm lẫn với cổng chỉ có điều kiện hội thoại không chiến đấu.
+
+### Sự kiện Đặc biệt (`SpecialEvent`) vs Lễ hội Theo mùa (`SeasonalFestival`)
+- **Định nghĩa**: Hai phân hệ sự kiện tách biệt về vòng đời và cơ chế vận hành:
+  - **Sự kiện Đặc biệt (`SpecialEvent`)**: Các hoạt động thi đấu, phụ bản hoặc đụng độ theo phiên ngắn hạn (`north_star`, `continuous_40_npc`, `rescue_2k`, `nine_heavens`, `arena`, `guild_siege`, `water_war`, `dragon_boat`), chịu giới hạn watchdog 120 phút và luật riêng của từng đấu trường.
+  - **Lễ hội Theo mùa (`SeasonalFestival`)**: Các đợt lễ hội vận hành dài ngày (như *Tết Nguyên Đán*, *Tết Nguyên Tiêu*, *Valentine*, *Cá Tháng Tư*, *Giỗ Tổ Hùng Vương*, *Lễ Phật Đản*, *Tết Đoan Ngọ*, *Lễ Thất Tịch*, *Tết Trung Thu*, *Halloween*, *Lễ Giáng Sinh*), do Admin bật/tắt thủ công độc lập từng lễ hội qua Bảng điều khiển Lễ hội, điều phối cổng/NPC/kịch bản `eve.emg`, vật phẩm rơi dã ngoại, pháo hoa và bảng lore.
+- **Ràng buộc (Invariants)**:
+  - **Không áp dụng watchdog 120 phút cho Lễ hội**: Trạng thái bật/tắt và bộ đếm đợt lễ hội (`season_seq`) của `SeasonalFestival` được lưu bền vững qua khởi động lại server; không dùng chung `EventPhase` hay `EventLifecycleManager` của đấu trường.
+  - **Độc lập với Đua Thuyền Rồng (`dragon_boat` / `OP 0x46`)**: Dù Đua Thuyền Rồng có nội dung văn bản gắn với Tết Đoan Ngọ trên client, `dragon_boat` vận hành độc lập thuộc nhóm `SpecialEvent`; bật/tắt lễ hội `doan_ngo` không khóa hay ép trạng thái `dragon_boat`.
+  - **Gating theo ranh giới bản đồ dùng chung**: Các bản đồ phụ bản lễ hội thuần (`54811..54831`, `12941..12943`, `57535..57536`) bị khóa toàn bộ và di tản người chơi về điểm lưu (`savemap`) khi lễ hội tắt; ngược lại, các bản đồ dùng chung với tuyến chính (`12000`, `12001`, `12005`, `12421`) chỉ gate chi tiết theo từng cặp `(scene_id, door_id / place_id / quest_id)` để không chặn người chơi thường.
+- **Tránh dùng các từ mơ hồ**: *Special Event* cho lễ hội mùa; gộp chung *seasonal_festival* vào bảng phụ bản/đấu trường.
+
+### Bảng Lore Lễ hội (`Festival.Dat` & `S→C 0x24 0x19`)
+- **Định nghĩa**: Giao diện hiển thị bài viết văn hóa/lịch sử của lễ hội (`TMR_FestivalInfoForm`) được client mở ra khi nhận gói `S→C 0x24 0x19 [key: u32 LE]`, đối chiếu bằng phép so sánh bằng trực tiếp `(double)key == record.double_at_0x00` trên file cục bộ `Data/Festival.Dat` (mã hóa XOR luân phiên hai khóa `keyA`/`keyB`, tối đa `0x16E = 366` bản ghi).
+- **Ràng buộc (Invariants)**:
+  - **Khóa tra cứu là số nguyên ép sang `double`, không phải `TDateTime`**: Client đọc `4` byte `u32 LE` và ép trực tiếp thành số thực IEEE-754 `(double)u32` (không gọi `EncodeDate`); giá trị `19000110` (`0x0121EAC6`) không khớp với `11.0` trong `Data/Festival.Dat` gốc.
+  - **An toàn với `Festival.Dat` gốc**: Khi toàn bộ `7` bản ghi trong `Festival.Dat` mang cùng khóa `11.0`, chỉ bản ghi `1` (*Tết Nguyên Đán*) là hợp lệ để mở bằng `u32 = 11`; cấm gửi `24 19` với `u32 = 11` cho các lễ hội `2..7`.
+  - **Tối đa 1 hộp thoại mỗi lần đăng nhập**: Client chỉ có một instance `TMR_FestivalInfoForm` duy nhất; mỗi lần đăng nhập chỉ đẩy tối đa `1` khung `24 19` chưa nhận trong đợt (`season-<seq>`).
+- **Tránh dùng các từ mơ hồ**: *TDateTime 19000110*, gọi nhầm `OP 0x17` là kênh mở `Festival.Dat`, hoặc gọi bản ghi `rec04` (*Ngày Cá Tháng Tư*) là *Halloween*.
+
+### Thông báo & Hiệu ứng Mùa (`S→C 0x17 0x39` & `0x17 0x46`)
+- **Định nghĩa**: Hai kênh phản hồi thời gian thực phía `OP 0x17` do server đẩy xuống:
+  - **`S→C 0x17 0x39 <sub2> [payload...]`**: Kênh phát `66` nhánh thông báo (`sub2` thuộc `0x01..0x0D` và `0x15..0x4A`, khuyết `0x0E..0x14`) ra khung chat hệ thống, bảng nổi hoặc thoại NPC, kèm `3` nhánh có hiệu ứng phụ (`0x0A`, `0x1F`, `0x34`).
+  - **`S→C 0x17 0x46 <sub3> [x: u16 LE][y: u16 LE][count: u8]`**: Kênh tạo hiệu ứng hạt pháo hoa `TFireLight` trên bản đồ.
+- **Ràng buộc (Invariants)**:
+  - Không giả định `0x17 0x39` nhận duy nhất `1` byte `1..=74`: nhiều nhánh (như `0x2B`, `0x33`, `0x34`, `0x35`, `0x39`, `0x43`, `0x44`, `0x46`) bắt buộc có `payload[2]` (`sub3`) và các nhánh phi-lễ-hội (`0x07`, `0x2D..0x32`, `0x36..0x38`, `0x40`, `0x41`) không thuộc phân hệ lễ hội.
+- **Tránh dùng các từ mơ hồ**: *74 mã thông báo lễ hội* (đánh đồng toàn bộ `0x17 0x39` là lễ hội), *kênh thời tiết tuyết rơi* (hiệu ứng tuyết do `SceneSet.Dat` / `mapId` / `QuestStep` quyết định cục bộ, không qua `0x17 0x39`).

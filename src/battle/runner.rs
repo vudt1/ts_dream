@@ -3193,6 +3193,15 @@ impl Battle {
         won: bool,
         out: &mut Vec<Out>,
     ) {
+        let effective_festival_exp_pct = if self.kind.allows_rewards() && won && !fled {
+            self.festivals
+                .as_ref()
+                .map(|f| f.active_exp_multiplier_pct())
+                .unwrap_or(self.festival_exp_pct)
+                .max(100)
+        } else {
+            100
+        };
         let mut text9 = String::new();
         for key in self.keys.clone() {
             let Some(cell) = self.list_war.get(&key).cloned() else {
@@ -3217,7 +3226,12 @@ impl Battle {
                 if cell.reborn == 2 {
                     exp = damage::banker_round(exp as f64 / 2.0) as i64;
                 }
-                exp = crate::battle::combat_formula::apply_god_ghost_exp(exp, snap.god, snap.ghost);
+                exp = crate::battle::combat_formula::apply_exp_multipliers(
+                    exp,
+                    snap.god,
+                    snap.ghost,
+                    effective_festival_exp_pct,
+                );
                 let new_texp = snap.texp + exp;
                 out.push(Out::Db(DbUpdate {
                     target: DbTarget::Player(player),

@@ -73,7 +73,9 @@ impl ServerControl {
             ),
         );
         let gd = data.clone().unwrap_or_else(|| Arc::new(GameData::default()));
-        let mut svc = BattleService::new(gd).with_events(events.clone());
+        let mut svc = BattleService::new(gd)
+            .with_events(events.clone())
+            .with_festivals(festivals.clone());
         if let Some(p) = pool.as_ref() {
             svc = svc.with_pool(p.clone());
         }
@@ -131,7 +133,9 @@ impl ServerControl {
     pub fn with_events(mut self, events: Arc<crate::server::events::EventLifecycleManager>) -> Self {
         self.events = events.clone();
         let gd = self.data.clone().unwrap_or_else(|| Arc::new(GameData::default()));
-        let mut svc = BattleService::new(gd).with_events(events);
+        let mut svc = BattleService::new(gd)
+            .with_events(events)
+            .with_festivals(self.festivals.clone());
         if let Some(p) = self.pool.as_ref() {
             svc = svc.with_pool(p.clone());
         }
@@ -146,7 +150,17 @@ impl ServerControl {
         mut self,
         festivals: Arc<crate::server::seasonal_festival::SeasonalFestivalManager>,
     ) -> Self {
-        self.festivals = festivals;
+        self.festivals = festivals.clone();
+        let gd = self.data.clone().unwrap_or_else(|| Arc::new(GameData::default()));
+        let mut svc = BattleService::new(gd)
+            .with_events(self.events.clone())
+            .with_festivals(festivals);
+        if let Some(p) = self.pool.as_ref() {
+            svc = svc.with_pool(p.clone());
+        }
+        let battle_service = Arc::new(svc);
+        BattleService::install_eve_backref(&battle_service);
+        self.battle_service = battle_service;
         self
     }
 

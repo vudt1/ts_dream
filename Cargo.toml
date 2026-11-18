@@ -8,6 +8,10 @@ description = "TS Dream - TS offline server written by Rust"
 name = "ts_dream"
 path = "src/main.rs"
 
+[[bin]]
+name = "patch_festival_dat"
+path = "src/bin/patch_festival_dat.rs"
+
 [lib]
 name = "ts_dream"
 path = "src/lib.rs"

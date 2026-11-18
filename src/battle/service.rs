@@ -103,6 +103,14 @@ fn try_write_session_with_retry(
     None
 }
 
+/// Snapshot of battle classification and max enemy level captured at spawn
+/// for post-battle seasonal bonus drop evaluation.
+#[derive(Debug, Clone, Copy)]
+struct BattleEndMeta {
+    kind: BattleKind,
+    max_enemy_level: u16,
+}
+
 /// The [`BattleSink`] implementation shared by all battles of one service.
 struct BattleSinkImpl {
     online: Arc<tokio::sync::RwLock<OnlineMap>>,
@@ -128,6 +136,12 @@ struct BattleSinkImpl {
     offline_eve_sessions: Arc<Mutex<HashMap<(i32, i64), Session>>>,
     /// Active ListQS spectators mapped `player_id -> battle_id`.
     spectators: Arc<Mutex<HashMap<i64, i32>>>,
+    /// Seasonal Festival Manager for post-battle bonus drops.
+    festivals: std::sync::RwLock<Arc<crate::server::seasonal_festival::SeasonalFestivalManager>>,
+    /// Per-battle kind & max enemy level snapshotted at `spawn_battle`.
+    battle_meta: Mutex<HashMap<i32, BattleEndMeta>>,
+    /// Deterministic PRNG for seasonal bonus drop rolls.
+    drop_rng: Mutex<crate::battle::rng::DotNetRandom>,
 }
 
 impl BattleSinkImpl {
@@ -449,6 +463,11 @@ impl BattleSink for BattleSinkImpl {
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0);
         let arena_40_challenger = self.active_40_npc.lock().unwrap().remove(&id);
+        let battle_meta = self
+            .battle_meta
+            .lock()
+            .ok()
+            .and_then(|mut m| m.remove(&id));
 
         if let Ok(mut spectators) = self.spectators.lock() {
             spectators.retain(|_, &mut bid| bid != id);
@@ -523,6 +542,11 @@ impl BattleSink for BattleSinkImpl {
             let pool_opt = self.pool.read().await.clone();
             let mut ended_sessions: Vec<Session> = Vec::new();
             let mut eve_followups: Vec<(i64, Session, u16, i32)> = Vec::new();
+            let mut pending_seasonal_drops: Vec<(
+                i64,
+                Vec<crate::server::session::InventoryItem>,
+                Vec<StagedFestivalDrop>,
+            )> = Vec::new();
             let mut post_battle_warps: Vec<(
                 i64,
                 crate::server::handlers::quest::ResolvedWarp,
@@ -630,6 +654,24 @@ impl BattleSink for BattleSinkImpl {
                         }
                     }
 
+                    if outcome == Outcome::PlayerWin
+                        && battle_meta.is_some_and(|m| m.kind.allows_rewards())
+                    {
+                        let max_enemy_lv = battle_meta.map(|m| m.max_enemy_level).unwrap_or(0);
+                        let before_homdo = s.homdo.clone();
+                        let staged = self
+                            .stage_seasonal_bonus_drops(
+                                pid,
+                                &mut s,
+                                max_enemy_lv,
+                                pool_opt.as_ref(),
+                            )
+                            .await;
+                        if !staged.is_empty() {
+                            pending_seasonal_drops.push((pid, before_homdo, staged));
+                        }
+                    }
+
                     crate::server::session::registry_update_if_online(&s);
                     ended_sessions.push(s.clone());
                 } else if let Some(mut s) = crate::server::session::registry_get(pid as u32) {
@@ -699,6 +741,23 @@ impl BattleSink for BattleSinkImpl {
                         );
                         self.send_map(pid, crate::battle::packets::hide_from_map(pid as u32));
                     }
+                    if outcome == Outcome::PlayerWin
+                        && battle_meta.is_some_and(|m| m.kind.allows_rewards())
+                    {
+                        let max_enemy_lv = battle_meta.map(|m| m.max_enemy_level).unwrap_or(0);
+                        let before_homdo = s.homdo.clone();
+                        let staged = self
+                            .stage_seasonal_bonus_drops(
+                                pid,
+                                &mut s,
+                                max_enemy_lv,
+                                pool_opt.as_ref(),
+                            )
+                            .await;
+                        if !staged.is_empty() {
+                            pending_seasonal_drops.push((pid, before_homdo, staged));
+                        }
+                    }
                     crate::server::session::registry_update_if_online(&s);
                     ended_sessions.push(s);
                 } else if let Some(mut offline_s) = offline_parked.remove(&pid) {
@@ -736,6 +795,7 @@ impl BattleSink for BattleSinkImpl {
                 }
             }
 
+            let mut db_persisted_ok = true;
             if !ended_sessions.is_empty() {
                 if let Some(ref pool) = pool_opt {
                     let refs: Vec<&Session> = ended_sessions.iter().collect();
@@ -746,7 +806,51 @@ impl BattleSink for BattleSinkImpl {
                     )
                     .await
                     {
+                        db_persisted_ok = false;
                         tracing::warn!(battle_id = id, "Battle End DB write-through failed");
+                    }
+                }
+            }
+
+            for (pid, before_homdo, staged_list) in pending_seasonal_drops {
+                let mut claim_ok = db_persisted_ok;
+                if claim_ok {
+                    if let Some(ref pool) = pool_opt {
+                        for drop in &staged_list {
+                            if let Err(e) =
+                                crate::server::seasonal_festival::record_festival_claim(
+                                    pool,
+                                    drop.player_id,
+                                    &drop.festival_id,
+                                    &drop.date_key,
+                                    &drop.claim_type,
+                                )
+                                .await
+                            {
+                                tracing::warn!(
+                                    player_id = drop.player_id,
+                                    festival_id = %drop.festival_id,
+                                    error = %e,
+                                    "Failed to record character_festival_claims; rolling back seasonal drop"
+                                );
+                                claim_ok = false;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if claim_ok {
+                    for drop in staged_list {
+                        self.send_to(pid, drop.frame);
+                    }
+                } else {
+                    if let Some((sess_arc, _)) = online_entries.get(&pid) {
+                        let mut s = sess_arc.write().await;
+                        s.homdo = before_homdo.clone();
+                        crate::server::session::registry_update_if_online(&s);
+                    } else if let Some(mut s) = crate::server::session::registry_get(pid as u32) {
+                        s.homdo = before_homdo;
+                        crate::server::session::registry_update_if_online(&s);
                     }
                 }
             }
@@ -834,7 +938,117 @@ impl BattleSink for BattleSinkImpl {
     }
 }
 
+struct StagedFestivalDrop {
+    player_id: u32,
+    festival_id: String,
+    date_key: String,
+    claim_type: String,
+    frame: String,
+}
+
 impl BattleSinkImpl {
+    async fn stage_seasonal_bonus_drops(
+        &self,
+        pid: i64,
+        s: &mut Session,
+        max_enemy_level: u16,
+        pool_opt: Option<&crate::db::pool::DbPool>,
+    ) -> Vec<StagedFestivalDrop> {
+        let mut staged = Vec::new();
+        let Some(player_id) = u32::try_from(pid).ok().filter(|&u| u > 0) else {
+            return staged;
+        };
+        let active_drops = {
+            let guard = self.festivals.read().unwrap();
+            guard.active_bonus_drops()
+        };
+        if active_drops.is_empty() {
+            return staged;
+        }
+
+        let now_secs = chrono::Utc::now().timestamp();
+        let date_key = crate::server::seasonal_festival::utc7_date_key(now_secs);
+        let mut staged_counts: HashMap<(String, String), u32> = HashMap::new();
+
+        for (festival_id, drop) in active_drops {
+            if drop.item_id == 0 || drop.drop_rate_pct == 0 || max_enemy_level < drop.min_enemy_level
+            {
+                continue;
+            }
+            let rolled = {
+                let Ok(mut rng) = self.drop_rng.lock() else {
+                    continue;
+                };
+                rng.next_range(0, 100) < i32::from(drop.drop_rate_pct)
+            };
+            if !rolled {
+                continue;
+            }
+
+            let item = crate::server::inventory::from_template(
+                self.data.as_ref(),
+                drop.item_id,
+                1,
+            );
+            // All-or-Nothing bag check: skip safely without incrementing daily_drop_cap.
+            if !crate::server::inventory::can_add_item(&s.homdo, &item) {
+                continue;
+            }
+
+            let claim_type = crate::server::seasonal_festival::drop_claim_type(drop.item_id);
+            let already_staged = staged_counts
+                .get(&(festival_id.clone(), claim_type.clone()))
+                .copied()
+                .unwrap_or(0);
+            if drop.daily_drop_cap > 0 {
+                let Some(pool) = pool_opt else {
+                    continue;
+                };
+                match crate::server::seasonal_festival::get_festival_claim_count(
+                    pool,
+                    player_id,
+                    &festival_id,
+                    &date_key,
+                    &claim_type,
+                )
+                .await
+                {
+                    Ok(count) if count.saturating_add(already_staged) >= drop.daily_drop_cap => {
+                        continue
+                    }
+                    Ok(_) => {}
+                    Err(e) => {
+                        tracing::warn!(
+                            player_id,
+                            festival_id = %festival_id,
+                            error = %e,
+                            "Failed to read character_festival_claims; skipping seasonal drop"
+                        );
+                        continue;
+                    }
+                }
+            }
+
+            let affected = crate::server::inventory::add_item(&mut s.homdo, item.clone());
+            if affected.is_empty() {
+                continue;
+            }
+
+            *staged_counts
+                .entry((festival_id.clone(), claim_type.clone()))
+                .or_insert(0) += 1;
+            staged.push(StagedFestivalDrop {
+                player_id,
+                festival_id,
+                date_key: date_key.clone(),
+                claim_type,
+                frame: crate::server::inventory::item_added_frame(&item),
+            });
+        }
+
+        staged
+    }
+
     async fn resume_eve_for_participant(
         &self,
         pid: i64,
@@ -1016,6 +1230,8 @@ pub struct BattleService {
     input_timeout: std::time::Duration,
     /// Special events & North Star quiz manager
     pub events: Arc<crate::server::events::EventLifecycleManager>,
+    /// Seasonal Festival lifecycle manager (ADR 0011)
+    pub festivals: Arc<crate::server::seasonal_festival::SeasonalFestivalManager>,
     /// Active 40-NPC Arena continuous battles (battle_id -> challenger_id)
     pub active_40_npc: Arc<Mutex<HashMap<i32, u32>>>,
 }
@@ -1048,6 +1264,7 @@ impl BattleService {
             ))))
         };
         let active_40_npc = Arc::new(Mutex::new(HashMap::new()));
+        let festivals = Arc::new(crate::server::seasonal_festival::SeasonalFestivalManager::default());
         let sink = Arc::new(BattleSinkImpl {
             online: Arc::clone(&online),
             members: Arc::new(Mutex::new(HashSet::new())),
@@ -1058,6 +1275,9 @@ impl BattleService {
             battle_participants: Arc::new(Mutex::new(HashMap::new())),
             offline_eve_sessions: Arc::new(Mutex::new(HashMap::new())),
             spectators: Arc::new(Mutex::new(HashMap::new())),
+            festivals: std::sync::RwLock::new(Arc::clone(&festivals)),
+            battle_meta: Mutex::new(HashMap::new()),
+            drop_rng: Mutex::new(crate::battle::rng::DotNetRandom::time_seeded()),
         });
         BattleService {
             manager: Arc::new(BattleManager::new()),
@@ -1072,6 +1292,7 @@ impl BattleService {
             next_battle: AtomicI32::new(1),
             input_timeout: std::time::Duration::from_secs(21),
             events: Arc::new(crate::server::events::EventLifecycleManager::default()),
+            festivals,
             active_40_npc,
         }
     }
@@ -1079,6 +1300,18 @@ impl BattleService {
     /// Attach a custom Special Events Lifecycle Manager.
     pub fn with_events(mut self, events: Arc<crate::server::events::EventLifecycleManager>) -> Self {
         self.events = events;
+        self
+    }
+
+    /// Attach a custom Seasonal Festival Manager.
+    pub fn with_festivals(
+        mut self,
+        festivals: Arc<crate::server::seasonal_festival::SeasonalFestivalManager>,
+    ) -> Self {
+        if let Ok(mut guard) = self.sink.festivals.write() {
+            *guard = Arc::clone(&festivals);
+        }
+        self.festivals = festivals;
         self
     }
 
@@ -2277,6 +2510,30 @@ impl BattleService {
             entry.extend(extra_members);
         }
         self.record_join_cells(id, &battle);
+
+        let live_festivals = Arc::clone(&self.festivals);
+        battle.festival_exp_pct = if battle.kind.allows_rewards() {
+            live_festivals.active_exp_multiplier_pct()
+        } else {
+            100
+        };
+        battle.festivals = Some(live_festivals);
+        let max_enemy_level = battle
+            .list_war
+            .values()
+            .filter(|c| c.team == 2 && c.id > 0)
+            .map(|c| u16::try_from(c.lv.max(0)).unwrap_or(u16::MAX))
+            .max()
+            .unwrap_or(0);
+        if let Ok(mut meta_map) = self.sink.battle_meta.lock() {
+            meta_map.insert(
+                id,
+                BattleEndMeta {
+                    kind: battle.kind,
+                    max_enemy_level,
+                },
+            );
+        }
 
         let diahinh = battle.diahinh;
         let start = if battle.is_pvp() {

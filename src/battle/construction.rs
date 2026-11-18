@@ -86,6 +86,11 @@ pub struct Battle {
     pub fight_type: u8,
     /// Lifecycle classification (`Normal` vs `Pk`), independent of `fight_type`.
     pub kind: BattleKind,
+    /// Active seasonal festival EXP multiplier percentage (`100` = 1.0x neutral).
+    pub festival_exp_pct: u32,
+    /// Live reference to `SeasonalFestivalManager` so `Battle::finish` evaluates
+    /// active festival EXP multiplier at victory time.
+    pub festivals: Option<std::sync::Arc<crate::server::seasonal_festival::SeasonalFestivalManager>>,
 }
 
 impl Battle {
@@ -109,6 +114,8 @@ impl Battle {
             is_40_npc: false,
             fight_type: 0,
             kind: BattleKind::Normal,
+            festival_exp_pct: 100,
+            festivals: None,
         };
 
         // Create 20 cells (row 0..3, col 0..4)

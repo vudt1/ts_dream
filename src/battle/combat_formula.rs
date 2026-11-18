@@ -155,10 +155,11 @@ pub fn element_multiplier(attacker: u8, defender: i64) -> f64 {
     }
 }
 
-/// Adjust experience gained based on God of Fortune and Ghost buffs.
+/// Adjust experience gained based on God of Fortune, Ghost buffs, and active seasonal festival multiplier.
 /// - If god > 0: exp * 1.5
 /// - If ghost == 1: exp * 0.5 (50% reduction)
-pub fn apply_god_ghost_exp(exp: i64, god: u32, ghost: u8) -> i64 {
+/// - If festival_exp_pct > 0 && festival_exp_pct != 100: exp * (festival_exp_pct / 100.0)
+pub fn apply_exp_multipliers(exp: i64, god: u32, ghost: u8, festival_exp_pct: u32) -> i64 {
     let mut modified = exp as f64;
     if god > 0 {
         modified *= 1.5;
@@ -166,6 +167,16 @@ pub fn apply_god_ghost_exp(exp: i64, god: u32, ghost: u8) -> i64 {
     if ghost == 1 {
         modified *= 0.5;
     }
+    if festival_exp_pct > 0 && festival_exp_pct != 100 {
+        modified *= f64::from(festival_exp_pct) / 100.0;
+    }
     crate::battle::damage::banker_round(modified) as i64
+}
+
+/// Adjust experience gained based on God of Fortune and Ghost buffs.
+/// - If god > 0: exp * 1.5
+/// - If ghost == 1: exp * 0.5 (50% reduction)
+pub fn apply_god_ghost_exp(exp: i64, god: u32, ghost: u8) -> i64 {
+    apply_exp_multipliers(exp, god, ghost, 100)
 }
 

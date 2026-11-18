@@ -58,7 +58,7 @@ async fn test_festival_profile_defaults_and_shared_vs_exclusive_gating() {
             id: FESTIVAL_TET_NGUYEN_TIEU.to_string(),
             name: "Tết Nguyên Tiêu".to_string(),
             lore_record_id: Some(2),
-            exp_multiplier_pct: 200,
+            exp_multiplier_pct: Some(200),
             exclusive_maps: vec![54811, 54812],
             shared_map_gates: vec![SharedMapGate {
                 map_id: 12001,
@@ -71,12 +71,13 @@ async fn test_festival_profile_defaults_and_shared_vs_exclusive_gating() {
                 npc_place_id: 77,
                 npc_id: 1825,
             }],
+            bonus_drops: vec![],
         },
         FestivalProfile {
             id: FESTIVAL_GIANG_SINH.to_string(),
             name: "Lễ Giáng Sinh".to_string(),
             lore_record_id: Some(11),
-            exp_multiplier_pct: 100,
+            exp_multiplier_pct: None,
             exclusive_maps: vec![54827],
             shared_map_gates: vec![
                 SharedMapGate {
@@ -93,6 +94,7 @@ async fn test_festival_profile_defaults_and_shared_vs_exclusive_gating() {
                 },
             ],
             dynamic_npcs: vec![],
+            bonus_drops: vec![],
         },
     ]);
 
@@ -326,7 +328,7 @@ async fn test_dynamic_npc_16_01_login_map_enter_and_admin_start_broadcast() {
         id: FESTIVAL_TET_NGUYEN_TIEU.to_string(),
         name: "Tết Nguyên Tiêu".to_string(),
         lore_record_id: Some(2),
-        exp_multiplier_pct: 200,
+        exp_multiplier_pct: Some(200),
         exclusive_maps: vec![54811],
         shared_map_gates: vec![],
         dynamic_npcs: vec![DynamicFestivalNpc {
@@ -334,6 +336,7 @@ async fn test_dynamic_npc_16_01_login_map_enter_and_admin_start_broadcast() {
             npc_place_id: 77,
             npc_id: 1825,
         }],
+        bonus_drops: vec![],
     }]));
 
     let control = Arc::new(

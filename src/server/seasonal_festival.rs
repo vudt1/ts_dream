@@ -33,6 +33,30 @@ pub fn season_period_key(season_seq: u64) -> String {
     format!("season-{season_seq}")
 }
 
+/// Canonical `period_key` (`YYYY-MM-DD` in `UTC+7`) for daily drop caps in `character_festival_claims`.
+pub fn utc7_date_key(unix_secs: i64) -> String {
+    let offset = chrono::FixedOffset::east_opt(7 * 3600).expect("UTC+7 offset");
+    chrono::DateTime::from_timestamp(unix_secs, 0)
+        .map(|dt| dt.with_timezone(&offset).format("%Y-%m-%d").to_string())
+        .unwrap_or_else(|| "1970-01-01".to_string())
+}
+
+/// Canonical `claim_type` for a seasonal bonus drop item in `character_festival_claims`.
+pub fn drop_claim_type(item_id: u16) -> String {
+    format!("drop_{item_id}")
+}
+
+/// Seasonal bonus drop rule for PvE `Normal` battle victories.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct SeasonalBonusDrop {
+    pub item_id: u16,
+    pub drop_rate_pct: u8,
+    #[serde(default)]
+    pub min_enemy_level: u16,
+    #[serde(default)]
+    pub daily_drop_cap: u32,
+}
+
 /// Granular gate rules for a shared map (`12000`, `12001`, `12005`, `12421`, etc.)
 /// so ONLY festival-specific doors, NPCs, and quests are locked when the festival is `Idle`,
 /// while normal main-story content on the same map stays open.
@@ -65,13 +89,15 @@ pub struct FestivalProfile {
     #[serde(default)]
     pub lore_record_id: Option<u32>,
     #[serde(default)]
-    pub exp_multiplier_pct: u32,
+    pub exp_multiplier_pct: Option<u32>,
     #[serde(default)]
     pub exclusive_maps: Vec<u16>,
     #[serde(default)]
     pub shared_map_gates: Vec<SharedMapGate>,
     #[serde(default)]
     pub dynamic_npcs: Vec<DynamicFestivalNpc>,
+    #[serde(default)]
+    pub bonus_drops: Vec<SeasonalBonusDrop>,
 }
 
 /// Public snapshot of a Seasonal Festival's configuration and live state.
@@ -153,7 +179,7 @@ impl FestivalEntry {
 }
 
 /// Central Seasonal Festival Lifecycle Manager.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct SeasonalFestivalManager {
     entries: Arc<RwLock<HashMap<String, FestivalEntry>>>,
 }
@@ -172,14 +198,28 @@ impl SeasonalFestivalManager {
                 id: FESTIVAL_TET_NGUYEN_DAN.to_string(),
                 name: "Tết Nguyên Đán".to_string(),
                 lore_record_id: Some(1),
-                exp_multiplier_pct: 100,
+                exp_multiplier_pct: None,
+                bonus_drops: vec![
+                    SeasonalBonusDrop {
+                        item_id: 46335,
+                        drop_rate_pct: 10,
+                        min_enemy_level: 10,
+                        daily_drop_cap: 10,
+                    },
+                    SeasonalBonusDrop {
+                        item_id: 46338,
+                        drop_rate_pct: 10,
+                        min_enemy_level: 10,
+                        daily_drop_cap: 10,
+                    },
+                ],
                 ..Default::default()
             },
             FestivalProfile {
                 id: FESTIVAL_TET_NGUYEN_TIEU.to_string(),
                 name: "Tết Nguyên Tiêu".to_string(),
                 lore_record_id: Some(2),
-                exp_multiplier_pct: 200,
+                exp_multiplier_pct: Some(200),
                 exclusive_maps: vec![54811, 54812],
                 shared_map_gates: vec![SharedMapGate {
                     map_id: 12001,
@@ -188,45 +228,52 @@ impl SeasonalFestivalManager {
                     quest_ids: Vec::new(),
                 }],
                 dynamic_npcs: Vec::new(),
+                bonus_drops: Vec::new(),
             },
             FestivalProfile {
                 id: FESTIVAL_VALENTINE.to_string(),
                 name: "Valentine".to_string(),
                 lore_record_id: Some(3),
-                exp_multiplier_pct: 100,
+                exp_multiplier_pct: None,
                 ..Default::default()
             },
             FestivalProfile {
                 id: FESTIVAL_CA_THANG_TU.to_string(),
                 name: "Ngày Cá Tháng Tư".to_string(),
                 lore_record_id: Some(4),
-                exp_multiplier_pct: 100,
+                exp_multiplier_pct: None,
                 ..Default::default()
             },
             FestivalProfile {
                 id: FESTIVAL_GIO_TO_HUNG_VUONG.to_string(),
                 name: "Giỗ Tổ Hùng Vương".to_string(),
                 lore_record_id: Some(5),
-                exp_multiplier_pct: 100,
+                exp_multiplier_pct: None,
                 ..Default::default()
             },
             FestivalProfile {
                 id: FESTIVAL_PHAT_DAN.to_string(),
                 name: "Lễ Phật Đản".to_string(),
                 lore_record_id: Some(6),
-                exp_multiplier_pct: 100,
+                exp_multiplier_pct: None,
                 ..Default::default()
             },
             FestivalProfile {
                 id: FESTIVAL_DOAN_NGO.to_string(),
                 name: "Tết Đoan Ngọ".to_string(),
                 lore_record_id: Some(7),
-                exp_multiplier_pct: 100,
+                exp_multiplier_pct: None,
                 shared_map_gates: vec![SharedMapGate {
                     map_id: 12000,
                     door_ids: Vec::new(),
                     npc_place_ids: Vec::new(),
                     quest_ids: Vec::new(),
+                }],
+                bonus_drops: vec![SeasonalBonusDrop {
+                    item_id: 46220,
+                    drop_rate_pct: 10,
+                    min_enemy_level: 10,
+                    daily_drop_cap: 10,
                 }],
                 ..Default::default()
             },
@@ -234,7 +281,7 @@ impl SeasonalFestivalManager {
                 id: FESTIVAL_THAT_TICH.to_string(),
                 name: "Lễ Thất Tịch".to_string(),
                 lore_record_id: Some(8),
-                exp_multiplier_pct: 100,
+                exp_multiplier_pct: None,
                 exclusive_maps: vec![54825, 12941, 12942, 12943],
                 shared_map_gates: vec![SharedMapGate {
                     map_id: 12001,
@@ -243,12 +290,13 @@ impl SeasonalFestivalManager {
                     quest_ids: vec![10786, 11746, 11747],
                 }],
                 dynamic_npcs: Vec::new(),
+                bonus_drops: Vec::new(),
             },
             FestivalProfile {
                 id: FESTIVAL_TRUNG_THU.to_string(),
                 name: "Tết Trung Thu".to_string(),
                 lore_record_id: Some(9),
-                exp_multiplier_pct: 100,
+                exp_multiplier_pct: None,
                 exclusive_maps: vec![61051, 61178],
                 shared_map_gates: vec![SharedMapGate {
                     map_id: 12001,
@@ -257,25 +305,32 @@ impl SeasonalFestivalManager {
                     quest_ids: Vec::new(),
                 }],
                 dynamic_npcs: Vec::new(),
+                bonus_drops: Vec::new(),
             },
             FestivalProfile {
                 id: FESTIVAL_HALLOWEEN.to_string(),
                 name: "Halloween".to_string(),
                 lore_record_id: Some(10),
-                exp_multiplier_pct: 100,
+                exp_multiplier_pct: None,
                 exclusive_maps: {
                     let mut maps = vec![57518];
                     maps.extend(57531..=57536);
                     maps.extend(61551..=61567);
                     maps
                 },
+                bonus_drops: vec![SeasonalBonusDrop {
+                    item_id: 46073,
+                    drop_rate_pct: 10,
+                    min_enemy_level: 10,
+                    daily_drop_cap: 10,
+                }],
                 ..Default::default()
             },
             FestivalProfile {
                 id: FESTIVAL_GIANG_SINH.to_string(),
                 name: "Lễ Giáng Sinh".to_string(),
                 lore_record_id: Some(11),
-                exp_multiplier_pct: 100,
+                exp_multiplier_pct: None,
                 exclusive_maps: (54827..=54831).collect(),
                 shared_map_gates: vec![
                     SharedMapGate {
@@ -292,6 +347,7 @@ impl SeasonalFestivalManager {
                     },
                 ],
                 dynamic_npcs: Vec::new(),
+                bonus_drops: Vec::new(),
             },
         ]
     }
@@ -405,6 +461,34 @@ impl SeasonalFestivalManager {
         let mut items: Vec<&FestivalEntry> = guard.values().filter(|e| e.is_active).collect();
         items.sort_by_key(|e| e.order);
         items.into_iter().map(|e| e.profile.id.clone()).collect()
+    }
+
+    /// Return the effective EXP multiplier percentage across all currently `Active` festivals
+    /// (`100` = 1.0x neutral, `200` = 2.0x). Returns `100` if no festival is active.
+    pub fn active_exp_multiplier_pct(&self) -> u32 {
+        let guard = self.entries.read().unwrap();
+        guard
+            .values()
+            .filter(|e| e.is_active)
+            .filter_map(|e| e.profile.exp_multiplier_pct)
+            .map(|m| m.max(100))
+            .max()
+            .unwrap_or(100)
+    }
+
+    /// Return all `(festival_id, SeasonalBonusDrop)` rules for currently `Active` festivals
+    /// in canonical display order.
+    pub fn active_bonus_drops(&self) -> Vec<(String, SeasonalBonusDrop)> {
+        let guard = self.entries.read().unwrap();
+        let mut items: Vec<&FestivalEntry> = guard.values().filter(|e| e.is_active).collect();
+        items.sort_by_key(|e| e.order);
+        let mut drops = Vec::new();
+        for entry in items {
+            for drop in &entry.profile.bonus_drops {
+                drops.push((entry.profile.id.clone(), drop.clone()));
+            }
+        }
+        drops
     }
 
     /// Check whether a door transition `(map_id, door_id -> target_map_id)` is allowed.
@@ -754,6 +838,29 @@ pub async fn has_festival_claim(
     .fetch_optional(&pool.read)
     .await?;
     Ok(row.is_some())
+}
+
+/// Query current `claim_count` for `(player_id, festival_id, period_key, claim_type)`
+/// in `character_festival_claims` (reads from `pool.read`). Returns `0` when absent.
+pub async fn get_festival_claim_count(
+    pool: &DbPool,
+    player_id: u32,
+    festival_id: &str,
+    period_key: &str,
+    claim_type: &str,
+) -> Result<u32, sqlx::Error> {
+    let row: Option<i64> = sqlx::query_scalar(
+        "SELECT claim_count FROM character_festival_claims
+         WHERE playerid = ? AND festival_id = ? AND period_key = ? AND claim_type = ?
+         LIMIT 1",
+    )
+    .bind(i64::from(player_id))
+    .bind(festival_id)
+    .bind(period_key)
+    .bind(claim_type)
+    .fetch_optional(&pool.read)
+    .await?;
+    Ok(row.and_then(|v| u32::try_from(v.max(0)).ok()).unwrap_or(0))
 }
 
 /// Insert or increment a claim in `character_festival_claims` (writes via `pool.write`).

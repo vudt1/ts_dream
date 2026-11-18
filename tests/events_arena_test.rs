@@ -4,6 +4,8 @@ mod common;
 
 #[path = "events_arena/arena.rs"]
 mod arena;
+#[path = "events_arena/festival_battle_drops_and_exp.rs"]
+mod festival_battle_drops_and_exp;
 #[path = "events_arena/festival_gating_and_evacuation.rs"]
 mod festival_gating_and_evacuation;
 #[path = "events_arena/festival_login_and_encoder.rs"]
