@@ -421,6 +421,10 @@ async fn handle_talk_warp(
     env: &crate::server::dispatcher::ServerEnv<'_>,
     out: &mut HandleOutcome,
 ) {
+    if conn.session.current_event_session.is_some() {
+        out.send(NpcTalkCodec::build_clear_pending_hex().to_string());
+        return;
+    }
     if payload.len() >= 2 {
         conn.session.idtalking = encoder::u16_le(payload[0], payload[1]) as i32;
     }

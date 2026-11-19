@@ -138,8 +138,8 @@ async fn test_atomic_create_with_password_overwrite() {
         conn.session.homdo
     );
     assert!(
-        conn.session.homdo.iter().any(|i| i.slot == 2 && i.id == 31007 && i.count == 1),
-        "RAM homdo must hold starter 31007x1 at slot 2, got {:?}",
+        !conn.session.homdo.iter().any(|i| i.id == 31007),
+        "RAM homdo must NOT hold 31007 at character create (granted on Quest 10037 instead), got {:?}",
         conn.session.homdo
     );
     assert!(
@@ -168,8 +168,8 @@ async fn test_atomic_create_with_password_overwrite() {
         probe.homdo
     );
     assert!(
-        probe.homdo.iter().any(|i| i.slot == 2 && i.id == 31007 && i.count == 1),
-        "homdo (inventories type 1) must hold starter 31007x1 at slot 2, got {:?}",
+        !probe.homdo.iter().any(|i| i.id == 31007),
+        "homdo (inventories type 1) must NOT hold 31007 at character create, got {:?}",
         probe.homdo
     );
     assert!(
@@ -377,11 +377,11 @@ async fn test_starter_item_31007_enter_game_and_relogin_no_duplication() {
         "17 05 must contain slot 1 32012x4 (collateral), got {homdo_frame}"
     );
     assert!(
-        homdo_frame.contains("021F7901"),
-        "17 05 must contain slot 2 31007x1, got {homdo_frame}"
+        !homdo_frame.contains("1F79"),
+        "17 05 must NOT contain 31007 on enter game, got {homdo_frame}"
     );
 
-    // Relogin (fresh Conn + 0x01 login): must NOT duplicate 31007.
+    // Relogin (fresh Conn + 0x01 login): 31007 stays absent, 32012x4 intact.
     let mut relogin_conn = Conn::default();
     let pass = b"enterpass1";
     let mut relogin_payload = Vec::new();
@@ -407,8 +407,8 @@ async fn test_starter_item_31007_enter_game_and_relogin_no_duplication() {
     assert!(relogin_conn.session.logined);
     assert_eq!(
         relogin_conn.session.homdo.iter().filter(|i| i.id == 31007).count(),
-        1,
-        "relogin must not duplicate 31007"
+        0,
+        "relogin must keep 31007 absent before Quest 10037"
     );
     assert_eq!(
         relogin_conn.session.homdo.iter().filter(|i| i.id == 32012).count(),
@@ -422,7 +422,7 @@ async fn test_starter_item_31007_enter_game_and_relogin_no_duplication() {
     .fetch_one(&pool.read)
     .await
     .unwrap();
-    assert_eq!(db_31007_count, 1, "DB must have exactly 1 row for 31007");
+    assert_eq!(db_31007_count, 0, "DB must have 0 rows for 31007 at char create");
 }
 
 #[tokio::test]
@@ -490,7 +490,7 @@ async fn test_existing_char_newbie_zero_not_granted_31007_on_enter_game() {
 }
 
 #[tokio::test]
-async fn test_in_memory_fallback_create_char_seeds_31007_and_keeps_newbie_zero() {
+async fn test_in_memory_fallback_create_char_omits_31007_and_keeps_newbie_zero() {
     let data = ts_dream::data::loader::GameData::default();
     let service = ts_dream::battle::service::BattleService::default();
     let env = ServerEnv {
@@ -508,6 +508,6 @@ async fn test_in_memory_fallback_create_char_seeds_31007_and_keeps_newbie_zero()
     assert!(frames.iter().any(|f| f == spawn::CHAR_CREATE_SUCCESS));
     assert_eq!(conn.session.newbie, 0);
     assert!(conn.session.homdo.iter().any(|i| i.slot == 1 && i.id == 32012 && i.count == 4));
-    assert!(conn.session.homdo.iter().any(|i| i.slot == 2 && i.id == 31007 && i.count == 1));
+    assert!(!conn.session.homdo.iter().any(|i| i.id == 31007));
     assert!(conn.session.trangbi.iter().any(|i| i.slot == 2 && i.id == 19737 && i.count == 1));
 }

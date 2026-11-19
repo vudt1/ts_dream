@@ -682,7 +682,7 @@ async fn production_data_0x14_08_fixes_door_vs_sceneinfo_and_honors_override_fal
     let _ = dispatch(&mut c3, &talk_warp_frame(2), data, &service, &env).await;
     assert_eq!((c3.session.map_id, c3.session.map_x, c3.session.map_y), (11902, 670, 1230));
 
-    // 4. (49902, 2): Unpassed BattleGate triggers battle via 0x14 08.
+    // 4. (49902, 2): Unpassed BattleGate triggers battle via 0x14 08 and emits 14 09.
     let mut c4 = Conn {
         session: Session {
             id: 60013,
@@ -694,7 +694,50 @@ async fn production_data_0x14_08_fixes_door_vs_sceneinfo_and_honors_override_fal
         },
         ..Default::default()
     };
-    let _ = dispatch(&mut c4, &talk_warp_frame(2), data, &service, &env).await;
+    let out_gate = dispatch(&mut c4, &talk_warp_frame(2), data, &service, &env).await;
     assert!(c4.session.battle_id > 0);
     assert_eq!(c4.session.map_id, 49902);
+    assert!(
+        out_gate.outgoing.iter().any(|f| f.frame == "F44402001409"),
+        "BattleGate triggered from 0x14 08 must emit 14 09 to clear 0xA094, got {:?}",
+        out_gate.outgoing
+    );
+
+    // 5. (10817, 1): Door 1 has eve_no=7 (MeetDoor dialogue -> Warp to 10867).
+    let mut c5 = Conn {
+        session: Session {
+            id: 60014,
+            map_id: 10817,
+            map_x: 1622,
+            map_y: 655,
+            in_world: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let out_open = dispatch(&mut c5, &talk_warp_frame(1), data, &service, &env).await;
+    assert_eq!(c5.session.map_id, 10817, "must NOT warp before dialogue ends");
+    assert!(c5.session.current_event_session.is_some(), "EventSession must activate");
+    assert!(
+        out_open.outgoing.iter().any(|f| f.frame.len() >= 12 && &f.frame[8..12] == "1401"),
+        "expected opening 14 01 step, got {:?}",
+        out_open.outgoing
+    );
+    let mut warped = false;
+    for _ in 0..7 {
+        let out_step = dispatch(
+            &mut c5,
+            &[0xF4, 0x44, 0x02, 0x00, 0x14, 0x06],
+            data,
+            &service,
+            &env,
+        )
+        .await;
+        if out_step.outgoing.iter().any(|f| f.frame == "F44402001407") {
+            warped = true;
+            break;
+        }
+    }
+    assert!(warped, "10817 Door 1 must warp after dialogue finishes");
+    assert_eq!(c5.session.map_id, 10867);
 }

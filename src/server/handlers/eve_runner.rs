@@ -22,6 +22,59 @@ use crate::server::handlers::stats::build_stat_update;
 use crate::server::handlers::talk::{end_talk_session, eve_rng_seed, reset_talk_context};
 use crate::server::session::Session;
 
+/// Bit flag in `Session::bit_flags` (`character_bit_flags` table) recording
+/// that the one-time tutorial bonus item `31007` (*Vé đoái hoán tâm*) was granted
+/// upon completing Quest `10037` with NPC `#15050` (*Nam Tinh Quân*).
+const FLAG_TUTORIAL_31007: u32 = 1;
+const TUTORIAL_QUEST_10037_NPC_ID: u16 = 15050;
+const TUTORIAL_QUEST_10037_EVE_NO: i32 = 3;
+const ITEM_MODERN_SUIT: u16 = 19737;
+const ITEM_WHITE_SKIN_ARMOR: u16 = 19001;
+const ITEM_EXCHANGE_HEART_TICKET: u16 = 31007;
+
+/// Resolves the effective item mutations for an Eve `MutateItem` effect.
+///
+/// On tutorial maps `10851..=10870`, NPC `#15050` (`eve_no == 3`, Quest `10037`)
+/// replaces `#19737` (*Bộ Áo Hiện Đại*) with `#19001` (*Giáp Bạch Bì*) and,
+/// once per character (`!bit_flags.contains(&FLAG_TUTORIAL_31007)`), grants
+/// `1x #31007` (*Vé đoái hoán tâm*) into `homdo`.
+fn resolve_effective_item_mutations(
+    session: &Session,
+    data: &GameData,
+    item_id: u16,
+    delta: i32,
+) -> (Vec<(u16, i32)>, bool) {
+    let is_tutorial_10037 = (10851..=10870).contains(&session.map_id)
+        && item_id == ITEM_MODERN_SUIT
+        && delta > 0
+        && session.current_event_session.as_ref().is_some_and(|ev| {
+            if ev.eve_no != TUTORIAL_QUEST_10037_EVE_NO {
+                return false;
+            }
+            let npc_template_id = u16::try_from(ev.npc_click_id)
+                .ok()
+                .and_then(|place_id| {
+                    data.scene_eve_data
+                        .get(&u32::from(session.map_id))
+                        .and_then(|scene| scene.npcs.get(&place_id))
+                        .map(|n| n.npc_id)
+                })
+                .unwrap_or_else(|| u16::try_from(session.idnpctalking).unwrap_or(0));
+            npc_template_id == TUTORIAL_QUEST_10037_NPC_ID
+        });
+
+    if !is_tutorial_10037 {
+        return (vec![(item_id, delta)], false);
+    }
+
+    let mut items = vec![(ITEM_WHITE_SKIN_ARMOR, delta)];
+    let grant_31007 = !session.bit_flags.contains(&FLAG_TUTORIAL_31007);
+    if grant_31007 {
+        items.push((ITEM_EXCHANGE_HEART_TICKET, 1));
+    }
+    (items, grant_31007)
+}
+
 /// All-or-Nothing pre-flight rejection reasons before mutating session state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PreFlightError {
@@ -76,23 +129,27 @@ fn preflight_probe_batch(
                 delta,
                 wire_result: _,
             } => {
-                if *delta < 0 {
-                    let needed = delta.unsigned_abs();
-                    let removed =
-                        crate::server::inventory::remove_item(&mut trial_homdo, *item_id, needed);
-                    if removed < needed {
-                        return Err(PreFlightError::InsufficientItem { item_id: *item_id });
-                    }
-                } else if *delta > 0 {
-                    let mut rem = *delta as u32;
-                    while rem > 0 {
-                        let chunk = rem.min(crate::server::inventory::STACK_CAP as u32) as u8;
-                        let item = crate::server::inventory::from_template(data, *item_id, chunk);
-                        if !crate::server::inventory::can_add_item(&trial_homdo, &item) {
-                            return Err(PreFlightError::HomdoFull { item_id: *item_id });
+                let (effective_items, _) =
+                    resolve_effective_item_mutations(session, data, *item_id, *delta);
+                for (eff_id, eff_delta) in effective_items {
+                    if eff_delta < 0 {
+                        let needed = eff_delta.unsigned_abs();
+                        let removed =
+                            crate::server::inventory::remove_item(&mut trial_homdo, eff_id, needed);
+                        if removed < needed {
+                            return Err(PreFlightError::InsufficientItem { item_id: eff_id });
                         }
-                        crate::server::inventory::add_item(&mut trial_homdo, item);
-                        rem -= u32::from(chunk);
+                    } else if eff_delta > 0 {
+                        let mut rem = eff_delta as u32;
+                        while rem > 0 {
+                            let chunk = rem.min(crate::server::inventory::STACK_CAP as u32) as u8;
+                            let item = crate::server::inventory::from_template(data, eff_id, chunk);
+                            if !crate::server::inventory::can_add_item(&trial_homdo, &item) {
+                                return Err(PreFlightError::HomdoFull { item_id: eff_id });
+                            }
+                            crate::server::inventory::add_item(&mut trial_homdo, item);
+                            rem -= u32::from(chunk);
+                        }
                     }
                 }
             }
@@ -276,21 +333,50 @@ fn execute_mutate_item(
     delta: i32,
     wire_result: &EveResult,
 ) {
-    if delta < 0 {
-        session.remove_homdo_item(item_id, delta.unsigned_abs());
-    } else if delta > 0 {
-        let mut rem = delta as u32;
-        while rem > 0 {
-            let chunk = rem.min(crate::server::inventory::STACK_CAP as u32) as u8;
-            let item = crate::server::inventory::from_template(data, item_id, chunk);
-            session.add_homdo_item(item);
-            rem -= u32::from(chunk);
+    let (effective_items, grant_31007) =
+        resolve_effective_item_mutations(session, data, item_id, delta);
+
+    let mut mutated = false;
+    for (eff_id, eff_delta) in &effective_items {
+        if *eff_delta < 0 {
+            session.remove_homdo_item(*eff_id, eff_delta.unsigned_abs());
+            mutated = true;
+        } else if *eff_delta > 0 {
+            let mut rem = *eff_delta as u32;
+            while rem > 0 {
+                let chunk = rem.min(crate::server::inventory::STACK_CAP as u32) as u8;
+                let item = crate::server::inventory::from_template(data, *eff_id, chunk);
+                session.add_homdo_item(item);
+                rem -= u32::from(chunk);
+            }
+            mutated = true;
         }
     }
-    if delta != 0 {
-        // Emit 0x14 01 so aLogin.exe displays item gain/loss toast, plus homdo sync (0x17 05).
-        out.send(NpcTalkCodec::build_eve_result_hex(wire_result));
+
+    if grant_31007 && !session.bit_flags.contains(&FLAG_TUTORIAL_31007) {
+        session.bit_flags.insert(FLAG_TUTORIAL_31007);
+    }
+
+    if mutated {
+        if effective_items.len() == 1 && effective_items[0] == (item_id, delta) {
+            // Emit 0x14 01 so aLogin.exe displays item gain/loss toast, plus homdo sync (0x17 05).
+            out.send(NpcTalkCodec::build_eve_result_hex(wire_result));
+        } else {
+            for (eff_id, eff_delta) in &effective_items {
+                if *eff_delta > 0 {
+                    let mut reward_res = wire_result.clone();
+                    reward_res.parameter = *eff_id;
+                    reward_res.result_value = *eff_delta;
+                    out.send(NpcTalkCodec::build_eve_result_hex(&reward_res));
+                }
+            }
+        }
         out.send(session.dump_homdo());
+        if grant_31007 {
+            out.send(crate::server::spawn::sys_msg_frame(
+                "Nhận thưởng: Giáp Bạch Bì x1 và Vé đoái hoán tâm x1.",
+            ));
+        }
         crate::server::session::registry_update_if_online(session);
     }
 }

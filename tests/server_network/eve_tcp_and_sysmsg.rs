@@ -98,21 +98,15 @@ where
     }
 }
 
-async fn connect_and_login(
+async fn login_on_running_server(
     port: u16,
-    data: Arc<GameData>,
-    pool: DbPool,
+    pool: &DbPool,
     player_id: u32,
+    map_id: u16,
     x: u16,
     y: u16,
-) -> (ServerControl, TcpStream, Decoder) {
-    set_eve_events_enabled(true);
-    seed_account_and_char(&pool, player_id, 10817, x, y).await;
-
-    let app = Arc::new(RwLock::new(AppState::new(1)));
-    app.write().await.data_loaded = true;
-    let control = ServerControl::new(port, app, Some(data), Some(pool));
-    control.start().await.expect("start test server");
+) -> (TcpStream, Decoder) {
+    seed_account_and_char(pool, player_id, map_id, x, y).await;
 
     let mut sock = loop {
         if let Ok(s) = TcpStream::connect(("127.0.0.1", port)).await {
@@ -136,9 +130,10 @@ async fn connect_and_login(
     let login_hex = build_login_hex(player_id, b"11111111");
     sock.write_all(&xor_wire(&login_hex)).await.expect("write login");
 
-    // 3. Wait for Logined1 (`03` / `sys_msg_frame`)
+    // 3. Wait for Logined1 (`17 05` homdo sync / `02 0C` sys_msg_frame)
     let _ = read_frames_until(&mut sock, &mut decoder, 2000, |fs| {
-        fs.iter().any(|f| f.contains("020C"))
+        fs.iter()
+            .any(|f| f.len() >= 12 && (&f[8..12] == "1705" || &f[8..12] == "020C"))
     })
     .await;
 
@@ -155,7 +150,36 @@ async fn connect_and_login(
         "expected 2709 server name frame, got {after_25:?}"
     );
 
+    (sock, decoder)
+}
+
+async fn connect_and_login_on_map(
+    port: u16,
+    data: Arc<GameData>,
+    pool: DbPool,
+    player_id: u32,
+    map_id: u16,
+    x: u16,
+    y: u16,
+) -> (ServerControl, TcpStream, Decoder) {
+    set_eve_events_enabled(true);
+    let app = Arc::new(RwLock::new(AppState::new(1)));
+    app.write().await.data_loaded = true;
+    let control = ServerControl::new(port, app, Some(data), Some(pool.clone()));
+    control.start().await.expect("start test server");
+    let (sock, decoder) = login_on_running_server(port, &pool, player_id, map_id, x, y).await;
     (control, sock, decoder)
+}
+
+async fn connect_and_login(
+    port: u16,
+    data: Arc<GameData>,
+    pool: DbPool,
+    player_id: u32,
+    x: u16,
+    y: u16,
+) -> (ServerControl, TcpStream, Decoder) {
+    connect_and_login_on_map(port, data, pool, player_id, 10817, x, y).await
 }
 
 #[test]
@@ -216,27 +240,78 @@ fn merge_post_dispatch_preserves_concurrent_stall_sale_and_local_walk() {
 
 #[tokio::test]
 async fn tcp_map_10817_door_14_08_does_not_deadlock() {
+    let data = Arc::clone(shared_game_data());
     let _db = setup_test_db().await;
     let pool = (*_db).clone();
-    let data = Arc::clone(shared_game_data());
     let player_id = 300081u32;
+    let port = 19451u16;
 
     let (control, mut sock, mut decoder) =
-        connect_and_login(19451, data, pool, player_id, 442, 758).await;
+        connect_and_login(port, Arc::clone(&data), pool.clone(), player_id, 442, 758).await;
 
-    // Send C->S F444040014080100 (Door 1 on map 10817)
+    // Send C->S F444040014080100 (Door 1 on map 10817, eve_no = 7)
     sock.write_all(&xor_wire("F444040014080100"))
         .await
         .expect("write 14 08 01 00");
 
-    // Must NOT deadlock: expect 14 07 + 0x0C warp response within 2s
-    let warp_frames = read_frames_until(&mut sock, &mut decoder, 2000, |fs| {
-        fs.iter().any(|f| f.len() >= 12 && &f[8..12] == "1407")
+    // Must open dialogue first: 06 02 + 14 2C 01 (Lock) + 14 01 (first step)
+    let open_frames = read_frames_until(&mut sock, &mut decoder, 2000, |fs| {
+        fs.iter().any(|f| f.len() >= 12 && &f[8..12] == "1401")
     })
     .await;
     assert!(
-        warp_frames.iter().any(|f| f.len() >= 12 && &f[8..12] == "1407"),
-        "14 08 01 00 must not deadlock; expected 1407 response, got {warp_frames:?}"
+        open_frames.iter().any(|f| f == "F44402000602"),
+        "expected 06 02 MoveStop before dialogue, got {open_frames:?}"
+    );
+    assert!(
+        open_frames.iter().any(|f| f == "F4440300142C01"),
+        "expected 14 2C 01 Lock before dialogue, got {open_frames:?}"
+    );
+    assert!(
+        open_frames.iter().any(|f| f.len() >= 12 && &f[8..12] == "1401"),
+        "expected 14 01 opening dialogue for map 10817 Door 1 eve_no=7, got {open_frames:?}"
+    );
+    assert!(
+        !open_frames.iter().any(|f| f.len() >= 12 && &f[8..12] == "1407"),
+        "map 10817 Door 1 must NOT warp immediately before dialogue finishes: {open_frames:?}"
+    );
+
+    // Advance 6 steps of 14 06 until eve_no=7 completes with 14 2C 02 + 14 07 + 0x0C (to 10867)
+    let mut final_frames = Vec::new();
+    let mut warped = false;
+    for _ in 0..7 {
+        sock.write_all(&xor_wire("F44402001406"))
+            .await
+            .expect("write 14 06");
+        let step_frames = read_frames_until(&mut sock, &mut decoder, 2000, |fs| {
+            fs.iter().any(|f| {
+                f.len() >= 12
+                    && (&f[8..12] == "1401" || &f[8..12] == "1407" || &f[8..10] == "0C")
+            })
+        })
+        .await;
+        let has_warp = step_frames
+            .iter()
+            .any(|f| f.len() >= 12 && (&f[8..12] == "1407" || &f[8..10] == "0C"));
+        final_frames.extend(step_frames);
+        if has_warp {
+            warped = true;
+            break;
+        }
+    }
+    assert!(
+        warped,
+        "14 08 01 00 + 14 06 steps on map 10817 must complete and warp; got {final_frames:?}"
+    );
+    assert!(
+        final_frames.iter().any(|f| f.len() >= 12 && &f[8..12] == "1407"),
+        "expected 14 07 warp ack after dialogue, got {final_frames:?}"
+    );
+    assert!(
+        final_frames
+            .iter()
+            .any(|f| f.len() >= 14 && &f[8..12] == "142C" && f.ends_with("02")),
+        "expected 14 2C .. 02 Unlock after dialogue, got {final_frames:?}"
     );
 
     // Verify socket read loop is still alive by sending `/where` chat
@@ -248,19 +323,178 @@ async fn tcp_map_10817_door_14_08_does_not_deadlock() {
     .await;
     assert!(
         chat_frames.iter().any(|f| f.contains("020C")),
-        "connection must stay responsive after 14 08 01 00, got {chat_frames:?}"
+        "connection must stay responsive after 14 08 01 00 dialogue->warp, got {chat_frames:?}"
     );
 
     drop(sock);
-    let _ = control.stop().await;
     lock_online_sessions().remove(&player_id);
+
+    // Scenario 2: Map 12000 Door 14 is a pure warp door (immediate 14 07 + 0x0C)
+    {
+        let (mut sock1, mut dec1) =
+            login_on_running_server(port, &pool, 300083, 12000, 500, 500).await;
+
+        sock1
+            .write_all(&xor_wire("F444040014080E00"))
+            .await
+            .expect("write 14 08 0E 00");
+
+        let warp_frames = read_frames_until(&mut sock1, &mut dec1, 2000, |fs| {
+            fs.iter().any(|f| f.len() >= 12 && &f[8..12] == "1407")
+        })
+        .await;
+        assert!(
+            warp_frames.iter().any(|f| f.len() >= 12 && &f[8..12] == "1407"),
+            "pure warp 14 08 0E 00 on map 12000 must emit 14 07 immediately, got {warp_frames:?}"
+        );
+        assert!(
+            warp_frames.iter().any(|f| f.len() >= 10 && &f[8..10] == "0C"),
+            "pure warp 14 08 0E 00 on map 12000 must emit 0x0C map change, got {warp_frames:?}"
+        );
+        drop(sock1);
+        lock_online_sessions().remove(&300083);
+    }
+
+    // Scenario 3A: Active EventSession started by MeetDoor (`06 01` into 10817 Door 1)
+    {
+        let door1 = data
+            .scene_eve_data
+            .get(&10817)
+            .and_then(|s| s.doors.get(&1))
+            .expect("10817 Door 1 must exist");
+        let mid_player_id = 300084u32;
+        let (dx, dy) = (door1.x as u16, door1.y as u16);
+        let (mut sock, mut decoder) = login_on_running_server(
+            port,
+            &pool,
+            mid_player_id,
+            10817,
+            dx.saturating_sub(20),
+            dy,
+        )
+        .await;
+
+        sock.write_all(&xor_wire(&build_move_hex(dx, dy)))
+            .await
+            .expect("write 06 01 MeetDoor");
+        let open_frames = read_frames_until(&mut sock, &mut decoder, 2000, |fs| {
+            fs.iter().any(|f| f.len() >= 12 && &f[8..12] == "1401")
+        })
+        .await;
+        assert!(
+            open_frames.iter().any(|f| f.len() >= 12 && &f[8..12] == "1401"),
+            "Case A: expected 14 01 from 06 01 MeetDoor, got {open_frames:?}"
+        );
+
+        sock.write_all(&xor_wire("F444040014080100"))
+            .await
+            .expect("write 14 08 while MeetDoor EventSession active");
+        let clear_frames = read_frames_until(&mut sock, &mut decoder, 2000, |fs| {
+            fs.iter().any(|f| f == "F44402001409")
+        })
+        .await;
+        assert!(
+            clear_frames.iter().any(|f| f == "F44402001409"),
+            "Case A: expected 14 09 when 14 08 arrives mid-EventSession, got {clear_frames:?}"
+        );
+        assert!(
+            !clear_frames.iter().any(|f| f == "F44402001408"),
+            "Case A: 14 08 must NOT close active dialog form: {clear_frames:?}"
+        );
+
+        let mut warped = false;
+        for _ in 0..7 {
+            sock.write_all(&xor_wire("F44402001406")).await.expect("write 14 06");
+            let step_frames = read_frames_until(&mut sock, &mut decoder, 2000, |fs| {
+                fs.iter().any(|f| {
+                    f.len() >= 12
+                        && (&f[8..12] == "1401" || &f[8..12] == "1407" || &f[8..10] == "0C")
+                })
+            })
+            .await;
+            if step_frames
+                .iter()
+                .any(|f| f.len() >= 12 && (&f[8..12] == "1407" || &f[8..10] == "0C"))
+            {
+                warped = true;
+                break;
+            }
+        }
+        assert!(warped, "Case A: active MeetDoor EventSession must still complete warp");
+
+        drop(sock);
+        lock_online_sessions().remove(&mid_player_id);
+    }
+
+    // Scenario 3B: Active EventSession started by ClickNpc (`14 01` on 15009 at 1430, 660)
+    {
+        let npc_player_id = 300085u32;
+        let (mut sock, mut decoder) =
+            login_on_running_server(port, &pool, npc_player_id, 10817, 1430, 660).await;
+
+        sock.write_all(&xor_wire(&build_move_hex(1430, 660)))
+            .await
+            .expect("write move");
+        sock.write_all(&xor_wire("F444040014010400"))
+            .await
+            .expect("write 14 01 04 00");
+        let first_talk = read_frames_until(&mut sock, &mut decoder, 2000, |fs| {
+            fs.iter().any(|f| f.len() >= 12 && &f[8..12] == "1401")
+        })
+        .await;
+        assert!(
+            first_talk.iter().any(|f| f.len() >= 12 && &f[8..12] == "1401"),
+            "Case B: expected 14 01 from ClickNpc 15009, got {first_talk:?}"
+        );
+
+        sock.write_all(&xor_wire("F444040014080100"))
+            .await
+            .expect("write 14 08 while ClickNpc EventSession active");
+        let clear_frames = read_frames_until(&mut sock, &mut decoder, 2000, |fs| {
+            fs.iter().any(|f| f == "F44402001409")
+        })
+        .await;
+        assert!(
+            clear_frames.iter().any(|f| f == "F44402001409"),
+            "Case B: expected 14 09 when 14 08 arrives mid-ClickNpc EventSession, got {clear_frames:?}"
+        );
+        assert!(
+            !clear_frames.iter().any(|f| f == "F44402001408"),
+            "Case B: 14 08 must NOT close active ClickNpc dialog form: {clear_frames:?}"
+        );
+
+        let mut warped = false;
+        for _ in 0..7 {
+            sock.write_all(&xor_wire("F44402001406")).await.expect("write 14 06");
+            let step_frames = read_frames_until(&mut sock, &mut decoder, 2000, |fs| {
+                fs.iter().any(|f| {
+                    f.len() >= 12
+                        && (&f[8..12] == "1401" || &f[8..12] == "1407" || &f[8..10] == "0C")
+                })
+            })
+            .await;
+            if step_frames
+                .iter()
+                .any(|f| f.len() >= 12 && (&f[8..12] == "1407" || &f[8..10] == "0C"))
+            {
+                warped = true;
+                break;
+            }
+        }
+        assert!(warped, "Case B: active ClickNpc EventSession must still complete warp");
+
+        drop(sock);
+        lock_online_sessions().remove(&npc_player_id);
+    }
+
+    let _ = control.stop().await;
 }
 
 #[tokio::test]
 async fn tcp_map_10817_bach_lao_nhan_15009_completes_without_deadlock() {
+    let data = Arc::clone(shared_game_data());
     let _db = setup_test_db().await;
     let pool = (*_db).clone();
-    let data = Arc::clone(shared_game_data());
     let player_id = 300082u32;
 
     // Spawn directly within +/-150 px of Bạch Lão Nhân (15009, MapObjectID=4 at 1430, 660)

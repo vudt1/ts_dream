@@ -29,6 +29,8 @@
 //!    `01/02` the research draft assumed. The handler stores whatever byte
 //!    arrives, so both dialects route through the same evaluator.
 
+use std::sync::Arc;
+use crate::common::shared_game_data;
 use ts_dream::battle::service::BattleService;
 use ts_dream::data::loader::GameData;
 use ts_dream::eve::auto_chain::EventPhase;
@@ -330,4 +332,108 @@ async fn test_menu_surface_and_choice_branching() {
     let out = dispatch_frame(&mut free_conn, &data, &service, &select_menu_frame(30)).await;
     assert_eq!(free_conn.session.select_menu, 30, "legacy select_menu stored");
     assert!(out.outgoing.is_empty(), "legacy path emits nothing");
+}
+
+#[tokio::test]
+async fn npc_15050_quest_10037_grants_19001_and_one_time_31007() {
+    set_eve_events_enabled(true);
+    let data = Arc::clone(shared_game_data());
+    let service = BattleService::new(Arc::clone(&data));
+
+    // Helper to drive NPC #15050 on a tutorial map through choice 30 -> reward
+    async fn run_15050_quest_10037(
+        conn: &mut Conn,
+        data: &Arc<GameData>,
+        service: &BattleService,
+    ) -> Vec<String> {
+        let map_id = u32::from(conn.session.map_id);
+        let (&place_id, npc) = data
+            .scene_eve_data
+            .get(&map_id)
+            .and_then(|s| s.npcs.iter().find(|(_, n)| n.npc_id == 15050))
+            .expect("NPC #15050 must exist on tutorial map");
+        conn.session.map_x = npc.x as u16;
+        conn.session.map_y = npc.y as u16;
+        let [p0, p1] = place_id.to_le_bytes();
+        let click_frame = [0xF4, 0x44, 0x04, 0x00, 0x14, 0x01, p0, p1];
+
+        let mut all_frames = Vec::new();
+        let out_open = dispatch_frame(conn, data, service, &click_frame).await;
+        all_frames.extend(out_open.outgoing.into_iter().map(|f| f.frame));
+        let out_choice = dispatch_frame(conn, data, service, &select_menu_frame(30)).await;
+        all_frames.extend(out_choice.outgoing.into_iter().map(|f| f.frame));
+        for _ in 0..8 {
+            if conn.session.current_event_session.is_none() {
+                break;
+            }
+            let out_step =
+                dispatch_frame(conn, data, service, &[0xF4, 0x44, 0x02, 0x00, 0x14, 0x06]).await;
+            all_frames.extend(out_step.outgoing.into_iter().map(|f| f.frame));
+        }
+        all_frames
+    }
+
+    // 1. Positive on map 10867: grants 19001 (instead of 19737) + one-time 31007 + bit_flag 1
+    let mut c1 = conn_at(10867, 1190, 200);
+    let frames1 = run_15050_quest_10037(&mut c1, &data, &service).await;
+    assert!(
+        c1.session.homdo.iter().any(|i| i.id == 19001 && i.count == 1),
+        "must grant 19001 Giáp Bạch Bì on 10867 NPC 15050, got {:?}",
+        c1.session.homdo
+    );
+    assert!(
+        !c1.session.homdo.iter().any(|i| i.id == 19737),
+        "must replace 19737 with 19001 in homdo, got {:?}",
+        c1.session.homdo
+    );
+    assert!(
+        c1.session.homdo.iter().any(|i| i.id == 31007 && i.count == 1),
+        "must grant 31007 Vé đoái hoán tâm once, got {:?}",
+        c1.session.homdo
+    );
+    assert!(c1.session.bit_flags.contains(&1), "bit_flag 1 must be set");
+    assert!(frames1.iter().any(|f| f.len() >= 12 && &f[8..12] == "1705"), "must emit 17 05");
+    assert!(frames1.iter().any(|f| f.len() >= 12 && &f[8..12] == "020C"), "must emit sys_msg 02 0C");
+
+    // 2. Idempotency across tutorial maps (10851): if bit_flags already contains 1, grants 19001 only
+    let mut c2 = conn_at(10851, 1190, 200);
+    c2.session.bit_flags.insert(1);
+    let _ = run_15050_quest_10037(&mut c2, &data, &service).await;
+    assert!(
+        c2.session.homdo.iter().any(|i| i.id == 19001 && i.count == 1),
+        "must grant 19001 even if bit_flag 1 already set"
+    );
+    assert!(
+        !c2.session.homdo.iter().any(|i| i.id == 31007),
+        "must NOT grant second 31007 when bit_flag 1 is already set, got {:?}",
+        c2.session.homdo
+    );
+
+    // 3. Full bag (24/25 slots occupied -> room for 1 item, not 2): All-or-Nothing preflight rejects
+    let mut c3 = conn_at(10867, 1190, 200);
+    for slot in 1..=24u8 {
+        c3.session.homdo.push(ts_dream::server::session::InventoryItem {
+            slot,
+            id: 32012,
+            count: 1,
+            ..Default::default()
+        });
+    }
+    let frames3 = run_15050_quest_10037(&mut c3, &data, &service).await;
+    assert!(
+        !c3.session.homdo.iter().any(|i| i.id == 19001),
+        "24/25 full bag must reject All-or-Nothing: 19001 must NOT be added"
+    );
+    assert!(
+        !c3.session.homdo.iter().any(|i| i.id == 31007),
+        "24/25 full bag must reject All-or-Nothing: 31007 must NOT be added"
+    );
+    assert!(
+        !c3.session.bit_flags.contains(&1),
+        "24/25 full bag must NOT set bit_flag 1"
+    );
+    assert!(
+        frames3.iter().any(|f| f.len() >= 12 && &f[8..12] == "020C"),
+        "full bag rejection must emit sys_msg warning"
+    );
 }

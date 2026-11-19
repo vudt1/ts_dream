@@ -267,12 +267,6 @@ pub fn apply_to_session(session: &mut Session, data: &CreateCharData) {
         count: 4,
         ..Default::default()
     });
-    session.homdo.push(InventoryItem {
-        slot: 2,
-        id: 31007,
-        count: 1,
-        ..Default::default()
-    });
     session.trangbi.clear();
     session.trangbi.push(InventoryItem {
         slot: 2,

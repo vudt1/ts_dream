@@ -973,6 +973,148 @@ pub fn resolve_scene_info_warp(
 ///    falls back to `Warps.txt`).
 /// 3. Fallback to `data.warps` only when the `Door` / scene is absent or has no
 ///    `rt=2` result in `eve.emg`.
+/// Collects door event IDs in priority order: `MeetDoor` (`when_happen[1] || when_happen[2]`)
+/// first, followed by all remaining door events, preserving relative order within each group.
+fn collect_prioritized_door_events(
+    scene: &crate::data::tables::eve::SceneEveData,
+    door_id: u16,
+) -> Vec<u16> {
+    let raw: Vec<u16> = if let Some(evs) = scene
+        .door_events_by_door
+        .get(&door_id)
+        .filter(|v| !v.is_empty())
+    {
+        evs.clone()
+    } else if let Some(door) = scene.doors.get(&door_id) {
+        door.events.iter().map(|&e| u16::from(e)).collect()
+    } else {
+        return Vec::new();
+    };
+
+    let mut meet_door = Vec::with_capacity(raw.len());
+    let mut other = Vec::new();
+    for eve_no in raw {
+        let is_meet_door = scene.npc_events.get(&eve_no).is_some_and(|ev| {
+            ev.when_happen.get(1).copied() == Some(true)
+                || ev.when_happen.get(2).copied() == Some(true)
+        });
+        if is_meet_door {
+            meet_door.push(eve_no);
+        } else {
+            other.push(eve_no);
+        }
+    }
+    meet_door.extend(other);
+    meet_door
+}
+
+/// Resolution outcome when a player interacts with or steps on a warp door (`0x14 0x08`).
+pub enum DoorActionResolution {
+    Warp(ResolvedWarp),
+    Event(crate::eve::auto_chain::EventSession),
+    Blocked,
+}
+
+/// Resolves a door click/step (`0x14 0x08`) into either a pure warp, an Eve `EventSession`
+/// (dialogue/quest/battle before optional warp), or `Blocked`.
+pub fn resolve_door_action(
+    data: &GameData,
+    session: &Session,
+    map_id: u16,
+    door_id: u16,
+) -> DoorActionResolution {
+    if WARP_OVERRIDE_KEYS.contains(&(map_id, door_id)) {
+        if let Some(resolved) = resolve_warps_txt_row(data, map_id, door_id) {
+            return DoorActionResolution::Warp(resolved);
+        }
+    }
+
+    if let Some(scene) = data.scene_eve_data.get(&u32::from(map_id)) {
+        let door_events = collect_prioritized_door_events(scene, door_id);
+
+        if !door_events.is_empty() {
+            let door_has_rt2 = door_events.iter().any(|eve_no| {
+                scene.npc_events.get(eve_no).is_some_and(|ev| {
+                    ev.conditions
+                        .iter()
+                        .any(|c| c.results.iter().any(|r| r.result_type == 2))
+                })
+            });
+
+            if !door_has_rt2 {
+                if let Some(resolved) = resolve_warps_txt_row(data, map_id, door_id) {
+                    return DoorActionResolution::Warp(resolved);
+                }
+            }
+
+            let state = crate::server::handlers::npc_event::snapshot_state_with_data(
+                session,
+                Some(data),
+                None,
+            );
+            let seed = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as i32)
+                .unwrap_or(12345);
+            let mut rng = crate::battle::rng::DotNetRandom::new(seed);
+
+            for eve_no in door_events {
+                let Some(event_data) = scene.npc_events.get(&eve_no) else {
+                    continue;
+                };
+                let Some(planned) = crate::eve::planner::plan_chain(
+                    event_data,
+                    &state,
+                    &scene.group_datas,
+                    &mut rng,
+                    None,
+                ) else {
+                    continue;
+                };
+                let has_non_warp_effect = planned.effects.iter().any(|eff| {
+                    !matches!(
+                        eff,
+                        crate::eve::planner::DomainEffect::Warp { .. }
+                            | crate::eve::planner::DomainEffect::NpcAction(_)
+                    )
+                });
+                if has_non_warp_effect {
+                    let event_session = crate::eve::auto_chain::EventSession {
+                        map_id: i32::from(map_id),
+                        eve_no: i32::from(event_data.eve_no),
+                        npc_click_id: i32::from(door_id),
+                        trigger_kind: crate::eve::auto_chain::EventTriggerKind::MeetDoor,
+                        chain_depth: 0,
+                        results: planned.results,
+                        planned_effects: planned.effects,
+                        current_index: 0,
+                        phase: crate::eve::auto_chain::EventPhase::Executing,
+                        last_surface_id: -1,
+                        last_choice_code: -1,
+                        battle_result: 0,
+                        matched_condition_no: planned.matched_condition_no,
+                    };
+                    return DoorActionResolution::Event(event_session);
+                }
+                for effect in planned.effects {
+                    if let crate::eve::planner::DomainEffect::Warp { warp_id } = effect {
+                        if let Some(resolved) = resolve_scene_info_warp(data, map_id, warp_id) {
+                            return DoorActionResolution::Warp(resolved);
+                        }
+                    }
+                }
+            }
+
+            if door_has_rt2 {
+                return DoorActionResolution::Blocked;
+            }
+        }
+    }
+
+    resolve_warps_txt_row(data, map_id, door_id)
+        .map_or(DoorActionResolution::Blocked, DoorActionResolution::Warp)
+}
+
 pub fn resolve_door_warp(
     data: &GameData,
     session: &Session,
@@ -986,17 +1128,7 @@ pub fn resolve_door_warp(
     }
 
     if let Some(scene) = data.scene_eve_data.get(&u32::from(map_id)) {
-        let door_events: Vec<u16> = if let Some(evs) = scene
-            .door_events_by_door
-            .get(&door_id)
-            .filter(|v| !v.is_empty())
-        {
-            evs.clone()
-        } else if let Some(door) = scene.doors.get(&door_id) {
-            door.events.iter().map(|&e| u16::from(e)).collect()
-        } else {
-            Vec::new()
-        };
+        let door_events = collect_prioritized_door_events(scene, door_id);
 
         if !door_events.is_empty() {
             let door_has_rt2 = door_events.iter().any(|eve_no| {
@@ -1006,6 +1138,12 @@ pub fn resolve_door_warp(
                         .any(|c| c.results.iter().any(|r| r.result_type == 2))
                 })
             });
+
+            if !door_has_rt2 {
+                if let Some(resolved) = resolve_warps_txt_row(data, map_id, door_id) {
+                    return Some(resolved);
+                }
+            }
 
             let state = crate::server::handlers::npc_event::snapshot_state_with_data(
                 session,
@@ -1328,26 +1466,78 @@ pub async fn handle_warp_confirm(
         end_talk(conn, out);
         return;
     }
-    if let Some(resolved) = resolve_door_warp(data, &conn.session, map_id, warp_id_u16) {
-        if let Some(trigger) = try_trigger_battle_gate(&mut conn.session, data, map_id, warp_id_u16) {
-            out.battle_trigger = Some(trigger);
+    if conn.session.current_event_session.is_some() {
+        out.send(crate::protocol::codecs::npc_talk::NpcTalkCodec::build_clear_pending_hex().to_string());
+        return;
+    }
+
+    if WARP_OVERRIDE_KEYS.contains(&(map_id, warp_id_u16)) {
+        if let Some(resolved) = resolve_warps_txt_row(data, map_id, warp_id_u16) {
+            if let Some(trigger) = try_trigger_battle_gate(&mut conn.session, data, map_id, warp_id_u16) {
+                out.send(crate::protocol::codecs::npc_talk::NpcTalkCodec::build_clear_pending_hex().to_string());
+                out.battle_trigger = Some(trigger);
+                return;
+            }
+            if !perform_party_warp_with_resolved(&mut conn.session, resolved, env.pool, out).await {
+                end_talk(conn, out);
+                return;
+            }
+            conn.session.idtalking = 0;
+            conn.session.select_menu = 0;
+            conn.session.talk_count = 0;
+            conn.session.warp_finish = false;
             return;
         }
+    }
 
-        if !perform_party_warp_with_resolved(&mut conn.session, resolved, env.pool, out).await {
+    if let Some(trigger) = try_trigger_battle_gate(&mut conn.session, data, map_id, warp_id_u16) {
+        out.send(crate::protocol::codecs::npc_talk::NpcTalkCodec::build_clear_pending_hex().to_string());
+        out.battle_trigger = Some(trigger);
+        return;
+    }
+
+    match resolve_door_action(data, &conn.session, map_id, warp_id_u16) {
+        DoorActionResolution::Warp(resolved) => {
+            if !perform_party_warp_with_resolved(&mut conn.session, resolved, env.pool, out).await {
+                end_talk(conn, out);
+                return;
+            }
+
+            // Party warp direct messages are queued in out.direct_messages and dispatched
+            // uniformly by the connection loop (server_control).
+
+            // Reset talk state without 1408 (1408 is sent upon teleport confirm 0x0C 0x01)
+            conn.session.idtalking = 0;
+            conn.session.select_menu = 0;
+            conn.session.talk_count = 0;
+            conn.session.warp_finish = false;
+        }
+        DoorActionResolution::Event(event_session) => {
+            out.send("F44402000602".to_string());
+            out.send("F4440300142C01".to_string());
+            let pre_len = out.outgoing.len();
+            crate::server::handlers::talk::activate_event_session(
+                &mut conn.session,
+                event_session,
+                data,
+                env.pool,
+                out,
+            )
+            .await;
+            let entered_battle_without_1401 = (out.eve_battle.is_some()
+                || out.battle_trigger.is_some())
+                && !out.outgoing[pre_len..]
+                    .iter()
+                    .any(|f| f.frame.starts_with("F444") && f.frame.len() >= 12 && &f.frame[8..12] == "1401");
+            if entered_battle_without_1401 {
+                out.send(
+                    crate::protocol::codecs::npc_talk::NpcTalkCodec::build_clear_pending_hex()
+                        .to_string(),
+                );
+            }
+        }
+        DoorActionResolution::Blocked => {
             end_talk(conn, out);
-            return;
         }
-
-        // Party warp direct messages are queued in out.direct_messages and dispatched
-        // uniformly by the connection loop (server_control).
-
-        // Reset talk state without 1408 (1408 is sent upon teleport confirm 0x0C 0x01)
-        conn.session.idtalking = 0;
-        conn.session.select_menu = 0;
-        conn.session.talk_count = 0;
-        conn.session.warp_finish = false;
-    } else {
-        end_talk(conn, out);
     }
 }

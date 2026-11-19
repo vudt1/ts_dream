@@ -15,6 +15,7 @@ pub const SUB_TALK_STEP: u8 = 0x01;
 pub const SUB_END_TALK: u8 = 0x04; // C -> S end talk request
 pub const SUB_TALK_CONTINUE: u8 = 0x06; // C -> S next step request
 pub const SUB_CLOSE_TALK_WINDOW: u8 = 0x08; // S -> C close talk dialog form
+pub const SUB_CLEAR_PENDING: u8 = 0x09; // S -> C clear PlayerState+0xA094 without closing UI
 pub const SUB_SELECT_MENU: u8 = 0x09; // C -> S menu option select
 pub const SUB_STAT_POINT_TOAST: u8 = 0x16; // S -> C stat point toast & WA0014 sound
 pub const SUB_SKILL_POINT_TOAST: u8 = 0x17; // S -> C skill point toast & WA0014 sound
@@ -131,6 +132,12 @@ impl NpcTalkCodec {
     /// Hex string representation of the warp acknowledgement frame (`0x14 07`).
     pub fn build_warp_ack_hex() -> &'static str {
         "F44402001407"
+    }
+
+    /// Hex string representation of the clear-pending-talk frame (`0x14 09`).
+    /// Clears `PlayerState+0xA094` on `aLogin.exe` without closing the dialog UI.
+    pub fn build_clear_pending_hex() -> &'static str {
+        "F44402001409"
     }
 
     /// Hex string representation of the actor movement-stop frame (`0x06 02`).

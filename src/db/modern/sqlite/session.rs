@@ -603,8 +603,8 @@ impl SqliteSessionRepository<'_> {
                 .execute(&mut *tx)
                 .await?;
         }
-        // 4. Starter inventories (type 1 Homdo/bag: 32012×4 slot 1, 31007×1
-        //    slot 2; type 8 Trangbi: 19737 slot 2) — taken from `session`,
+        // 4. Starter inventories (type 1 Homdo/bag: 32012×4 slot 1;
+        //    type 8 Trangbi: 19737 slot 2) — taken from `session`,
         //    committed in the same Tx.
         let insert_inventory_sql = format!(
             "INSERT INTO inventories ({}) VALUES ({})",
