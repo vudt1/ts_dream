@@ -510,4 +510,57 @@ async fn test_in_memory_fallback_create_char_omits_31007_and_keeps_newbie_zero()
     assert!(conn.session.homdo.iter().any(|i| i.slot == 1 && i.id == 32012 && i.count == 4));
     assert!(!conn.session.homdo.iter().any(|i| i.id == 31007));
     assert!(conn.session.trangbi.iter().any(|i| i.slot == 2 && i.id == 19737 && i.count == 1));
+    assert_eq!(conn.session.agi2, 1);
+}
+
+#[tokio::test]
+async fn test_create_char_persists_equipagi_and_save_roundtrips_equip_stats() {
+    let pool = setup_test_db().await;
+    let repos = SqliteRepositories::new(pool.clone());
+    let data = ts_dream::data::loader::GameData::default();
+    let service = ts_dream::battle::service::BattleService::default();
+    let env = ServerEnv {
+        pool: Some(&pool),
+        repos: Some(&repos),
+        hub: None,
+        sender: None,
+    };
+
+    let acc = ts_dream::db::accounts::create(&pool, "eqpass1", "eqpass2")
+        .await
+        .unwrap();
+    let mut conn = Conn::default();
+    conn.session.id = acc as u32;
+    conn.session.authed = true;
+
+    name_check(&mut conn, &data, &service, env, b"EquipHero").await;
+    let frames = create_char(&mut conn, &data, &service, env, &create_payload(b"", b"")).await;
+    assert!(frames.iter().any(|f| f == spawn::CHAR_CREATE_SUCCESS));
+    assert_eq!(conn.session.agi2, 1);
+
+    let (equipatk, equipdef, equipint, equipagi, equiphpx, equipspx): (i64, i64, i64, i64, i64, i64) =
+        sqlx::query_as(
+            "SELECT equipatk, equipdef, equipint, equipagi, equiphpx, equipspx FROM characters WHERE playerid = ?",
+        )
+        .bind(acc)
+        .fetch_one(&pool.read)
+        .await
+        .unwrap();
+    assert_eq!((equipatk, equipdef, equipint, equipagi, equiphpx, equipspx), (0, 0, 0, 1, 0, 0));
+
+    // Verify save + load round-trips equip* columns.
+    conn.session.atk2 = 5;
+    conn.session.def2 = 3;
+    conn.session.int2 = 7;
+    conn.session.agi2 = 9;
+    conn.session.hpx2 = 2;
+    conn.session.spx2 = 4;
+    repos.sessions().save(&conn.session).await.unwrap();
+
+    let mut loaded = ts_dream::server::session::Session::default();
+    assert!(repos.sessions().load(acc, &mut loaded).await.unwrap());
+    assert_eq!(
+        (loaded.atk2, loaded.def2, loaded.int2, loaded.agi2, loaded.hpx2, loaded.spx2),
+        (5, 3, 7, 9, 2, 4)
+    );
 }

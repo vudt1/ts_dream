@@ -276,4 +276,5 @@ pub fn apply_to_session(session: &mut Session, data: &CreateCharData) {
         loai: 2,
         ..Default::default()
     });
+    session.recompute_stats();
 }

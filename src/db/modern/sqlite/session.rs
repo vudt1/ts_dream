@@ -22,6 +22,7 @@ impl SqliteSessionRepository<'_> {
                     c.rebornstage AS reborn, c.curhp AS hp, c.maxhp AS hp_max, c.cursp AS sp, c.maxsp AS sp_max,
                     c.freepoints AS stat_point, c.skillpoint AS skill_point, c.baseint AS int_attr,
                     c.baseatk AS atk, c.basedef AS def, c.basehpx AS hpx, basespx AS spx, c.baseagi AS agi,
+                    c.equipatk, c.equipdef, c.equipint, c.equipagi, c.equiphpx, c.equipspx,
                     c.reputation,
                     c.mapid AS map_id, c.mapx AS map_x, c.mapy AS map_y,
                     c.pk, c.curexp AS texp,
@@ -62,6 +63,12 @@ impl SqliteSessionRepository<'_> {
         session.hpx = clamp_u16(row.get("hpx"));
         session.spx = clamp_u16(row.get("spx"));
         session.agi = clamp_u16(row.get("agi"));
+        session.atk2 = row.try_get::<i64, _>("equipatk").map(|v| v.max(0) as u32).unwrap_or(0);
+        session.def2 = row.try_get::<i64, _>("equipdef").map(|v| v.max(0) as u32).unwrap_or(0);
+        session.int2 = row.try_get::<i64, _>("equipint").map(|v| v.max(0) as u32).unwrap_or(0);
+        session.agi2 = row.try_get::<i64, _>("equipagi").map(|v| v.max(0) as u32).unwrap_or(0);
+        session.hpx2 = row.try_get::<i64, _>("equiphpx").map(|v| v.max(0) as u32).unwrap_or(0);
+        session.spx2 = row.try_get::<i64, _>("equipspx").map(|v| v.max(0) as u32).unwrap_or(0);
         session.tiengtam = clamp_u16(row.get("reputation"));
         session.map_id = clamp_u16(row.get("map_id"));
         session.map_x = clamp_u16(row.get("map_x"));
@@ -311,14 +318,19 @@ impl SqliteSessionRepository<'_> {
         }
         sqlx::query(
             "UPDATE characters SET level=?, jobtype=?, gender=?, hair=?, element=?, rebornstage=?, curhp=?, maxhp=?, cursp=?, maxsp=?,
-             freepoints=?, skillpoint=?, baseint=?, baseatk=?, basedef=?, basehpx=?, basespx=?, baseagi=?, reputation=?, mapid=?, mapx=?, mapy=?,
+             freepoints=?, skillpoint=?, baseint=?, baseatk=?, basedef=?, basehpx=?, basespx=?, baseagi=?,
+             equipatk=?, equipdef=?, equipint=?, equipagi=?, equiphpx=?, equipspx=?,
+             reputation=?, mapid=?, mapx=?, mapy=?,
              pk=?, curexp=?, newbie=?, ghost=?, god=?, guild_id=?, savemap_id=?, savemap_x=?, savemap_y=? WHERE playerid=?",
         )
         .bind(i64::from(session.level)).bind(i64::from(session.job)).bind(i64::from(session.sex)).bind(i64::from(session.hair))
         .bind(i64::from(session.thuoctinh)).bind(i64::from(session.reborn)).bind(i64::from(session.hp)).bind(i64::from(session.hp_max))
         .bind(i64::from(session.sp)).bind(i64::from(session.sp_max)).bind(i64::from(session.point)).bind(i64::from(session.skill_point))
         .bind(i64::from(session.int1)).bind(i64::from(session.atk)).bind(i64::from(session.def)).bind(i64::from(session.hpx))
-        .bind(i64::from(session.spx)).bind(i64::from(session.agi)).bind(i64::from(session.tiengtam)).bind(i64::from(session.map_id)).bind(i64::from(session.map_x))
+        .bind(i64::from(session.spx)).bind(i64::from(session.agi))
+        .bind(i64::from(session.atk2)).bind(i64::from(session.def2)).bind(i64::from(session.int2))
+        .bind(i64::from(session.agi2)).bind(i64::from(session.hpx2)).bind(i64::from(session.spx2))
+        .bind(i64::from(session.tiengtam)).bind(i64::from(session.map_id)).bind(i64::from(session.map_x))
         .bind(i64::from(session.map_y)).bind(i64::from(session.pk)).bind(i64::from(session.texp)).bind(i64::from(session.newbie))
         .bind(i64::from(session.ghost)).bind(i64::from(session.god)).bind(i64::from(session.guild_id))
         .bind(i64::from(session.savemap)).bind(i64::from(session.savemap_x)).bind(i64::from(session.savemap_y))
@@ -560,9 +572,10 @@ impl SqliteSessionRepository<'_> {
             "INSERT INTO characters (playerid, name, level, gender, hair, element,
              rebornstage, curhp, maxhp, cursp, maxsp, curexp, nextexp, freepoints, skillpoint,
              baseint, baseatk, basedef, basehpx, basespx, baseagi,
+             equipatk, equipdef, equipint, equipagi, equiphpx, equipspx,
              reputation, pk, mapid, mapx, mapy, jobtype, newbie, ghost, god, guild_id,
              savemap_id, savemap_x, savemap_y)
-             VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?)",
+             VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?)",
         )
         .bind(account_id).bind(name)
         .bind(seed.level).bind(seed.sex).bind(seed.hair)
@@ -572,6 +585,8 @@ impl SqliteSessionRepository<'_> {
         .bind(i64::from(session.texp))
         .bind(i64::from(session.int1)).bind(i64::from(session.atk)).bind(i64::from(session.def))
         .bind(i64::from(session.hpx)).bind(i64::from(session.spx)).bind(i64::from(session.agi))
+        .bind(i64::from(session.atk2)).bind(i64::from(session.def2)).bind(i64::from(session.int2))
+        .bind(i64::from(session.agi2)).bind(i64::from(session.hpx2)).bind(i64::from(session.spx2))
         .bind(i64::from(session.tiengtam))
         .bind(i64::from(session.map_id)).bind(i64::from(session.map_x)).bind(i64::from(session.map_y))
         .bind(i64::from(session.ghost)).bind(i64::from(session.god)).bind(i64::from(session.guild_id))
