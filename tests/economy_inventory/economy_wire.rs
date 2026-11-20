@@ -60,7 +60,7 @@ fn test_currency_wire_sync_login() {
 
     let frames = build_logined_sequence_session(&session);
 
-    // 1. Verify 1A 04 frame is 10 bytes (gold + shop_point), 42 02 has shop_point, and no 1A 03 or 23 04
+    // 1. Verify 1A 04 frame is 10 bytes (gold + shop_point), 23 04 has shop_point, and no 1A 03 or 42 02 on login
     let expected_currency_frame = format!(
         "F4440A001A04{}{}",
         encoder::le32(500_000),
@@ -72,11 +72,9 @@ fn test_currency_wire_sync_login() {
         expected_currency_frame
     );
 
-    let expected_mall_point_frame = format!("F44406004202{}", encoder::le32(88_888));
     assert!(
-        frames.iter().any(|f| f == &expected_mall_point_frame),
-        "spawn frames must contain 42 02 with shop_point (u32 LE): expected {}",
-        expected_mall_point_frame
+        !frames.iter().any(|f| f.starts_with("F44406004202")),
+        "spawn frames must NOT emit 42 02 on login (auto-opens GM Shop UI on client)"
     );
 
     assert!(
@@ -121,11 +119,9 @@ fn test_currency_wire_sync_login() {
         expected_capped_currency
     );
 
-    let expected_capped_mall = format!("F44406004202{}", encoder::le32(1_500_000_000));
     assert!(
-        capped_frames.iter().any(|f| f == &expected_capped_mall),
-        "shop point 42 02 frame must contain 1_500_000_000: expected {}",
-        expected_capped_mall
+        !capped_frames.iter().any(|f| f.starts_with("F44406004202")),
+        "spawn frames must NOT emit 42 02 on login"
     );
 
     let expected_capped_bank = format!("F44406001D04{}", encoder::le32(GOLD_CAP));

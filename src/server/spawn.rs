@@ -667,9 +667,10 @@ pub fn build_logined_sequence_session_ext(s: &Session) -> Vec<String> {
     // 20. Step 20: Hotbar
     frames.push(s.dump_hotkeys());
 
-    // 21. Step 21: Shop-point banner (`23 04` with A=0, B=shop_point) + Item Mall sync (`42 02 <u32 LE>`)
+    // 21. Step 21: Shop-point banner (`23 04` with A=0, B=shop_point).
+    // Do NOT emit `42 02` on login: `FUN_00522ab8` Mode 2 calls `gvar_007DA35C->VMT+0x20`
+    // which automatically opens the Item Mall / GM Shop panel on the client.
     frames.push(shop_point_banner_frame(s.shop_point));
-    frames.push(crate::server::handlers::system::shop_points_frame(s.shop_point));
 
     // 22. Step 22: Quest state sync (Opcode 0x18: bulk quest log `Sub 0x06`,
     //     bulk quest-dont `Sub 0x07`) — emitted in `tasks -> dont` order

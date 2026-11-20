@@ -118,6 +118,18 @@ Trong lúc live-test với `aLogin.exe`, hãy kiểm tra lại các điểm sau:
 - Các test mới được thêm vào [economy_wire.rs](file:///D:/VUDT/GIT_PCC/ts_dream/tests/economy_inventory/economy_wire.rs), [missing_eve_effect_executors.rs](file:///D:/VUDT/GIT_PCC/ts_dream/tests/eve_quest/missing_eve_effect_executors.rs), và [eve_tcp_and_sysmsg.rs](file:///D:/VUDT/GIT_PCC/ts_dream/tests/server_network/eve_tcp_and_sysmsg.rs).
 
 ### Checklist Live-Test Tiếp Theo (`aLogin.exe`, `TS_PACKET_LOGGING=true`)
-1. Đăng nhập nhân vật mới (`shoppoint = 1000`): xác nhận hiện đúng `"Điểm số còn dư 1000"` (không còn `10000`), mở Mall (`42 03`) thấy `1000` và mua thử (`42 01`) trừ điểm thật.
+1. Đăng nhập nhân vật mới (`shoppoint = 1000`): xác nhận hiện đúng `"Điểm số còn dư 1000"` (không còn `10000`), không tự động bật GM Shop / Item Mall khi vừa vào game, mở Mall (`42 03`) thấy `1000` và mua thử (`42 01`) trừ điểm thật.
 2. Đi vào `10817 Door #1 (1300, 700)`: xác nhận không còn frame lỗi `14 2C 01` và kiểm chứng flow bước 6 → `PlayMovie(17)/(18)` → `Warp(10867)`.
 3. Nói chuyện NPC #2 (`10917`) và NPC dùng `data.talks`: xác nhận mỗi đoạn thoại hiển thị đủ ~2 giây.
+
+---
+
+## 10. Cập Nhật Bổ Sung — Sửa Lỗi Tự Động Mở GM Shop Khi Đăng Nhập (`42 02` trong `Logined1`)
+- **Phát hiện từ live capture** ([packet_1.txt](file:///D:/VUDT/GIT_PCC/ts_dream/packet_1.txt)):
+  - Dòng 15 (`F4440A001A0400000000E8030000`) và dòng 33 (`F4441200230400000000E80300000000000000000000`) đã đồng bộ `shop_point = 1000` (`player+0x1300` và `player+0x146C`) và hiển thị banner `"Điểm số còn dư 1000"`.
+  - Dòng 35 (`F44406004202E8030000`) phát `42 02` ngay khi đăng nhập. Theo [opcode_42.md](file:///D:/VUDT/GIT_PCC/ts_dream/.scratch/client-pseudo-op-code/opcode_42.md#L76-L83), `42 02` gọi `FUN_00522ab8` Mode 2 trên `gvar_007DA35C`, vừa ghi `player+0x146C` vừa gọi `VMT+0x20` khiến `aLogin.exe` tự động mở giao diện GM Shop / Item Mall dù người chơi chưa bấm nút.
+- **Thay đổi đã thực hiện**:
+  - [spawn.rs](file:///D:/VUDT/GIT_PCC/ts_dream/src/server/spawn.rs#L670-L673): bỏ `shop_points_frame(s.shop_point)` (`42 02`) khỏi Step 21 của `build_logined_sequence_session_ext`; `42 02` chỉ được gửi khi client chủ động tương tác Mall/Points (`42 03`, `42 01`, `22 01` tại [system.rs](file:///D:/VUDT/GIT_PCC/ts_dream/src/server/handlers/system.rs#L60-L71)).
+  - [economy_wire.rs](file:///D:/VUDT/GIT_PCC/ts_dream/tests/economy_inventory/economy_wire.rs#L63-L79), [inventory_storage_type.rs](file:///D:/VUDT/GIT_PCC/ts_dream/tests/economy_inventory/inventory_storage_type.rs#L206-L226), [login_char_flow.rs](file:///D:/VUDT/GIT_PCC/ts_dream/tests/server_network/login_char_flow.rs#L230-L236): cập nhật assertion `Logined1` không chứa `42 02` và độ dài chuỗi không pet là `20` frames (`21` nếu có `luulang`).
+- **Kiểm thử sau cập nhật**:
+  - `cargo test --all-targets --no-fail-fast`: 10/11 suite pass ngay; sau khi cập nhật assertion cuối ở `login_char_flow::test_character_creation_edge_cases` ([login_char_flow.rs](file:///D:/VUDT/GIT_PCC/ts_dream/tests/server_network/login_char_flow.rs#L356)), `cargo test --test server_network_test` đạt **109 passed, 0 failed**.
