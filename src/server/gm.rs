@@ -272,7 +272,10 @@ pub async fn handle(
             };
             persist::update_player(pool, target, "Gold", i64::from(session.gold)).await;
             if target == actor {
-                out.send(crate::server::spawn::store_frame(session.gold));
+                out.send(crate::server::handlers::shops::currency_sync_frame(
+                    session.gold,
+                    session.shop_point,
+                ));
             }
             audit(
                 pool,

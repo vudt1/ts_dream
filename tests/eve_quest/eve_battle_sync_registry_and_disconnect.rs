@@ -434,6 +434,7 @@ async fn e2e_eve_battle_party_member_preserves_standard_eve_quest_progress() {
         last_surface_id: 0,
         last_choice_code: 0,
         matched_condition_no: 0,
+        last_step_sent_ms: 0,
     });
 
     let service = BattleService::new(Arc::clone(&data)).with_pool(pool.clone());
@@ -680,6 +681,7 @@ async fn eve_fight_data_loads_right_enemies_diahinh_fallback_and_direct_map_broa
         last_surface_id: 0,
         last_choice_code: 0,
         matched_condition_no: 0,
+        last_step_sent_ms: 0,
     });
     let mut member = Session::new();
     member.id = 9852;

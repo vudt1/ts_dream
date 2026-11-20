@@ -21,6 +21,10 @@ use tracing::{debug, info};
 pub enum EventPhase {
     /// Executing results in order.
     Executing,
+    /// Waiting for the client `14 06` acknowledgement after a `TalkStep` (`rt = 1`).
+    AwaitingTalkAck,
+    /// Waiting for the client `14 06` acknowledgement after `PlayMovie` / `MoveEntity`.
+    AwaitingMovieAck,
     /// Waiting for the client Surface choice (C:020-009).
     AwaitingChoice,
     /// Waiting for the battle to finish.
@@ -104,6 +108,9 @@ pub struct EventSession {
     pub battle_result: i32,
     /// Matched chain head conditionNo (guard #1 loop detection key).
     pub matched_condition_no: i32,
+    /// Wall-clock timestamp (ms) when the last blocking talk/movie step was sent.
+    /// Runtime-only; defaults to `0`.
+    pub last_step_sent_ms: u64,
 }
 
 impl EventSession {
@@ -211,6 +218,7 @@ impl EveAutoChainEngine {
                     last_choice_code: -1,
                     battle_result: 0,
                     matched_condition_no: planned.matched_condition_no,
+                    last_step_sent_ms: 0,
                 };
 
                 if i32::from(eve_no) == completed.eve_no {

@@ -144,6 +144,7 @@ fn test_preflight_walks_through_talk_step_and_checks_item_sufficiency() {
         last_choice_code: -1,
         battle_result: 0,
         matched_condition_no: 1,
+        last_step_sent_ms: 0,
     });
 
     let mut out = HandleOutcome::default();
@@ -181,6 +182,7 @@ fn test_preflight_walks_through_talk_step_and_checks_item_sufficiency() {
         last_choice_code: -1,
         battle_result: 0,
         matched_condition_no: 1,
+        last_step_sent_ms: 0,
     });
     let mut out2 = HandleOutcome::default();
     execute_event_step(&mut sess, &data, &mut out2);
@@ -215,6 +217,7 @@ fn test_point_cap_wire_0x1a_05_06_and_item_0x14_01() {
         last_choice_code: -1,
         battle_result: 0,
         matched_condition_no: 1,
+        last_step_sent_ms: 0,
     });
 
     let mut out = HandleOutcome::default();
@@ -252,6 +255,7 @@ fn test_point_cap_wire_0x1a_05_06_and_item_0x14_01() {
         last_choice_code: -1,
         battle_result: 0,
         matched_condition_no: 1,
+        last_step_sent_ms: 0,
     });
     let mut out_cap = HandleOutcome::default();
     execute_event_step(&mut sess, &data, &mut out_cap);
@@ -339,6 +343,7 @@ async fn test_pet_storage_type_isolation_in_actions_and_reward_pet() {
         last_choice_code: -1,
         battle_result: 0,
         matched_condition_no: 1,
+        last_step_sent_ms: 0,
     });
     let mut out_rp = HandleOutcome::default();
     execute_event_step(&mut conn.session, &data, &mut out_rp);
@@ -393,6 +398,7 @@ async fn test_registry_sync_atomic_party_tx_and_warp_rollback() {
         last_choice_code: -1,
         battle_result: 0,
         matched_condition_no: 1,
+        last_step_sent_ms: 0,
     });
     let mut out = HandleOutcome::default();
     execute_event_step(&mut s1, &data, &mut out);
@@ -531,6 +537,7 @@ async fn test_warp_event_count_and_walkstep_autochain_and_menu() {
         last_choice_code: -1,
         battle_result: 0,
         matched_condition_no: 1,
+        last_step_sent_ms: 0,
     };
     let mut state = PlayerEventState::default();
     state.completed_eve_counts.insert(10, 1);
@@ -558,6 +565,7 @@ async fn test_warp_event_count_and_walkstep_autochain_and_menu() {
         last_choice_code: -1,
         battle_result: 0,
         matched_condition_no: 1,
+        last_step_sent_ms: 0,
     });
     let mut out = HandleOutcome::default();
     ts_dream::server::handlers::talk::execute_event_step_with_pool(&mut sess, &data, None, &mut out)
@@ -632,6 +640,7 @@ async fn test_warp_event_count_and_walkstep_autochain_and_menu() {
         last_choice_code: -1,
         battle_result: 0,
         matched_condition_no: 1,
+        last_step_sent_ms: 0,
     });
     let svc = BattleService::new(std::sync::Arc::new(data_menu.clone()));
     let env = ServerEnv::none();
@@ -776,6 +785,7 @@ async fn test_battle_ended_offline_parked_warp_persistence() {
         last_choice_code: -1,
         battle_result: 0,
         matched_condition_no: 1,
+        last_step_sent_ms: 0,
     });
 
     let sess_arc = Arc::new(RwLock::new(sess.clone()));

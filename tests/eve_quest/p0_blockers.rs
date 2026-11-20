@@ -130,6 +130,7 @@ fn session_with_event(map_id: u16, results: Vec<EveResult>) -> Session {
         last_choice_code: -1,
         battle_result: 0,
         matched_condition_no: 0,
+        last_step_sent_ms: 0,
     });
     session
 }
@@ -169,6 +170,7 @@ fn test_snapshot_state_with_context_preserves_completed_session_context() {
         last_choice_code: 3,
         battle_result: 1, // Won battle
         matched_condition_no: 1,
+        last_step_sent_ms: 0,
     };
 
     // When snapshot_state_with_context is called with Some(&completed), the context is preserved
@@ -198,6 +200,7 @@ fn test_snapshot_state_with_context_fallback_to_current_event_session() {
         last_choice_code: 2,
         battle_result: 2, // Lost battle
         matched_condition_no: 0,
+        last_step_sent_ms: 0,
     });
 
     // When active is None, it should fall back to session.current_event_session
@@ -281,6 +284,7 @@ fn test_auto_chain_after_preserves_battle_result_for_next_event() {
         last_choice_code: -1,
         battle_result: 1, // Win!
         matched_condition_no: 0,
+        last_step_sent_ms: 0,
     };
 
     let mut rng = DotNetRandom::new(42);
@@ -315,6 +319,7 @@ fn test_auto_chain_after_preserves_battle_result_for_next_event() {
         last_choice_code: -1,
         battle_result: 2, // Lost
         matched_condition_no: 0,
+        last_step_sent_ms: 0,
     };
     let mut rng = DotNetRandom::new(42);
     let result_loss = auto_chain_after(&completed_loss, &session, &data, &mut rng);

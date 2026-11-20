@@ -1,19 +1,15 @@
 //! System & Role handlers: PK/War (0x21), Game points (0x22), Rank (0x41), GM Shop (0x42), Teleport confirm (0x0C), Account Mgmt (0x23).
 
 use crate::db;
-use crate::protocol::encoder;
+use crate::protocol::{encoder, POINT_CAP};
 use crate::server::dispatcher::OpcodeCtx;
 use crate::server::session::InventoryItem;
-use crate::server::spawn::{store_frame, sys_msg_frame};
+use crate::server::spawn::sys_msg_frame;
 
-/// Op 0x42 point frame: `F44406004202`+le16(points)+`0100`. Width is the spec-
-/// normalized LE16 (a legacy build emitted LE32 with a malformed 4-byte length
-/// header — final parity needs a real capture).
-fn shop_points_frame(points: u32) -> String {
-    let mut body = String::new();
-    body.push_str(&encoder::le16(points as u16));
-    body.push_str("0100");
-    crate::protocol::frame("4202", &body)
+/// Op 0x42 Sub 0x02 point frame: `F44406004202` + `le32(points)` (6-byte payload
+/// `[42][02][points:4B LE]`, `FUN_00522ab8` Mode 2 writes `player+0x146C`).
+pub fn shop_points_frame(points: u32) -> String {
+    format!("F44406004202{}", encoder::le32(points.min(POINT_CAP)))
 }
 
 /// Handle Opcode 0x00 (OP_SYSTEM_ALERT) from the client — the liveness ACK
@@ -67,7 +63,11 @@ pub fn handle_game_points(ctx: &mut OpcodeCtx) {
     }
     let conn = &mut ctx.conn;
     let out = &mut ctx.out;
-    out.send(store_frame(conn.session.gold));
+    out.send(shop_points_frame(conn.session.shop_point));
+    out.send(crate::server::handlers::shops::currency_sync_frame(
+        conn.session.gold,
+        conn.session.shop_point,
+    ));
 }
 
 /// Handle Opcode 0x41 — Rank system (§2.3.28).
@@ -92,41 +92,33 @@ pub fn handle_rank(ctx: &mut OpcodeCtx) {
 pub async fn handle_gm_shop(ctx: &mut OpcodeCtx<'_>) {
     let conn = &mut ctx.conn;
     let out = &mut ctx.out;
-    if !conn.session.authed
-        || !conn.session.logined
-        || conn.session.gm_level <= crate::server::gm::PLAYER_GM_LEVEL
-    {
-        out.send(sys_msg_frame("Ban khong co quyen GM."));
-        if let Some(pool) = ctx.env.pool {
-            let repo = crate::db::modern::sqlite::accounts::SqliteAccountRepository { pool };
-            let _ = repo
-                .write_gm_audit(
-                    i64::from(conn.session.id),
-                    conn.session.gm_level,
-                    None,
-                    "deny_opcode_42",
-                    "normal_account_attempted_gm_shop",
-                )
-                .await;
-        }
+    if !conn.session.authed || !conn.session.logined {
         return;
     }
     let (sub, payload) = (ctx.sub, ctx.payload);
     match sub {
-        // Sub 1: Buy item from GM shop
+        // Sub 1: Buy item from Item Mall (open to all logged-in players)
         1 => {
             if payload.len() < 7 {
                 return;
             }
             let item_id = encoder::u16_le(payload[3], payload[4]);
+            // Note: `price` is currently supplied by the client until a
+            // server-side Item Mall price table is introduced; reject 0 to
+            // prevent free-item exploits.
             let price = u32::from(encoder::u16_le(payload[5], payload[6]));
-
-            if conn.session.shop_point < price {
-                return; // under-funded buys are silently ignored
+            if item_id == 0 || price == 0 {
+                return;
             }
+
             let Some(template) = ctx.data.items.get(&i64::from(item_id)) else {
                 return; // Unknown item id -> no grant
             };
+            if conn.session.shop_point < price {
+                // "Điểm số không đủ, mời bạn bổ sung điểm số" (`opcode_42.md#L178`)
+                out.send("F4440300420E02");
+                return;
+            }
             let item = InventoryItem::from_template(template, 1);
 
             if !crate::server::inventory::can_add_item(&conn.session.homdo, &item) {
@@ -134,16 +126,12 @@ pub async fn handle_gm_shop(ctx: &mut OpcodeCtx<'_>) {
                 return;
             }
 
-            // Emit the shared `17 06` item-add frame *before* deducting the
-            // points.
-            out.send(crate::server::inventory::item_added_frame(&item));
-
-            // Grant + deduct in memory, then persist both atomically.
-            let new_points = conn.session.shop_point.saturating_sub(price);
-            conn.session.add_homdo_item(item);
-            conn.session.shop_point = new_points;
-            let granted = conn
-                .session
+            // Prepare next state and commit DB first (Two-Phase State Lock).
+            let new_points = conn.session.shop_point - price;
+            let mut next_session = conn.session.clone();
+            next_session.add_homdo_item(item.clone());
+            next_session.shop_point = new_points;
+            let granted = next_session
                 .homdo
                 .iter()
                 .find(|i| i.id == item_id && i.count > 0)
@@ -155,20 +143,36 @@ pub async fn handle_gm_shop(ctx: &mut OpcodeCtx<'_>) {
                     loai: 1,
                     ..Default::default()
                 });
-            db::persist::persist_shop_point_and_item(
+            if !db::persist::persist_shop_point_and_item(
                 ctx.env.pool,
                 conn.session.id,
                 new_points,
                 &granted,
             )
-            .await;
+            .await
+            {
+                out.send(sys_msg_frame("Giao dich Mall that bai"));
+                return;
+            }
+
+            conn.session = next_session;
+            crate::server::session::registry_update_if_online(&conn.session);
+            out.send(crate::server::inventory::item_added_frame(&item));
             out.send(shop_points_frame(conn.session.shop_point));
+            out.send(crate::server::handlers::shops::currency_sync_frame(
+                conn.session.gold,
+                conn.session.shop_point,
+            ));
         }
         // Sub 2: no-op (§2.3.29).
         2 => {}
-        // Sub 3: Query GM shop points
+        // Sub 3: Query Item Mall points
         3 => {
             out.send(shop_points_frame(conn.session.shop_point));
+            out.send(crate::server::handlers::shops::currency_sync_frame(
+                conn.session.gold,
+                conn.session.shop_point,
+            ));
         }
         _ => {}
     }

@@ -1057,3 +1057,388 @@ async fn map_10817_door_1_survives_14_04_and_06_02_echo_then_plays_movies() {
     let out_idle_0602 = dispatch(&mut conn, &echo_0602, data, &service, &env).await;
     assert!(has_frame_prefix(&out_idle_0602, "F44402001408"));
 }
+
+#[tokio::test]
+async fn door_10817_14_08_no_broken_142c01_and_clears_pending() {
+    set_eve_events_enabled(true);
+    let data = crate::common::shared_game_data();
+    let mut conn = Conn {
+        session: Session {
+            id: 991201,
+            name: b"Door10817WarpConfirm".to_vec(),
+            map_id: 10817,
+            map_x: 1300,
+            map_y: 700,
+            id_leader: 991201,
+            pending_meet_door: Some(ts_dream::server::session::PendingMeetDoor {
+                map_id: 10817,
+                door_id: 1,
+                due_ms: 999_999_999,
+            }),
+            pending_talk_advance: Some(ts_dream::server::session::PendingTalkAdvance {
+                due_ms: 999_999_999,
+                kind: ts_dream::server::session::TalkAdvanceKind::EveStep,
+            }),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let service = BattleService::default();
+    let env = ServerEnv::none();
+
+    let warp_confirm = vec![0xF4, 0x44, 0x04, 0x00, 0x14, 0x08, 0x01, 0x00];
+    let out = dispatch(&mut conn, &warp_confirm, data, &service, &env).await;
+
+    assert!(
+        !out.outgoing.iter().any(|f| f.frame == "F4440300142C01"),
+        "14 08 01 00 must NOT emit broken 3-byte F4440300142C01"
+    );
+    let expected_lock = ts_dream::protocol::codecs::npc_talk::NpcTalkCodec::build_talk_lock_hex(
+        991201,
+        ts_dream::protocol::codecs::npc_talk::TalkLockMode::Lock,
+    );
+    assert!(
+        out.outgoing.iter().any(|f| f.frame == expected_lock),
+        "must emit 7-byte talk lock frame"
+    );
+    assert_eq!(
+        out.outgoing.iter().filter(|f| f.frame == "F44402000602").count(),
+        1,
+        "must emit 06 02 MoveStop exactly once"
+    );
+    assert!(conn.session.pending_meet_door.is_none());
+    assert!(conn.session.pending_talk_advance.is_none());
+}
+
+#[tokio::test]
+async fn bare_14_04_during_awaiting_movie_ack_does_not_end_talk() {
+    set_eve_events_enabled(true);
+    let mut data = GameData::default();
+    let mut scene = SceneEveData::default();
+    scene.doors.insert(
+        1,
+        ts_dream::data::loaders::EveDoorPlacement {
+            id: 1,
+            x: 500,
+            y: 500,
+            events: vec![1],
+            ..Default::default()
+        },
+    );
+    scene.npc_events.insert(
+        1,
+        NpcEventData {
+            eve_no: 1,
+            when_happen: [true, true, true, true],
+            conditions: vec![EveCondition {
+                condition_no: 1,
+                condition_class: 0,
+                to_result: 1,
+                and_num: 0,
+                results: vec![
+                    EveResult {
+                        result_type: 5,
+                        result_class: 0,
+                        parameter: 0,
+                        parameter_style: 0,
+                        result_value: 17,
+                        result_mean_no: 0,
+                        ..Default::default()
+                    },
+                    EveResult {
+                        result_type: 1,
+                        result_class: 0,
+                        parameter: 0,
+                        parameter_style: 0,
+                        result_value: 1,
+                        result_mean_no: 10001,
+                        ..Default::default()
+                    },
+                ],
+                ..Default::default()
+            }],
+            ..Default::default()
+        },
+    );
+    scene.build_indices();
+    data.scene_eve_data.insert(10817, scene);
+
+    let mut conn = Conn {
+        session: Session {
+            id: 991202,
+            map_id: 10817,
+            map_x: 500,
+            map_y: 500,
+            id_leader: 991202,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let service = BattleService::default();
+    let env = ServerEnv::none();
+
+    let click_door = vec![0xF4, 0x44, 0x04, 0x00, 0x14, 0x04, 0x01, 0x00];
+    let _ = dispatch(&mut conn, &click_door, &data, &service, &env).await;
+    assert_eq!(
+        conn.session.current_event_session.as_ref().map(|ev| ev.phase),
+        Some(ts_dream::eve::auto_chain::EventPhase::AwaitingMovieAck)
+    );
+
+    let bare_14_04 = vec![0xF4, 0x44, 0x02, 0x00, 0x14, 0x04];
+    let out_bare = dispatch(&mut conn, &bare_14_04, &data, &service, &env).await;
+    assert!(has_frame_prefix(&out_bare, "F44402001409"));
+    assert!(!has_frame_prefix(&out_bare, "F44402001408"));
+    assert!(conn.session.current_event_session.is_some());
+}
+
+#[tokio::test]
+async fn door_event_finish_sets_door_trigger_cooldown_and_blocks_retrigger() {
+    set_eve_events_enabled(true);
+    let mut data = GameData::default();
+    let mut scene = SceneEveData::default();
+    scene.doors.insert(
+        1,
+        ts_dream::data::loaders::EveDoorPlacement {
+            id: 1,
+            x: 500,
+            y: 500,
+            events: vec![1],
+            ..Default::default()
+        },
+    );
+    scene.npc_events.insert(
+        1,
+        NpcEventData {
+            eve_no: 1,
+            when_happen: [true, true, true, true],
+            conditions: vec![EveCondition {
+                condition_no: 1,
+                condition_class: 0,
+                to_result: 1,
+                and_num: 0,
+                results: vec![EveResult {
+                    result_type: 1,
+                    result_class: 0,
+                    parameter: 0,
+                    parameter_style: 0,
+                    result_value: 1,
+                    result_mean_no: 10001,
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+            ..Default::default()
+        },
+    );
+    scene.build_indices();
+    data.scene_eve_data.insert(10817, scene);
+
+    let mut conn = Conn {
+        session: Session {
+            id: 991203,
+            map_id: 10817,
+            map_x: 500,
+            map_y: 500,
+            id_leader: 991203,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let service = BattleService::default();
+    let env = ServerEnv::none();
+
+    let [x_lo, x_hi] = 500u16.to_le_bytes();
+    let [y_lo, y_hi] = 500u16.to_le_bytes();
+    let walk_in = vec![0xF4, 0x44, 0x07, 0x00, 0x06, 0x01, 0x06, x_lo, x_hi, y_lo, y_hi];
+    let _ = dispatch(&mut conn, &walk_in, &data, &service, &env).await;
+    assert!(conn.session.current_event_session.is_some());
+
+    // Finish the 1-step door event without warping
+    let out_end = dispatch(&mut conn, &CONTINUE_FRAME, &data, &service, &env).await;
+    assert!(has_frame_prefix(&out_end, "F44402001408"));
+    assert!(conn.session.current_event_session.is_none());
+    let (cd_map, cd_door, cd_until) = conn
+        .session
+        .door_trigger_cooldown
+        .expect("door_trigger_cooldown must be set");
+    assert_eq!((cd_map, cd_door), (10817, 1));
+    assert!(cd_until > ts_dream::server::session::now_ms());
+
+    // Immediate walk on the same door must NOT re-trigger MeetDoor
+    let out_retrigger = dispatch(&mut conn, &walk_in, &data, &service, &env).await;
+    assert!(conn.session.current_event_session.is_none());
+    assert!(!has_frame_prefix(&out_retrigger, "F44402000602"));
+}
+
+#[tokio::test]
+async fn talk_pacing_with_min_dwell_defers_early_14_06_and_advances_late_14_06() {
+    set_eve_events_enabled(true);
+    let data = synthetic_scene_with_results(
+        10917,
+        1,
+        vec![
+            EveResult {
+                result_type: 1,
+                result_class: 0,
+                parameter: 0,
+                parameter_style: 0,
+                result_value: 1,
+                result_mean_no: 10001,
+                ..Default::default()
+            },
+            EveResult {
+                result_type: 1,
+                result_class: 0,
+                parameter: 0,
+                parameter_style: 0,
+                result_value: 1,
+                result_mean_no: 10002,
+                ..Default::default()
+            },
+        ],
+    );
+    let mut conn = Conn {
+        session: Session {
+            id: 991204,
+            map_id: 10917,
+            map_x: 500,
+            map_y: 500,
+            id_leader: 991204,
+            min_talk_dwell_ms: 2000,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let service = BattleService::default();
+    let env = ServerEnv::none();
+
+    let out_open = dispatch(&mut conn, &click_npc_frame(1), &data, &service, &env).await;
+    assert_eq!(op14_01_results(&out_open).len(), 1);
+    assert_eq!(
+        conn.session.current_event_session.as_ref().map(|ev| ev.phase),
+        Some(ts_dream::eve::auto_chain::EventPhase::AwaitingTalkAck)
+    );
+
+    // Simulate 50ms elapsed -> 14 06 schedules pending_talk_advance without advancing index
+    if let Some(ev) = conn.session.current_event_session.as_mut() {
+        ev.last_step_sent_ms = ts_dream::server::session::now_ms().saturating_sub(50);
+    }
+    let out_early = dispatch(&mut conn, &CONTINUE_FRAME, &data, &service, &env).await;
+    assert!(out_early.outgoing.is_empty());
+    assert_eq!(
+        conn.session.current_event_session.as_ref().map(|ev| ev.current_index),
+        Some(0)
+    );
+    assert_eq!(
+        conn.session.pending_talk_advance.map(|p| p.kind),
+        Some(ts_dream::server::session::TalkAdvanceKind::EveStep)
+    );
+
+    // Duplicate 14 06 while pending_talk_advance is set -> still no advance
+    let out_dup = dispatch(&mut conn, &CONTINUE_FRAME, &data, &service, &env).await;
+    assert!(out_dup.outgoing.is_empty());
+    assert_eq!(
+        conn.session.current_event_session.as_ref().map(|ev| ev.current_index),
+        Some(0)
+    );
+
+    // Clear pending and simulate 2100ms elapsed -> 14 06 advances immediately
+    conn.session.pending_talk_advance = None;
+    if let Some(ev) = conn.session.current_event_session.as_mut() {
+        ev.last_step_sent_ms = ts_dream::server::session::now_ms().saturating_sub(2100);
+    }
+    let out_late = dispatch(&mut conn, &CONTINUE_FRAME, &data, &service, &env).await;
+    assert_eq!(op14_01_results(&out_late).len(), 1);
+    assert_eq!(
+        conn.session.current_event_session.as_ref().map(|ev| ev.current_index),
+        Some(1)
+    );
+}
+
+#[tokio::test]
+async fn mutate_item_rt0_splits_from_next_talk_step_when_dwell_nonzero() {
+    set_eve_events_enabled(true);
+    let mut data = synthetic_scene_with_results(
+        10917,
+        1,
+        vec![
+            EveResult {
+                result_type: 0,
+                result_class: 1,
+                parameter: 46016,
+                parameter_style: 1,
+                result_value: 1,
+                result_mean_no: 0,
+                ..Default::default()
+            },
+            EveResult {
+                result_type: 1,
+                result_class: 0,
+                parameter: 0,
+                parameter_style: 0,
+                result_value: 1,
+                result_mean_no: 10002,
+                ..Default::default()
+            },
+        ],
+    );
+    data.items = crate::common::shared_game_data().items.clone();
+
+    let mut conn = Conn {
+        session: Session {
+            id: 991205,
+            map_id: 10917,
+            map_x: 500,
+            map_y: 500,
+            id_leader: 991205,
+            min_talk_dwell_ms: 2000,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let service = BattleService::default();
+    let env = ServerEnv::none();
+
+    let out_open = dispatch(&mut conn, &click_npc_frame(1), &data, &service, &env).await;
+    let steps = op14_01_results(&out_open);
+    assert_eq!(steps.len(), 1, "only MutateItem toast 14 01 should emit in first batch");
+    assert_eq!(steps[0].0, 0, "emitted 14 01 must be rt=0 MutateItem, not rt=1 TalkStep");
+    assert_eq!(
+        conn.session.pending_talk_advance.map(|p| p.kind),
+        Some(ts_dream::server::session::TalkAdvanceKind::EveStep)
+    );
+    assert_eq!(
+        conn.session.current_event_session.as_ref().map(|ev| ev.current_index),
+        Some(0)
+    );
+}
+
+#[test]
+fn talk_messages_queues_legacy_dialogs_when_dwell_nonzero() {
+    let mut conn = Conn {
+        session: Session {
+            id: 991206,
+            min_talk_dwell_ms: 2000,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let mut out = HandleOutcome::default();
+    ts_dream::server::handlers::talk::talk_messages(
+        &mut conn,
+        "F4440600140101020304F4440600140105060708F44402001408",
+        &mut out,
+    );
+    assert_eq!(out.outgoing.len(), 1);
+    assert_eq!(out.outgoing[0].frame, "F4440600140101020304");
+    assert_eq!(out.outgoing[0].delay_ms, 0);
+    assert_eq!(conn.session.pending_legacy_dialogs.len(), 2);
+    assert_eq!(
+        conn.session.pending_legacy_dialogs.front().map(String::as_str),
+        Some("F4440600140105060708")
+    );
+    assert_eq!(
+        conn.session.pending_talk_advance.map(|p| p.kind),
+        Some(ts_dream::server::session::TalkAdvanceKind::LegacyDialog)
+    );
+}

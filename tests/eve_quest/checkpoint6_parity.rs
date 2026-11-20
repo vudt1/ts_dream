@@ -89,6 +89,7 @@ fn session_with_action(results: Vec<EveResult>) -> Session {
         last_choice_code: -1,
         battle_result: 0,
         matched_condition_no: 0,
+        last_step_sent_ms: 0,
     });
     session
 }
@@ -129,7 +130,10 @@ fn test_class5_gold_type1_and_type2_deduction() {
     let mut out = HandleOutcome::default();
     execute_event_step(&mut session, &data, &mut out);
     assert_eq!(session.gold, 2500);
-    assert_eq!(out.outgoing[0].frame, gold_frame(2500));
+    assert_eq!(
+        out.outgoing[0].frame,
+        ts_dream::server::handlers::shops::currency_sync_frame(2500, session.shop_point)
+    );
 
     // Type 2: deduct gold (saturating_sub)
     let action_sub_gold = EveResult {
@@ -144,7 +148,10 @@ fn test_class5_gold_type1_and_type2_deduction() {
     let mut out = HandleOutcome::default();
     execute_event_step(&mut session, &data, &mut out);
     assert_eq!(session.gold, 700);
-    assert_eq!(out.outgoing[0].frame, gold_frame(700));
+    assert_eq!(
+        out.outgoing[0].frame,
+        ts_dream::server::handlers::shops::currency_sync_frame(700, session.shop_point)
+    );
 
     // Type 2: deduct gold more than owned -> rejected All-or-Nothing by Pre-Flight Probe (Ticket 06)
     let action_sub_overflow = EveResult {

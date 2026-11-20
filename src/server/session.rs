@@ -423,6 +423,34 @@ pub struct Session {
     pub walk_start_ms: u64,
     /// Pending delayed `MeetDoor` trigger scheduled during a walk. Runtime-only; never persisted.
     pub pending_meet_door: Option<PendingMeetDoor>,
+    /// Cooldown `(map_id, door_id, until_ms)` suppressing immediate `MeetDoor` re-trigger
+    /// after a door-bound event finishes without warping. Runtime-only; never persisted.
+    pub door_trigger_cooldown: Option<(u16, u16, u64)>,
+    /// Pending non-blocking dialogue advance timer. Runtime-only; never persisted.
+    pub pending_talk_advance: Option<PendingTalkAdvance>,
+    /// Queued legacy `data.talks` frames waiting for `pending_talk_advance`. Runtime-only; never persisted.
+    pub pending_legacy_dialogs: std::collections::VecDeque<String>,
+    /// Wall-clock timestamp (ms) when the last legacy dialog fragment was sent. Runtime-only; never persisted.
+    pub last_talk_sent_ms: u64,
+    /// Minimum dwell time (ms) between consecutive talk steps (`0` in sync unit tests, `2000` on live TCP).
+    /// Runtime-only; never persisted.
+    pub min_talk_dwell_ms: u64,
+}
+
+/// Kind of pending non-blocking dialogue advance scheduled in [`Session::pending_talk_advance`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TalkAdvanceKind {
+    /// Advance an active Eve [`crate::eve::auto_chain::EventSession`] (`current_index += 1`).
+    EveStep,
+    /// Pop and send the next fragment from [`Session::pending_legacy_dialogs`].
+    LegacyDialog,
+}
+
+/// Pending non-blocking dialogue advance timer for `tokio::select!`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PendingTalkAdvance {
+    pub due_ms: u64,
+    pub kind: TalkAdvanceKind,
 }
 
 /// Pending delayed `MeetDoor` trigger scheduled while walking toward a door.
@@ -578,6 +606,11 @@ impl Default for Session {
             walk_dest: (0, 0),
             walk_start_ms: 0,
             pending_meet_door: None,
+            door_trigger_cooldown: None,
+            pending_talk_advance: None,
+            pending_legacy_dialogs: std::collections::VecDeque::new(),
+            last_talk_sent_ms: 0,
+            min_talk_dwell_ms: 0,
         }
     }
 }
@@ -1025,6 +1058,11 @@ pub fn merge_post_dispatch(base: &Session, local: &Session, remote: &Session) ->
             tham_chien,
             color,
             last_battle_end_ms,
+            door_trigger_cooldown,
+            pending_talk_advance,
+            pending_legacy_dialogs,
+            last_talk_sent_ms,
+            min_talk_dwell_ms,
         ]
     );
     if local.current_event_session.is_some() != base.current_event_session.is_some()

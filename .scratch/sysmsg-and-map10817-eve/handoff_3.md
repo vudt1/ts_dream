@@ -84,3 +84,40 @@ Trong lúc live-test với `aLogin.exe`, hãy kiểm tra lại các điểm sau:
 ## Suggested Skills (Cho Phiên Làm Việc Tiếp Theo)
 - `diagnosing-bugs`: nếu live-test `10817 Door #1` phát hiện `PlayMovie` bị treo chờ `14 06` hoặc xuất hiện gói bất thường từ `aLogin.exe`.
 - `tdd`: viết test tái hiện capture mới trong `tests/eve_quest/` trước khi sửa handler.
+
+---
+
+## 7. Cập Nhật Bổ Sung — Chuẩn Hóa `shoppoint` (`1A 04`, `23 04`, `0x42`)
+- **Nghiên cứu & đối chiếu capture**: [research_shoppoint_and_talk_sync.md](file:///D:/VUDT/GIT_PCC/ts_dream/.scratch/sysmsg-and-map10817-eve/research_shoppoint_and_talk_sync.md), [packet_shoppoint.txt](file:///D:/VUDT/GIT_PCC/ts_dream/packet_shoppoint.txt), [implementation_plan.md](file:///C:/Users/tuan.vu/.gemini/antigravity-cli/brain/89cabf7a-0b52-4721-98db-93d60a28683e/implementation_plan.md).
+- **[shops.rs](file:///D:/VUDT/GIT_PCC/ts_dream/src/server/handlers/shops.rs)**: thêm `currency_sync_frame(gold, shop_point)` (10 byte `1A 04`: `gold` + `shop_point`), chuyển `gold_frame` thành wrapper gọi `currency_sync_frame(gold, 0)`, đổi `point_frame` thành `money_capacity_error_frame() -> "F44402001A03"` (*"Dung lượng tiền bạc không đủ"*), và cập nhật các call-site ở `shops.rs`, [eve_runner.rs](file:///D:/VUDT/GIT_PCC/ts_dream/src/server/handlers/eve_runner.rs), [event_npcs.rs](file:///D:/VUDT/GIT_PCC/ts_dream/src/server/handlers/event_npcs.rs), [trade_storage.rs](file:///D:/VUDT/GIT_PCC/ts_dream/src/server/handlers/trade_storage.rs).
+- **[spawn.rs](file:///D:/VUDT/GIT_PCC/ts_dream/src/server/spawn.rs)** & **[gm.rs](file:///D:/VUDT/GIT_PCC/ts_dream/src/server/gm.rs)**:
+  - Step 12 thay `gold_frame` + `1A 03` bằng `currency_sync_frame(s.gold, s.shop_point)`.
+  - Step 21 bỏ 3 lệnh `store_frame` (`hp_store`/`sp_store = 10000` gây `"Điểm số còn dư 10000"`), thay bằng `shop_point_banner_frame(s.shop_point)` (`23 04` với `A=0, B=shop_point, D=0` để hiện đúng `"Điểm số còn dư <shop_point>"` và giữ `player+0x146C = shop_point`) + `shop_points_frame(s.shop_point)` (`42 02`).
+  - `/addgold` và `/setgold` trong `gm.rs` dùng `currency_sync_frame`.
+- **[system.rs](file:///D:/VUDT/GIT_PCC/ts_dream/src/server/handlers/system.rs)**:
+  - `shop_points_frame(points)` phát `F44406004202` + `le32(points.min(POINT_CAP))`.
+  - `handle_game_points` (`0x22`) phát `shop_points_frame` + `currency_sync_frame`.
+  - `handle_gm_shop` (`0x42`): bỏ gate `gm_level` cho mọi người chơi đã `authed && logined`; `42 03` trả `42 02` + `1A 04`; `42 01` kiểm tra `price > 0`, thiếu điểm gửi `F4440300420E02`, kiểm tra `can_add_item`, commit DB trước qua `persist_shop_point_and_item` rồi mới cập nhật `conn.session`, `registry_update_if_online` và phát `17 06` + `42 02` + `1A 04`.
+- **[docs/client-opcodes.md](file:///D:/VUDT/GIT_PCC/ts_dream/docs/client-opcodes.md)** & **[GLOSSARY.md](file:///D:/VUDT/GIT_PCC/ts_dream/GLOSSARY.md)**: cập nhật `1A 04`, `1A 03`, `42 02`, và quy cách banner `0x23 01–04`.
+
+## 8. Cập Nhật Bổ Sung — Đồng Bộ `10817 Door #1`, `PlayMovie` & Non-Blocking Talk Pacing
+- **Đối chiếu capture**: [packet_10817_Door#1_full.txt](file:///D:/VUDT/GIT_PCC/ts_dream/packet_10817_Door%231_full.txt) & [packet_talks_lien_tiep.txt](file:///D:/VUDT/GIT_PCC/ts_dream/packet_talks_lien_tiep.txt).
+- **[quest.rs](file:///D:/VUDT/GIT_PCC/ts_dream/src/server/handlers/quest.rs)**: xóa `F44402000602` và frame lỗi 3 byte `F4440300142C01` trong `DoorActionResolution::Event` của `14 08`; xóa `pending_meet_door` và `pending_talk_advance` trước `activate_event_session`.
+- **[auto_chain.rs](file:///D:/VUDT/GIT_PCC/ts_dream/src/eve/auto_chain.rs)** & **[npc_event.rs](file:///D:/VUDT/GIT_PCC/ts_dream/src/server/handlers/npc_event.rs)**: thêm `EventPhase::{AwaitingTalkAck, AwaitingMovieAck}` và runtime field `last_step_sent_ms: u64`.
+- **[session.rs](file:///D:/VUDT/GIT_PCC/ts_dream/src/server/session.rs)**: thêm `TalkAdvanceKind`, `PendingTalkAdvance`, và các field runtime (`door_trigger_cooldown`, `pending_talk_advance`, `pending_legacy_dialogs`, `last_talk_sent_ms`, `min_talk_dwell_ms` default `0` trong `Session::default()`) + đồng bộ đầy đủ trong `merge_post_dispatch`.
+- **[movement.rs](file:///D:/VUDT/GIT_PCC/ts_dream/src/server/handlers/movement.rs)** & **[talk.rs](file:///D:/VUDT/GIT_PCC/ts_dream/src/server/handlers/talk.rs)**:
+  - Bare `14 04` khi `AwaitingMovieAck` chỉ phát `14 09`, không gọi `end_talk`.
+  - Set `door_trigger_cooldown` (`1500 ms`) khi kết thúc event gắn Door trên cùng map; bỏ qua `MeetDoor` trong thời gian cooldown.
+  - `handle_talk_continue` (`14 06`): không drop im lặng (tránh kẹt `a094 = 1`); đặt `pending_talk_advance` đến đủ `min_talk_dwell_ms` (`2000 ms`) nếu client tự nhảy sớm, hoặc chạy ngay nếu đủ thời gian / vừa xong `AwaitingMovieAck`.
+  - `talk_messages` (`data.talks`): nạp các mảnh sau vào `pending_legacy_dialogs` khi `min_talk_dwell_ms > 0` (giữ sync cho unit test khi `min_talk_dwell_ms == 0`).
+- **[eve_runner.rs](file:///D:/VUDT/GIT_PCC/ts_dream/src/server/handlers/eve_runner.rs)**: cập nhật `AwaitingTalkAck`/`AwaitingMovieAck` + `last_step_sent_ms`, và tách bước toast `rt=0` (`MutateItem` / `NpcTeam` / `RewardPet`) khỏi `TalkStep` kế tiếp khi `min_talk_dwell_ms > 0` (`1200 ms`).
+- **[server_control.rs](file:///D:/VUDT/GIT_PCC/ts_dream/src/web/server_control.rs)**: đặt `min_talk_dwell_ms = 2000` (`DEFAULT_TALK_DWELL_MS`) cho live TCP session, thêm nhánh `tokio::select!` cho `pending_talk_advance` theo Two-Phase State Lock, và bỏ `tokio::time::sleep(frame.delay_ms)` trong vòng gửi `out.outgoing`.
+
+## 9. Kết Quả Kiểm Thử Sau Cập Nhật (`cargo test --all-targets --no-fail-fast`)
+- Chạy `cargo test --all-targets --no-fail-fast` sau lần chỉnh sửa cuối cùng: **thoát với mã `0`** trên toàn bộ 11 test suites (`architecture_guardrails_test`: 8 passed, `battle_test`: 186 passed, `server_network_test`: 109 passed, `server_stop_test`: 1 passed, `skill_job_system_test`: 19 passed, và tất cả các suite còn lại đều 0 failed).
+- Các test mới được thêm vào [economy_wire.rs](file:///D:/VUDT/GIT_PCC/ts_dream/tests/economy_inventory/economy_wire.rs), [missing_eve_effect_executors.rs](file:///D:/VUDT/GIT_PCC/ts_dream/tests/eve_quest/missing_eve_effect_executors.rs), và [eve_tcp_and_sysmsg.rs](file:///D:/VUDT/GIT_PCC/ts_dream/tests/server_network/eve_tcp_and_sysmsg.rs).
+
+### Checklist Live-Test Tiếp Theo (`aLogin.exe`, `TS_PACKET_LOGGING=true`)
+1. Đăng nhập nhân vật mới (`shoppoint = 1000`): xác nhận hiện đúng `"Điểm số còn dư 1000"` (không còn `10000`), mở Mall (`42 03`) thấy `1000` và mua thử (`42 01`) trừ điểm thật.
+2. Đi vào `10817 Door #1 (1300, 700)`: xác nhận không còn frame lỗi `14 2C 01` và kiểm chứng flow bước 6 → `PlayMovie(17)/(18)` → `Warp(10867)`.
+3. Nói chuyện NPC #2 (`10917`) và NPC dùng `data.talks`: xác nhận mỗi đoạn thoại hiển thị đủ ~2 giây.

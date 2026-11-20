@@ -327,12 +327,21 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 
 ### Tiền tệ (Currencies: Kim, Tiền trang, Điểm)
 - **Định nghĩa**: Hệ thống 3 loại tài nguyên tiền tệ của nhân vật:
-  - **Kim mang theo (Gold)**: Lưu tại `player+0x12F8`, trần `GOLD_CAP = 9_999_999`. Sử dụng trong mua bán NPC, mở sạp, giao dịch P2P, tạo quân đoàn. Frame S→C: `1A 01` (+Δ), `1A 02` (-Δ), `1A 04` (=Gold, 6 byte LE).
+  - **Kim mang theo (Gold)**: Lưu tại `player+0x12F8`, trần `GOLD_CAP = 9_999_999`. Sử dụng trong mua bán NPC, mở sạp, giao dịch P2P, tạo quân đoàn. Frame S→C: `1A 01` (+Δ), `1A 02` (-Δ), `1A 04` (=Gold + Shop Point, 10 byte LE).
   - **Tiền trang ngân lượng (Bank Gold)**: Lưu tại `player+0x12FC`, trần `9_999_999`. Rút nộp qua Form `TMoneyAccountForm`. Frame S→C: `1D 01` (+Δ), `1D 02` (-Δ), `1D 04` (=Bank, 6 byte LE), `1D 07/08` (mở khóa nút).
-  - **Điểm tích lũy / Tiền mềm (Shop Point)**: Lưu tại `player+0x1300`, trần `2_000_000_000`. Frame S→C: `1A 05` (+Δ), `1A 03` (=Point, 6 byte LE). Không có frame trừ delta S→C.
+  - **Điểm tích lũy / Tiền mềm (Shop Point)**: Lưu tại `player+0x1300` (bảng chung `1A 04`) và `player+0x146C` (Item Mall `42 02`), trần `2_000_000_000`. Frame S→C: `1A 05` (+Δ), `1A 06` (-Δ), `1A 04` (10B đồng bộ Gold + Shop Point), `42 02` (6B `u32 LE` đồng bộ điểm Mall). `1A 03` là frame báo lỗi *"Dung lượng tiền bạc không đủ"* (`F44402001A03`), không dùng để đồng bộ số dư.
 - **Ràng buộc (Invariants)**:
   - Các phép cộng/trừ delta (`1A 01/02`, `1D 01/02`) từ chối nguyên tử (atomic reject) nếu vượt trần hoặc làm số dư âm.
-  - Các phép set tuyệt đối (`1A 04`, `1D 04`, `1A 03`) ghi đè trực tiếp đúng 6 byte payload (`F4440600...`). Tuyệt đối không ghép chung `shop_point` vào frame `1A 04`.
+  - Frame `1A 04` luôn gửi đủ 10 byte payload (`F4440A001A04` + `le32(gold)` + `le32(shop_point)`) để không ghi đè `player+0x1300 = 0`; `1D 04` và `42 02` gửi 6 byte payload (`F4440600...`). Tuyệt đối không dùng `23 04` (`store_frame`) với `A != 0` để gửi số dư tiền/điểm.
+
+### Banner & Thông báo Tài khoản (Opcode `0x23` Sub `0x01–0x04`)
+- **Định nghĩa**: Nhóm gói tin S→C từ handler `0x23` (`FUN_00792bad`) hiển thị banner hệ thống cố định hoặc banner điểm số kèm chat-log trên `aLogin.exe`:
+  - **`23 01 <K: u8>`** (`F44403002301KK`, 3 byte payload, banner `2000 ms`): Kết quả đổi mật khẩu / mã cá nhân (`K=0`: *Sửa đổi thất bại*; `K=1`: *Sửa đổi thành công* + ghi `player+0x648/0x64C`; `K=2`: *Mật mã cũ sai lầm*; `K=3`: *Mã cá nhân cũ sai lầm*; `K=4`: *Mật mã quá ngắn*; `K=5`: *Không thể sửa đổi mật mã và mã cá nhân trên server này*).
+  - **`23 02 <K: u8>`** (`F44403002302KK`, 3 byte payload): Kết quả xóa nhân vật (`K=1`: *Loại trừ nhân vật thành công* + reload file; `K=2`: *Mật mã loại trừ nhân vật sai lệch*; `K=3`: *Mã cá nhân loại trừ nhân vật sai lệch*; `K=4`: *Loại trừ nhân vật thất bại*).
+  - **`23 03 <K: u8>`** (`F44403002303KK`, 3 byte payload, banner `2000 ms`, `K=1..8`, không ghi state): Kết quả nạp thẻ/điểm (`K=1`: *Lưu trữ thành công*; `K=2`: *Lưu trữ thất bại*; `K=3`: *Tài khoản thẻ sai lầm*; `K=4`: *Mật mã sai lệch*; `K=5`: *Thẻ đã sử dụng qua*; `K=6`: *Đã lưu trữ điểm số thẻ khởi động*; `K=7,8`: nhánh phụ).
+  - **`23 04 <A: u32 LE><B: u32 LE><D: f64 LE>`** (`F44412002304` + 16 byte, 18 byte payload, banner + chat-log `10000 ms`): Hiển thị `"Điểm số còn dư <A+B>"` (kèm `"Kỳ hạn có thể chơi ..."` nếu `D != 0.0`) và ghi `player+0x146C = A * 100 + B`.
+- **Ràng buộc (Invariants)**:
+  - Khi phát banner `"Điểm số còn dư <shop_point>"` lúc đăng nhập (`shop_point_banner_frame` trong `src/server/spawn.rs`), **bắt buộc đặt `A = 0`, `B = shop_point.min(POINT_CAP)`, `D = 0`** để `A + B == shop_point` và `player+0x146C == 0 * 100 + shop_point == shop_point`, kèm `42 02 <le32(shop_point)>` ngay sau đó. Không gọi `store_frame` (`A = point, B = 0`) cho `gold`, `hp_store`, `sp_store`.
 
 ### 5 Container Vật phẩm (Item Containers)
 - **Định nghĩa**: Năm không gian chứa vật phẩm chuẩn hóa của nhân vật theo kiến trúc Client Delphi:

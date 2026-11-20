@@ -261,7 +261,12 @@ async fn tcp_map_10817_door_14_08_does_not_deadlock() {
         .await
         .expect("write 14 08 01 00");
 
-    // Must open dialogue first: 06 02 + 14 2C 01 (Lock) + 14 01 (first step)
+    // Must open dialogue first: 06 02 + 14 2C <char_id> 01 (7B Lock) + 14 01 (first step),
+    // and must NOT emit the broken 3-byte F4440300142C01.
+    let expected_lock = ts_dream::protocol::codecs::npc_talk::NpcTalkCodec::build_talk_lock_hex(
+        player_id,
+        ts_dream::protocol::codecs::npc_talk::TalkLockMode::Lock,
+    );
     let open_frames = read_frames_until(&mut sock, &mut decoder, 2000, |fs| {
         fs.iter().any(|f| f.len() >= 12 && &f[8..12] == "1401")
     })
@@ -271,8 +276,12 @@ async fn tcp_map_10817_door_14_08_does_not_deadlock() {
         "expected 06 02 MoveStop before dialogue, got {open_frames:?}"
     );
     assert!(
-        open_frames.iter().any(|f| f == "F4440300142C01"),
-        "expected 14 2C 01 Lock before dialogue, got {open_frames:?}"
+        open_frames.iter().any(|f| f == &expected_lock),
+        "expected 7-byte 14 2C <char_id> 01 Lock before dialogue, got {open_frames:?}"
+    );
+    assert!(
+        !open_frames.iter().any(|f| f == "F4440300142C01"),
+        "must NOT emit broken 3-byte F4440300142C01, got {open_frames:?}"
     );
     assert!(
         open_frames.iter().any(|f| f.len() >= 12 && &f[8..12] == "1401"),
@@ -290,7 +299,7 @@ async fn tcp_map_10817_door_14_08_does_not_deadlock() {
         sock.write_all(&xor_wire("F44402001406"))
             .await
             .expect("write 14 06");
-        let step_frames = read_frames_until(&mut sock, &mut decoder, 2000, |fs| {
+        let step_frames = read_frames_until(&mut sock, &mut decoder, 3000, |fs| {
             fs.iter().any(|f| {
                 f.len() >= 12
                     && (&f[8..12] == "1401" || &f[8..12] == "1407" || &f[8..10] == "0C")
@@ -418,7 +427,7 @@ async fn tcp_map_10817_door_14_08_does_not_deadlock() {
         let mut warped = false;
         for _ in 0..10 {
             sock.write_all(&xor_wire("F44402001406")).await.expect("write 14 06");
-            let step_frames = read_frames_until(&mut sock, &mut decoder, 2000, |fs| {
+            let step_frames = read_frames_until(&mut sock, &mut decoder, 3000, |fs| {
                 fs.iter().any(|f| {
                     f.len() >= 12
                         && (&f[8..12] == "1401" || &f[8..12] == "1407" || &f[8..10] == "0C")
@@ -479,7 +488,7 @@ async fn tcp_map_10817_door_14_08_does_not_deadlock() {
         let mut warped = false;
         for _ in 0..10 {
             sock.write_all(&xor_wire("F44402001406")).await.expect("write 14 06");
-            let step_frames = read_frames_until(&mut sock, &mut decoder, 2000, |fs| {
+            let step_frames = read_frames_until(&mut sock, &mut decoder, 3000, |fs| {
                 fs.iter().any(|f| {
                     f.len() >= 12
                         && (&f[8..12] == "1401" || &f[8..12] == "1407" || &f[8..10] == "0C")
@@ -539,7 +548,7 @@ async fn tcp_map_10817_bach_lao_nhan_15009_completes_without_deadlock() {
         sock.write_all(&xor_wire("F44402001406"))
             .await
             .expect("write 14 06");
-        let step_frames = read_frames_until(&mut sock, &mut decoder, 2000, |fs| {
+        let step_frames = read_frames_until(&mut sock, &mut decoder, 3000, |fs| {
             fs.iter().any(|f| {
                 f.len() >= 12
                     && (&f[8..12] == "1401" || &f[8..12] == "1407" || &f[8..10] == "0C")
@@ -557,6 +566,72 @@ async fn tcp_map_10817_bach_lao_nhan_15009_completes_without_deadlock() {
     assert!(
         warped,
         "Bạch Lão Nhân (15009) eve_no=4 must complete and warp without deadlock"
+    );
+
+    drop(sock);
+    let _ = control.stop().await;
+    lock_online_sessions().remove(&player_id);
+}
+
+#[tokio::test]
+async fn tcp_pending_talk_advance_paces_early_14_06_without_blocking_socket_reader() {
+    let data = Arc::clone(shared_game_data());
+    let _db = setup_test_db().await;
+    let pool = (*_db).clone();
+    let player_id = 300083u32;
+
+    let (control, mut sock, mut decoder) =
+        connect_and_login(19453, data, pool, player_id, 1300, 700).await;
+
+    // Trigger 10817 Door #1 (eve_no = 7) via 14 08 01 00 -> step 1 (14 01) arrives immediately.
+    sock.write_all(&xor_wire("F444040014080100"))
+        .await
+        .expect("write 14 08 01 00");
+    let open_frames = read_frames_until(&mut sock, &mut decoder, 2000, |fs| {
+        fs.iter().any(|f| f.len() >= 12 && &f[8..12] == "1401")
+    })
+    .await;
+    assert!(
+        open_frames.iter().any(|f| f.len() >= 12 && &f[8..12] == "1401"),
+        "expected initial 14 01, got {open_frames:?}"
+    );
+
+    // Send 14 06 immediately (~0ms < 2000ms dwell): server schedules pending_talk_advance
+    // and must NOT emit the next 14 01 immediately.
+    sock.write_all(&xor_wire("F44402001406"))
+        .await
+        .expect("write early 14 06");
+    let too_early = read_frames_until(&mut sock, &mut decoder, 250, |fs| {
+        fs.iter().any(|f| f.len() >= 12 && &f[8..12] == "1401")
+    })
+    .await;
+    assert!(
+        !too_early.iter().any(|f| f.len() >= 12 && &f[8..12] == "1401"),
+        "early 14 06 must be paced by pending_talk_advance, got {too_early:?}"
+    );
+
+    // While pending_talk_advance is waiting, socket reader must remain responsive:
+    // sending 14 01 <npc> returns 14 09 immediately without waiting 2000ms.
+    sock.write_all(&xor_wire("F444040014010400"))
+        .await
+        .expect("write 14 01 while paced");
+    let responsive_frames = read_frames_until(&mut sock, &mut decoder, 300, |fs| {
+        fs.iter().any(|f| f == "F44402001409")
+    })
+    .await;
+    assert!(
+        responsive_frames.iter().any(|f| f == "F44402001409"),
+        "socket reader must process 14 01 -> 14 09 while pending_talk_advance is armed, got {responsive_frames:?}"
+    );
+
+    // After the 2000ms dwell elapses, pending_talk_advance fires and delivers the next 14 01.
+    let paced_frames = read_frames_until(&mut sock, &mut decoder, 2600, |fs| {
+        fs.iter().any(|f| f.len() >= 12 && &f[8..12] == "1401")
+    })
+    .await;
+    assert!(
+        paced_frames.iter().any(|f| f.len() >= 12 && &f[8..12] == "1401"),
+        "pending_talk_advance must emit next 14 01 after dwell time, got {paced_frames:?}"
     );
 
     drop(sock);

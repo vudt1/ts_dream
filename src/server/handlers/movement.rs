@@ -88,34 +88,45 @@ pub async fn handle_move_dispatch(ctx: &mut OpcodeCtx<'_>) {
 
     // 1. MeetDoor: check closest door within ±60 px of new coordinates.
     if let Some((door_id, _)) = closest_door {
-        if let Some(door) = scene.doors.get(&door_id) {
-            let origin = ctx.conn.session.walk_origin;
-            let dx = f64::from(door.x) - f64::from(origin.0);
-            let dy = f64::from(door.y) - f64::from(origin.1);
-            let dist = (dx * dx + dy * dy).sqrt();
-            let travel_ms =
-                ((dist / ctx.conn.session.walk_speed_px_per_sec()) * 1000.0).round() as u64;
-            if travel_ms > 250 {
-                let now_ms = crate::server::session::now_ms();
-                ctx.conn.session.pending_meet_door = Some(crate::server::session::PendingMeetDoor {
-                    map_id: ctx.conn.session.map_id,
-                    door_id,
-                    due_ms: now_ms.saturating_add(travel_ms),
+        let now_ms = crate::server::session::now_ms();
+        let door_blocked = ctx.conn.session.talk_locked
+            || ctx
+                .conn
+                .session
+                .door_trigger_cooldown
+                .is_some_and(|(m, d, until)| {
+                    m == ctx.conn.session.map_id && d == door_id && now_ms < until
                 });
+        if !door_blocked {
+            if let Some(door) = scene.doors.get(&door_id) {
+                let origin = ctx.conn.session.walk_origin;
+                let dx = f64::from(door.x) - f64::from(origin.0);
+                let dy = f64::from(door.y) - f64::from(origin.1);
+                let dist = (dx * dx + dy * dy).sqrt();
+                let travel_ms =
+                    ((dist / ctx.conn.session.walk_speed_px_per_sec()) * 1000.0).round() as u64;
+                if travel_ms > 250 {
+                    ctx.conn.session.pending_meet_door =
+                        Some(crate::server::session::PendingMeetDoor {
+                            map_id: ctx.conn.session.map_id,
+                            door_id,
+                            due_ms: now_ms.saturating_add(travel_ms),
+                        });
+                    return;
+                }
+            }
+            if trigger_meet_door_for_door(
+                &mut ctx.conn.session,
+                door_id,
+                ctx.data,
+                &ctx.env,
+                &mut ctx.out,
+                cached_state.as_ref(),
+            )
+            .await
+            {
                 return;
             }
-        }
-        if trigger_meet_door_for_door(
-            &mut ctx.conn.session,
-            door_id,
-            ctx.data,
-            &ctx.env,
-            &mut ctx.out,
-            cached_state.as_ref(),
-        )
-        .await
-        {
-            return;
         }
     }
 
@@ -156,6 +167,13 @@ pub async fn trigger_meet_door_for_door(
     cached_state: Option<&crate::eve::state::PlayerEventState>,
 ) -> bool {
     let map_id = session.map_id;
+    let now_ms = crate::server::session::now_ms();
+    let cooldown_active = session
+        .door_trigger_cooldown
+        .is_some_and(|(m, d, until)| m == map_id && d == door_id && now_ms < until);
+    if session.talk_locked || cooldown_active {
+        return false;
+    }
     if let Some(hub) = env.hub {
         let target_map_id = crate::server::handlers::quest::resolve_door_warp(
             data,

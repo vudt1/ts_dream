@@ -289,6 +289,7 @@ fn activate(
                     last_choice_code: -1,
                     battle_result: 0,
                     matched_condition_no: planned.matched_condition_no,
+                    last_step_sent_ms: 0,
                 })
             };
 
@@ -335,6 +336,7 @@ fn activate(
             last_choice_code: -1,
             battle_result: 0,
             matched_condition_no: planned.matched_condition_no,
+            last_step_sent_ms: 0,
         })
     };
 

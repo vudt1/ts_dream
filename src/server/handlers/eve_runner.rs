@@ -17,7 +17,7 @@ use crate::protocol::encoder;
 use crate::server::dispatcher::HandleOutcome;
 use crate::server::handlers::npc_event;
 use crate::server::handlers::quest_sync::{remove_quest_task, set_quest_dont, set_quest_task};
-use crate::server::handlers::shops::gold_frame;
+use crate::server::handlers::shops::currency_sync_frame;
 use crate::server::handlers::stats::build_stat_update;
 use crate::server::handlers::talk::{end_talk_session, eve_rng_seed, reset_talk_context};
 use crate::server::session::Session;
@@ -485,13 +485,13 @@ fn execute_mutate_money(session: &mut Session, out: &mut HandleOutcome, op: Mone
         }
         MoneyOp::AddGold(add) => {
             session.gold = session.gold.saturating_add(add).min(crate::protocol::GOLD_CAP);
-            out.send(gold_frame(session.gold));
+            out.send(currency_sync_frame(session.gold, session.shop_point));
             out.send(NpcTalkCodec::build_gold_add_hex(add));
             crate::server::session::registry_update_if_online(session);
         }
         MoneyOp::DeductGold(sub) => {
             session.gold = session.gold.saturating_sub(sub);
-            out.send(gold_frame(session.gold));
+            out.send(currency_sync_frame(session.gold, session.shop_point));
             out.send(NpcTalkCodec::build_gold_sub_hex(sub));
             crate::server::session::registry_update_if_online(session);
         }
@@ -728,6 +728,10 @@ fn process_single_domain_effect(
 ) -> StepOutcome {
     match effect {
         DomainEffect::TalkStep(res) => {
+            if let Some(ev) = session.current_event_session.as_mut() {
+                ev.phase = EventPhase::AwaitingTalkAck;
+                ev.last_step_sent_ms = crate::server::session::now_ms();
+            }
             out.send(NpcTalkCodec::build_talk_step_hex(res));
             StepOutcome::Halt
         }
@@ -829,6 +833,10 @@ fn process_single_domain_effect(
         }
         DomainEffect::MoveEntity(res) => {
             if res.result_class == 3 && res.result_value >= 10_000 {
+                if let Some(ev) = session.current_event_session.as_mut() {
+                    ev.phase = EventPhase::AwaitingMovieAck;
+                    ev.last_step_sent_ms = crate::server::session::now_ms();
+                }
                 out.send(NpcTalkCodec::build_talk_step_hex(res));
                 StepOutcome::Halt
             } else {
@@ -842,6 +850,10 @@ fn process_single_domain_effect(
             }
         }
         DomainEffect::PlayMovie(res) => {
+            if let Some(ev) = session.current_event_session.as_mut() {
+                ev.phase = EventPhase::AwaitingMovieAck;
+                ev.last_step_sent_ms = crate::server::session::now_ms();
+            }
             out.send(NpcTalkCodec::build_talk_step_hex(res));
             StepOutcome::Halt
         }
@@ -922,6 +934,20 @@ fn finish_event_session_iter(
             true
         }
         AutoChainResult::NoMatch => {
+            if matches!(
+                completed.trigger_kind,
+                crate::eve::auto_chain::EventTriggerKind::MeetDoor
+                    | crate::eve::auto_chain::EventTriggerKind::ClickDoor
+            ) && i32::from(session.map_id) == completed.map_id
+            {
+                if let Ok(door_id) = u16::try_from(completed.npc_click_id) {
+                    session.door_trigger_cooldown = Some((
+                        session.map_id,
+                        door_id,
+                        crate::server::session::now_ms().saturating_add(1500),
+                    ));
+                }
+            }
             out.send(NpcTalkCodec::build_talk_lock_hex(
                 char_id,
                 TalkLockMode::Unlock,
@@ -1078,6 +1104,7 @@ async fn execute_event_step_core(
             return;
         }
 
+        let pre_out_len = out.outgoing.len();
         match process_single_domain_effect(session, data, out, &first_effect) {
             StepOutcome::Halt => {
                 if out.eve_battle.is_some() && session.db_character_id > 0 {
@@ -1093,6 +1120,32 @@ async fn execute_event_step_core(
                 return;
             }
             StepOutcome::Continue => {
+                let emitted_toast = matches!(
+                    first_effect,
+                    DomainEffect::MutateItem { .. }
+                        | DomainEffect::NpcTeam(_)
+                        | DomainEffect::RewardPet(_)
+                ) && out.outgoing[pre_out_len..].iter().any(|f| {
+                    f.frame.starts_with("F444") && f.frame.len() >= 12 && &f.frame[8..12] == "1401"
+                });
+                let next_is_non_warp_non_battle = session
+                    .current_event_session
+                    .as_ref()
+                    .and_then(|ev| ev.planned_effects.get(idx + 1))
+                    .is_some_and(|next| {
+                        !matches!(
+                            next,
+                            DomainEffect::Warp { .. } | DomainEffect::StartBattle { .. }
+                        )
+                    });
+                if session.min_talk_dwell_ms > 0 && emitted_toast && next_is_non_warp_non_battle {
+                    session.pending_talk_advance =
+                        Some(crate::server::session::PendingTalkAdvance {
+                            due_ms: crate::server::session::now_ms().saturating_add(1200),
+                            kind: crate::server::session::TalkAdvanceKind::EveStep,
+                        });
+                    return;
+                }
                 if let Some(ev) = session.current_event_session.as_mut() {
                     ev.current_index = ev.current_index.saturating_add(1);
                 }
@@ -1187,6 +1240,9 @@ pub async fn activate_event_session(
     let first_non_action = event_session.results.iter().find(|r| r.result_type != 0);
     let should_lock_ui = !matches!(first_non_action.map(|r| r.result_type), Some(2 | 3));
     let char_id = session.id;
+    session.pending_meet_door = None;
+    session.pending_talk_advance = None;
+    session.pending_legacy_dialogs.clear();
     session.current_event_session = Some(event_session);
     if should_lock_ui {
         session.talk_locked = true;

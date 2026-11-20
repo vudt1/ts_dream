@@ -1093,6 +1093,7 @@ pub fn resolve_door_action(
                         last_choice_code: -1,
                         battle_result: 0,
                         matched_condition_no: planned.matched_condition_no,
+                        last_step_sent_ms: 0,
                     };
                     return DoorActionResolution::Event(event_session);
                 }
@@ -1520,8 +1521,8 @@ pub async fn handle_warp_confirm(
             conn.session.warp_finish = false;
         }
         DoorActionResolution::Event(event_session) => {
-            out.send("F44402000602".to_string());
-            out.send("F4440300142C01".to_string());
+            conn.session.pending_meet_door = None;
+            conn.session.pending_talk_advance = None;
             let pre_len = out.outgoing.len();
             crate::server::handlers::talk::activate_event_session(
                 &mut conn.session,

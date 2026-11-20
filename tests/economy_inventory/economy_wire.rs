@@ -23,8 +23,8 @@ use ts_dream::protocol::{
 };
 use ts_dream::server::dispatcher::{HandleOutcome, OpcodeCtx, ServerEnv};
 use ts_dream::server::handlers::shops::{
-    complete_shop_buy, gold_frame, handle_npc_shop, handle_player_shop, player_shop_catalog_frame,
-    point_frame, ShopBuyError,
+    complete_shop_buy, currency_sync_frame, gold_frame, handle_npc_shop, handle_player_shop,
+    money_capacity_error_frame, player_shop_catalog_frame, ShopBuyError,
 };
 use ts_dream::server::handlers::talk::handle_talk;
 use ts_dream::server::handlers::trade_storage::{
@@ -60,19 +60,37 @@ fn test_currency_wire_sync_login() {
 
     let frames = build_logined_sequence_session(&session);
 
-    // 1. Verify 1A 04 frame contains gold (6 bytes) and 1A 03 frame contains shop_point (6 bytes)
-    let expected_gold_frame = format!("F44406001A04{}", encoder::le32(500_000));
+    // 1. Verify 1A 04 frame is 10 bytes (gold + shop_point), 42 02 has shop_point, and no 1A 03 or 23 04
+    let expected_currency_frame = format!(
+        "F4440A001A04{}{}",
+        encoder::le32(500_000),
+        encoder::le32(88_888)
+    );
     assert!(
-        frames.iter().any(|f| f == &expected_gold_frame),
-        "spawn frames must contain 1A 04 with gold (6 bytes): expected {}",
-        expected_gold_frame
+        frames.iter().any(|f| f == &expected_currency_frame),
+        "spawn frames must contain 10-byte 1A 04 with gold + shop_point: expected {}",
+        expected_currency_frame
     );
 
-    let expected_point_frame = format!("F44406001A03{}", encoder::le32(88_888));
+    let expected_mall_point_frame = format!("F44406004202{}", encoder::le32(88_888));
     assert!(
-        frames.iter().any(|f| f == &expected_point_frame),
-        "spawn frames must contain 1A 03 with shop_point (6 bytes): expected {}",
-        expected_point_frame
+        frames.iter().any(|f| f == &expected_mall_point_frame),
+        "spawn frames must contain 42 02 with shop_point (u32 LE): expected {}",
+        expected_mall_point_frame
+    );
+
+    assert!(
+        !frames.iter().any(|f| f.starts_with("F44406001A03")),
+        "spawn frames must NOT emit 1A 03 for shop_point"
+    );
+    let expected_shop_banner = format!(
+        "F4441200230400000000{}0000000000000000",
+        encoder::le32(88_888)
+    );
+    assert!(
+        frames.iter().any(|f| f == &expected_shop_banner),
+        "spawn frames must emit 23 04 with A=0, B=shop_point: expected {}",
+        expected_shop_banner
     );
 
     // 2. Verify 1D 04 frame contains bank_gold
@@ -92,18 +110,22 @@ fn test_currency_wire_sync_login() {
 
     let capped_frames = build_logined_sequence_session(&capped_session);
 
-    let expected_capped_gold = format!("F44406001A04{}", encoder::le32(GOLD_CAP));
+    let expected_capped_currency = format!(
+        "F4440A001A04{}{}",
+        encoder::le32(GOLD_CAP),
+        encoder::le32(1_500_000_000)
+    );
     assert!(
-        capped_frames.iter().any(|f| f == &expected_capped_gold),
-        "gold must be clamped to GOLD_CAP: expected {}",
-        expected_capped_gold
+        capped_frames.iter().any(|f| f == &expected_capped_currency),
+        "gold must be clamped to GOLD_CAP in 1A 04: expected {}",
+        expected_capped_currency
     );
 
-    let expected_capped_point = format!("F44406001A03{}", encoder::le32(1_500_000_000));
+    let expected_capped_mall = format!("F44406004202{}", encoder::le32(1_500_000_000));
     assert!(
-        capped_frames.iter().any(|f| f == &expected_capped_point),
-        "shop point sync frame must contain 1_500_000_000: expected {}",
-        expected_capped_point
+        capped_frames.iter().any(|f| f == &expected_capped_mall),
+        "shop point 42 02 frame must contain 1_500_000_000: expected {}",
+        expected_capped_mall
     );
 
     let expected_capped_bank = format!("F44406001D04{}", encoder::le32(GOLD_CAP));
@@ -113,11 +135,16 @@ fn test_currency_wire_sync_login() {
         expected_capped_bank
     );
 
-    // 4. Test gold_frame helper
-    let gf = gold_frame(capped_session.gold);
-    assert_eq!(gf, expected_capped_gold);
-    let pf = point_frame(capped_session.shop_point);
-    assert_eq!(pf, expected_capped_point);
+    // 4. Test currency_sync_frame, gold_frame, and money_capacity_error_frame helpers
+    assert_eq!(
+        currency_sync_frame(capped_session.gold, capped_session.shop_point),
+        expected_capped_currency
+    );
+    assert_eq!(
+        gold_frame(capped_session.gold),
+        format!("F4440A001A04{}00000000", encoder::le32(GOLD_CAP))
+    );
+    assert_eq!(money_capacity_error_frame(), "F44402001A03");
 
     // 5. Verify unconditional 1D 04 sync frame when bank_gold == 0 (Ticket 02 / B4 fix)
     let mut zero_bank_session = Session::default();
@@ -175,7 +202,7 @@ async fn test_npc_shop_buy_flow_and_errors() {
         "Must send 1A 02 to deduct gold"
     );
 
-    let expected_sync = format!("F44406001A04{}", encoder::le32(970));
+    let expected_sync = currency_sync_frame(970, 50);
     assert!(
         frames.iter().any(|f| f == &expected_sync),
         "Must send 1A 04 to sync balance"
@@ -437,7 +464,7 @@ async fn test_npc_shop_sell_flow_and_errors() {
         "Must send 1A 01 to credit gold"
     );
 
-    let expected_sync = format!("F44406001A04{}", encoder::le32(150));
+    let expected_sync = currency_sync_frame(150, 10);
     assert!(
         frames.iter().any(|f| f == &expected_sync),
         "Must send 1A 04 to sync balance"
@@ -2711,5 +2738,184 @@ async fn test_bank_withdraw_overflow_vs_insufficient_balance() {
     }
     assert_eq!(out_invalid.outgoing.len(), 0);
 }
+
+// =========================================================================
+// Test: Item Mall 0x42 (Normal player 42 03 / 42 01, price == 0 reject, 42 0E 02, DB rollback)
+// =========================================================================
+#[tokio::test]
+async fn test_item_mall_0x42_normal_player_and_validation() {
+    use ts_dream::server::handlers::system::{handle_gm_shop, shop_points_frame};
+    use ts_dream::server::session::registry_update_if_online;
+
+    let pool = setup_test_db().await;
+
+    // Seed account + character + money with shoppoint = 1000, gm_level = 0
+    let acc_id = ts_dream::db::accounts::create(&pool, "pass1", "pass2")
+        .await
+        .expect("create account");
+    let char_id = acc_id;
+    sqlx::query("INSERT INTO characters (playerid, name) VALUES (?, ?)")
+        .bind(char_id)
+        .bind(b"MallPlayer".to_vec())
+        .execute(&pool.write)
+        .await
+        .expect("insert character");
+    sqlx::query("INSERT INTO character_money (playerid, gold, bankgold, shoppoint) VALUES (?, ?, ?, ?)")
+        .bind(char_id)
+        .bind(500i64)
+        .bind(0i64)
+        .bind(1000i64)
+        .execute(&pool.write)
+        .await
+        .expect("insert money");
+
+    let mut data = GameData::default();
+    let mut tpl = Item::default();
+    tpl.id = 26001;
+    tpl.name = b"MallPotion".to_vec();
+    tpl.loai = 1;
+    data.items.insert(26001, tpl);
+
+    let service = BattleService::default();
+    let env = ServerEnv {
+        pool: Some(&pool),
+        repos: None,
+        hub: None,
+        sender: None,
+    };
+
+    let mut conn = create_test_conn(char_id as u32, char_id);
+    conn.session.authed = true;
+    conn.session.logined = true;
+    conn.session.gm_level = 0; // normal player
+    conn.session.gold = 500;
+    conn.session.shop_point = 1000;
+    registry_update_if_online(&conn.session);
+
+    // 1. Sub 3 (42 03) query points -> emits 42 02 <le32(1000)> + 10-byte 1A 04
+    let mut out_q = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out_q,
+            opcode: 0x42,
+            sub: 3,
+            payload: &[],
+            decoded: &[],
+            env,
+        };
+        handle_gm_shop(&mut ctx).await;
+    }
+    assert_eq!(out_q.outgoing.len(), 2);
+    assert_eq!(out_q.outgoing[0].frame, shop_points_frame(1000));
+    assert_eq!(out_q.outgoing[1].frame, currency_sync_frame(500, 1000));
+
+    // 2. Sub 1 (42 01) reject price == 0 (anti-cheat)
+    let mut out_free = HandleOutcome::default();
+    let free_payload = [0u8, 0, 0, 0x91, 0x65, 0x00, 0x00]; // item_id=26001, price=0
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out_free,
+            opcode: 0x42,
+            sub: 1,
+            payload: &free_payload,
+            decoded: &[],
+            env,
+        };
+        handle_gm_shop(&mut ctx).await;
+    }
+    assert!(out_free.outgoing.is_empty());
+    assert_eq!(conn.session.shop_point, 1000);
+    assert!(conn.session.homdo.is_empty());
+
+    // 3. Sub 1 (42 01) insufficient points (price = 1500 > 1000) -> F4440300420E02
+    let mut out_poor = HandleOutcome::default();
+    let price_1500 = 1500u16.to_le_bytes();
+    let item_26001 = 26001u16.to_le_bytes();
+    let poor_payload = [0u8, 0, 0, item_26001[0], item_26001[1], price_1500[0], price_1500[1]];
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out_poor,
+            opcode: 0x42,
+            sub: 1,
+            payload: &poor_payload,
+            decoded: &[],
+            env,
+        };
+        handle_gm_shop(&mut ctx).await;
+    }
+    assert_eq!(out_poor.outgoing.len(), 1);
+    assert_eq!(out_poor.outgoing[0].frame, "F4440300420E02");
+    assert_eq!(conn.session.shop_point, 1000);
+
+    // 4. Sub 1 (42 01) successful purchase (price = 250) -> DB + RAM updated, emits 17 06 + 42 02 + 1A 04
+    let mut out_ok = HandleOutcome::default();
+    let price_250 = 250u16.to_le_bytes();
+    let ok_payload = [0u8, 0, 0, item_26001[0], item_26001[1], price_250[0], price_250[1]];
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out_ok,
+            opcode: 0x42,
+            sub: 1,
+            payload: &ok_payload,
+            decoded: &[],
+            env,
+        };
+        handle_gm_shop(&mut ctx).await;
+    }
+    assert_eq!(conn.session.shop_point, 750);
+    assert_eq!(conn.session.homdo.len(), 1);
+    assert_eq!(conn.session.homdo[0].id, 26001);
+    assert!(out_ok.outgoing.iter().any(|f| f.frame.starts_with("F4440E001706")));
+    assert!(out_ok.outgoing.iter().any(|f| f.frame == shop_points_frame(750)));
+    assert!(out_ok.outgoing.iter().any(|f| f.frame == currency_sync_frame(500, 750)));
+
+    let db_points: i64 = sqlx::query_scalar("SELECT shoppoint FROM character_money WHERE playerid = ?")
+        .bind(char_id)
+        .fetch_one(&pool.read)
+        .await
+        .unwrap();
+    assert_eq!(db_points, 750);
+
+    // 5. Sub 1 (42 01) DB failure -> RAM unchanged and no 17 06 emitted
+    let closed_pool = pool.clone();
+    closed_pool.write.close().await;
+    let env_closed = ServerEnv {
+        pool: Some(&closed_pool),
+        repos: None,
+        hub: None,
+        sender: None,
+    };
+    let mut out_fail = HandleOutcome::default();
+    {
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            data: &data,
+            service: &service,
+            out: &mut out_fail,
+            opcode: 0x42,
+            sub: 1,
+            payload: &ok_payload,
+            decoded: &[],
+            env: env_closed,
+        };
+        handle_gm_shop(&mut ctx).await;
+    }
+    assert_eq!(conn.session.shop_point, 750);
+    assert_eq!(conn.session.homdo.len(), 1);
+    assert!(!out_fail.outgoing.iter().any(|f| f.frame.starts_with("F4440E001706")));
+}
+
 
 

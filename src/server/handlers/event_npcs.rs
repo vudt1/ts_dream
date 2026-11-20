@@ -13,7 +13,7 @@
 use crate::data::loader::GameData;
 use crate::db::pool::DbPool;
 use crate::server::dispatcher::HandleOutcome;
-use crate::server::handlers::shops::gold_frame;
+use crate::server::handlers::shops::currency_sync_frame;
 use crate::server::handlers::talk::end_talk;
 use crate::server::session::{Conn, InventoryItem};
 
@@ -48,7 +48,7 @@ pub async fn try_handle_event_npc(
             if conn.session.gold >= 500 {
                 conn.session.gold -= 500;
                 conn.session.ghost = 0;
-                out.send(gold_frame(conn.session.gold));
+                out.send(currency_sync_frame(conn.session.gold, conn.session.shop_point));
                 let sync = crate::server::spawn::state_sync_frame(conn.session.id, 1, 0);
                 out.send(sync.clone());
                 out.broadcast(conn.session.id, &sync);
@@ -86,7 +86,7 @@ pub async fn try_handle_event_npc(
             true
         } else if conn.session.gold >= 1000 {
             conn.session.gold -= 1000;
-            out.send(gold_frame(conn.session.gold));
+            out.send(currency_sync_frame(conn.session.gold, conn.session.shop_point));
             true
         } else {
             false

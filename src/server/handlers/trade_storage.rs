@@ -488,8 +488,9 @@ pub async fn handle_trade(ctx: &mut OpcodeCtx<'_>) {
                     } else if a_gold > b_gold {
                         ctx.out.send(format!("F44406001A02{}", encoder::le32(a_gold - b_gold)));
                     }
-                    ctx.out.send(crate::server::handlers::shops::gold_frame(
+                    ctx.out.send(crate::server::handlers::shops::currency_sync_frame(
                         ctx.conn.session.gold,
+                        ctx.conn.session.shop_point,
                     ));
 
                     // Emit item changes (17 09 remove, 17 06 add)
@@ -510,7 +511,10 @@ pub async fn handle_trade(ctx: &mut OpcodeCtx<'_>) {
                         }
                         hub.send_to(
                             partner_id,
-                            &crate::server::handlers::shops::gold_frame(partner.gold),
+                            &crate::server::handlers::shops::currency_sync_frame(
+                                partner.gold,
+                                partner.shop_point,
+                            ),
                         )
                         .await;
 
@@ -635,8 +639,9 @@ pub async fn handle_trade(ctx: &mut OpcodeCtx<'_>) {
                     let partner_after = partner.clone();
                     registry_put(partner_after.clone());
                     registry_update_if_online(&ctx.conn.session);
-                    ctx.out.send(crate::server::handlers::shops::gold_frame(
+                    ctx.out.send(crate::server::handlers::shops::currency_sync_frame(
                         ctx.conn.session.gold,
+                        ctx.conn.session.shop_point,
                     ));
                     if let Some(stt) = current_offered_stt {
                         ctx.out.send(removed_pet_frame(ctx.conn.session.id, stt));
@@ -661,7 +666,10 @@ pub async fn handle_trade(ctx: &mut OpcodeCtx<'_>) {
                     if let Some(hub) = ctx.env.hub {
                         hub.send_to(
                             partner_id,
-                            &crate::server::handlers::shops::gold_frame(partner_after.gold),
+                            &crate::server::handlers::shops::currency_sync_frame(
+                                partner_after.gold,
+                                partner_after.shop_point,
+                            ),
                         )
                         .await;
                         if let Some(stt) = partner_offered_stt {

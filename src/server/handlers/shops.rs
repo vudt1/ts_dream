@@ -1,28 +1,34 @@
 //! NPC shop buy/sell (Opcode 0x1B) & Player shop (Opcode 0x17 subs 30–33) handlers.
 
 use crate::db::persist;
-use crate::protocol::{encoder, GOLD_CAP};
+use crate::protocol::{encoder, GOLD_CAP, POINT_CAP};
 use crate::server::dispatcher::OpcodeCtx;
 use crate::server::session::{Conn, InventoryItem};
 use crate::server::spawn::sys_msg_frame;
 
-/// `F44406001A04` + gold — the gold-update frame sent after
-/// every successful shop transaction (also used by the Eve gold action in
-/// `handlers::talk`). Gold is clamped to GOLD_CAP (9,999,999) to prevent client desync.
-pub fn gold_frame(gold: u32) -> String {
+/// `F4440A001A04` + `le32(gold)` + `le32(shop_point)` — 10-byte currency sync
+/// frame (`FUN_0079175f` `case 4`: writes `player+0x12F8` gold and `player+0x1300`
+/// shop_point simultaneously).
+pub fn currency_sync_frame(gold: u32, shop_point: u32) -> String {
     let clamped_gold = gold.min(GOLD_CAP);
+    let clamped_point = shop_point.min(POINT_CAP);
     format!(
-        "F44406001A04{}",
-        encoder::le32(clamped_gold)
+        "F4440A001A04{}{}",
+        encoder::le32(clamped_gold),
+        encoder::le32(clamped_point)
     )
 }
 
-/// `F44406001A03` + point — shop point sync frame (6 bytes wire).
-pub fn point_frame(point: u32) -> String {
-    format!(
-        "F44406001A03{}",
-        encoder::le32(point)
-    )
+/// Legacy wrapper for `currency_sync_frame(gold, 0)`. Prefer `currency_sync_frame`
+/// whenever a `Session` is available so `player+0x1300` is not zeroed out.
+pub fn gold_frame(gold: u32) -> String {
+    currency_sync_frame(gold, 0)
+}
+
+/// `F44402001A03` — money capacity error frame ("Dung lượng tiền bạc không đủ",
+/// `FUN_0079175f` `case 3`).
+pub fn money_capacity_error_frame() -> &'static str {
+    "F44402001A03"
 }
 
 /// Helper building S->C `1B 03` frame opening the NPC shop dialogue form.
@@ -276,7 +282,7 @@ pub async fn handle_npc_shop(ctx: &mut OpcodeCtx<'_>) {
                 for item in &granted_items {
                     out.send(crate::server::inventory::item_added_frame(item));
                 }
-                out.send(gold_frame(conn.session.gold));
+                out.send(currency_sync_frame(conn.session.gold, conn.session.shop_point));
                 out.send(npc_shop_buy_result(crate::protocol::NPC_SHOP_BUY_SUCCESS));
                 return;
             }
@@ -348,7 +354,7 @@ pub async fn handle_npc_shop(ctx: &mut OpcodeCtx<'_>) {
 
             // Wire sequence: 1A 02 -> 1A 04 -> multiple 17 06 -> 1B 01 00
             out.send(format!("F44406001A02{}", encoder::le32(total_cost)));
-            out.send(gold_frame(conn.session.gold));
+            out.send(currency_sync_frame(conn.session.gold, conn.session.shop_point));
             for item in &added_items {
                 out.send(crate::server::inventory::item_added_frame(item));
             }
@@ -415,7 +421,7 @@ pub async fn handle_npc_shop(ctx: &mut OpcodeCtx<'_>) {
 
             // Wire sequence: 1A 01 -> 1A 04 -> 17 09 -> 1B 02 00
             out.send(format!("F44406001A01{}", encoder::le32(revenue)));
-            out.send(gold_frame(conn.session.gold));
+            out.send(currency_sync_frame(conn.session.gold, conn.session.shop_point));
             out.send(format!("F44404001709{:02X}{:02X}", slot, qty));
             out.send(npc_shop_sell_result(crate::protocol::NPC_SHOP_SELL_SUCCESS));
         }
@@ -758,13 +764,13 @@ pub async fn handle_player_shop(ctx: &mut OpcodeCtx<'_>) {
                         .lock()
                         .unwrap()
                         .insert(seller_id, seller_session.clone());
-                    out.send(gold_frame(conn.session.gold));
+                    out.send(currency_sync_frame(conn.session.gold, conn.session.shop_point));
                     // Refresh the buyer's view of the seller's catalog.
                     out.send(player_shop_catalog_frame(&seller_session));
                     out.send(crate::server::inventory::item_added_frame(&res.item));
                     if let Some(hub) = hub {
                         // Notify the seller of the gold received.
-                        let seller_gold = gold_frame(seller_session.gold);
+                        let seller_gold = currency_sync_frame(seller_session.gold, seller_session.shop_point);
                         hub.send_to(seller_id, &seller_gold).await;
                         // Gói gỡ/trừ đồ trên quầy
                         hub.send_to(seller_id, &format!("F44404001709{:02X}{:02X}", res.item.slot, res.count)).await;

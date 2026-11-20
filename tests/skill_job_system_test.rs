@@ -172,6 +172,7 @@ fn create_test_event_session(results: Vec<ts_dream::data::loaders::EveResult>) -
         last_choice_code: 0,
         battle_result: 0,
         matched_condition_no: 0,
+        last_step_sent_ms: 0,
     }
 }
 

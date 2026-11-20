@@ -283,7 +283,7 @@ async fn test_menu_surface_and_choice_branching() {
             .current_event_session
             .as_ref()
             .expect("branch session must activate");
-        assert_eq!(ev.phase, EventPhase::Executing, "branch resumed execution");
+        assert_eq!(ev.phase, EventPhase::AwaitingTalkAck, "branch resumed execution and awaits talk ack");
         assert_eq!(ev.last_choice_code, 30, "choice recorded on the session");
         assert_eq!(ev.last_surface_id, 3, "Surface context carried into the branch");
         assert_eq!(ev.matched_condition_no, 3, "cls10 chain 30 must win");

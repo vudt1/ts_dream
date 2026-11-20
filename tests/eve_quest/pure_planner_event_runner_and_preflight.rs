@@ -158,6 +158,7 @@ fn pure_planner_never_emits_0x14_for_rt_ge_7_and_handles_autochain_negative_psty
         last_choice_code: -1,
         battle_result: 0,
         matched_condition_no: 0,
+        last_step_sent_ms: 0,
     });
     let mut out = HandleOutcome::default();
     execute_event_step(&mut session, &data, &mut out);
@@ -189,6 +190,7 @@ fn pure_planner_never_emits_0x14_for_rt_ge_7_and_handles_autochain_negative_psty
         last_choice_code: -1,
         battle_result: 0,
         matched_condition_no: 1,
+        last_step_sent_ms: 0,
     };
     let give_pstyle0 = EventSession {
         results: vec![EveResult {

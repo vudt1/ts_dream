@@ -17,7 +17,7 @@ use ts_dream::db::pool::{bootstrap, DbPool};
 /// Environment variable overriding the test database URL.
 pub const TEST_DB_URL_ENV: &str = "TS_TEST_DB_URL";
 
-const DB_LOCK_TIMEOUT: Duration = Duration::from_secs(15);
+const DB_LOCK_TIMEOUT: Duration = Duration::from_secs(120);
 const SCHEMA: &str = include_str!("../../migrations/0001_init.sql");
 const MIGRATION_0002: &str = include_str!("../../migrations/0002_eve_quest_persistence.sql");
 const MIGRATION_0003: &str = include_str!("../../migrations/0003_seasonal_festivals.sql");

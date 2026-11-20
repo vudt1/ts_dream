@@ -782,6 +782,8 @@ async fn drain_outbound(
     }
 }
 
+const DEFAULT_TALK_DWELL_MS: u64 = 2000;
+
 /// Connection handler for game TCP streams: frames inbound, dispatches opcodes,
 /// writes outgoing frames, registers/logins the client and fans out
 /// map-broadcast frames to peers.
@@ -812,6 +814,7 @@ async fn handle_client_connection(
     let mut player_disc_rx = control.player_disconnect_tx.subscribe();
 
     let mut conn = Conn::with_peer_ip(peer.ip().to_string());
+    conn.session.min_talk_dwell_ms = DEFAULT_TALK_DWELL_MS;
     let mut buf = vec![0u8; 8192];
     let mut logined_id = 0u32;
 
@@ -836,7 +839,176 @@ async fn handle_client_connection(
                 None
             }
         });
+        let talk_advance_sleep_ms = conn.session.pending_talk_advance.and_then(|pending| {
+            let can_fire = match pending.kind {
+                crate::server::session::TalkAdvanceKind::EveStep => {
+                    conn.session.battle_id == 0 && conn.session.current_event_session.is_some()
+                }
+                crate::server::session::TalkAdvanceKind::LegacyDialog => {
+                    !conn.session.pending_legacy_dialogs.is_empty()
+                }
+            };
+            if can_fire {
+                let now = crate::server::session::now_ms();
+                Some(pending.due_ms.saturating_sub(now))
+            } else {
+                None
+            }
+        });
         tokio::select! {
+            _ = async {
+                match talk_advance_sleep_ms {
+                    Some(ms) => tokio::time::sleep(Duration::from_millis(ms)).await,
+                    None => std::future::pending::<()>().await,
+                }
+            }, if talk_advance_sleep_ms.is_some() => {
+                if let Some(pending) = conn.session.pending_talk_advance {
+                    if logined_id > 0 {
+                        let _guard =
+                            crate::server::session::lock_player_operations([logined_id]).await;
+                        if let Some(snapshot) = crate::server::session::registry_get(logined_id) {
+                            conn.session = snapshot;
+                        }
+                    }
+                    let still_valid = conn.session.pending_talk_advance == Some(pending)
+                        && match pending.kind {
+                            crate::server::session::TalkAdvanceKind::EveStep => {
+                                conn.session.battle_id == 0
+                                    && conn.session.current_event_session.is_some()
+                            }
+                            crate::server::session::TalkAdvanceKind::LegacyDialog => {
+                                !conn.session.pending_legacy_dialogs.is_empty()
+                            }
+                        };
+                    if still_valid {
+                        let pre_snapshot = Some(conn.session.clone());
+                        conn.session.pending_talk_advance = None;
+                        let mut out = crate::server::dispatcher::HandleOutcome::default();
+                        match pending.kind {
+                            crate::server::session::TalkAdvanceKind::EveStep => {
+                                if let Some(ev) = conn.session.current_event_session.as_mut() {
+                                    ev.current_index = ev.current_index.saturating_add(1);
+                                }
+                                crate::server::handlers::talk::execute_event_step_with_pool(
+                                    &mut conn.session,
+                                    &data,
+                                    pool.as_ref(),
+                                    &mut out,
+                                )
+                                .await;
+                            }
+                            crate::server::session::TalkAdvanceKind::LegacyDialog => {
+                                if let Some(next_frame) =
+                                    conn.session.pending_legacy_dialogs.pop_front()
+                                {
+                                    if next_frame == "F44402001408" {
+                                        conn.session.select_menu = 40;
+                                    }
+                                    out.send(next_frame);
+                                    let now = crate::server::session::now_ms();
+                                    conn.session.last_talk_sent_ms = now;
+                                    if !conn.session.pending_legacy_dialogs.is_empty()
+                                        && conn.session.min_talk_dwell_ms > 0
+                                    {
+                                        conn.session.pending_talk_advance = Some(
+                                            crate::server::session::PendingTalkAdvance {
+                                                due_ms: now.saturating_add(
+                                                    conn.session.min_talk_dwell_ms,
+                                                ),
+                                                kind: crate::server::session::TalkAdvanceKind::LegacyDialog,
+                                            },
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        if let Some(trigger) = out.battle_trigger.take() {
+                            service.start_teamdef_battle(&mut conn.session, &trigger);
+                            conn.session.clear_walk_tracking();
+                        }
+                        if logined_id > 0 {
+                            let _guard =
+                                crate::server::session::lock_player_operations([logined_id])
+                                    .await;
+                            let merged = {
+                                let mut sessions = lock_online_sessions();
+                                let next = match (
+                                    pre_snapshot.as_ref(),
+                                    sessions.get(&logined_id),
+                                ) {
+                                    (Some(base), Some(remote))
+                                        if remote.sync_revision != base.sync_revision =>
+                                    {
+                                        crate::server::session::merge_post_dispatch(
+                                            base,
+                                            &conn.session,
+                                            remote,
+                                        )
+                                    }
+                                    _ => {
+                                        let mut next = conn.session.clone();
+                                        next.sync_revision = sessions
+                                            .get(&logined_id)
+                                            .map_or(0, |s| s.sync_revision.wrapping_add(1));
+                                        next
+                                    }
+                                };
+                                sessions.insert(logined_id, next.clone());
+                                next
+                            };
+                            conn.session = merged.clone();
+                            service.register_sender(
+                                i64::from(logined_id),
+                                Arc::new(tokio::sync::RwLock::new(merged)),
+                                tx.clone(),
+                            );
+                        }
+                        for frame in &out.outgoing {
+                            match tx.try_send(frame.frame.clone()) {
+                                Ok(()) => {}
+                                Err(mpsc::error::TrySendError::Full(_)) => {
+                                    tracing::warn!(
+                                        peer_ip = %peer_ip,
+                                        "client outbound queue full, disconnecting client"
+                                    );
+                                    close = true;
+                                    break;
+                                }
+                                Err(mpsc::error::TrySendError::Closed(_)) => {
+                                    close = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if close {
+                            break;
+                        }
+                        if let Some((fight_id, diahinh)) = out.eve_battle {
+                            conn.session.clear_walk_tracking();
+                            service.start_eve_encounter(&mut conn.session, fight_id, diahinh);
+                            if logined_id > 0 {
+                                let _guard = crate::server::session::lock_player_operations([
+                                    logined_id,
+                                ])
+                                .await;
+                                crate::server::session::registry_update_if_online(
+                                    &conn.session,
+                                );
+                                if let Some(synced) =
+                                    crate::server::session::registry_get(logined_id)
+                                {
+                                    conn.session = synced.clone();
+                                }
+                                service.register_sender(
+                                    i64::from(logined_id),
+                                    Arc::new(tokio::sync::RwLock::new(conn.session.clone())),
+                                    tx.clone(),
+                                );
+                            }
+                        }
+                    }
+                }
+            }
             _ = async {
                 match meet_door_sleep_ms {
                     Some(ms) => tokio::time::sleep(Duration::from_millis(ms)).await,
@@ -917,10 +1089,6 @@ async fn handle_client_connection(
                             );
                         }
                         for frame in &out.outgoing {
-                            if frame.delay_ms > 0 {
-                                tokio::time::sleep(Duration::from_millis(frame.delay_ms))
-                                    .await;
-                            }
                             match tx.try_send(frame.frame.clone()) {
                                 Ok(()) => {}
                                 Err(mpsc::error::TrySendError::Full(_)) => {
@@ -1088,13 +1256,6 @@ async fn handle_client_connection(
                                 );
                             }
                             for frame in &out.outgoing {
-                                // Dialog fragments are paced (500 ms between
-                                // dialog splits); honor it on the
-                                // live connection, never blocking the runtime.
-                                if frame.delay_ms > 0 {
-                                    tokio::time::sleep(Duration::from_millis(frame.delay_ms))
-                                        .await;
-                                }
                                 match tx.try_send(frame.frame.clone()) {
                                     Ok(()) => {}
                                     Err(mpsc::error::TrySendError::Full(_)) => {
@@ -1152,6 +1313,7 @@ async fn handle_client_connection(
                             }
                             if conn.session.logined && logined_id == 0 && id > 0 {
                                 logined_id = id;
+                                conn.session.min_talk_dwell_ms = DEFAULT_TALK_DWELL_MS;
                             }
                             if out.shutdown {
                                 app.write().await.push_log(

@@ -375,6 +375,7 @@ fn ticket11_auto_chain_battle_result_zero_and_same_condition_guard() {
         last_choice_code: -1,
         battle_result: 0,
         matched_condition_no: 1,
+        last_step_sent_ms: 0,
     };
     let mut rng = DotNetRandom::new(1);
     match EveAutoChainEngine::try_auto_chain(&scene, &completed_diff, &state, &mut rng) {
@@ -387,6 +388,7 @@ fn ticket11_auto_chain_battle_result_zero_and_same_condition_guard() {
     // Negative: identical matched_condition_no (2 -> 2) must be stopped by Guard #1!
     let completed_same = EventSession {
         matched_condition_no: 2,
+        last_step_sent_ms: 0,
         ..completed_diff
     };
     assert_eq!(

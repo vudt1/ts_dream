@@ -388,6 +388,7 @@ fn ticket14_auto_chain_door_respects_when_happen() {
         last_choice_code: -1,
         battle_result: 0,
         matched_condition_no: 1,
+        last_step_sent_ms: 0,
     };
     let mut rng = DotNetRandom::new(42);
     let chained = EveAutoChainEngine::try_auto_chain(&scene, &completed, &PlayerEventState::default(), &mut rng);

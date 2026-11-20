@@ -40,10 +40,27 @@ pub(crate) fn reset_talk_context(session: &mut Session) {
     session.warp_finish = false;
     session.talk_locked = false;
     session.current_event_session = None;
+    session.pending_talk_advance = None;
+    session.pending_legacy_dialogs.clear();
 }
 
 /// EndTalk packet + reset the whole talk context, over a bare [`Session`].
 pub fn end_talk_session(session: &mut Session, out: &mut HandleOutcome) {
+    if let Some(ev) = session.current_event_session.as_ref() {
+        if matches!(
+            ev.trigger_kind,
+            EventTriggerKind::MeetDoor | EventTriggerKind::ClickDoor
+        ) && i32::from(session.map_id) == ev.map_id
+        {
+            if let Ok(door_id) = u16::try_from(ev.npc_click_id) {
+                session.door_trigger_cooldown = Some((
+                    session.map_id,
+                    door_id,
+                    crate::server::session::now_ms().saturating_add(1500),
+                ));
+            }
+        }
+    }
     if session.current_event_session.is_some() || session.talk_locked {
         let char_id = session.id;
         out.send(NpcTalkCodec::build_talk_lock_hex(
@@ -68,18 +85,45 @@ pub(crate) fn eve_rng_seed() -> i32 {
         .unwrap_or(12345)
 }
 
-/// Split a dialog hex string on `F444` and emit each fragment 500 ms apart.
-/// Frame order is preserved.
+/// Split a dialog hex string on `F444` and emit fragments.
+/// When `min_talk_dwell_ms == 0` (synchronous unit tests), queues delayed frames immediately.
+/// When `min_talk_dwell_ms > 0` (live TCP), sends the first fragment immediately and schedules
+/// remaining fragments in `pending_legacy_dialogs` via `pending_talk_advance`.
 pub fn talk_messages(conn: &mut Conn, talk_string: &str, out: &mut HandleOutcome) {
-    for part in talk_string.split("F444") {
-        if !part.is_empty() {
-            let frame = format!("F444{part}");
+    let fragments: Vec<String> = talk_string
+        .split("F444")
+        .filter(|part| !part.is_empty())
+        .map(|part| format!("F444{part}"))
+        .collect();
+    let Some((first, rest)) = fragments.split_first() else {
+        return;
+    };
+    if first == "F44402001408" {
+        conn.session.select_menu = 40;
+    }
+    out.send(first.clone());
+    let now = crate::server::session::now_ms();
+    conn.session.last_talk_sent_ms = now;
+    if rest.is_empty() {
+        return;
+    }
+    if conn.session.min_talk_dwell_ms == 0 {
+        for frame in rest {
             if frame == "F44402001408" {
                 conn.session.select_menu = 40;
             }
-            out.send_delayed(frame, 500);
+            out.send_delayed(frame.clone(), 500);
         }
+        return;
     }
+    conn.session.pending_legacy_dialogs.clear();
+    for frame in rest {
+        conn.session.pending_legacy_dialogs.push_back(frame.clone());
+    }
+    conn.session.pending_talk_advance = Some(crate::server::session::PendingTalkAdvance {
+        due_ms: now.saturating_add(conn.session.min_talk_dwell_ms),
+        kind: crate::server::session::TalkAdvanceKind::LegacyDialog,
+    });
 }
 
 /// Dispatch Opcode 0x14 — NpcEvent (NPC talk / gate / scene-script).
@@ -269,7 +313,12 @@ async fn handle_talk_continue(
     out: &mut HandleOutcome,
 ) {
     if conn.session.current_event_session.is_some() {
-        if let Some(ev) = conn.session.current_event_session.as_mut() {
+        if conn.session.pending_talk_advance.is_some() {
+            tracing::debug!("ignoring duplicate talk-continue while pending_talk_advance is scheduled");
+            return;
+        }
+        let dwell_ms = conn.session.min_talk_dwell_ms;
+        let should_defer = if let Some(ev) = conn.session.current_event_session.as_mut() {
             if ev.phase == EventPhase::AwaitingChoice {
                 tracing::debug!("ignoring talk-continue while awaiting Surface choice");
                 return;
@@ -278,7 +327,27 @@ async fn handle_talk_continue(
                 tracing::debug!("ignoring talk-continue while awaiting eve battle");
                 return;
             }
-            ev.current_index = ev.current_index.saturating_add(1);
+            if dwell_ms > 0 && ev.phase == EventPhase::AwaitingTalkAck {
+                let elapsed = crate::server::session::now_ms().saturating_sub(ev.last_step_sent_ms);
+                if elapsed < dwell_ms {
+                    Some(ev.last_step_sent_ms.saturating_add(dwell_ms))
+                } else {
+                    ev.current_index = ev.current_index.saturating_add(1);
+                    None
+                }
+            } else {
+                ev.current_index = ev.current_index.saturating_add(1);
+                None
+            }
+        } else {
+            None
+        };
+        if let Some(due_ms) = should_defer {
+            conn.session.pending_talk_advance = Some(crate::server::session::PendingTalkAdvance {
+                due_ms,
+                kind: crate::server::session::TalkAdvanceKind::EveStep,
+            });
+            return;
         }
         execute_event_step_with_pool(&mut conn.session, data, pool, out).await;
         return;
@@ -387,6 +456,15 @@ async fn handle_talk_click_door(
     out: &mut HandleOutcome,
 ) {
     if payload.len() < 2 {
+        if conn
+            .session
+            .current_event_session
+            .as_ref()
+            .is_some_and(|ev| ev.phase == EventPhase::AwaitingMovieAck)
+        {
+            let _ = clear_pending_if_active_event(&conn.session, out);
+            return;
+        }
         end_talk(conn, out);
         return;
     }

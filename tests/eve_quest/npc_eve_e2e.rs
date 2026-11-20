@@ -146,6 +146,7 @@ fn session_with_event(map_id: u16, results: Vec<EveResult>) -> Session {
         last_choice_code: -1,
         battle_result: 0,
         matched_condition_no: 0,
+        last_step_sent_ms: 0,
     });
     session
 }
@@ -364,7 +365,10 @@ fn action_class5_gold_type1_points_then_gold() {
     let mut out = HandleOutcome::default();
     execute_event_step(&mut session, &data, &mut out);
     assert_eq!(session.gold, 1700);
-    assert_eq!(out.outgoing[0].frame, gold_frame(1700));
+    assert_eq!(
+        out.outgoing[0].frame,
+        ts_dream::server::handlers::shops::currency_sync_frame(1700, session.shop_point)
+    );
     assert_eq!(session.point, 0);
 
     // Type 2: deduct gold with saturating_sub (Task 2.1).
@@ -375,7 +379,10 @@ fn action_class5_gold_type1_points_then_gold() {
     execute_event_step(&mut session, &data, &mut out);
     assert_eq!(session.gold, 7);
     assert_eq!(session.point, 7);
-    assert_eq!(out.outgoing[0].frame, gold_frame(7));
+    assert_eq!(
+        out.outgoing[0].frame,
+        ts_dream::server::handlers::shops::currency_sync_frame(7, session.shop_point)
+    );
 
     // Type 2 when amount exceeds owned gold: rejected All-or-Nothing by Pre-Flight Probe (Ticket 06):
     let mut session = session_with_event(SOURCE_MAP, vec![gold_action(2, 999)]);
@@ -551,6 +558,7 @@ async fn battle_parks_after_talk_and_stray_inputs_are_ignored() {
         last_choice_code: -1,
         battle_result: 0,
         matched_condition_no: 0,
+        last_step_sent_ms: 0,
     });
 
     // 1) Talk-start delivery: the Talk frame goes out first (the connection
@@ -563,7 +571,7 @@ async fn battle_parks_after_talk_and_stray_inputs_are_ignored() {
     {
         let ev = conn.session.current_event_session.as_ref().expect("session");
         assert_eq!(ev.current_index, 0, "Talk leaves the index on the delivered result");
-        assert_eq!(ev.phase, EventPhase::Executing);
+        assert_eq!(ev.phase, EventPhase::AwaitingTalkAck);
     }
 
     // 2) Sub 6 continue advances onto the Battle result and parks the session:

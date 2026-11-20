@@ -390,6 +390,17 @@ pub fn store_frame(point: u32) -> String {
     crate::protocol::frame(OPCODE_STORE, &body)
 }
 
+/// Login shop-point banner + chat-log frame (`23 04` with `A = 0, B = shop_point, D = 0`).
+/// Client displays `"Điểm số còn dư <A+B>"` and writes `player+0x146C = A*100 + B = shop_point`.
+pub fn shop_point_banner_frame(shop_point: u32) -> String {
+    let clamped = shop_point.min(crate::protocol::POINT_CAP);
+    let mut body = String::new();
+    body.push_str("00000000"); // A = 0
+    body.push_str(&encoder::le32(clamped)); // B = shop_point
+    body.push_str(&"00".repeat(8)); // D = 0.0
+    crate::protocol::frame(OPCODE_STORE, &body)
+}
+
 /// Client-verified S→C notice frames (aLogin bus semantics, see
 /// `.scratch/client-pseudo-op-code/opcode_17.md` §3–§4 and `opcode_0b.md`
 /// §2–§3). These carry only static client-side text/effects, so they are
@@ -622,15 +633,14 @@ pub fn build_logined_sequence_session_ext(s: &Session) -> Vec<String> {
     // 11. Step 11: Equipped
     frames.push(s.dump_trangbi());
 
-    // 12. Step 12: Gold & Bank Gold & Shop Point
-    // Gold sync: 1A 04 <gold: u32 LE> (6 bytes wire)
-    frames.push(crate::server::handlers::shops::gold_frame(s.gold));
+    // 12. Step 12: Gold + Shop Point (1A 04, 10 bytes wire) & Bank Gold
+    frames.push(crate::server::handlers::shops::currency_sync_frame(
+        s.gold,
+        s.shop_point,
+    ));
 
     // Bank gold sync: 1D 04 <bank_gold: u32 LE> (unconditionally sent on login)
     frames.push(format!("F44406001D04{}", encoder::le32(s.bank_gold.min(GOLD_CAP))));
-
-    // Shop point sync: 1A 03 <shop_point: u32 LE> (6 bytes wire)
-    frames.push(crate::server::handlers::shops::point_frame(s.shop_point));
 
     // 13. Step 13: Server name ("TSDREAM")
     frames.push(server_name_frame(s.id, "TSDREAM"));
@@ -657,10 +667,9 @@ pub fn build_logined_sequence_session_ext(s: &Session) -> Vec<String> {
     // 20. Step 20: Hotbar
     frames.push(s.dump_hotkeys());
 
-    // 21. Step 21: God / HP store / SP store (3x)
-    frames.push(store_frame(s.god));
-    frames.push(store_frame(s.hp_store));
-    frames.push(store_frame(s.sp_store));
+    // 21. Step 21: Shop-point banner (`23 04` with A=0, B=shop_point) + Item Mall sync (`42 02 <u32 LE>`)
+    frames.push(shop_point_banner_frame(s.shop_point));
+    frames.push(crate::server::handlers::system::shop_points_frame(s.shop_point));
 
     // 22. Step 22: Quest state sync (Opcode 0x18: bulk quest log `Sub 0x06`,
     //     bulk quest-dont `Sub 0x07`) — emitted in `tasks -> dont` order
