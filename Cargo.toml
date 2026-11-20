@@ -3,6 +3,7 @@ name = "ts_dream"
 version = "0.1.0"
 edition = "2021"
 description = "TS Dream - TS offline server written by Rust"
+default-run = "ts_dream"
 
 [[bin]]
 name = "ts_dream"

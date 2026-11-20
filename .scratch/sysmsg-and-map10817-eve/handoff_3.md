@@ -1,6 +1,6 @@
 # Walkthrough — Khắc Phục Lỗi Live-Test & Chuẩn Hóa Kiến Trúc Tương Tác
 
-Toàn bộ các hạng mục trong [implementation_plan.md](file:///C:/Users/tuan.vu/.gemini/antigravity-cli/brain/9e93aebe-37ba-4a63-aac9-c6ad2b6d6e63/implementation_plan.md) đã được triển khai qua 3 subagent song song và vượt qua toàn bộ **699 tests** trên cả 11 test suite chuẩn (`cargo test --all-targets --no-fail-fast`).
+Toàn bộ các hạng mục trong [implementation_plan.md](file:///C:/Users/tuan.vu/.gemini/antigravity-cli/brain/9e93aebe-37ba-4a63-aac9-c6ad2b6d6e63/implementation_plan.md) cùng phần sửa bổ sung cho **Map `10817` Door #1 (`eve_no = 7`)** đã được triển khai và vượt qua toàn bộ **700 tests** trên cả 11 test suite chuẩn (`cargo test --all-targets --no-fail-fast`).
 
 ---
 
@@ -34,11 +34,19 @@ Toàn bộ các hạng mục trong [implementation_plan.md](file:///C:/Users/tua
   - Đánh dấu `PlayMovie` (`rt=5`) và `MoveEntity` (`rt=4`) là blocking (`StepOutcome::Halt` chờ `14 06`).
 - [talk.rs](file:///D:/VUDT/GIT_PCC/ts_dream/src/server/handlers/talk.rs): ưu tiên `npc_event::resolve_npc_event` trước các nhánh Banker/Inn hardcoded fallback, và thay `"0100"` hardcoded trong `handle_inn_menu` bằng `encoder::le16(conn.session.idtalking as u16)`.
 
+## 6. Sửa Bổ Sung Map `10817` Door #1 (`eve_no = 7`) & `Cargo.toml`
+- **Nghiên cứu capture `packet_10817_new.txt` & `packet_10817_new_2.txt`**: chi tiết đối chiếu `eve_no = 4` (NPC #4) vs `eve_no = 7` (Door #1) xem tại [research_playmovie_10817.md](file:///D:/VUDT/GIT_PCC/ts_dream/.scratch/sysmsg-and-map10817-eve/research_playmovie_10817.md).
+  - `packet_10817_new_2.txt` cho thấy `06 01` tới `(1302, 695)` đã mở `eve_no = 7` (`MeetDoor`, phát `06 02`, `14 2C 01`, `14 01 mean=10447`), nhưng bị client tự động gửi `14 04 01 00` và `06 02` (stop-walk echo) làm server đóng hội thoại (`14 2C 02` / `14 08`).
+- [talk.rs](file:///D:/VUDT/GIT_PCC/ts_dream/src/server/handlers/talk.rs): thêm helper `clear_pending_if_active_event` (phát `14 09` qua `NpcTalkCodec::build_clear_pending_hex()` khi `session.current_event_session.is_some()`), áp dụng cho `handle_talk_start` (`14 01 <npc_id>`, giữ check `payload.len() < 2`), `handle_talk_click_door` (`14 04 <door_id>`, giữ bare `14 04` làm `end_talk`), và `handle_talk_warp` (`14 08`).
+- [movement.rs](file:///D:/VUDT/GIT_PCC/ts_dream/src/server/handlers/movement.rs): trong `handle_move_inner` (`sub == 2`), chỉ gửi `F44402001408` khi `conn.session.current_event_session.is_none() && !conn.session.talk_locked` để không đóng UI thoại/mở khóa đi bộ khi `06 02` echo về giữa lúc đang chạy event.
+- [missing_eve_effect_executors.rs](file:///D:/VUDT/GIT_PCC/ts_dream/tests/eve_quest/missing_eve_effect_executors.rs): thêm test `map_10817_door_1_survives_14_04_and_06_02_echo_then_plays_movies` kiểm chứng `MeetDoor(1)` → `14 04 01 00` (`14 09`) → `06 02` (không phát `14 08`) → `14 01` (`14 09`) → 5x `14 06` → `PlayMovie(17)` → `PlayMovie(18)` → `Warp(10867)` → idle `06 02` (`14 08`).
+- [Cargo.toml](file:///D:/VUDT/GIT_PCC/ts_dream/Cargo.toml#L5-L6): thêm `default-run = "ts_dream"` trong `[package]` để có thể chạy thẳng `cargo run`.
+
 ---
 
 ## Kết Quả Kiểm Thử (`cargo test --all-targets --no-fail-fast`)
 
-Tất cả 11 test suite chuẩn đều pass (**699 passed, 0 failed**):
+Tất cả 11 test suite chuẩn đều pass (**700 passed, 0 failed**):
 
 | Suite | Kết quả |
 | --- | --- |
@@ -48,7 +56,7 @@ Tất cả 11 test suite chuẩn đều pass (**699 passed, 0 failed**):
 | `data_loaders_test` | 40 passed, 0 failed |
 | `db_test` | 23 passed, 0 failed |
 | `economy_inventory_test` | 62 passed, 0 failed |
-| `eve_quest_test` | 143 passed, 0 failed |
+| `eve_quest_test` | 144 passed, 0 failed |
 | `events_arena_test` | 88 passed, 0 failed |
 | `server_network_test` | 108 passed, 0 failed |
 | `server_stop_test` | 1 passed, 0 failed |
@@ -58,15 +66,21 @@ Tất cả 11 test suite chuẩn đều pass (**699 passed, 0 failed**):
 
 ## Hướng Dẫn Live-Test Tiếp Theo
 
-Trước khi bật server bằng `cargo run --bin ts_dream`, cần chạy migration SQLite thủ công cho DB live/dev của bạn (theo ADR 0004):
+Trước khi bật server bằng `cargo run`, cần chạy migration SQLite thủ công cho DB live/dev của bạn (theo ADR 0004):
 
 ```powershell
 sqlite3 DB/ts_dream_dev.db ".read migrations/0004_character_color.sql"
 $env:TS_DATABASE_URL="sqlite://DB/ts_dream_dev.db"
 $env:TS_PACKET_LOGGING="true"
-cargo run --bin ts_dream
+cargo run
 ```
 
-Trong lúc live-test với `aLogin.exe`, hãy kiểm tra lại 2 điểm đã lưu ý trong kế hoạch:
+Trong lúc live-test với `aLogin.exe`, hãy kiểm tra lại các điểm sau:
 1. Bấm nút **Sắp xếp** trên `homdo` để xác nhận client gửi `17 3C` hay chuỗi `17 0A` (cả hai đều đã phát `17 05` redraw).
-2. Đi qua cổng `10817 Door 1` (`eve_no=7`) để xác nhận sau `PlayMovie` (`rt=5`), client có gửi `14 06` hay đứng chờ (nếu client không gửi `14 06`, sẽ chuyển bước tiếp theo sang timer trễ).
+2. Đi bộ vào cổng `10817 Door #1 (1300, 700)` (`eve_no = 7`):
+   - Xác nhận hội thoại `10447..10452` không còn bị ngắt bởi `14 04 01 00` hay `06 02` echo.
+   - Xác nhận sau `PlayMovie(17)` / `PlayMovie(18)` (`rt=5`), `aLogin.exe` có tự gửi `14 06` để sang `Warp(10867)` hay đứng chờ (nếu `a076 == 0` do `MeetDoor` mở event không qua `14 0C`, kiểm tra thêm nhánh `14 04` khi `pending_meet_door.is_some()` hoặc chuyển sang timer trễ).
+
+## Suggested Skills (Cho Phiên Làm Việc Tiếp Theo)
+- `diagnosing-bugs`: nếu live-test `10817 Door #1` phát hiện `PlayMovie` bị treo chờ `14 06` hoặc xuất hiện gói bất thường từ `aLogin.exe`.
+- `tdd`: viết test tái hiện capture mới trong `tests/eve_quest/` trước khi sửa handler.
