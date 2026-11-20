@@ -1442,3 +1442,94 @@ fn talk_messages_queues_legacy_dialogs_when_dwell_nonzero() {
         Some(ts_dream::server::session::TalkAdvanceKind::LegacyDialog)
     );
 }
+
+#[tokio::test]
+async fn meet_door_06_01_ignores_walking_away_and_outside_50_px() {
+    set_eve_events_enabled(true);
+    let mut data = GameData::default();
+    let mut scene = SceneEveData::default();
+    scene.doors.insert(
+        1,
+        ts_dream::data::loaders::EveDoorPlacement {
+            id: 1,
+            x: 680,
+            y: 430,
+            events: vec![7],
+        },
+    );
+    scene.npc_events.insert(
+        7,
+        NpcEventData {
+            eve_no: 7,
+            when_happen: [false, true, false, false], // MeetDoor
+            conditions: vec![EveCondition {
+                condition_no: 1,
+                results: vec![EveResult {
+                    result_group_no: 1,
+                    result_no: 1,
+                    result_type: 1,
+                    result_class: 7,
+                    parameter: 0,
+                    parameter_style: 0,
+                    result_value: 0,
+                    result_mean_no: 10447,
+                }],
+                ..Default::default()
+            }],
+        },
+    );
+    data.scene_eve_data.insert(19911, scene);
+
+    let service = BattleService::default();
+    let env = ServerEnv::none();
+
+    let make_walk = |x: u16, y: u16| -> Vec<u8> {
+        let [x_lo, x_hi] = x.to_le_bytes();
+        let [y_lo, y_hi] = y.to_le_bytes();
+        vec![0xF4, 0x44, 0x07, 0x00, 0x06, 0x01, 0x02, x_lo, x_hi, y_lo, y_hi]
+    };
+
+    // 1. Standing 30 px from door (650, 430) and clicking AWAY to (635, 430) (45 px away):
+    //    must NOT trigger MeetDoor.
+    let mut conn = Conn {
+        session: Session {
+            id: 991207,
+            map_id: 19911,
+            map_x: 650,
+            map_y: 430,
+            walk_origin: (650, 430),
+            walk_dest: (650, 430),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let out_away = dispatch(&mut conn, &make_walk(635, 430), &data, &service, &env).await;
+    assert!(
+        conn.session.current_event_session.is_none()
+            && conn.session.pending_meet_door.is_none()
+            && !out_away.outgoing.iter().any(|f| f.frame.contains("1401")),
+        "walking away from door must not trigger MeetDoor"
+    );
+
+    // 2. Walking from (600, 430) to (625, 430) (55 px from door): outside 50 px Euclidean -> no trigger.
+    conn.session.map_x = 600;
+    conn.session.map_y = 430;
+    conn.session.clear_walk_tracking();
+    let out_55 = dispatch(&mut conn, &make_walk(625, 430), &data, &service, &env).await;
+    assert!(
+        conn.session.current_event_session.is_none()
+            && conn.session.pending_meet_door.is_none()
+            && !out_55.outgoing.iter().any(|f| f.frame.contains("1401")),
+        "walking to 55 px from door must not trigger MeetDoor (> 50 px)"
+    );
+
+    // 3. Walking from (650, 430) toward door center (670, 430) (10 px from door): triggers MeetDoor!
+    conn.session.map_x = 650;
+    conn.session.map_y = 430;
+    conn.session.clear_walk_tracking();
+    let _out_in = dispatch(&mut conn, &make_walk(670, 430), &data, &service, &env).await;
+    assert!(
+        conn.session.current_event_session.is_some() || conn.session.pending_meet_door.is_some(),
+        "walking toward door within 50 px must trigger MeetDoor"
+    );
+}

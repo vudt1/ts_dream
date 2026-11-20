@@ -61,17 +61,26 @@ pub async fn handle_move_dispatch(ctx: &mut OpcodeCtx<'_>) {
 
     let px = ctx.conn.session.map_x;
     let py = ctx.conn.session.map_y;
+    let origin = ctx.conn.session.walk_origin;
 
-    // Fast-path: check if any door is within ±60 px or any encounter zone contains (px, py)
+    // Fast-path: check if any door is within 50 px Euclidean (and the player is moving
+    // toward the door or landing on its center) or any encounter zone contains (px, py)
     // before seeding RNG or building a PlayerEventState snapshot.
+    const MEET_DOOR_RADIUS_SQ: i64 = 50 * 50;
+    const MEET_DOOR_CENTER_SQ: i64 = 25 * 25;
     let mut closest_door: Option<(u16, i64)> = None;
     for door in scene.doors.values() {
-        let dx = (i32::from(px) - door.x).abs();
-        let dy = (i32::from(py) - door.y).abs();
-        if dx <= 60 && dy <= 60 {
-            let dist2 = i64::from(dx) * i64::from(dx) + i64::from(dy) * i64::from(dy);
-            if closest_door.map_or(true, |(_, best)| dist2 < best) {
-                closest_door = Some((door.id, dist2));
+        let dx = i64::from(px) - i64::from(door.x);
+        let dy = i64::from(py) - i64::from(door.y);
+        let dist2 = dx * dx + dy * dy;
+        if dist2 <= MEET_DOOR_RADIUS_SQ {
+            let ox = i64::from(origin.0) - i64::from(door.x);
+            let oy = i64::from(origin.1) - i64::from(door.y);
+            let origin_dist2 = ox * ox + oy * oy;
+            if dist2 < origin_dist2 || dist2 <= MEET_DOOR_CENTER_SQ {
+                if closest_door.map_or(true, |(_, best)| dist2 < best) {
+                    closest_door = Some((door.id, dist2));
+                }
             }
         }
     }

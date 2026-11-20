@@ -782,7 +782,7 @@ async fn drain_outbound(
     }
 }
 
-const DEFAULT_TALK_DWELL_MS: u64 = 2000;
+const DEFAULT_TALK_DWELL_MS: u64 = 900;
 
 /// Connection handler for game TCP streams: frames inbound, dispatches opcodes,
 /// writes outgoing frames, registers/logins the client and fans out

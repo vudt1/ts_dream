@@ -120,7 +120,8 @@ Trong lúc live-test với `aLogin.exe`, hãy kiểm tra lại các điểm sau:
 ### Checklist Live-Test Tiếp Theo (`aLogin.exe`, `TS_PACKET_LOGGING=true`)
 1. Đăng nhập nhân vật mới (`shoppoint = 1000`): xác nhận hiện đúng `"Điểm số còn dư 1000"` (không còn `10000`), không tự động bật GM Shop / Item Mall khi vừa vào game, mở Mall (`42 03`) thấy `1000` và mua thử (`42 01`) trừ điểm thật.
 2. Đi vào `10817 Door #1 (1300, 700)`: xác nhận không còn frame lỗi `14 2C 01` và kiểm chứng flow bước 6 → `PlayMovie(17)/(18)` → `Warp(10867)`.
-3. Nói chuyện NPC #2 (`10917`) và NPC dùng `data.talks`: xác nhận mỗi đoạn thoại hiển thị đủ ~2 giây.
+3. Nói chuyện NPC #2 (`10917`) và NPC dùng `data.talks`: xác nhận mỗi đoạn thoại hiển thị đủ ~`900 ms` (đã giảm từ `2000 ms`).
+4. Đứng cạnh Door chuyển map rồi click đi ra xa vs đi vào trong tâm Door: xác nhận không bị warp nhầm khi đi ra xa.
 
 ---
 
@@ -133,3 +134,17 @@ Trong lúc live-test với `aLogin.exe`, hãy kiểm tra lại các điểm sau:
   - [economy_wire.rs](file:///D:/VUDT/GIT_PCC/ts_dream/tests/economy_inventory/economy_wire.rs#L63-L79), [inventory_storage_type.rs](file:///D:/VUDT/GIT_PCC/ts_dream/tests/economy_inventory/inventory_storage_type.rs#L206-L226), [login_char_flow.rs](file:///D:/VUDT/GIT_PCC/ts_dream/tests/server_network/login_char_flow.rs#L230-L236): cập nhật assertion `Logined1` không chứa `42 02` và độ dài chuỗi không pet là `20` frames (`21` nếu có `luulang`).
 - **Kiểm thử sau cập nhật**:
   - `cargo test --all-targets --no-fail-fast`: 10/11 suite pass ngay; sau khi cập nhật assertion cuối ở `login_char_flow::test_character_creation_edge_cases` ([login_char_flow.rs](file:///D:/VUDT/GIT_PCC/ts_dream/tests/server_network/login_char_flow.rs#L356)), `cargo test --test server_network_test` đạt **109 passed, 0 failed**.
+
+---
+
+## 11. Cập Nhật Bổ Sung — Giảm `min_talk_dwell_ms` (`900 ms`) & Siết `MeetDoor` (`06 01`) `50 px` + Hướng Di Chuyển
+- **Giảm thời gian chờ thoại (`min_talk_dwell_ms`)**:
+  - [server_control.rs](file:///D:/VUDT/GIT_PCC/ts_dream/src/web/server_control.rs#L785): giảm `DEFAULT_TALK_DWELL_MS` từ `2000` xuống `900` ms cho live TCP session.
+- **Siết điều kiện `MeetDoor` khi đi bộ (`06 01`)** (theo phân tích capture `06 01` → `14 07` → `0C` ở [packet_1.txt](file:///D:/VUDT/GIT_PCC/ts_dream/packet_1.txt)):
+  - [movement.rs](file:///D:/VUDT/GIT_PCC/ts_dream/src/server/handlers/movement.rs#L64-L82): thay hộp `±60 px` bằng bán kính **`50 px` Euclidean** (`MEET_DOOR_RADIUS_SQ = 50 * 50`) kết hợp kiểm tra hướng đi: chỉ kích hoạt `MeetDoor` khi `dist2 < origin_dist2` (tiến lại gần door hơn so với `walk_origin`) hoặc `dist2 <= 25 * 25` (đáp vào tâm door). Đứng gần door mà click đi ra xa sẽ không còn bị warp nhầm.
+  - Giữ nguyên bán kính `130 px` cho `14 04` / `14 08` tại [talk.rs](file:///D:/VUDT/GIT_PCC/ts_dream/src/server/handlers/talk.rs#L185-L200) cho thao tác click trực tiếp vào door/cổng warp.
+  - [missing_eve_effect_executors.rs](file:///D:/VUDT/GIT_PCC/ts_dream/tests/eve_quest/missing_eve_effect_executors.rs#L1446-L1522): thêm test `meet_door_06_01_ignores_walking_away_and_outside_50_px`.
+- **Kiểm thử sau cập nhật**:
+  - `cargo test --test eve_quest_test`: **151 passed, 0 failed**.
+  - `cargo test --test server_network_test`: **109 passed, 0 failed**.
+  - `cargo test --test events_arena_test`: 87/88 pass ở lần chạy đầu (lẻ `test_daily_drop_cap_enforced_per_utc7_day_and_resets_next_day` do RNG drop), chạy lại riêng test đó đạt **1 passed, 0 failed**.
