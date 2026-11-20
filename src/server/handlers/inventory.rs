@@ -3,11 +3,14 @@
 //! `persist`; golden replay keeps everything in-memory over the seeded session.
 
 use crate::db::persist;
+use crate::db::pool::DbPool;
 use crate::protocol::{
-    encoder, ITEM_SUB_EQUIP, ITEM_SUB_PET_EQUIP, ITEM_SUB_PET_UNEQUIP, ITEM_SUB_UNEQUIP,
+    encoder, ITEM_SUB_EQUIP, ITEM_SUB_MOVE_STACK, ITEM_SUB_PET_EQUIP, ITEM_SUB_PET_UNEQUIP,
+    ITEM_SUB_SORT, ITEM_SUB_UNEQUIP,
 };
 use crate::server::dispatcher::{hex_of, HandleOutcome, OpcodeCtx};
 use crate::server::handlers::stats::build_stat_update;
+use crate::server::inventory::{HOMDO_SLOTS, STACK_CAP};
 use crate::server::map_drops;
 use crate::server::session::{pet_equip_slot, registry_update_if_online, Conn, InventoryItem};
 use crate::server::spawn::sys_msg_frame;
@@ -55,8 +58,8 @@ pub async fn handle_inventory(ctx: &mut OpcodeCtx<'_>) {
         2 => handle_pickup(conn, payload, out, pool, hub).await,
         // Sub 3: Drop item
         3 => handle_drop(conn, payload, out, pool, hub).await,
-        // Sub 10: Move / stack item (echo raw packet back on success)
-        10 => handle_move_stack(conn, payload, decoded, out, pool).await,
+        // Sub 10: Move / stack / split item
+        ITEM_SUB_MOVE_STACK => handle_move_stack(conn, payload, decoded, out, pool).await,
         // Sub 11: Equip player item
         ITEM_SUB_EQUIP => handle_equip(conn, payload, out, pool, hub).await,
         // Sub 12: Unequip player item
@@ -79,6 +82,8 @@ pub async fn handle_inventory(ctx: &mut OpcodeCtx<'_>) {
         0x39 => crate::server::handlers::crafting::handle_compound(ctx).await,
         // Sub 3A (0x3A): Feather socketing into equipment
         0x3A => crate::server::handlers::crafting::handle_socket_feather(ctx).await,
+        // Sub 3C (0x3C): Sort homdo bag
+        ITEM_SUB_SORT => handle_sort_homdo(conn, out, pool).await,
         // Sub 45: Warp item
         45 => handle_warp_jail(conn, payload, out).await,
         // Sub 46: Player reborn
@@ -218,19 +223,28 @@ async fn handle_drop(
     }
 }
 
+fn same_stack_attrs(a: &InventoryItem, b: &InventoryItem) -> bool {
+    a.id == b.id
+        && a.doben == b.doben
+        && a.long_val == b.long_val
+        && a.giatri_long == b.giatri_long
+        && a.khang == b.khang
+        && a.texp == b.texp
+}
+
 async fn handle_move_stack(
     conn: &mut Conn,
     payload: &[u8],
     decoded: &[u8],
     out: &mut HandleOutcome,
-    pool: Option<&crate::db::pool::DbPool>,
+    pool: Option<&DbPool>,
 ) {
-    // Move/stack: payload[0]=old slot, [1]=count, [2]=new slot.
-    if payload.len() < 3 {
+    // Move/stack/split: payload[0]=old slot, [1]=count, [2]=new slot.
+    if payload.len() < 3 || reject_if_in_battle(conn, out) {
         return;
     }
     let oldslot = payload[0];
-    let count = payload[1] as u16;
+    let count = u16::from(payload[1]);
     let newslot = payload[2];
     let Some(src_idx) = conn.session.homdo.iter().position(|i| i.slot == oldslot) else {
         return;
@@ -239,10 +253,16 @@ async fn handle_move_stack(
     if src.id == 0 || src.count == 0 {
         return;
     }
-    let dst_idx = conn.session.homdo.iter().position(|i| i.slot == newslot);
     let src_count = u16::from(src.count);
+    if count == 0 || count > src_count || oldslot == newslot || !(1..=HOMDO_SLOTS).contains(&newslot) {
+        return;
+    }
+    let dst_idx = conn.session.homdo.iter().position(|i| i.slot == newslot);
     if (1..=6).contains(&src.effective_equip_pos()) {
-        // Equipment: only moves to an empty slot or swaps with dst.
+        // Equipment: only moves full item to an empty slot or swaps with dst.
+        if count != src_count {
+            return;
+        }
         if dst_idx.is_none() {
             conn.session.homdo[src_idx].slot = newslot;
             let moved = conn.session.homdo[src_idx].clone();
@@ -252,9 +272,10 @@ async fn handle_move_stack(
             };
             persist::upsert_item(pool, conn.session.id, "homdo", &empty).await;
             persist::upsert_item(pool, conn.session.id, "homdo", &moved).await;
+            registry_update_if_online(&conn.session);
             out.send(hex_of(decoded));
-        } else if count == src_count {
-            let d_idx = dst_idx.unwrap();
+            out.send(conn.session.dump_homdo());
+        } else if let Some(d_idx) = dst_idx {
             conn.session.homdo[src_idx].slot = newslot;
             conn.session.homdo[d_idx].slot = oldslot;
             conn.session.homdo.swap(src_idx, d_idx);
@@ -262,30 +283,45 @@ async fn handle_move_stack(
             let b = conn.session.homdo[d_idx].clone();
             persist::upsert_item(pool, conn.session.id, "homdo", &a).await;
             persist::upsert_item(pool, conn.session.id, "homdo", &b).await;
+            registry_update_if_online(&conn.session);
             out.send(hex_of(decoded));
+            out.send(conn.session.dump_homdo());
         }
         return;
     }
-    // Stackable: dst empty, or same id merge, or swap.
+    // Stackable: dst empty (full move or partial split), same attrs merge, or full swap.
     let dst = dst_idx.map(|i| conn.session.homdo[i].clone());
     match dst {
         None => {
-            conn.session.homdo[src_idx].slot = newslot;
-            let moved = conn.session.homdo[src_idx].clone();
-            let empty = InventoryItem {
-                slot: oldslot,
-                ..Default::default()
-            };
-            persist::upsert_item(pool, conn.session.id, "homdo", &empty).await;
-            persist::upsert_item(pool, conn.session.id, "homdo", &moved).await;
+            if count < src_count {
+                conn.session.homdo[src_idx].count = (src_count - count) as u8;
+                let remaining = conn.session.homdo[src_idx].clone();
+                let mut split = src;
+                split.slot = newslot;
+                split.count = count as u8;
+                conn.session.homdo.push(split.clone());
+                persist::upsert_item(pool, conn.session.id, "homdo", &remaining).await;
+                persist::upsert_item(pool, conn.session.id, "homdo", &split).await;
+            } else {
+                conn.session.homdo[src_idx].slot = newslot;
+                let moved = conn.session.homdo[src_idx].clone();
+                let empty = InventoryItem {
+                    slot: oldslot,
+                    ..Default::default()
+                };
+                persist::upsert_item(pool, conn.session.id, "homdo", &empty).await;
+                persist::upsert_item(pool, conn.session.id, "homdo", &moved).await;
+            }
+            registry_update_if_online(&conn.session);
             out.send(hex_of(decoded));
+            out.send(conn.session.dump_homdo());
         }
         Some(d) => {
-            if d.id == src.id && d.count < 50 && count + u16::from(d.count) <= 50 {
-                let dst_count = u16::from(d.count);
+            let dst_count = u16::from(d.count);
+            if same_stack_attrs(&d, &src) && dst_count < STACK_CAP && count + dst_count <= STACK_CAP {
+                let d_idx = dst_idx.unwrap();
                 if count == src_count {
                     // Full merge: dst absorbs src entirely; oldslot is emptied.
-                    let d_idx = dst_idx.unwrap();
                     conn.session.homdo[d_idx].count = (dst_count + count) as u8;
                     let merged_dst = conn.session.homdo[d_idx].clone();
                     conn.session.homdo.remove(src_idx);
@@ -296,8 +332,7 @@ async fn handle_move_stack(
                     persist::upsert_item(pool, conn.session.id, "homdo", &empty).await;
                     persist::upsert_item(pool, conn.session.id, "homdo", &merged_dst).await;
                 } else {
-                    // Partial merge / split
-                    let d_idx = dst_idx.unwrap();
+                    // Partial merge / split into existing stack
                     conn.session.homdo[src_idx].count = (src_count - count) as u8;
                     conn.session.homdo[d_idx].count = (count + dst_count) as u8;
                     let a = conn.session.homdo[src_idx].clone();
@@ -305,7 +340,9 @@ async fn handle_move_stack(
                     persist::upsert_item(pool, conn.session.id, "homdo", &a).await;
                     persist::upsert_item(pool, conn.session.id, "homdo", &b).await;
                 }
+                registry_update_if_online(&conn.session);
                 out.send(hex_of(decoded));
+                out.send(conn.session.dump_homdo());
             } else if count == src_count {
                 // Swap the two slots
                 let d_idx = dst_idx.unwrap();
@@ -316,10 +353,72 @@ async fn handle_move_stack(
                 let b = conn.session.homdo[d_idx].clone();
                 persist::upsert_item(pool, conn.session.id, "homdo", &a).await;
                 persist::upsert_item(pool, conn.session.id, "homdo", &b).await;
+                registry_update_if_online(&conn.session);
                 out.send(hex_of(decoded));
+                out.send(conn.session.dump_homdo());
             }
         }
     }
+}
+
+async fn handle_sort_homdo(
+    conn: &mut Conn,
+    out: &mut HandleOutcome,
+    pool: Option<&DbPool>,
+) {
+    if reject_if_in_battle(conn, out) {
+        return;
+    }
+    if conn.session.trade.active {
+        out.send(sys_msg_frame("Không thể sắp xếp túi đồ khi đang giao dịch!"));
+        return;
+    }
+
+    let mut result: Vec<InventoryItem> = Vec::with_capacity(conn.session.homdo.len());
+    for item in conn.session.homdo.iter().filter(|i| i.id > 0 && i.count > 0) {
+        if (1..=6).contains(&item.effective_equip_pos()) || u16::from(item.count) > STACK_CAP {
+            result.push(item.clone());
+            continue;
+        }
+        let mut rem = item.count;
+        for existing in result.iter_mut() {
+            if existing.effective_equip_pos() == 0
+                && u16::from(existing.count) < STACK_CAP
+                && same_stack_attrs(existing, item)
+            {
+                let room = (STACK_CAP - u16::from(existing.count)).min(u16::from(rem));
+                existing.count += room as u8;
+                rem -= room as u8;
+                if rem == 0 {
+                    break;
+                }
+            }
+        }
+        if rem > 0 {
+            let mut rest = item.clone();
+            rest.count = rem;
+            result.push(rest);
+        }
+    }
+
+    result.sort_by_key(|item| (item.id, std::cmp::Reverse(item.count), item.slot));
+    if result.len() > usize::from(HOMDO_SLOTS) {
+        out.send(sys_msg_frame("Túi đồ vượt quá giới hạn ô!"));
+        return;
+    }
+    for (idx, item) in result.iter_mut().enumerate() {
+        item.slot = (idx + 1) as u8;
+    }
+
+    let before_homdo = conn.session.homdo.clone();
+    conn.session.homdo = result;
+    if !persist::persist_sessions_transaction(pool, &[&conn.session], &["homdo"]).await {
+        conn.session.homdo = before_homdo;
+        out.send(sys_msg_frame("Lỗi lưu dữ liệu túi đồ!"));
+        return;
+    }
+    registry_update_if_online(&conn.session);
+    out.send(conn.session.dump_homdo());
 }
 
 async fn handle_equip(
@@ -572,6 +671,15 @@ async fn handle_reborn(
     persist::update_player(pool, conn.session.id, "Hpx", 0).await;
     persist::update_player(pool, conn.session.id, "Spx", 0).await;
     persist::update_player(pool, conn.session.id, "Agi", 0).await;
+    if let Some(p) = pool {
+        persist::update_player_text(
+            &p.write,
+            i64::from(conn.session.id),
+            "color",
+            &conn.session.color,
+        )
+        .await;
+    }
     persist::delete_reborn_skills(pool, conn.session.id).await;
 
     out.send("F44402002C01");

@@ -11,7 +11,7 @@ use crate::data::loader::GameData;
 use crate::data::loaders::EveResult;
 use crate::db::pool::DbPool;
 use crate::eve::auto_chain::{AutoChainResult, EventPhase, EventSession};
-use crate::eve::planner::{DomainEffect, MoneyOp, PetOp, PlayerOp, QuestOp};
+use crate::eve::planner::{DomainEffect, MoneyOp, NpcServiceOp, PetOp, PlayerOp, QuestOp};
 use crate::protocol::codecs::npc_talk::{NpcTalkCodec, TalkLockMode};
 use crate::protocol::encoder;
 use crate::server::dispatcher::HandleOutcome;
@@ -830,6 +830,7 @@ fn process_single_domain_effect(
         DomainEffect::MoveEntity(res) => {
             if res.result_class == 3 && res.result_value >= 10_000 {
                 out.send(NpcTalkCodec::build_talk_step_hex(res));
+                StepOutcome::Halt
             } else {
                 tracing::warn!(
                     rc = res.result_class,
@@ -837,11 +838,40 @@ fn process_single_domain_effect(
                     val = res.result_value,
                     "invalid MoveEntity (rt=4) record; skipped"
                 );
+                StepOutcome::Continue
             }
-            StepOutcome::Continue
         }
         DomainEffect::PlayMovie(res) => {
             out.send(NpcTalkCodec::build_talk_step_hex(res));
+            StepOutcome::Halt
+        }
+        DomainEffect::NpcService(op) => {
+            match op {
+                NpcServiceOp::BankClose => {
+                    tracing::debug!("executed server-side NpcService BankClose");
+                }
+                NpcServiceOp::BankOpen => {
+                    out.send("F44403001D0900");
+                    out.send(format!(
+                        "F44406001D04{}",
+                        encoder::le32(session.bank_gold)
+                    ));
+                    out.send("F44402001D05");
+                }
+                NpcServiceOp::InnShop => {
+                    out.send(crate::server::handlers::shops::open_npc_shop_frame());
+                }
+                NpcServiceOp::InnHeal => {
+                    session.hp = session.hp_max;
+                    session.sp = session.sp_max;
+                    out.send(build_stat_update(0x19, i32::from(session.hp)));
+                    out.send(build_stat_update(0x1A, i32::from(session.sp)));
+                    crate::server::session::registry_update_if_online(session);
+                }
+                NpcServiceOp::BankExchangeOrSpecial => {
+                    out.send("F44402001D06");
+                }
+            }
             StepOutcome::Continue
         }
         DomainEffect::NpcAction(res) => {

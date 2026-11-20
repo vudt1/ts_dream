@@ -528,11 +528,15 @@ async fn migration_0002_in_place_upgrade_preserves_existing_completed_events_und
     .await
     .expect("insert pre-0002 completed event");
 
-    // Apply 0002 migration in-place.
+    // Apply 0002 + 0004 migrations in-place so current Session::load schema is satisfied.
     sqlx::raw_sql(include_str!("../../migrations/0002_eve_quest_persistence.sql"))
         .execute(&pool.write)
         .await
         .expect("apply 0002_eve_quest_persistence.sql in-place");
+    sqlx::raw_sql(include_str!("../../migrations/0004_character_color.sql"))
+        .execute(&pool.write)
+        .await
+        .expect("apply 0004_character_color.sql in-place");
 
     let repos = SqliteRepositories::new(pool.clone());
     let mut loaded = Session::new();

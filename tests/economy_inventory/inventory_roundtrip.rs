@@ -279,3 +279,377 @@ fn test_fingerprint_mixes_all_5_containers() {
     let fp_long2 = fingerprint(&s_long);
     assert_ne!(fp_long1, fp_long2, "giatri_long change must change fingerprint");
 }
+
+#[tokio::test]
+async fn test_move_stack_partial_split_to_empty_slot() {
+    let pool = setup_test_db().await;
+    let repos = SqliteRepositories::new(pool.clone());
+
+    let acc_id = ts_dream::db::accounts::create(&pool, "user_split", "pass_split")
+        .await
+        .expect("create account");
+    let seed = CharacterSeed {
+        level: 1,
+        sex: 0,
+        hair: 1,
+        element: 1,
+        map_id: 10817,
+        map_x: 100,
+        map_y: 100,
+    };
+    repos
+        .characters()
+        .create(acc_id, b"Splitter", &seed)
+        .await
+        .expect("create character");
+
+    let session = Session {
+        id: acc_id as u32,
+        db_character_id: acc_id,
+        name: b"Splitter".to_vec(),
+        homdo: vec![
+            InventoryItem {
+                slot: 1,
+                id: 20001,
+                count: 30,
+                ..Default::default()
+            },
+            // Adjacent decoy items to guard against collateral corruption
+            InventoryItem {
+                slot: 2,
+                id: 20002,
+                count: 7,
+                ..Default::default()
+            },
+            InventoryItem {
+                slot: 5,
+                id: 10001,
+                count: 1,
+                loai: 1,
+                ..Default::default()
+            },
+        ],
+        ..Default::default()
+    };
+    repos.sessions().save(&session).await.expect("initial save");
+
+    let mut conn = Conn::default();
+    conn.session = session;
+    let data = ts_dream::data::loader::GameData::default();
+    let service = ts_dream::battle::service::BattleService::default();
+    let mut out = HandleOutcome::default();
+    let env = ServerEnv {
+        pool: Some(&pool),
+        repos: Some(&repos),
+        hub: None,
+        sender: None,
+    };
+
+    // Split 10 items from slot 1 into empty slot 3
+    let decoded = [0xF4, 0x44, 0x05, 0x00, 0x17, 0x0A, 0x01, 0x0A, 0x03];
+    let payload = [0x01, 0x0A, 0x03];
+    let mut ctx = OpcodeCtx {
+        conn: &mut conn,
+        out: &mut out,
+        env,
+        data: &data,
+        service: &service,
+        decoded: &decoded,
+        opcode: 0x17,
+        sub: ts_dream::protocol::ITEM_SUB_MOVE_STACK,
+        payload: &payload,
+    };
+    handle_inventory(&mut ctx).await;
+
+    assert_eq!(out.outgoing.len(), 2, "must emit 17 0A echo and 17 05 dump");
+    assert_eq!(out.outgoing[0], "F4440500170A010A03");
+    assert!(
+        out.outgoing[1].starts_with("F444") && out.outgoing[1].contains("1705"),
+        "second frame must be 17 05 homdo dump, got: {}",
+        out.outgoing[1].frame
+    );
+
+    let mut reloaded = Session {
+        id: acc_id as u32,
+        ..Default::default()
+    };
+    repos.sessions().load(acc_id, &mut reloaded).await.expect("reload");
+
+    let s1 = reloaded.homdo.iter().find(|i| i.slot == 1).expect("slot 1 kept");
+    let s2 = reloaded.homdo.iter().find(|i| i.slot == 2).expect("decoy slot 2 intact");
+    let s3 = reloaded.homdo.iter().find(|i| i.slot == 3).expect("slot 3 created");
+    let s5 = reloaded.homdo.iter().find(|i| i.slot == 5).expect("decoy slot 5 intact");
+    assert_eq!(s1.id, 20001);
+    assert_eq!(s1.count, 20);
+    assert_eq!(s2.id, 20002);
+    assert_eq!(s2.count, 7);
+    assert_eq!(s3.id, 20001);
+    assert_eq!(s3.count, 10);
+    assert_eq!(s5.id, 10001);
+    assert_eq!(s5.count, 1);
+}
+
+#[tokio::test]
+async fn test_move_stack_partial_split_negative_rejects() {
+    let pool = setup_test_db().await;
+    let repos = SqliteRepositories::new(pool.clone());
+
+    let acc_id = ts_dream::db::accounts::create(&pool, "user_split_neg", "pass_split_neg")
+        .await
+        .expect("create account");
+    let seed = CharacterSeed {
+        level: 1,
+        sex: 0,
+        hair: 1,
+        element: 1,
+        map_id: 10817,
+        map_x: 100,
+        map_y: 100,
+    };
+    repos
+        .characters()
+        .create(acc_id, b"SplitNeg", &seed)
+        .await
+        .expect("create character");
+
+    let session = Session {
+        id: acc_id as u32,
+        db_character_id: acc_id,
+        name: b"SplitNeg".to_vec(),
+        homdo: vec![
+            InventoryItem {
+                slot: 1,
+                id: 20001,
+                count: 30,
+                ..Default::default()
+            },
+            // Different item id
+            InventoryItem {
+                slot: 2,
+                id: 20002,
+                count: 10,
+                ..Default::default()
+            },
+            // Same item id, but 45 + 10 > 50
+            InventoryItem {
+                slot: 3,
+                id: 20001,
+                count: 45,
+                ..Default::default()
+            },
+            // Same item id, but different dynamic attrs
+            InventoryItem {
+                slot: 4,
+                id: 20001,
+                count: 10,
+                doben: 99,
+                ..Default::default()
+            },
+        ],
+        ..Default::default()
+    };
+    repos.sessions().save(&session).await.expect("initial save");
+
+    let mut conn = Conn::default();
+    conn.session = session.clone();
+    let data = ts_dream::data::loader::GameData::default();
+    let service = ts_dream::battle::service::BattleService::default();
+    let env = ServerEnv {
+        pool: Some(&pool),
+        repos: Some(&repos),
+        hub: None,
+        sender: None,
+    };
+
+    let invalid_cases: &[[u8; 3]] = &[
+        [1, 10, 2], // partial split onto different item
+        [1, 10, 3], // partial split exceeding STACK_CAP (45 + 10 > 50)
+        [1, 10, 4], // partial split onto different dynamic attrs
+        [1, 0, 5],  // zero count
+        [1, 31, 5], // count > src_count
+        [1, 10, 1], // oldslot == newslot
+        [1, 10, 26], // newslot out of HOMDO_SLOTS
+    ];
+
+    for payload in invalid_cases {
+        let mut out = HandleOutcome::default();
+        let decoded = [
+            0xF4, 0x44, 0x05, 0x00, 0x17, 0x0A, payload[0], payload[1], payload[2],
+        ];
+        let mut ctx = OpcodeCtx {
+            conn: &mut conn,
+            out: &mut out,
+            env,
+            data: &data,
+            service: &service,
+            decoded: &decoded,
+            opcode: 0x17,
+            sub: ts_dream::protocol::ITEM_SUB_MOVE_STACK,
+            payload,
+        };
+        handle_inventory(&mut ctx).await;
+        assert!(
+            out.outgoing.is_empty(),
+            "invalid move/split {:?} must emit no frames, got {:?}",
+            payload,
+            out.outgoing
+        );
+    }
+
+    assert_eq!(conn.session.homdo.len(), 4);
+    assert_eq!(conn.session.homdo[0].count, 30);
+
+    let mut reloaded = Session {
+        id: acc_id as u32,
+        ..Default::default()
+    };
+    repos.sessions().load(acc_id, &mut reloaded).await.expect("reload");
+    assert_eq!(reloaded.homdo.len(), 4);
+    assert_eq!(reloaded.homdo.iter().find(|i| i.slot == 1).unwrap().count, 30);
+    assert_eq!(reloaded.homdo.iter().find(|i| i.slot == 2).unwrap().count, 10);
+    assert_eq!(reloaded.homdo.iter().find(|i| i.slot == 3).unwrap().count, 45);
+    assert_eq!(reloaded.homdo.iter().find(|i| i.slot == 4).unwrap().count, 10);
+}
+
+#[tokio::test]
+async fn test_sort_homdo_merges_and_sorts() {
+    let pool = setup_test_db().await;
+    let repos = SqliteRepositories::new(pool.clone());
+
+    let acc_id = ts_dream::db::accounts::create(&pool, "user_sort", "pass_sort")
+        .await
+        .expect("create account");
+    let seed = CharacterSeed {
+        level: 1,
+        sex: 0,
+        hair: 1,
+        element: 1,
+        map_id: 10817,
+        map_x: 100,
+        map_y: 100,
+    };
+    repos
+        .characters()
+        .create(acc_id, b"Sorter", &seed)
+        .await
+        .expect("create character");
+
+    let session = Session {
+        id: acc_id as u32,
+        db_character_id: acc_id,
+        name: b"Sorter".to_vec(),
+        homdo: vec![
+            InventoryItem {
+                slot: 8,
+                id: 20002,
+                count: 30,
+                ..Default::default()
+            },
+            InventoryItem {
+                slot: 3,
+                id: 20002,
+                count: 35,
+                ..Default::default()
+            },
+            // Same id as 20002, different dynamic attrs -> must NOT merge
+            InventoryItem {
+                slot: 5,
+                id: 20002,
+                count: 10,
+                doben: 99,
+                ..Default::default()
+            },
+            // Equipment (must NOT merge)
+            InventoryItem {
+                slot: 7,
+                id: 10005,
+                count: 1,
+                loai: 1,
+                ..Default::default()
+            },
+            InventoryItem {
+                slot: 2,
+                id: 10005,
+                count: 1,
+                loai: 1,
+                ..Default::default()
+            },
+            InventoryItem {
+                slot: 10,
+                id: 20001,
+                count: 5,
+                ..Default::default()
+            },
+        ],
+        // Decoy item in tientrang to ensure other containers are untouched
+        tientrang: vec![InventoryItem {
+            slot: 1,
+            id: 30001,
+            count: 12,
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    repos.sessions().save(&session).await.expect("initial save");
+
+    let mut conn = Conn::default();
+    conn.session = session;
+    let data = ts_dream::data::loader::GameData::default();
+    let service = ts_dream::battle::service::BattleService::default();
+    let mut out = HandleOutcome::default();
+    let env = ServerEnv {
+        pool: Some(&pool),
+        repos: Some(&repos),
+        hub: None,
+        sender: None,
+    };
+
+    let decoded = [0xF4, 0x44, 0x02, 0x00, 0x17, 0x3C];
+    let mut ctx = OpcodeCtx {
+        conn: &mut conn,
+        out: &mut out,
+        env,
+        data: &data,
+        service: &service,
+        decoded: &decoded,
+        opcode: 0x17,
+        sub: ts_dream::protocol::ITEM_SUB_SORT,
+        payload: &[],
+    };
+    handle_inventory(&mut ctx).await;
+
+    assert_eq!(out.outgoing.len(), 1, "sort must emit 17 05 homdo dump");
+    assert!(
+        out.outgoing[0].starts_with("F444") && out.outgoing[0].contains("1705"),
+        "expected 17 05 frame, got {}",
+        out.outgoing[0].frame
+    );
+
+    let mut reloaded = Session {
+        id: acc_id as u32,
+        ..Default::default()
+    };
+    repos.sessions().load(acc_id, &mut reloaded).await.expect("reload");
+
+    assert_eq!(reloaded.homdo.len(), 6);
+    assert_eq!((reloaded.homdo[0].slot, reloaded.homdo[0].id, reloaded.homdo[0].count), (1, 10005, 1));
+    assert_eq!((reloaded.homdo[1].slot, reloaded.homdo[1].id, reloaded.homdo[1].count), (2, 10005, 1));
+    assert_eq!((reloaded.homdo[2].slot, reloaded.homdo[2].id, reloaded.homdo[2].count), (3, 20001, 5));
+    assert_eq!(
+        (reloaded.homdo[3].slot, reloaded.homdo[3].id, reloaded.homdo[3].count, reloaded.homdo[3].doben),
+        (4, 20002, 50, 0)
+    );
+    assert_eq!(
+        (reloaded.homdo[4].slot, reloaded.homdo[4].id, reloaded.homdo[4].count, reloaded.homdo[4].doben),
+        (5, 20002, 15, 0)
+    );
+    assert_eq!(
+        (reloaded.homdo[5].slot, reloaded.homdo[5].id, reloaded.homdo[5].count, reloaded.homdo[5].doben),
+        (6, 20002, 10, 99)
+    );
+
+    // Other container untouched
+    assert_eq!(reloaded.tientrang.len(), 1);
+    assert_eq!(reloaded.tientrang[0].id, 30001);
+    assert_eq!(reloaded.tientrang[0].count, 12);
+}

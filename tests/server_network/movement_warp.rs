@@ -236,11 +236,18 @@ async fn test_warp_confirm_and_teleport_confirm_cycle() {
     let service = ts_dream::battle::service::BattleService::default();
     let env = ServerEnv::none();
 
+    let (door_x, door_y) = data
+        .scene_eve_data
+        .get(&49902)
+        .and_then(|s| s.doors.get(&1))
+        .map(|d| (d.x as u16, d.y as u16))
+        .unwrap_or((200, 200));
+
     let mut conn = Conn::default();
     conn.session.id = 3001;
     conn.session.map_id = 49902;
-    conn.session.map_x = 200;
-    conn.session.map_y = 200;
+    conn.session.map_x = door_x;
+    conn.session.map_y = door_y;
     conn.session.in_world = true;
 
     lock_online_sessions()
@@ -319,13 +326,20 @@ async fn test_party_warp_follow() {
     let data = crate::common::shared_game_data();
     let service = ts_dream::battle::service::BattleService::default();
 
+    let (door_x, door_y) = data
+        .scene_eve_data
+        .get(&49902)
+        .and_then(|s| s.doors.get(&1))
+        .map(|d| (d.x as u16, d.y as u16))
+        .unwrap_or((200, 200));
+
     let mut leader_conn = Conn::default();
     leader_conn.session.id = 4001;
     leader_conn.session.id_leader = 4001;
     leader_conn.session.id_mem = [4002, 0, 0, 0];
     leader_conn.session.map_id = 49902;
-    leader_conn.session.map_x = 200;
-    leader_conn.session.map_y = 200;
+    leader_conn.session.map_x = door_x;
+    leader_conn.session.map_y = door_y;
     leader_conn.session.in_world = true;
 
     let member_session = Session {

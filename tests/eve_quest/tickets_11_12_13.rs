@@ -550,8 +550,8 @@ async fn ticket12_e2e_rt2_warp_uses_eve_scene_info_and_persists_party() {
             id_leader: leader_id,
             id_mem: [member_id, 0, 0, 0],
             map_id: 9001,
-            map_x: 100,
-            map_y: 100,
+            map_x: 0,
+            map_y: 0,
             ..Default::default()
         },
         ..Default::default()
@@ -672,6 +672,8 @@ async fn ticket12_e2e_rt2_warp_prefers_eve_scene_info_over_conflicting_warps_txt
         session: Session {
             id: 12003,
             map_id: 9001,
+            map_x: 0,
+            map_y: 0,
             ..Default::default()
         },
         ..Default::default()

@@ -100,23 +100,32 @@ pub async fn handle_talk(ctx: &mut OpcodeCtx<'_>) {
     }
 }
 
-/// H1 identity + distance gate.
+/// H1 identity + distance gate (`130 px` Euclidean radius using walk interpolation).
 fn resolve_npc(data: &GameData, conn: &Conn, map_object_id: i32) -> Option<(i32, bool)> {
+    let (px, py) = conn
+        .session
+        .estimated_position_at(crate::server::session::now_ms());
     if let Some(npc) = data
         .npc_on_map
         .iter()
         .find(|n| n.map_id == i64::from(conn.session.map_id) && n.id == i64::from(map_object_id))
     {
-        let dx = i64::from(conn.session.map_x) - npc.x;
-        let dy = i64::from(conn.session.map_y) - npc.y;
-        let in_range = (-150..=150).contains(&dx) && (-150..=150).contains(&dy);
+        let in_range = crate::eve::state::EveStateBuilder::is_within_range(
+            px,
+            py,
+            npc.x as i32,
+            npc.y as i32,
+        );
         return Some((npc.npc_id as i32, in_range));
     }
     if let Some(scene) = data.scene_eve_data.get(&u32::from(conn.session.map_id)) {
         if let Some(npc) = scene.npcs.get(&(map_object_id as u16)) {
-            let dx = i64::from(conn.session.map_x) - i64::from(npc.x);
-            let dy = i64::from(conn.session.map_y) - i64::from(npc.y);
-            let in_range = (-150..=150).contains(&dx) && (-150..=150).contains(&dy);
+            let in_range = crate::eve::state::EveStateBuilder::is_within_range(
+                px,
+                py,
+                i32::from(npc.x),
+                i32::from(npc.y),
+            );
             return Some((i32::from(npc.npc_id), in_range));
         }
     }
@@ -124,6 +133,26 @@ fn resolve_npc(data: &GameData, conn: &Conn, map_object_id: i32) -> Option<(i32,
         return Some((map_object_id, true));
     }
     None
+}
+
+/// Checks whether the player's interpolated position is within `130 px` of `door_id`
+/// on the current map. Returns `true` if the scene/door coordinates are absent or
+/// the player is still at origin `(0, 0)`.
+pub(crate) fn is_player_near_door(session: &Session, data: &GameData, door_id: i32) -> bool {
+    let (px, py) = session.estimated_position_at(crate::server::session::now_ms());
+    if px == 0 && py == 0 {
+        return true;
+    }
+    let Some(scene) = data.scene_eve_data.get(&u32::from(session.map_id)) else {
+        return true;
+    };
+    let Ok(door_u16) = u16::try_from(door_id) else {
+        return true;
+    };
+    let Some(door) = scene.doors.get(&door_u16) else {
+        return true;
+    };
+    crate::eve::state::EveStateBuilder::is_within_range(px, py, door.x, door.y)
 }
 
 async fn handle_talk_start(
@@ -157,31 +186,8 @@ async fn handle_talk_start(
     };
     conn.session.idnpctalking = template_id;
 
-    if matches!(template_id, 16080 | 16004 | 16011 | 16015) {
-        if !in_range {
-            end_talk(conn, out);
-            return;
-        }
-        out.send(NpcTalkCodec::build_move_stop_hex());
-        out.send(format!(
-            "F44411001401000000010603{:02X}0000000000000100",
-            map_object_id
-        ));
-        return;
-    }
-    if matches!(template_id, 15002 | 16001 | 16016) {
-        if !in_range {
-            end_talk(conn, out);
-            return;
-        }
-        out.send(NpcTalkCodec::build_move_stop_hex());
-        out.send(format!(
-            "F44411001401000000010603{:02X}0000000000000200",
-            map_object_id
-        ));
-        return;
-    }
-    if template_id == 16012 {
+    if !in_range {
+        end_talk(conn, out);
         return;
     }
 
@@ -196,11 +202,6 @@ async fn handle_talk_start(
     )
     .await
     {
-        return;
-    }
-
-    if !in_range {
-        end_talk(conn, out);
         return;
     }
 
@@ -221,6 +222,26 @@ async fn handle_talk_start(
             }
         }
         activate_event_session(&mut conn.session, event_session, data, pool, out).await;
+        return;
+    }
+
+    if matches!(template_id, 16080 | 16004 | 16011 | 16015) {
+        out.send(NpcTalkCodec::build_move_stop_hex());
+        out.send(format!(
+            "F44411001401000000010603{:02X}0000000000000100",
+            map_object_id
+        ));
+        return;
+    }
+    if matches!(template_id, 15002 | 16001 | 16016) {
+        out.send(NpcTalkCodec::build_move_stop_hex());
+        out.send(format!(
+            "F44411001401000000010603{:02X}0000000000000200",
+            map_object_id
+        ));
+        return;
+    }
+    if template_id == 16012 {
         return;
     }
 
@@ -311,11 +332,12 @@ async fn handle_talk_continue(
 }
 
 fn handle_inn_menu(conn: &mut Conn, data: &GameData, out: &mut HandleOutcome, item_tag: &str) {
+    let npc_tag = encoder::le16(conn.session.idtalking as u16);
     match conn.session.select_menu {
         30 => {
             out.send(format!(
-                "F4441100140100000001060301000000000000{}00",
-                item_tag
+                "F44411001401000000010603{}0000000000{}00",
+                npc_tag, item_tag
             ));
         }
         31 => {
@@ -328,8 +350,8 @@ fn handle_inn_menu(conn: &mut Conn, data: &GameData, out: &mut HandleOutcome, it
         32 => {
             out.send(crate::server::handlers::shops::open_npc_shop_frame());
             out.send(format!(
-                "F4441100140100000001060301000000000000{}00",
-                item_tag
+                "F44411001401000000010603{}0000000000{}00",
+                npc_tag, item_tag
             ));
         }
         33 => {
@@ -357,6 +379,10 @@ async fn handle_talk_click_door(
     }
     let door_id = encoder::u16_le(payload[0], payload[1]) as i32;
     if conn.session.id_leader > 0 && conn.session.id_leader != conn.session.id {
+        end_talk(conn, out);
+        return;
+    }
+    if !is_player_near_door(&conn.session, data, door_id) {
         end_talk(conn, out);
         return;
     }

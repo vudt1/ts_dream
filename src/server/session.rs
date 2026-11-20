@@ -415,6 +415,31 @@ pub struct Session {
     /// [`ServerControl`] post-dispatch sync to detect concurrent cross-player updates.
     /// Runtime-only; never persisted.
     pub sync_revision: u64,
+    /// Walk interpolation origin `(x, y)`. Runtime-only; never persisted.
+    pub walk_origin: (u16, u16),
+    /// Walk interpolation destination `(x, y)`. Runtime-only; never persisted.
+    pub walk_dest: (u16, u16),
+    /// Walk start timestamp in ms (`0` when stationary). Runtime-only; never persisted.
+    pub walk_start_ms: u64,
+    /// Pending delayed `MeetDoor` trigger scheduled during a walk. Runtime-only; never persisted.
+    pub pending_meet_door: Option<PendingMeetDoor>,
+}
+
+/// Pending delayed `MeetDoor` trigger scheduled while walking toward a door.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PendingMeetDoor {
+    pub map_id: u16,
+    pub door_id: u16,
+    pub due_ms: u64,
+}
+
+/// Current wall-clock time in milliseconds since the Unix epoch.
+#[must_use]
+pub fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -549,6 +574,10 @@ impl Default for Session {
             last_battle_end_ms: 0,
             last_chat_ms: 0,
             sync_revision: 0,
+            walk_origin: (0, 0),
+            walk_dest: (0, 0),
+            walk_start_ms: 0,
+            pending_meet_door: None,
         }
     }
 }
@@ -556,6 +585,48 @@ impl Default for Session {
 impl Session {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Walk speed in pixels per second (`128.0` on overworld maps where `map_id % 1000 == 0`, else `160.0`).
+    #[must_use]
+    pub fn walk_speed_px_per_sec(&self) -> f64 {
+        if self.map_id % 1000 == 0 {
+            128.0
+        } else {
+            160.0
+        }
+    }
+
+    /// Linearly interpolated position at `now_ms`, or `(map_x, map_y)` when stationary or arrived.
+    #[must_use]
+    pub fn estimated_position_at(&self, now_ms: u64) -> (i32, i32) {
+        if self.walk_start_ms == 0 {
+            return (i32::from(self.map_x), i32::from(self.map_y));
+        }
+        let dx = f64::from(self.walk_dest.0) - f64::from(self.walk_origin.0);
+        let dy = f64::from(self.walk_dest.1) - f64::from(self.walk_origin.1);
+        let dist = (dx * dx + dy * dy).sqrt();
+        if dist <= 0.0 {
+            return (i32::from(self.map_x), i32::from(self.map_y));
+        }
+        let speed = self.walk_speed_px_per_sec();
+        let travel_ms = (dist / speed) * 1000.0;
+        let elapsed_ms = now_ms.saturating_sub(self.walk_start_ms) as f64;
+        if elapsed_ms >= travel_ms {
+            return (i32::from(self.map_x), i32::from(self.map_y));
+        }
+        let t = (elapsed_ms / travel_ms).clamp(0.0, 1.0);
+        let x = (f64::from(self.walk_origin.0) + dx * t).round() as i32;
+        let y = (f64::from(self.walk_origin.1) + dy * t).round() as i32;
+        (x, y)
+    }
+
+    /// Reset walk interpolation tracking and clear any pending delayed `MeetDoor`.
+    pub fn clear_walk_tracking(&mut self) {
+        self.walk_origin = (self.map_x, self.map_y);
+        self.walk_dest = (self.map_x, self.map_y);
+        self.walk_start_ms = 0;
+        self.pending_meet_door = None;
     }
 
     /// Recompute gear bonus stats and max HP/SP.

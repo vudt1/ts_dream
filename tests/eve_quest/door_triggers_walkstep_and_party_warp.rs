@@ -303,7 +303,10 @@ async fn e2e_meet_door_party_warp_and_walkstep_event() {
         "WalkStep must trigger scripted Eve event in encounter zone"
     );
 
-    // 2. MeetDoor by walking onto door 10 proximity (310, 405) -> warps Leader & Member to 12002
+    // 2. MeetDoor by walking onto door 10 proximity (310, 405) from nearby (290, 390) -> warps Leader & Member to 12002
+    conn.session.map_x = 290;
+    conn.session.map_y = 390;
+    conn.session.clear_walk_tracking();
     let out_meet = dispatch(&mut conn, &move_frame(1, 310, 405), &data, &service, &env).await;
     assert_eq!((conn.session.map_id, conn.session.map_x, conn.session.map_y), (12002, 830, 950));
     assert!(has_relocate_frame(&outgoing_hexes(&out_meet), leader_id as u32, 12002));

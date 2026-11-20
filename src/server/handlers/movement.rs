@@ -88,64 +88,33 @@ pub async fn handle_move_dispatch(ctx: &mut OpcodeCtx<'_>) {
 
     // 1. MeetDoor: check closest door within ±60 px of new coordinates.
     if let Some((door_id, _)) = closest_door {
-        let map_id = ctx.conn.session.map_id;
-        if let Some(hub) = ctx.env.hub {
-            let target_map_id = crate::server::handlers::quest::resolve_door_warp(
-                ctx.data,
-                &ctx.conn.session,
-                map_id,
-                door_id,
-            )
-            .map(|r| r.dest_map)
-            .unwrap_or(0);
-            if let Err(msg) = hub
-                .festivals
-                .check_door_access(map_id, door_id, target_map_id)
-            {
-                ctx.out.send(crate::server::spawn::sys_msg_frame(msg));
+        if let Some(door) = scene.doors.get(&door_id) {
+            let origin = ctx.conn.session.walk_origin;
+            let dx = f64::from(door.x) - f64::from(origin.0);
+            let dy = f64::from(door.y) - f64::from(origin.1);
+            let dist = (dx * dx + dy * dy).sqrt();
+            let travel_ms =
+                ((dist / ctx.conn.session.walk_speed_px_per_sec()) * 1000.0).round() as u64;
+            if travel_ms > 250 {
+                let now_ms = crate::server::session::now_ms();
+                ctx.conn.session.pending_meet_door = Some(crate::server::session::PendingMeetDoor {
+                    map_id: ctx.conn.session.map_id,
+                    door_id,
+                    due_ms: now_ms.saturating_add(travel_ms),
+                });
                 return;
             }
         }
-        if let Some(trigger) = crate::server::handlers::quest::try_trigger_battle_gate(
+        if trigger_meet_door_for_door(
             &mut ctx.conn.session,
-            ctx.data,
-            map_id,
             door_id,
-        ) {
-            ctx.out.battle_trigger = Some(trigger);
-            return;
-        }
-        if let Some(event_session) =
-            crate::server::handlers::npc_event::resolve_npc_event_with_filter_and_state(
-                &ctx.conn.session,
-                ctx.data,
-                crate::server::handlers::npc_event::NpcTrigger::MeetDoor(i32::from(door_id)),
-                &mut rng,
-                None,
-                cached_state.as_ref(),
-            )
+            ctx.data,
+            &ctx.env,
+            &mut ctx.out,
+            cached_state.as_ref(),
+        )
+        .await
         {
-            if let Some(hub) = ctx.env.hub {
-                if let Err(msg) = crate::server::handlers::talk::check_event_session_quest_access(
-                    &hub.festivals,
-                    map_id,
-                    &event_session,
-                ) {
-                    ctx.out.send(crate::server::spawn::sys_msg_frame(msg));
-                    return;
-                }
-            }
-            ctx.conn.session.idtalking = i32::from(door_id);
-            ctx.conn.session.talk_type = "DOOR".to_string();
-            ctx.conn.session.talk_count = 0;
-            crate::server::handlers::talk::activate_event_session(
-                &mut ctx.conn.session,
-                event_session,
-                ctx.data,
-                ctx.env.pool,
-                &mut ctx.out,
-            )
-            .await;
             return;
         }
     }
@@ -172,6 +141,83 @@ pub async fn handle_move_dispatch(ctx: &mut OpcodeCtx<'_>) {
             .await;
         }
     }
+}
+
+/// Shared `MeetDoor` execution path for both immediate `06 01` and delayed walk arrival.
+///
+/// Returns `true` if the door trigger handled/terminated the step (festival block,
+/// BattleGate battle, or Eve `MeetDoor` event activated).
+pub async fn trigger_meet_door_for_door(
+    session: &mut crate::server::session::Session,
+    door_id: u16,
+    data: &crate::data::loader::GameData,
+    env: &crate::server::dispatcher::ServerEnv<'_>,
+    out: &mut crate::server::dispatcher::HandleOutcome,
+    cached_state: Option<&crate::eve::state::PlayerEventState>,
+) -> bool {
+    let map_id = session.map_id;
+    if let Some(hub) = env.hub {
+        let target_map_id = crate::server::handlers::quest::resolve_door_warp(
+            data,
+            session,
+            map_id,
+            door_id,
+        )
+        .map(|r| r.dest_map)
+        .unwrap_or(0);
+        if let Err(msg) = hub
+            .festivals
+            .check_door_access(map_id, door_id, target_map_id)
+        {
+            out.send(crate::server::spawn::sys_msg_frame(msg));
+            return true;
+        }
+    }
+    if let Some(trigger) = crate::server::handlers::quest::try_trigger_battle_gate(
+        session,
+        data,
+        map_id,
+        door_id,
+    ) {
+        out.battle_trigger = Some(trigger);
+        return true;
+    }
+    let seed = crate::server::session::now_ms() as i32;
+    let mut rng = crate::battle::rng::DotNetRandom::new(seed);
+    if let Some(event_session) =
+        crate::server::handlers::npc_event::resolve_npc_event_with_filter_and_state(
+            session,
+            data,
+            crate::server::handlers::npc_event::NpcTrigger::MeetDoor(i32::from(door_id)),
+            &mut rng,
+            None,
+            cached_state,
+        )
+    {
+        if let Some(hub) = env.hub {
+            if let Err(msg) = crate::server::handlers::talk::check_event_session_quest_access(
+                &hub.festivals,
+                map_id,
+                &event_session,
+            ) {
+                out.send(crate::server::spawn::sys_msg_frame(msg));
+                return true;
+            }
+        }
+        session.idtalking = i32::from(door_id);
+        session.talk_type = "DOOR".to_string();
+        session.talk_count = 0;
+        crate::server::handlers::talk::activate_event_session(
+            session,
+            event_session,
+            data,
+            env.pool,
+            out,
+        )
+        .await;
+        return true;
+    }
+    false
 }
 
 /// Op 0x05 — Player / Actor state sync (C->S is non-movement: sub=6 form selection, sub=7 tab switch).
@@ -214,6 +260,22 @@ fn handle_move_inner(ctx: &mut OpcodeCtx) -> Option<crate::eve::state::PlayerEve
     let dir = payload[0];
     let x = encoder::u16_le(payload[1], payload[2]);
     let y = encoder::u16_le(payload[3], payload[4]);
+    let now_ms = crate::server::session::now_ms();
+    let prev_pos = conn.session.estimated_position_at(now_ms);
+    if sub == 1 {
+        conn.session.walk_origin = (
+            prev_pos.0.clamp(0, i32::from(u16::MAX)) as u16,
+            prev_pos.1.clamp(0, i32::from(u16::MAX)) as u16,
+        );
+        conn.session.walk_dest = (x, y);
+        conn.session.walk_start_ms = now_ms;
+        conn.session.pending_meet_door = None;
+    } else if sub == 2 {
+        conn.session.walk_origin = (x, y);
+        conn.session.walk_dest = (x, y);
+        conn.session.walk_start_ms = 0;
+        conn.session.pending_meet_door = None;
+    }
     conn.session.gocnhin = dir;
     conn.session.map_x = x;
     conn.session.map_y = y;

@@ -1271,6 +1271,7 @@ async fn perform_party_warp_locked(
     session.map_id = dest_map;
     session.map_x = dest_x;
     session.map_y = dest_y;
+    session.clear_walk_tracking();
 
     let mut warped_members: Vec<(u16, Session)> = Vec::new();
     if id_leader == id && id > 0 {
@@ -1283,6 +1284,7 @@ async fn perform_party_warp_locked(
                 mem_session.map_id = dest_map;
                 mem_session.map_x = dest_x;
                 mem_session.map_y = dest_y;
+                mem_session.clear_walk_tracking();
                 warped_members.push((member_old_map, mem_session));
             }
         }
@@ -1381,6 +1383,11 @@ pub async fn handle_warp_confirm(
 ) {
     let map_id = conn.session.map_id;
     let idtalking = conn.session.idtalking;
+
+    if !crate::server::handlers::talk::is_player_near_door(&conn.session, data, idtalking) {
+        end_talk(conn, out);
+        return;
+    }
 
     if let Some(hub) = env.hub {
         let warp_id_u16 = u16::try_from(idtalking).unwrap_or(0);

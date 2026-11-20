@@ -7,7 +7,7 @@
 use crate::db::modern::model::StorageType;
 use crate::db::pool::DbPool;
 use crate::server::session::{InventoryItem, PetState, Session};
-use sqlx::{Sqlite, Transaction};
+use sqlx::{Sqlite, SqlitePool, Transaction};
 
 pub type SqliteTx<'a> = Transaction<'a, Sqlite>;
 
@@ -116,6 +116,27 @@ pub async fn update_player(pool: Option<&DbPool>, player_id: u32, column: &str, 
         .await
     {
         tracing::warn!("update_player({column}) failed: {e}");
+    }
+}
+
+/// Update one modern `characters` TEXT column by `player_id` (e.g. `color` on reborn).
+pub async fn update_player_text(pool: &SqlitePool, player_id: i64, column: &str, value: &str) {
+    let field = match column {
+        "Color" | "color" => "color",
+        _ => {
+            tracing::warn!("skipped unknown modern character text column write: {column}");
+            return;
+        }
+    };
+    let normalized = crate::db::modern::sqlite::session::normalize_color_hex(value);
+    let sql = format!("UPDATE characters SET {field} = ? WHERE playerid = ?");
+    if let Err(e) = sqlx::query(&sql)
+        .bind(normalized)
+        .bind(player_id)
+        .execute(pool)
+        .await
+    {
+        tracing::warn!("update_player_text({column}) failed: {e}");
     }
 }
 

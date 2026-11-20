@@ -129,8 +129,8 @@ async fn test_atomic_create_with_password_overwrite() {
     assert!(repos.accounts().verify_pass2(acc, b"123456").await.unwrap());
 
     // Full row + money + inventories visible together (atomic).
-    // Appearance color lives in session RAM for player_appear (covered by
-    // the `hair` column in DB — no separate color columns).
+    // Appearance color (8 bytes / 16 hex chars) is stored in `characters.color`,
+    // separate from the 1-byte `hair` column.
     assert_eq!(conn.session.color, "1122334455667788");
     assert!(
         conn.session.homdo.iter().any(|i| i.slot == 1 && i.id == 32012 && i.count == 4),
@@ -155,7 +155,19 @@ async fn test_atomic_create_with_password_overwrite() {
     assert_eq!(probe.map_id, 10817);
     assert_eq!((probe.map_x, probe.map_y), (442, 758));
     assert_eq!(probe.hair, 3);
+    assert_eq!(probe.color, "1122334455667788");
     assert_eq!(probe.newbie, 0, "DB newbie must remain 0 after create");
+
+    // Verify 0x03 self-appear frame generated on relog carries the persisted 8-byte color.
+    let relog_frames = spawn::build_logined_sequence_session(&probe);
+    let appear_frame = relog_frames
+        .iter()
+        .find(|f| f.len() >= 10 && &f[8..10] == "03")
+        .expect("relog sequence must include 0x03 player_appear frame");
+    assert!(
+        appear_frame.contains("1122334455667788"),
+        "0x03 appear frame must contain persisted 8-byte color 1122334455667788, got {appear_frame}"
+    );
     let db_newbie: i64 = sqlx::query_scalar("SELECT newbie FROM characters WHERE playerid = ?")
         .bind(acc)
         .fetch_one(&pool.read)

@@ -258,6 +258,8 @@ async fn test_shared_and_exclusive_map_gating_through_dispatcher() {
     );
 
     // 2. ClickDoor (0x14 04) on festival door 88 (targets 54811) while Idle -> rejected with sys_msg_frame
+    conn.session.map_x = 300;
+    conn.session.map_y = 300;
     let click_fest_door = raw_frame(&[0x14, 0x04, 88, 0x00]);
     let out_door = dispatch(&mut conn, &click_fest_door, &data, &service, &env).await;
     let expected_err = sys_msg_frame("Lễ hội chưa mở: không thể vào bản đồ này.");

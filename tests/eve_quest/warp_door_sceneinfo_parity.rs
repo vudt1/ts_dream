@@ -135,8 +135,8 @@ async fn door_id_vs_scene_info_id_0x14_08_resolves_via_door_chain_not_scene_info
         session: Session {
             id: 50001,
             map_id: 12000,
-            map_x: 100,
-            map_y: 100,
+            map_x: 0,
+            map_y: 0,
             in_world: true,
             ..Default::default()
         },
@@ -349,6 +349,8 @@ async fn override_warps_win_before_eve_and_fallback_warps_only_when_no_rt2() {
         session: Session {
             id: 50003,
             map_id: 25303,
+            map_x: 0,
+            map_y: 0,
             in_world: true,
             ..Default::default()
         },
@@ -364,6 +366,8 @@ async fn override_warps_win_before_eve_and_fallback_warps_only_when_no_rt2() {
         session: Session {
             id: 50004,
             map_id: 11901,
+            map_x: 0,
+            map_y: 0,
             in_world: true,
             ..Default::default()
         },
@@ -499,8 +503,8 @@ async fn battlegate_triggers_on_meet_door_and_warps_party_with_db_on_win_without
             id_leader: l_u32,
             id_mem: [m_u32, 0, 0, 0],
             map_id: 49902,
-            map_x: 100,
-            map_y: 100,
+            map_x: 180,
+            map_y: 180,
             hp: 100,
             hp_max: 100,
             in_world: true,
@@ -513,8 +517,8 @@ async fn battlegate_triggers_on_meet_door_and_warps_party_with_db_on_win_without
         db_character_id: m_id,
         id_leader: l_u32,
         map_id: 49902,
-        map_x: 100,
-        map_y: 100,
+        map_x: 180,
+        map_y: 180,
         hp: 100,
         hp_max: 100,
         in_world: true,
@@ -577,8 +581,8 @@ async fn battlegate_triggers_on_meet_door_and_warps_party_with_db_on_win_without
     // 3. Returning to (49902, 2) in the same session must NOT repeat the BattleGate battle.
     leader_conn.session = l_reg;
     leader_conn.session.map_id = 49902;
-    leader_conn.session.map_x = 100;
-    leader_conn.session.map_y = 100;
+    leader_conn.session.map_x = 180;
+    leader_conn.session.map_y = 180;
     let _ = dispatch(&mut leader_conn, &talk_warp_frame(2), &data_arc, &service, &env).await;
     assert_eq!(leader_conn.session.battle_id, 0, "passed BattleGate must not re-trigger battle");
     assert_eq!(leader_conn.session.map_id, 49903, "passed BattleGate must warp directly");
@@ -598,8 +602,8 @@ async fn battlegate_lose_or_flee_does_not_mark_passed_or_warp() {
         session: Session {
             id: 60003,
             map_id: 49902,
-            map_x: 100,
-            map_y: 100,
+            map_x: 180,
+            map_y: 180,
             hp: 100,
             hp_max: 100,
             in_world: true,
@@ -648,6 +652,8 @@ async fn production_data_0x14_08_fixes_door_vs_sceneinfo_and_honors_override_fal
         session: Session {
             id: 60010,
             map_id: 12000,
+            map_x: 0,
+            map_y: 0,
             in_world: true,
             ..Default::default()
         },
@@ -661,6 +667,8 @@ async fn production_data_0x14_08_fixes_door_vs_sceneinfo_and_honors_override_fal
         session: Session {
             id: 60011,
             map_id: 25303,
+            map_x: 0,
+            map_y: 0,
             in_world: true,
             ..Default::default()
         },
@@ -674,6 +682,8 @@ async fn production_data_0x14_08_fixes_door_vs_sceneinfo_and_honors_override_fal
         session: Session {
             id: 60012,
             map_id: 11901,
+            map_x: 0,
+            map_y: 0,
             in_world: true,
             ..Default::default()
         },
@@ -687,6 +697,8 @@ async fn production_data_0x14_08_fixes_door_vs_sceneinfo_and_honors_override_fal
         session: Session {
             id: 60013,
             map_id: 49902,
+            map_x: 0,
+            map_y: 0,
             hp: 100,
             hp_max: 100,
             in_world: true,
@@ -703,13 +715,18 @@ async fn production_data_0x14_08_fixes_door_vs_sceneinfo_and_honors_override_fal
         out_gate.outgoing
     );
 
-    // 5. (10817, 1): Door 1 has eve_no=7 (MeetDoor dialogue -> Warp to 10867).
+    // 5. (10817, 1): Door 1 has eve_no=7 (MeetDoor dialogue + 2x PlayMovie -> Warp to 10867).
+    let door1 = data
+        .scene_eve_data
+        .get(&10817)
+        .and_then(|s| s.doors.get(&1))
+        .expect("10817 door 1");
     let mut c5 = Conn {
         session: Session {
             id: 60014,
             map_id: 10817,
-            map_x: 1622,
-            map_y: 655,
+            map_x: door1.x as u16,
+            map_y: door1.y as u16,
             in_world: true,
             ..Default::default()
         },
@@ -724,7 +741,7 @@ async fn production_data_0x14_08_fixes_door_vs_sceneinfo_and_honors_override_fal
         out_open.outgoing
     );
     let mut warped = false;
-    for _ in 0..7 {
+    for _ in 0..9 {
         let out_step = dispatch(
             &mut c5,
             &[0xF4, 0x44, 0x02, 0x00, 0x14, 0x06],

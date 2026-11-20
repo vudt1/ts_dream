@@ -417,15 +417,34 @@ async fn e2e_move_entity_movie_npc_action_and_unknown_fail_closed() {
     let service = BattleService::default();
     let env = ServerEnv::none();
 
-    let out = dispatch(&mut conn, &click_npc_frame(1), &data, &service, &env).await;
-    let emitted = op14_01_results(&out);
-
-    assert!(emitted.iter().any(|&(rt, rc, _, _, val, _)| rt == 4 && rc == 3 && val == 120345));
-    assert!(emitted.iter().any(|&(rt, _, _, _, val, _)| rt == 5 && val == 17));
+    let out1 = dispatch(&mut conn, &click_npc_frame(1), &data, &service, &env).await;
+    let emitted1 = op14_01_results(&out1);
     assert!(
-        !emitted.iter().any(|&(rt, ..)| rt >= 7),
-        "rt >= 7 (including rt=9 NpcAction and UNKNOWN rt=7/8/10) must NEVER be emitted via 0x14 01"
+        emitted1.iter().any(|&(rt, rc, _, _, val, _)| rt == 4 && rc == 3 && val == 120345),
+        "first step must emit MoveEntity (rt=4)"
     );
+    assert!(
+        !emitted1.iter().any(|&(rt, ..)| rt == 5),
+        "MoveEntity (rt=4) must halt before PlayMovie (rt=5)"
+    );
+    assert!(conn.session.current_event_session.is_some());
+
+    let continue_frame = ts_dream::protocol::encoder::bytes("F44402001406").unwrap();
+    let out2 = dispatch(&mut conn, &continue_frame, &data, &service, &env).await;
+    let emitted2 = op14_01_results(&out2);
+    assert!(
+        emitted2.iter().any(|&(rt, _, _, _, val, _)| rt == 5 && val == 17),
+        "second step must emit PlayMovie (rt=5)"
+    );
+    assert!(conn.session.current_event_session.is_some(), "PlayMovie (rt=5) must halt waiting for 14 06");
+
+    let out3 = dispatch(&mut conn, &continue_frame, &data, &service, &env).await;
+    let emitted3 = op14_01_results(&out3);
+    assert!(
+        !emitted1.iter().chain(emitted2.iter()).chain(emitted3.iter()).any(|&(rt, ..)| rt >= 7),
+        "rt >= 7 (including rt=9 NpcAction, rt=7 NpcService, and UNKNOWN rt=8/10) must NEVER be emitted via 0x14 01"
+    );
+    assert!(conn.session.current_event_session.is_none());
 }
 
 #[tokio::test]
@@ -615,5 +634,344 @@ async fn negative_preflight_rejects_gold_cap_and_full_pet_bag_all_or_nothing() {
     assert!(
         conn_owned_pet.session.quest_tasks.contains_key(&10998),
         "already-owned RewardPet must not falsely reject preceding quest step"
+    );
+}
+
+#[tokio::test]
+async fn map_10917_npc_2_runs_eve_event_4_not_innkeeper_fallback() {
+    set_eve_events_enabled(true);
+    let data = crate::common::shared_game_data();
+    let scene = data
+        .scene_eve_data
+        .get(&10917)
+        .expect("map 10917 must exist in eve.emg");
+    let npc = scene.npcs.get(&2).expect("map 10917 NPC 2 must exist");
+    assert_eq!(npc.npc_id, 16015);
+
+    let mut conn = Conn {
+        session: Session {
+            id: 9101,
+            map_id: 10917,
+            map_x: npc.x as u16,
+            map_y: npc.y as u16,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let service = BattleService::default();
+    let env = ServerEnv::none();
+
+    let out = dispatch(&mut conn, &click_npc_frame(2), data, &service, &env).await;
+    let emitted = op14_01_results(&out);
+    assert!(
+        emitted.iter().any(|&(rt, _, param, _, _, mean)| rt == 6 && (param == 2 || mean == 2 || mean == 3)),
+        "10917 NPC 2 (#16015) must open Surface 2 via NpcEvent 4, got {emitted:?}"
+    );
+
+    let out_choice = dispatch(&mut conn, &select_menu_frame(30), data, &service, &env).await;
+    let choice_emitted = op14_01_results(&out_choice);
+    assert!(
+        choice_emitted.iter().any(|&(rt, _, _, _, _, mean)| rt == 1 && mean == 10412),
+        "choice 30 on 10917 NPC 2 must lead to dialog 10412, got {choice_emitted:?}"
+    );
+}
+
+#[tokio::test]
+async fn map_13242_and_28012_npc_service_rt7_rc7_executes_without_raw_1401() {
+    set_eve_events_enabled(true);
+    let data = crate::common::shared_game_data();
+    let service = BattleService::default();
+    let env = ServerEnv::none();
+
+    // 13242 #16015 (Inn)
+    if let Some(scene) = data.scene_eve_data.get(&13242) {
+        if let Some((&place_id, npc)) = scene.npcs.iter().find(|(_, n)| n.npc_id == 16015) {
+            let mut conn = Conn {
+                session: Session {
+                    id: 9102,
+                    map_id: 13242,
+                    map_x: npc.x as u16,
+                    map_y: npc.y as u16,
+                    hp: 1,
+                    hp_max: 100,
+                    sp: 1,
+                    sp_max: 50,
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            let out1 = dispatch(&mut conn, &click_npc_frame(place_id), data, &service, &env).await;
+            let emitted1 = op14_01_results(&out1);
+            assert!(
+                !emitted1.iter().any(|&(rt, ..)| rt >= 7),
+                "13242 #16015 must never emit raw rt >= 7 over 0x14 01"
+            );
+            // If it opened a menu, select InnHeal (31) or InnShop (32) and verify no raw rt>=7
+            if conn.session.current_event_session.is_some() {
+                let out2 = dispatch(&mut conn, &select_menu_frame(31), data, &service, &env).await;
+                let emitted2 = op14_01_results(&out2);
+                assert!(
+                    !emitted2.iter().any(|&(rt, ..)| rt >= 7),
+                    "13242 #16015 choice 31 must never emit raw rt >= 7 over 0x14 01"
+                );
+            }
+        }
+    }
+
+    // 28012 #16080 (Banker)
+    if let Some(scene) = data.scene_eve_data.get(&28012) {
+        if let Some((&place_id, npc)) = scene.npcs.iter().find(|(_, n)| n.npc_id == 16080) {
+            let mut conn = Conn {
+                session: Session {
+                    id: 9103,
+                    map_id: 28012,
+                    map_x: npc.x as u16,
+                    map_y: npc.y as u16,
+                    bank_gold: 1234,
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            let out1 = dispatch(&mut conn, &click_npc_frame(place_id), data, &service, &env).await;
+            let emitted1 = op14_01_results(&out1);
+            assert!(
+                !emitted1.iter().any(|&(rt, ..)| rt >= 7),
+                "28012 #16080 must never emit raw rt >= 7 over 0x14 01"
+            );
+            if conn.session.current_event_session.is_some() {
+                let out2 = dispatch(&mut conn, &select_menu_frame(30), data, &service, &env).await;
+                let emitted2 = op14_01_results(&out2);
+                assert!(
+                    !emitted2.iter().any(|&(rt, ..)| rt >= 7),
+                    "28012 #16080 choice 30 must never emit raw rt >= 7 over 0x14 01"
+                );
+                assert!(
+                    has_frame_prefix(&out2, "F44403001D0900")
+                        || has_frame_prefix(&out2, "F44406001D04")
+                        || has_frame_prefix(&out2, "F44402001D05"),
+                    "28012 #16080 BankOpen must emit 1D .. frames, got {:?}",
+                    out2.outgoing
+                );
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn handle_inn_menu_fallback_uses_idtalking() {
+    set_eve_events_enabled(true);
+    let mut data = GameData::default();
+    let mut scene = SceneEveData::default();
+    scene.npcs.insert(
+        3,
+        EveNpcPlacement {
+            id: 3,
+            npc_id: 15002,
+            x: 500,
+            y: 500,
+            events: vec![],
+            ..Default::default()
+        },
+    );
+    data.scene_eve_data.insert(12001, scene);
+
+    let mut conn = Conn {
+        session: Session {
+            id: 9104,
+            map_id: 12001,
+            map_x: 500,
+            map_y: 500,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let service = BattleService::default();
+    let env = ServerEnv::none();
+
+    let out_start = dispatch(&mut conn, &click_npc_frame(3), &data, &service, &env).await;
+    assert!(
+        has_frame_prefix(&out_start, "F444110014010000000106030300"),
+        "Innkeeper start should use idtalking 0300"
+    );
+
+    let _ = dispatch(&mut conn, &select_menu_frame(30), &data, &service, &env).await;
+    let out_menu = dispatch(&mut conn, &CONTINUE_FRAME, &data, &service, &env).await;
+    assert!(
+        has_frame_prefix(&out_menu, "F444110014010000000106030300"),
+        "handle_inn_menu choice 30 must use idtalking 0300 instead of 0100, got {:?}",
+        out_menu.outgoing
+    );
+}
+
+#[tokio::test]
+async fn map_10817_door_1_play_movie_halts_before_warp() {
+    set_eve_events_enabled(true);
+    let data = crate::common::shared_game_data();
+    let (door_x, door_y) = data
+        .scene_eve_data
+        .get(&10817)
+        .and_then(|s| s.doors.get(&1))
+        .map(|d| (d.x as u16, d.y as u16))
+        .unwrap_or((442, 758));
+    let mut conn = Conn {
+        session: Session {
+            id: 9105,
+            map_id: 10817,
+            map_x: door_x,
+            map_y: door_y,
+            idtalking: 1,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let service = BattleService::default();
+    let env = ServerEnv::none();
+
+    let warp_confirm = vec![0xF4, 0x44, 0x04, 0x00, 0x14, 0x08, 0x01, 0x00];
+    let out1 = dispatch(&mut conn, &warp_confirm, data, &service, &env).await;
+    assert!(conn.session.current_event_session.is_some());
+    assert!(!has_frame_prefix(&out1, "F44402001407"));
+
+    // Step through until PlayMovie (rt=5) is emitted and verify it halts BEFORE Warp (14 07)
+    let mut saw_play_movie_halt = false;
+    for _ in 0..10 {
+        let out_step = dispatch(&mut conn, &CONTINUE_FRAME, data, &service, &env).await;
+        let emitted = op14_01_results(&out_step);
+        if emitted.iter().any(|&(rt, ..)| rt == 5) {
+            assert!(
+                !has_frame_prefix(&out_step, "F44402001407"),
+                "PlayMovie (rt=5) must halt waiting for 14 06 before Warp (14 07)"
+            );
+            assert!(
+                conn.session.current_event_session.is_some(),
+                "EventSession must remain parked after PlayMovie (rt=5)"
+            );
+            saw_play_movie_halt = true;
+            break;
+        }
+    }
+    assert!(saw_play_movie_halt, "expected PlayMovie (rt=5) halt step in 10817 Door 1 eve_no=7");
+}
+
+#[tokio::test]
+async fn proximity_130_px_and_delayed_meet_door() {
+    set_eve_events_enabled(true);
+    let mut data = GameData::default();
+    let mut scene = SceneEveData::default();
+    scene.npcs.insert(
+        1,
+        EveNpcPlacement {
+            id: 1,
+            npc_id: 15002,
+            x: 500,
+            y: 500,
+            events: vec![1],
+            ..Default::default()
+        },
+    );
+    scene.doors.insert(
+        1,
+        ts_dream::data::loaders::EveDoorPlacement {
+            id: 1,
+            x: 900,
+            y: 500,
+            events: vec![2],
+        },
+    );
+    scene.npc_events.insert(
+        1,
+        NpcEventData {
+            eve_no: 1,
+            when_happen: [true, false, false, false],
+            conditions: vec![EveCondition {
+                condition_no: 1,
+                results: vec![EveResult {
+                    result_group_no: 1,
+                    result_no: 1,
+                    result_type: 1,
+                    result_class: 0,
+                    parameter: 0,
+                    parameter_style: 0,
+                    result_value: 0,
+                    result_mean_no: 100,
+                }],
+                ..Default::default()
+            }],
+        },
+    );
+    scene.npc_events.insert(
+        2,
+        NpcEventData {
+            eve_no: 2,
+            when_happen: [false, true, false, false],
+            conditions: vec![EveCondition {
+                condition_no: 1,
+                results: vec![EveResult {
+                    result_group_no: 1,
+                    result_no: 1,
+                    result_type: 2,
+                    result_class: 0,
+                    parameter: 1,
+                    parameter_style: 0,
+                    result_value: 0,
+                    result_mean_no: 0,
+                }],
+                ..Default::default()
+            }],
+        },
+    );
+    data.scene_eve_data.insert(12001, scene);
+
+    let service = BattleService::default();
+    let env = ServerEnv::none();
+
+    // 1. Out of 130 px range (140 px away) -> 14 01 returns 14 08 EndTalk
+    let mut conn = Conn {
+        session: Session {
+            id: 9106,
+            map_id: 12001,
+            map_x: 640,
+            map_y: 500,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let out_npc = dispatch(&mut conn, &click_npc_frame(1), &data, &service, &env).await;
+    assert!(
+        has_frame_prefix(&out_npc, "F44402001408"),
+        "14 01 at 140 px (> 130 px) must emit 14 08 EndTalk"
+    );
+
+    // 2. 14 04 ClickDoor out of range -> 14 08 EndTalk
+    let click_door = vec![0xF4, 0x44, 0x04, 0x00, 0x14, 0x04, 0x01, 0x00];
+    let out_door = dispatch(&mut conn, &click_door, &data, &service, &env).await;
+    assert!(
+        has_frame_prefix(&out_door, "F44402001408"),
+        "14 04 out of 130 px range must emit 14 08 EndTalk"
+    );
+
+    // 3. 14 08 WarpConfirm out of range -> 14 08 EndTalk
+    let warp_confirm = vec![0xF4, 0x44, 0x04, 0x00, 0x14, 0x08, 0x01, 0x00];
+    let out_warp = dispatch(&mut conn, &warp_confirm, &data, &service, &env).await;
+    assert!(
+        has_frame_prefix(&out_warp, "F44402001408"),
+        "14 08 out of 130 px range must emit 14 08 EndTalk"
+    );
+
+    // 4. 06 01 walk from (400, 500) to door (900, 500) sets pending_meet_door and does NOT warp immediately
+    conn.session.map_x = 400;
+    conn.session.map_y = 500;
+    conn.session.clear_walk_tracking();
+    let [x_lo, x_hi] = 900u16.to_le_bytes();
+    let [y_lo, y_hi] = 500u16.to_le_bytes();
+    let move_frame = vec![0xF4, 0x44, 0x07, 0x00, 0x06, 0x01, 0x02, x_lo, x_hi, y_lo, y_hi];
+    let out_move = dispatch(&mut conn, &move_frame, &data, &service, &env).await;
+    assert!(
+        !has_frame_prefix(&out_move, "F44402001407"),
+        "06 01 from far away must NOT warp immediately"
+    );
+    assert!(
+        conn.session.pending_meet_door.is_some(),
+        "06 01 from far away must schedule pending_meet_door"
     );
 }

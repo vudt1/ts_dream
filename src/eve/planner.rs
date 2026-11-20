@@ -106,13 +106,24 @@ pub enum PetOp {
     NoOp,
 }
 
+/// Typed NPC service operation parsed from `rt = 7, rc = 7`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NpcServiceOp {
+    BankClose,
+    BankOpen,
+    InnShop,
+    InnHeal,
+    BankExchangeOrSpecial,
+}
+
 /// Pure domain effect produced from an `EveResult`.
 ///
 /// Only `TalkStep` (`rt=1`) and `AwaitMenuChoice` (`rt=6`) emit `S→C 0x14 01`
 /// dialogue/menu prompts; `MoveEntity`, `PlayMovie`, `NpcTeam`, `MutateItem`,
 /// and `RewardPet` carry `EveResult` only when needed for `0x14 01` client
 /// display notifications. `result_type >= 7` (except `rt=9` server-side
-/// `NpcAction`) are never sent raw via `0x14` and become [`DomainEffect::Unsupported`].
+/// `NpcAction` and `rt=7, rc=7` `NpcService`) are never sent raw via `0x14` and
+/// become [`DomainEffect::Unsupported`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum DomainEffect {
     /// `rt = 1`: Deliver a dialogue step (`0x14 01`) and wait for `0x14 06`.
@@ -127,6 +138,8 @@ pub enum DomainEffect {
     MoveEntity(EveResult),
     /// `rt = 5`: Play movie/animation (Ticket 06).
     PlayMovie(EveResult),
+    /// `rt = 7, rc = 7`: Server-side NPC service (Bank/Inn).
+    NpcService(NpcServiceOp),
     /// `rt = 9`: Server-side NPC action (Ticket 06).
     NpcAction(EveResult),
     /// `rt = 0, rc = 1`: Add or remove `Item.dat` item in `homdo (0x17)`.
@@ -161,6 +174,8 @@ impl DomainEffect {
                 | Self::AwaitMenuChoice { .. }
                 | Self::Warp { .. }
                 | Self::StartBattle { .. }
+                | Self::MoveEntity(_)
+                | Self::PlayMovie(_)
         )
     }
 }
@@ -191,6 +206,17 @@ pub fn plan_result(result: &EveResult) -> DomainEffect {
         },
         4 => DomainEffect::MoveEntity(result.clone()),
         5 => DomainEffect::PlayMovie(result.clone()),
+        7 if result.result_class == 7 => match result.parameter_style {
+            1 => DomainEffect::NpcService(NpcServiceOp::BankClose),
+            2 => DomainEffect::NpcService(NpcServiceOp::BankOpen),
+            4 => DomainEffect::NpcService(NpcServiceOp::InnShop),
+            5 => DomainEffect::NpcService(NpcServiceOp::InnHeal),
+            15 => DomainEffect::NpcService(NpcServiceOp::BankExchangeOrSpecial),
+            _ => DomainEffect::Unsupported {
+                result_type: 7,
+                result_class: 7,
+            },
+        },
         9 => DomainEffect::NpcAction(result.clone()),
         0 => match result.result_class {
             1 => DomainEffect::MutateItem {

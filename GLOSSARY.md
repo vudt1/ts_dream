@@ -252,8 +252,16 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 ### AutoSave (Dịch vụ Tự Động Lưu Trữ Nền)
 - **Định nghĩa**: Tiến trình nền (Background Task) chạy định kỳ mỗi 3 phút trong Tokio runtime, sử dụng thuật toán băm FNV-1a để phát hiện những phiên người chơi có trạng thái biến động (dirty state: vàng, HP/SP, chỉ số, túi đồ, võ tướng, nhiệm vụ) và thực hiện ghi vào cơ sở dữ liệu SQLite theo từng Transaction nguyên tử.
 
+### Appearance Color (Màu ngoại hình)
+- **Định nghĩa**: Chuỗi 8 byte (biểu diễn bằng 16 ký tự hex viết hoa `0-9A-F`) quy định màu tóc, da, áo, quần, giày của nhân vật. Nhận từ gói tạo nhân vật `0x09 0x01` (`payload[4..12]`) hoặc cập nhật khi `reborn`, tách biệt hoàn toàn với `hair` (1 byte kiểu tóc tại `payload[2]`).
+- **Ràng buộc (Invariants)**: Lưu trữ chính thức tại cột `characters.color` (`TEXT NOT NULL DEFAULT '0000000000000000'`) qua migration `0004_character_color.sql`. Giá trị rỗng, sai độ dài hoặc chứa ký tự không phải hex được chuẩn hóa về `"0000000000000000"` (`normalize_color_hex`).
+
 ### Map & Spatial Position (Bản đồ & Tọa độ)
 - **Định nghĩa**: Không gian tọa độ thế giới game nơi các Nhân vật di chuyển, tương tác với NPC và kích hoạt các sự kiện/trận đấu.
+
+### Proximity Gate & Walk Interpolation (Kiểm tra khoảng cách & Nội suy bước đi)
+- **Định nghĩa**: Cơ chế đồng bộ vị trí tức thời của nhân vật khi di chuyển (`0x06 0x01` gửi tọa độ đích ngay lúc click) bằng nội suy tuyến tính từ `(walk_origin, walk_dest, walk_start_ms)` theo tốc độ client: `160 px/s` (`0.16 px/ms`) ở bản đồ thường và `128 px/s` (`0.128 px/ms`) ở bản đồ thế giới (`map_id % 1000 == 0`).
+- **Ràng buộc (Invariants)**: Kiểm tra khoảng cách tương tác (`14 01`, `14 04`, `14 08`) chuẩn hóa thống nhất theo bán kính **Euclidean `130 px`** ($\sqrt{\Delta x^2 + \Delta y^2} \le 130$) trên vị trí nội suy; kích hoạt cửa (`MeetDoor`) dùng timer hủy được thay vì kiểm tra tức thời tại thời điểm click.
 
 ### Tân thủ / Newbie (Trạng thái tân thủ)
 - **Định nghĩa**: Cờ đếm `characters.newbie` (`BIGINT NOT NULL DEFAULT 0`, ánh xạ `Session.newbie: u32`) đánh dấu người chơi đã nhận gói quà gift code `TSVN123/TSVN456` hay chưa (đồng thời sách `46238` tăng giá trị đếm). Giá trị `1` chặn nhận lại gói `TSVN123/TSVN456` (guard `AlreadyGifted` trong `src/db/item_code.rs:116`).
@@ -271,10 +279,10 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 ### Deferred Drift (Đã Cleanup Sau ADR 0001)
 - **Định nghĩa**: Tập hợp các trường/cột schema thuộc `characters`/`inventories`/`character_pets`/`character_missions` mà **migration 0001_init.sql chưa định nghĩa** nhưng source Rust vẫn tham chiếu. Sau cleanup, các tham chiếu này đã bị xóa khỏi Rust (giữ in-memory hoặc xóa hoàn toàn); migration **không** được sửa.
 - **Ràng buộc (Invariants)**:
-  - `Session` struct vẫn giữ các field deferred (`int2, atk2, def2, hpx2, spx2, agi2, texp, hp_store, sp_store, tiengtam, gocnhin, pk, tham_chien, savemap, color, fight_npc_id, title_id`) cho wire packet + in-memory state, **nhưng persist về DB không còn thực hiện** — restart = mất state.
+  - `Session` struct vẫn giữ các field deferred (`int2, atk2, def2, hpx2, spx2, agi2, texp, hp_store, sp_store, tiengtam, gocnhin, pk, tham_chien, savemap, fight_npc_id, title_id`) cho wire packet + in-memory state, **nhưng persist về DB không còn thực hiện** — restart = mất state.
   - `quest_steps`/`warp_steps` đã bị xóa khỏi `Session` — toàn bộ quest state mất khi restart. Persist lại cần `character_missions.npc_id/warp_id` (migration mới).
   - `PetState.int2/atk2/def2/hpx2/spx2/agi2` (in-memory, set = 0 tại load).
-  - `Session.newbie`, `Session.god`, và `Session.ghost` đã được định nghĩa cột chính thức trong `characters` và **persist đầy đủ xuống SQLite**.
+  - `Session.newbie`, `Session.god`, `Session.ghost`, và `Session.color` đã được định nghĩa cột chính thức trong `characters` và **persist đầy đủ xuống SQLite**.
 - **Trường đã xóa hoàn toàn khỏi Rust**: `db::players` (file orphan), `db::quest` (file orphan), `src/server/handlers/quest::save_map` (chỉ còn in-memory, comment ghi rõ).
 
 ### Combat Damage Formula

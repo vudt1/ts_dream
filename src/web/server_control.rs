@@ -828,7 +828,152 @@ async fn handle_client_connection(
 
     let mut close = false;
     while !close {
+        let meet_door_sleep_ms = conn.session.pending_meet_door.and_then(|pending| {
+            if conn.session.battle_id == 0 && conn.session.current_event_session.is_none() {
+                let now = crate::server::session::now_ms();
+                Some(pending.due_ms.saturating_sub(now))
+            } else {
+                None
+            }
+        });
         tokio::select! {
+            _ = async {
+                match meet_door_sleep_ms {
+                    Some(ms) => tokio::time::sleep(Duration::from_millis(ms)).await,
+                    None => std::future::pending::<()>().await,
+                }
+            }, if meet_door_sleep_ms.is_some() => {
+                if let Some(pending) = conn.session.pending_meet_door {
+                    if logined_id > 0 {
+                        let _guard =
+                            crate::server::session::lock_player_operations([logined_id]).await;
+                        if let Some(snapshot) = crate::server::session::registry_get(logined_id) {
+                            conn.session = snapshot;
+                        }
+                    }
+                    let still_valid = conn.session.pending_meet_door == Some(pending)
+                        && conn.session.map_id == pending.map_id
+                        && conn.session.battle_id == 0
+                        && conn.session.current_event_session.is_none();
+                    if still_valid {
+                        let pre_snapshot = Some(conn.session.clone());
+                        conn.session.pending_meet_door = None;
+                        let env = ServerEnv {
+                            pool: pool.as_ref(),
+                            repos: repos.as_ref(),
+                            hub: Some(&control),
+                            sender: Some(&tx),
+                        };
+                        let mut out = crate::server::dispatcher::HandleOutcome::default();
+                        let _ = crate::server::handlers::movement::trigger_meet_door_for_door(
+                            &mut conn.session,
+                            pending.door_id,
+                            &data,
+                            &env,
+                            &mut out,
+                            None,
+                        )
+                        .await;
+                        if let Some(trigger) = out.battle_trigger.take() {
+                            service.start_teamdef_battle(&mut conn.session, &trigger);
+                            conn.session.clear_walk_tracking();
+                        }
+                        let id = conn.session.id;
+                        if logined_id > 0 {
+                            let _guard =
+                                crate::server::session::lock_player_operations([logined_id])
+                                    .await;
+                            let merged = {
+                                let mut sessions = lock_online_sessions();
+                                let next = match (
+                                    pre_snapshot.as_ref(),
+                                    sessions.get(&logined_id),
+                                ) {
+                                    (Some(base), Some(remote))
+                                        if remote.sync_revision != base.sync_revision =>
+                                    {
+                                        crate::server::session::merge_post_dispatch(
+                                            base,
+                                            &conn.session,
+                                            remote,
+                                        )
+                                    }
+                                    _ => {
+                                        let mut next = conn.session.clone();
+                                        next.sync_revision = sessions
+                                            .get(&logined_id)
+                                            .map_or(0, |s| s.sync_revision.wrapping_add(1));
+                                        next
+                                    }
+                                };
+                                sessions.insert(logined_id, next.clone());
+                                next
+                            };
+                            conn.session = merged.clone();
+                            service.register_sender(
+                                i64::from(logined_id),
+                                Arc::new(tokio::sync::RwLock::new(merged)),
+                                tx.clone(),
+                            );
+                        }
+                        for frame in &out.outgoing {
+                            if frame.delay_ms > 0 {
+                                tokio::time::sleep(Duration::from_millis(frame.delay_ms))
+                                    .await;
+                            }
+                            match tx.try_send(frame.frame.clone()) {
+                                Ok(()) => {}
+                                Err(mpsc::error::TrySendError::Full(_)) => {
+                                    tracing::warn!(
+                                        peer_ip = %peer_ip,
+                                        "client outbound queue full, disconnecting client"
+                                    );
+                                    close = true;
+                                    break;
+                                }
+                                Err(mpsc::error::TrySendError::Closed(_)) => {
+                                    close = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if close {
+                            break;
+                        }
+                        if let Some((fight_id, diahinh)) = out.eve_battle {
+                            conn.session.clear_walk_tracking();
+                            service.start_eve_encounter(&mut conn.session, fight_id, diahinh);
+                            if logined_id > 0 {
+                                let _guard = crate::server::session::lock_player_operations([
+                                    logined_id,
+                                ])
+                                .await;
+                                crate::server::session::registry_update_if_online(
+                                    &conn.session,
+                                );
+                                if let Some(synced) =
+                                    crate::server::session::registry_get(logined_id)
+                                {
+                                    conn.session = synced.clone();
+                                }
+                                service.register_sender(
+                                    i64::from(logined_id),
+                                    Arc::new(tokio::sync::RwLock::new(conn.session.clone())),
+                                    tx.clone(),
+                                );
+                            }
+                        }
+                        if !out.map_broadcast.is_empty() {
+                            control.broadcast_map(id, &out.map_broadcast).await;
+                        }
+                        if !out.direct_messages.is_empty() {
+                            for (target_id, frame) in &out.direct_messages {
+                                control.send_to(*target_id, frame).await;
+                            }
+                        }
+                    }
+                }
+            }
             _ = conn_shutdown_rx.recv() => {
                 tracing::debug!(peer_ip = %peer_ip, "server stopping: closing connection");
                 close = true;
@@ -975,6 +1120,7 @@ async fn handle_client_connection(
                             // the same client channel, so talk frames are
                             // never reordered behind battle frames.
                             if let Some((fight_id, diahinh)) = out.eve_battle {
+                                conn.session.clear_walk_tracking();
                                 service.start_eve_encounter(&mut conn.session, fight_id, diahinh);
                                 if logined_id > 0 {
                                     let _guard = crate::server::session::lock_player_operations([

@@ -9,6 +9,20 @@ use crate::db::pool::DbPool;
 use crate::server::session::{HotkeySlot, InventoryItem, PetState, Session};
 use sqlx::Row;
 
+pub const DEFAULT_COLOR_HEX: &str = "0000000000000000";
+pub const COLOR_HEX_LEN: usize = 16;
+
+/// Normalize an appearance color hex string to 16 uppercase hex characters,
+/// falling back to [`DEFAULT_COLOR_HEX`] when empty, wrong length, or non-hex.
+pub fn normalize_color_hex(raw: &str) -> String {
+    let trimmed = raw.trim();
+    if trimmed.len() == COLOR_HEX_LEN && trimmed.bytes().all(|b| b.is_ascii_hexdigit()) {
+        trimmed.to_ascii_uppercase()
+    } else {
+        DEFAULT_COLOR_HEX.to_string()
+    }
+}
+
 pub struct SqliteSessionRepository<'a> {
     pub pool: &'a DbPool,
 }
@@ -18,7 +32,7 @@ impl SqliteSessionRepository<'_> {
     /// wire-visible session from 0001 tables. `account_id` is the shared PK (`character_id`).
     pub async fn load(&self, account_id: i64, session: &mut Session) -> Result<bool, sqlx::Error> {
         let Some(row) = sqlx::query(
-            "SELECT c.playerid AS id, c.name, c.level, c.jobtype AS job, c.gender AS sex, c.hair, c.element,
+            "SELECT c.playerid AS id, c.name, c.level, c.jobtype AS job, c.gender AS sex, c.hair, c.color, c.element,
                     c.rebornstage AS reborn, c.curhp AS hp, c.maxhp AS hp_max, c.cursp AS sp, c.maxsp AS sp_max,
                     c.freepoints AS stat_point, c.skillpoint AS skill_point, c.baseint AS int_attr,
                     c.baseatk AS atk, c.basedef AS def, c.basehpx AS hpx, basespx AS spx, c.baseagi AS agi,
@@ -49,6 +63,7 @@ impl SqliteSessionRepository<'_> {
         session.job = clamp_u8(row.get("job"));
         session.sex = clamp_u8(row.get("sex"));
         session.hair = clamp_u16(row.get("hair"));
+        session.color = normalize_color_hex(&row.get::<String, _>("color"));
         session.thuoctinh = clamp_u8(row.get("element"));
         session.reborn = clamp_u8(row.get("reborn"));
         session.hp = clamp_u16(row.get("hp"));
@@ -317,13 +332,14 @@ impl SqliteSessionRepository<'_> {
             return Ok(());
         }
         sqlx::query(
-            "UPDATE characters SET level=?, jobtype=?, gender=?, hair=?, element=?, rebornstage=?, curhp=?, maxhp=?, cursp=?, maxsp=?,
+            "UPDATE characters SET level=?, jobtype=?, gender=?, hair=?, color=?, element=?, rebornstage=?, curhp=?, maxhp=?, cursp=?, maxsp=?,
              freepoints=?, skillpoint=?, baseint=?, baseatk=?, basedef=?, basehpx=?, basespx=?, baseagi=?,
              equipatk=?, equipdef=?, equipint=?, equipagi=?, equiphpx=?, equipspx=?,
              reputation=?, mapid=?, mapx=?, mapy=?,
              pk=?, curexp=?, newbie=?, ghost=?, god=?, guild_id=?, savemap_id=?, savemap_x=?, savemap_y=? WHERE playerid=?",
         )
         .bind(i64::from(session.level)).bind(i64::from(session.job)).bind(i64::from(session.sex)).bind(i64::from(session.hair))
+        .bind(normalize_color_hex(&session.color))
         .bind(i64::from(session.thuoctinh)).bind(i64::from(session.reborn)).bind(i64::from(session.hp)).bind(i64::from(session.hp_max))
         .bind(i64::from(session.sp)).bind(i64::from(session.sp_max)).bind(i64::from(session.point)).bind(i64::from(session.skill_point))
         .bind(i64::from(session.int1)).bind(i64::from(session.atk)).bind(i64::from(session.def)).bind(i64::from(session.hpx))
@@ -552,9 +568,8 @@ impl SqliteSessionRepository<'_> {
     ///
     /// `session` must already reflect the new character (via
     /// `apply_to_session`); on success `session.db_character_id` is set.
-    /// The 8-byte appearance color (`session.color`) travels in `session` RAM
-    /// for `player_appear` and is covered by the `hair` column — no separate DB
-    /// columns.
+    /// The 8-byte appearance color (`session.color`) is persisted as 16
+    /// uppercase hex characters in `characters.color`, separate from `hair`.
     pub async fn create_and_seed(
         &self,
         account_id: i64,
@@ -569,16 +584,17 @@ impl SqliteSessionRepository<'_> {
         // 1. Full character row (mirrors `save()` columns so the row is never
         //    half-initialised, even if the process dies right after commit).
         sqlx::query(
-            "INSERT INTO characters (playerid, name, level, gender, hair, element,
+            "INSERT INTO characters (playerid, name, level, gender, hair, color, element,
              rebornstage, curhp, maxhp, cursp, maxsp, curexp, nextexp, freepoints, skillpoint,
              baseint, baseatk, basedef, basehpx, basespx, baseagi,
              equipatk, equipdef, equipint, equipagi, equiphpx, equipspx,
              reputation, pk, mapid, mapx, mapy, jobtype, newbie, ghost, god, guild_id,
              savemap_id, savemap_x, savemap_y)
-             VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?)",
+             VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?)",
         )
         .bind(account_id).bind(name)
         .bind(seed.level).bind(seed.sex).bind(seed.hair)
+        .bind(normalize_color_hex(&session.color))
         .bind(seed.element)
         .bind(i64::from(session.hp)).bind(i64::from(session.hp_max))
         .bind(i64::from(session.sp)).bind(i64::from(session.sp_max))

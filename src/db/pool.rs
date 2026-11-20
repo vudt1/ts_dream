@@ -203,6 +203,12 @@ pub async fn verify_schema(pool: &SqlitePool) -> Result<()> {
             ADR_0004_HINT
         )));
     }
+    if !char_cols.contains("color") {
+        return Err(TsError::Migrate(format!(
+            "SQLite schema sanity-check failed: `characters` is missing column [color] from migrations/0004_character_color.sql. {}",
+            ADR_0004_HINT
+        )));
+    }
 
     let completed_rows = sqlx::query("PRAGMA table_info(character_completed_events)")
         .fetch_all(pool)

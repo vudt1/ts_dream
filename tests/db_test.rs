@@ -6,5 +6,7 @@ mod common;
 mod repository_init;
 #[path = "db/sqlite_migration_0002.rs"]
 mod sqlite_migration_0002;
+#[path = "db/sqlite_migration_0004_color.rs"]
+mod sqlite_migration_0004_color;
 #[path = "db/startup_schema_check.rs"]
 mod startup_schema_check;

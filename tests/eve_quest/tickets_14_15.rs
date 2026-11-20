@@ -174,8 +174,8 @@ async fn ticket14_door_when_happen_separates_click_door_and_meet_door() {
         session: Session {
             id: 14001,
             map_id: 9001,
-            map_x: 100,
-            map_y: 100,
+            map_x: 300,
+            map_y: 400,
             ..Default::default()
         },
         ..Default::default()
@@ -188,8 +188,8 @@ async fn ticket14_door_when_happen_separates_click_door_and_meet_door() {
         session: Session {
             id: 14002,
             map_id: 9001,
-            map_x: 200,
-            map_y: 200,
+            map_x: 290,
+            map_y: 390,
             ..Default::default()
         },
         ..Default::default()
@@ -202,7 +202,7 @@ async fn ticket14_door_when_happen_separates_click_door_and_meet_door() {
         session: Session {
             id: 14003,
             map_id: 9001,
-            map_x: 500,
+            map_x: 590,
             map_y: 400,
             ..Default::default()
         },
@@ -223,7 +223,7 @@ async fn ticket14_door_when_happen_separates_click_door_and_meet_door() {
         session: Session {
             id: 14004,
             map_id: 9001,
-            map_x: 700,
+            map_x: 790,
             map_y: 400,
             ..Default::default()
         },
@@ -329,8 +329,8 @@ async fn ticket14_click_npc_on_ser_stroke_and_walkstep_encounter_on_click_obj_pr
         session: Session {
             id: 14005,
             map_id: 9002,
-            map_x: 100,
-            map_y: 100,
+            map_x: 0,
+            map_y: 0,
             ..Default::default()
         },
         ..Default::default()

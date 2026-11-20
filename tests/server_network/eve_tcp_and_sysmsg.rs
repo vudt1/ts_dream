@@ -246,8 +246,15 @@ async fn tcp_map_10817_door_14_08_does_not_deadlock() {
     let player_id = 300081u32;
     let port = 19451u16;
 
+    let (door_x, door_y) = data
+        .scene_eve_data
+        .get(&10817)
+        .and_then(|s| s.doors.get(&1))
+        .map(|d| (d.x as u16, d.y as u16))
+        .unwrap_or((442, 758));
+
     let (control, mut sock, mut decoder) =
-        connect_and_login(port, Arc::clone(&data), pool.clone(), player_id, 442, 758).await;
+        connect_and_login(port, Arc::clone(&data), pool.clone(), player_id, door_x, door_y).await;
 
     // Send C->S F444040014080100 (Door 1 on map 10817, eve_no = 7)
     sock.write_all(&xor_wire("F444040014080100"))
@@ -276,10 +283,10 @@ async fn tcp_map_10817_door_14_08_does_not_deadlock() {
         "map 10817 Door 1 must NOT warp immediately before dialogue finishes: {open_frames:?}"
     );
 
-    // Advance 6 steps of 14 06 until eve_no=7 completes with 14 2C 02 + 14 07 + 0x0C (to 10867)
+    // Advance steps of 14 06 until eve_no=7 completes with 14 2C 02 + 14 07 + 0x0C (to 10867)
     let mut final_frames = Vec::new();
     let mut warped = false;
-    for _ in 0..7 {
+    for _ in 0..10 {
         sock.write_all(&xor_wire("F44402001406"))
             .await
             .expect("write 14 06");
@@ -331,8 +338,14 @@ async fn tcp_map_10817_door_14_08_does_not_deadlock() {
 
     // Scenario 2: Map 12000 Door 14 is a pure warp door (immediate 14 07 + 0x0C)
     {
+        let (d14_x, d14_y) = data
+            .scene_eve_data
+            .get(&12000)
+            .and_then(|s| s.doors.get(&14))
+            .map(|d| (d.x as u16, d.y as u16))
+            .unwrap_or((500, 500));
         let (mut sock1, mut dec1) =
-            login_on_running_server(port, &pool, 300083, 12000, 500, 500).await;
+            login_on_running_server(port, &pool, 300083, 12000, d14_x, d14_y).await;
 
         sock1
             .write_all(&xor_wire("F444040014080E00"))
@@ -403,7 +416,7 @@ async fn tcp_map_10817_door_14_08_does_not_deadlock() {
         );
 
         let mut warped = false;
-        for _ in 0..7 {
+        for _ in 0..10 {
             sock.write_all(&xor_wire("F44402001406")).await.expect("write 14 06");
             let step_frames = read_frames_until(&mut sock, &mut decoder, 2000, |fs| {
                 fs.iter().any(|f| {
@@ -464,7 +477,7 @@ async fn tcp_map_10817_door_14_08_does_not_deadlock() {
         );
 
         let mut warped = false;
-        for _ in 0..7 {
+        for _ in 0..10 {
             sock.write_all(&xor_wire("F44402001406")).await.expect("write 14 06");
             let step_frames = read_frames_until(&mut sock, &mut decoder, 2000, |fs| {
                 fs.iter().any(|f| {

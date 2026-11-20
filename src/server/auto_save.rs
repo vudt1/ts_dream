@@ -52,6 +52,9 @@ pub fn fingerprint(s: &Session) -> u64 {
     mix(&mut h, u64::from(s.job));
     mix(&mut h, u64::from(s.sex));
     mix(&mut h, u64::from(s.hair));
+    for &b in s.color.as_bytes() {
+        mix(&mut h, u64::from(b));
+    }
     mix(&mut h, u64::from(s.thuoctinh));
     mix(&mut h, u64::from(s.reborn));
     mix(&mut h, u64::from(s.point));

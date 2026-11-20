@@ -334,6 +334,7 @@ async fn test_session_load_and_save() {
         boat_paddle_tokens: 5.0,
         boat_last_paddle_ms: 0,
         pending_guild_invite: None,
+        ..Default::default()
     };
 
     // Save session
@@ -448,6 +449,7 @@ async fn test_session_load_and_save() {
         boat_paddle_tokens: 5.0,
         boat_last_paddle_ms: 0,
         pending_guild_invite: None,
+        ..Default::default()
     };
 
     let loaded = repos
@@ -804,6 +806,7 @@ async fn test_nonexistent_and_edge_cases() {
         boat_paddle_tokens: 5.0,
         boat_last_paddle_ms: 0,
         pending_guild_invite: None,
+        ..Default::default()
     };
     let found = repos
         .sessions()

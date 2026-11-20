@@ -218,9 +218,11 @@ pub const STORAGE_SUB_ITEM_REMOVE: u8 = 0x05;
 pub const STORAGE_SUB_CLEAR: u8 = 0x08;
 
 /// Item & Inventory sub-opcodes (opcode `0x17`).
+pub const ITEM_SUB_HOMDO_DUMP: u8 = 0x05;
 pub const ITEM_SUB_ADD: u8 = 0x06;
 pub const ITEM_SUB_REFRESH_SLOT: u8 = 0x08;
 pub const ITEM_SUB_REMOVE: u8 = 0x09;
+pub const ITEM_SUB_MOVE_STACK: u8 = 0x0A;        // 10
 pub const ITEM_SUB_EQUIP: u8 = 0x0B;          // 11
 pub const ITEM_SUB_UNEQUIP: u8 = 0x0C;        // 12
 pub const ITEM_SUB_PET_EQUIP: u8 = 0x11;      // 17
@@ -234,6 +236,7 @@ pub const ITEM_SUB_ACTION_FINISH: u8 = 0x32;   // 50
 pub const ITEM_SUB_WAREHOUSE_DEPOSIT: u8 = 0x33; // 51
 pub const ITEM_SUB_WAREHOUSE_WITHDRAW: u8 = 0x34;// 52
 pub const ITEM_SUB_CLOSE_TRADE_FORM: u8 = 0x3B;// 59
+pub const ITEM_SUB_SORT: u8 = 0x3C;              // 60
 pub const ITEM_SUB_WAREHOUSE_ITEM_ADD: u8 = 0x66;
 pub const ITEM_SUB_WAREHOUSE_ITEM_REMOVE: u8 = 0x68;
 /// [0x1F] PetHotel — khách điếm pet (Shared)
