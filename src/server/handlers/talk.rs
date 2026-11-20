@@ -155,6 +155,16 @@ pub(crate) fn is_player_near_door(session: &Session, data: &GameData, door_id: i
     crate::eve::state::EveStateBuilder::is_within_range(px, py, door.x, door.y)
 }
 
+/// Clear client `PlayerState+0xA094` (`14 09`) without closing the dialog UI
+/// when an incoming NPC/door trigger collides with an already-active `EventSession`.
+fn clear_pending_if_active_event(session: &Session, out: &mut HandleOutcome) -> bool {
+    if session.current_event_session.is_some() {
+        out.send(NpcTalkCodec::build_clear_pending_hex().to_string());
+        return true;
+    }
+    false
+}
+
 async fn handle_talk_start(
     conn: &mut Conn,
     payload: &[u8],
@@ -166,6 +176,9 @@ async fn handle_talk_start(
 ) {
     if payload.len() < 2 {
         end_talk(conn, out);
+        return;
+    }
+    if clear_pending_if_active_event(&conn.session, out) {
         return;
     }
     let map_object_id = encoder::u16_le(payload[0], payload[1]) as i32;
@@ -377,6 +390,9 @@ async fn handle_talk_click_door(
         end_talk(conn, out);
         return;
     }
+    if clear_pending_if_active_event(&conn.session, out) {
+        return;
+    }
     let door_id = encoder::u16_le(payload[0], payload[1]) as i32;
     if conn.session.id_leader > 0 && conn.session.id_leader != conn.session.id {
         end_talk(conn, out);
@@ -447,8 +463,7 @@ async fn handle_talk_warp(
     env: &crate::server::dispatcher::ServerEnv<'_>,
     out: &mut HandleOutcome,
 ) {
-    if conn.session.current_event_session.is_some() {
-        out.send(NpcTalkCodec::build_clear_pending_hex().to_string());
+    if clear_pending_if_active_event(&conn.session, out) {
         return;
     }
     if payload.len() >= 2 {

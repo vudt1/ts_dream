@@ -975,3 +975,85 @@ async fn proximity_130_px_and_delayed_meet_door() {
         "06 01 from far away must schedule pending_meet_door"
     );
 }
+
+#[tokio::test]
+async fn map_10817_door_1_survives_14_04_and_06_02_echo_then_plays_movies() {
+    set_eve_events_enabled(true);
+    let data = crate::common::shared_game_data();
+    let mut conn = Conn {
+        session: Session {
+            id: 300_000,
+            map_id: 10817,
+            map_x: 1262,
+            map_y: 695,
+            in_world: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let service = BattleService::default();
+    let env = ServerEnv::none();
+
+    // 1. Walk into Door #1 center (1302, 695) -> MeetDoor opens eve_no=7 (step 1 mean=10447)
+    let [x_lo, x_hi] = 1302u16.to_le_bytes();
+    let [y_lo, y_hi] = 695u16.to_le_bytes();
+    let walk_in = vec![0xF4, 0x44, 0x07, 0x00, 0x06, 0x01, 0x06, x_lo, x_hi, y_lo, y_hi];
+    let out_open = dispatch(&mut conn, &walk_in, data, &service, &env).await;
+    assert!(has_frame_prefix(&out_open, "F44402000602"), "must emit 06 02 MoveStop");
+    assert!(
+        op14_01_results(&out_open)
+            .iter()
+            .any(|&(rt, _, _, _, _, mean)| rt == 1 && mean == 10447),
+        "MeetDoor must open eve_no=7 at Talk 10447"
+    );
+    assert_eq!(
+        conn.session.current_event_session.as_ref().map(|ev| ev.eve_no),
+        Some(7)
+    );
+    assert!(conn.session.talk_locked);
+
+    // 2. Client auto-sends 14 04 01 00 (FUN_005EE590) -> must emit 14 09 (NOT 14 08 / 14 2C 02)
+    let click_door_1 = vec![0xF4, 0x44, 0x04, 0x00, 0x14, 0x04, 0x01, 0x00];
+    let out_1404 = dispatch(&mut conn, &click_door_1, data, &service, &env).await;
+    assert!(has_frame_prefix(&out_1404, "F44402001409"), "14 04 during active event must emit 14 09");
+    assert!(!has_frame_prefix(&out_1404, "F44402001408"), "must NOT emit 14 08 EndTalk");
+    assert!(conn.session.current_event_session.is_some());
+
+    // 3. Client echoes 06 02 stop-walk (FUN_0071fdf8) -> updates coords, must NOT emit 14 08
+    let [sx_lo, sx_hi] = 1267u16.to_le_bytes();
+    let [sy_lo, sy_hi] = 695u16.to_le_bytes();
+    let echo_0602 = vec![0xF4, 0x44, 0x07, 0x00, 0x06, 0x02, 0x06, sx_lo, sx_hi, sy_lo, sy_hi];
+    let out_0602 = dispatch(&mut conn, &echo_0602, data, &service, &env).await;
+    assert_eq!((conn.session.map_x, conn.session.map_y), (1267, 695));
+    assert!(!has_frame_prefix(&out_0602, "F44402001408"), "06 02 during active event must NOT emit 14 08");
+    assert!(conn.session.current_event_session.is_some());
+
+    // 4. Stray 14 01 <npc_id> during active event -> emits 14 09 and preserves active session
+    let out_1401 = dispatch(&mut conn, &click_npc_frame(1), data, &service, &env).await;
+    assert!(has_frame_prefix(&out_1401, "F44402001409"));
+    assert!(!has_frame_prefix(&out_1401, "F44402001408"));
+    assert_eq!(conn.session.idtalking, 1);
+
+    // 5. Continue through remaining 5 talks + 2 PlayMovie (rt=5) halts -> final Warp to 10867
+    let mut play_movie_vals = Vec::new();
+    let mut warped = false;
+    for _ in 0..10 {
+        let out_step = dispatch(&mut conn, &CONTINUE_FRAME, data, &service, &env).await;
+        for (rt, _, _, _, val, _) in op14_01_results(&out_step) {
+            if rt == 5 {
+                play_movie_vals.push(val);
+            }
+        }
+        if has_frame_prefix(&out_step, "F44402001407") {
+            warped = true;
+            break;
+        }
+    }
+    assert_eq!(play_movie_vals, vec![17, 18], "must play both PlayMovie steps 17 and 18");
+    assert!(warped, "must warp to 10867 after PlayMovie steps complete");
+    assert_eq!(conn.session.map_id, 10867);
+
+    // 6. Outside any active talk/event, 06 02 still emits 14 08 to release standalone walk lock
+    let out_idle_0602 = dispatch(&mut conn, &echo_0602, data, &service, &env).await;
+    assert!(has_frame_prefix(&out_idle_0602, "F44402001408"));
+}

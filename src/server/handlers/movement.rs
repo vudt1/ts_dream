@@ -285,8 +285,11 @@ fn handle_move_inner(ctx: &mut OpcodeCtx) -> Option<crate::eve::state::PlayerEve
 
     if sub == 2 {
         // Echo response to server position lock reconciliation (Op 0x06 Sub 0x02):
-        // Confirm reconciled position and release client walk lock with [14 08].
-        out.send("F44402001408");
+        // Release client walk lock with [14 08] ONLY when no talk/event session holds the lock;
+        // otherwise [14 08] would prematurely close the active dialog UI on aLogin.exe.
+        if conn.session.current_event_session.is_none() && !conn.session.talk_locked {
+            out.send("F44402001408");
+        }
         return None;
     }
 
