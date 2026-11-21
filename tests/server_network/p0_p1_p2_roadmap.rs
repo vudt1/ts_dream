@@ -160,15 +160,30 @@ async fn test_p1_pet_mount_width_2_bytes() {
 
     let data = GameData::default();
     let service = ts_dream::battle::service::BattleService::default();
-    let mut out = HandleOutcome::default();
-
     let pet_id: u16 = 18005;
-    let payload = [ (pet_id & 0xFF) as u8, (pet_id >> 8) as u8 ];
+    let payload = [(pet_id & 0xFF) as u8, (pet_id >> 8) as u8];
+
+    // 1. Without riding skill 14023 -> rejected with sys_msg_frame, horse_pet_id stays 0
+    let mut out_no_skill = HandleOutcome::default();
+    let mut ctx_no_skill = test_ctx(&mut conn, &data, &service, &mut out_no_skill, 0x0F, 4, &payload);
+    pet_actions::handle_pet_actions(&mut ctx_no_skill).await;
+    assert_eq!(conn.session.horse_pet_id, 0, "Mount must be rejected without skill 14023");
+    assert!(
+        out_no_skill.outgoing.iter().any(|f| f.frame.starts_with("F444") && f.frame.len() >= 12 && &f.frame[8..12] == "020C"),
+        "Missing riding skill 14023 must emit sys_msg_frame"
+    );
+
+    // 2. With riding skill 14023 -> mounts and emits valid 14-byte 0F05 frame (36 hex chars)
+    conn.session.skills.push((14023, 1));
+    let mut out = HandleOutcome::default();
     let mut ctx = test_ctx(&mut conn, &data, &service, &mut out, 0x0F, 4, &payload);
     pet_actions::handle_pet_actions(&mut ctx).await;
 
     assert_eq!(conn.session.horse_pet_id, 18005, "Horse pet id should be set with 2-byte payload");
     assert!(!out.outgoing.is_empty());
+    let mount_frame = &out.outgoing[0].frame;
+    assert!(mount_frame.starts_with("F4440E000F05"), "Expected 0F05 frame, got {mount_frame}");
+    assert_eq!(mount_frame.len(), 36, "0F05 frame must have 14-byte body (36 hex chars total), got {mount_frame}");
 }
 
 #[tokio::test]

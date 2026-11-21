@@ -350,12 +350,23 @@ pub async fn handle_pet_actions(ctx: &mut OpcodeCtx<'_>) {
             if !owned || ctx.conn.session.horse_pet_id == pet_id {
                 return;
             }
+            if !ctx
+                .conn
+                .session
+                .skills
+                .iter()
+                .any(|&(id, lv)| id == 14023 && lv > 0)
+            {
+                ctx.out.send(crate::server::spawn::sys_msg_frame(
+                    "Bạn chưa học kỹ năng Thuật Cưỡi Ngựa!",
+                ));
+                return;
+            }
             ctx.conn.session.horse_pet_id = pet_id;
             let id4 = encoder::le32(ctx.conn.session.id);
-            let frame = format!(
-                "F4440E000F05{}{}0000",
-                id4,
-                encoder::le32(u32::from(pet_id))
+            let frame = crate::protocol::frame(
+                "0F05",
+                &format!("{}{}00000000", id4, encoder::le32(u32::from(pet_id))),
             );
             ctx.out.send(frame.clone());
             ctx.out.broadcast(ctx.conn.session.id, frame);
