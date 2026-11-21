@@ -1533,3 +1533,305 @@ async fn meet_door_06_01_ignores_walking_away_and_outside_50_px() {
         "walking toward door within 50 px must trigger MeetDoor"
     );
 }
+
+#[test]
+fn evaluator_invert_emg_ops_4_treats_bag_item_and_level_as_gte() {
+    use ts_dream::eve::evaluator::evaluate;
+    use ts_dream::eve::state::PlayerEventState;
+
+    let item_cond_1 = EveCondition {
+        condition_class: 1,
+        condition_parameter: 31007,
+        condition_parameter_style: 1,
+        condition_ops: 4,
+        condition_value: 1,
+        ..Default::default()
+    };
+    let mut state = PlayerEventState::default();
+    assert!(!evaluate(&item_cond_1, &state));
+    state.bag_items.insert(31007, 1);
+    assert!(evaluate(&item_cond_1, &state));
+    state.bag_items.insert(31007, 2);
+    assert!(evaluate(&item_cond_1, &state));
+
+    let item_cond_5 = EveCondition {
+        condition_class: 1,
+        condition_parameter: 31007,
+        condition_parameter_style: 1,
+        condition_ops: 4,
+        condition_value: 5,
+        ..Default::default()
+    };
+    state.bag_items.insert(31007, 4);
+    assert!(!evaluate(&item_cond_5, &state));
+    state.bag_items.insert(31007, 5);
+    assert!(evaluate(&item_cond_5, &state));
+
+    let level_cond_15 = EveCondition {
+        condition_class: 7,
+        condition_parameter: 0,
+        condition_ops: 4,
+        condition_value: 15,
+        ..Default::default()
+    };
+    state.level = 14;
+    assert!(!evaluate(&level_cond_15, &state));
+    state.level = 15;
+    assert!(evaluate(&level_cond_15, &state));
+}
+
+#[tokio::test]
+async fn map_12003_bdy_16024_trades_ticket_31007_for_pet_22028() {
+    set_eve_events_enabled(true);
+    let mut data = GameData::default();
+    let mut scene = SceneEveData::default();
+
+    scene.npcs.insert(
+        8,
+        EveNpcPlacement {
+            id: 8,
+            npc_id: 16024,
+            x: 690,
+            y: 860,
+            events: vec![8, 19],
+            ..Default::default()
+        },
+    );
+
+    // eve_no = 8: Đoái hoán tâm (#31007) -> Ba Đậu Yêu (#22028)
+    scene.npc_events.insert(
+        8,
+        NpcEventData {
+            eve_no: 8,
+            when_happen: [true, false, false, false],
+            conditions: vec![
+                EveCondition {
+                    condition_no: 1,
+                    condition_class: 0,
+                    and_num: 1,
+                    to_result: 1,
+                    results: vec![
+                        EveResult {
+                            result_group_no: 1,
+                            result_no: 1,
+                            result_type: 1,
+                            result_class: 3,
+                            parameter: 8,
+                            result_mean_no: 12438,
+                            ..Default::default()
+                        },
+                        EveResult {
+                            result_group_no: 1,
+                            result_no: 2,
+                            result_type: 1,
+                            result_class: 3,
+                            parameter: 8,
+                            result_mean_no: 15963,
+                            ..Default::default()
+                        },
+                    ],
+                    ..Default::default()
+                },
+                EveCondition {
+                    condition_no: 2,
+                    condition_class: 1,
+                    condition_parameter: 31007,
+                    condition_parameter_style: 1,
+                    condition_ops: 4,
+                    condition_value: 1,
+                    and_num: 2,
+                    to_result: 1,
+                    results: vec![EveResult {
+                        result_group_no: 2,
+                        result_no: 1,
+                        result_type: 6, // Surface 8
+                        result_class: 3,
+                        parameter: 8,
+                        result_mean_no: 8,
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                },
+                EveCondition {
+                    condition_no: 3,
+                    condition_class: 7,
+                    condition_parameter: 5,
+                    condition_parameter_style: 2,
+                    condition_ops: 0,
+                    condition_value: 0,
+                    ..Default::default()
+                },
+                EveCondition {
+                    condition_no: 8,
+                    condition_class: 10,
+                    condition_parameter: 8,
+                    condition_parameter_style: 30,
+                    and_num: 3,
+                    to_result: 1,
+                    results: vec![
+                        EveResult {
+                            result_group_no: 8,
+                            result_no: 1,
+                            result_type: 0,
+                            result_class: 1,
+                            parameter: 31007,
+                            parameter_style: 1,
+                            result_value: -1,
+                            ..Default::default()
+                        },
+                        EveResult {
+                            result_group_no: 8,
+                            result_no: 2,
+                            result_type: 0,
+                            result_class: 8,
+                            parameter: 22028,
+                            parameter_style: 1,
+                            result_value: 1,
+                            ..Default::default()
+                        },
+                        EveResult {
+                            result_group_no: 8,
+                            result_no: 3,
+                            result_type: 1,
+                            result_class: 3,
+                            parameter: 8,
+                            result_mean_no: 12437,
+                            ..Default::default()
+                        },
+                    ],
+                    ..Default::default()
+                },
+                EveCondition {
+                    condition_no: 9,
+                    condition_class: 1,
+                    condition_parameter: 31007,
+                    condition_parameter_style: 1,
+                    condition_ops: 4,
+                    condition_value: 1,
+                    ..Default::default()
+                },
+                EveCondition {
+                    condition_no: 10,
+                    condition_class: 7,
+                    condition_parameter: 5,
+                    condition_parameter_style: 2,
+                    condition_ops: 0,
+                    condition_value: 0,
+                    ..Default::default()
+                },
+            ],
+        },
+    );
+
+    // eve_no = 19: Vé đoái hoán túi đeo (#31023) -> must NOT trigger when player has 0x #31023
+    scene.npc_events.insert(
+        19,
+        NpcEventData {
+            eve_no: 19,
+            when_happen: [true, false, false, false],
+            conditions: vec![EveCondition {
+                condition_no: 1,
+                condition_class: 1,
+                condition_parameter: 31023,
+                condition_parameter_style: 1,
+                condition_ops: 4,
+                condition_value: 1,
+                and_num: 1,
+                to_result: 1,
+                results: vec![EveResult {
+                    result_group_no: 1,
+                    result_no: 1,
+                    result_type: 6, // Surface 9
+                    result_class: 3,
+                    parameter: 8,
+                    result_mean_no: 9,
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        },
+    );
+
+    data.scene_eve_data.insert(12003, scene);
+
+    let service = BattleService::default();
+    let env = ServerEnv::none();
+    let mut conn = Conn {
+        session: Session {
+            id: 991208,
+            map_id: 12003,
+            map_x: 690,
+            map_y: 860,
+            homdo: vec![InventoryItem {
+                slot: 1,
+                id: 31007,
+                count: 1,
+                ..Default::default()
+            }],
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    // 1. Click Thương nhân BDY #16024 (place_id = 8) with 1x #31007 -> opens Surface 8 (0800), NOT Surface 9 (0900)
+    let out1 = dispatch(&mut conn, &click_npc_frame(8), &data, &service, &env).await;
+    assert!(
+        out1.outgoing
+            .iter()
+            .any(|f| f.frame == "F44411001401000200010603080000000000000800"),
+        "expected Surface 8 (0800) from eve_no=8; got {:?}",
+        out1.outgoing
+    );
+
+    // 2. Select choice 30 (0x1E) -> consumes 1x #31007 and grants pet #22028
+    let out2 = dispatch(&mut conn, &select_menu_frame(30), &data, &service, &env).await;
+    assert!(
+        !out2.outgoing.iter().any(|f| f.frame.starts_with("F444") && f.frame.contains("020C")),
+        "must not emit insufficient item error; got {:?}",
+        out2.outgoing
+    );
+    assert!(
+        conn.session.homdo.iter().all(|i| i.id != 31007),
+        "ticket 31007 must be consumed; homdo={:?}",
+        conn.session.homdo
+    );
+    assert!(
+        conn.session.pets.iter().any(|p| p.id == 22028 && (1..=4).contains(&p.stt)),
+        "pet 22028 must be granted in active roster; pets={:?}",
+        conn.session.pets
+    );
+
+    // Finish Talk(12437) and any chained greeting dialogs so the event session closes cleanly before the next click
+    for _ in 0..4 {
+        if conn.session.current_event_session.is_none() {
+            break;
+        }
+        let out_cont = dispatch(&mut conn, &CONTINUE_FRAME, &data, &service, &env).await;
+        assert!(
+            !out_cont.outgoing.iter().any(|f| f.frame.ends_with("0900")),
+            "must NOT chain into Surface 9 (eve_no=19); got {:?}",
+            out_cont.outgoing
+        );
+    }
+    assert!(conn.session.current_event_session.is_none());
+
+    // 3. With 0 tickets (#31007 = 0, #31023 = 0), clicking #16024 plays greeting 12438 -> 15963 and must NOT open Surface 9
+    let out_no_ticket_1 = dispatch(&mut conn, &click_npc_frame(8), &data, &service, &env).await;
+    assert!(
+        out_no_ticket_1.outgoing.iter().any(|f| f.frame.ends_with("9630")),
+        "expected greeting 12438 (0x3096); got {:?}",
+        out_no_ticket_1.outgoing
+    );
+    let out_no_ticket_2 = dispatch(&mut conn, &CONTINUE_FRAME, &data, &service, &env).await;
+    assert!(
+        out_no_ticket_2.outgoing.iter().any(|f| f.frame.ends_with("5B3E")),
+        "expected greeting 15963 (0x3E5B); got {:?}",
+        out_no_ticket_2.outgoing
+    );
+    let out_no_ticket_3 = dispatch(&mut conn, &CONTINUE_FRAME, &data, &service, &env).await;
+    assert!(
+        !out_no_ticket_3.outgoing.iter().any(|f| f.frame.ends_with("0900")),
+        "must NOT open Surface 9 (eve_no=19) when player has 0x #31023; got {:?}",
+        out_no_ticket_3.outgoing
+    );
+}

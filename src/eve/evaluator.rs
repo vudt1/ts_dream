@@ -36,19 +36,19 @@ pub fn compare_step(actual: i32, ops: u8, expected: i32) -> bool {
     }
 }
 
-/// Invert a `conditionOps` operator for `Data/eve.emg` classes (`cc = 1` BagItem
-/// and `cc = 7, param = 0 | 2` Level/Reborn) whose script rows encode
-/// `expected <op> actual` instead of `actual <op> expected`.
-///
-/// Preserves 100% of the `Data/eve.emg` truth table while keeping every
-/// `compare_step(actual, ops, expected)` call in canonical `(actual, expected)` order.
+/// Normalize a `conditionOps` operator for `Data/eve.emg` classes (`cc = 1` BagItem
+/// and `cc = 7, param = 0 | 2` Level/Reborn):
+/// - `2` -> `4` (`expected < actual`  <=> `actual > expected`)
+/// - `3` -> `5` (`expected <= actual` <=> `actual >= expected`)
+/// - `4` -> `5` (`Data/eve.emg` encodes `actual >= expected` directly, e.g. `val = 1, 5, 15`)
+/// - `5` -> `3` (`expected >= actual` <=> `actual <= expected`)
 #[must_use]
 fn invert_emg_ops(ops: u8) -> u8 {
     match ops {
-        2 => 4, // expected < actual  <=> actual > expected
-        3 => 5, // expected <= actual <=> actual >= expected
-        4 => 2, // expected > actual  <=> actual < expected
-        5 => 3, // expected >= actual <=> actual <= expected
+        2 => 4,
+        3 => 5,
+        4 => 5,
+        5 => 3,
         other => other,
     }
 }
