@@ -307,3 +307,32 @@ async fn test_dispatch_click_npc_bridges_to_eve_session() {
     );
 }
 
+#[test]
+fn test_map_12808_straw_dummy_resolution() {
+    let data = std::sync::Arc::clone(crate::common::shared_game_data());
+    let scene = data.scene_eve_data.get(&12808).expect("Scene 12808 must be loaded from eve.emg");
+    assert_eq!(scene.npcs.len(), 15, "Map 12808 should contain 15 NPCs");
+    assert!(scene.fight_datas.len() >= 6, "Map 12808 should contain at least 6 FightData entries");
+
+    let mut session = Session::new();
+    session.id = 1001;
+    session.name = b"player".to_vec();
+    session.map_id = 12808;
+    session.map_x = 750;
+    session.map_y = 1780;
+    let mut rng = DotNetRandom::new(12345);
+
+    for npc_id in 1..=6u16 {
+        let npc = scene.npcs.get(&npc_id).expect("Dummy NPC 1..6 must exist");
+        assert_eq!(npc.npc_id, 22012, "NPC template must be 22012 (Straw Dummy)");
+
+        let res = resolve_npc_event(&session, &data, NpcTrigger::ClickNpc(npc_id as i32), &mut rng);
+        assert!(res.is_some(), "ClickNpc({}) must resolve to an EventSession", npc_id);
+        let session_res = res.unwrap();
+        assert_eq!(session_res.results.len(), 1);
+        assert_eq!(session_res.results[0].result_type, 3, "Result must be battle trigger (type 3)");
+        assert_eq!(session_res.results[0].result_mean_no, npc_id, "Fight ID must match dummy index 1..6");
+    }
+}
+
+
