@@ -264,7 +264,7 @@ async fn e2e_12001_tong_dung_battle_win_rewards_registry_and_next_packet_safe() 
         post_frames.iter().any(|f| f.contains("0F08"))
             && post_frames
                 .iter()
-                .any(|f| f.contains("0F01") && f.ends_with("00")),
+                .any(|f| f.contains("0F01") && f.ends_with("01")),
         "Win must emit 0F08 + 0F01 (quest=0) for pet 14106"
     );
 

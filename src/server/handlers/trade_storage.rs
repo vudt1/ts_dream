@@ -180,6 +180,7 @@ fn empty_pet_offer_frame(gold: u32) -> String {
 
 
 pub fn received_pet_frame(pet: &PetState) -> String {
+    let wire_normal_flag: u8 = if pet.quest == 0 { 1 } else { 0 };
     frame(
         "0F07",
         &format!(
@@ -187,7 +188,7 @@ pub fn received_pet_frame(pet: &PetState) -> String {
             encoder::le32(u32::from(pet.id)),
             pet.stt,
             encoder::le32(u32::from(pet.id)),
-            pet.quest,
+            wire_normal_flag,
             pet.name.len(),
             encoder::strhex(&pet.name)
         ),
@@ -199,12 +200,13 @@ pub fn removed_pet_frame(owner_id: u32, stt: u8) -> String {
 }
 
 pub fn pet_presence_frame(owner_id: u32, pet: &PetState) -> String {
+    let wire_normal_flag: u8 = if pet.quest == 0 { 1 } else { 0 };
     format!(
         "F4440C000F01{}{:02X}{}{:02X}",
         encoder::le32(owner_id),
         pet.stt,
         encoder::le32(u32::from(pet.id)),
-        pet.quest
+        wire_normal_flag
     )
 }
 

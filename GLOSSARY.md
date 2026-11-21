@@ -108,6 +108,9 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 
 ### Pet / Companion (Sủng vật / Đậu đậu)
 - **Định nghĩa**: Nhân vật phi người chơi (NPC) có thể thu phục hoặc chiêu mộ đồng hành cùng Nhân vật người chơi trong các trận đấu và di chuyển.
+- **Quy ước cờ trạng thái `pet+0x55F` trên client `aLogin.exe`**:
+  - Trên DB/server (`character_pets.quest`, `PetState.quest`): `0` = pet thường, `1` = pet nhiệm vụ.
+  - Trên wire gửi cho client `aLogin.exe` (`pet+0x55F`, được ghi bởi `+0x1A` của `0F 08`, byte cuối của `0F 01`, và `0F 07`): chiều giá trị ngược lại — `1` = pet thường (tên trắng, xuất chiến được), `0` = pet nhiệm vụ (tên cam, không thể xuất chiến).
 
 ### Thu phục Võ tướng / Bắt quái (Pet Capture) — skill 15001
 - **Định nghĩa**: Hành động người chơi sử dụng lệnh kỹ năng `15001` (hoặc đạo cụ Lưới bắt) để thu phục một NPC quái vật trên bàn cờ làm Sủng vật tùy thân (chuyển vào 1 trong 4 ô trống của `character_pets`).

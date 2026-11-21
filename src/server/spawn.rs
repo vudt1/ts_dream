@@ -493,8 +493,11 @@ fn pet_stat_entry(s: &Session, p: &crate::server::session::PetState) -> String {
     stats.push_str(&encoder::le16(p.agi)); // +0x12..0x13
     stats.push_str(&encoder::le16(p.hpx)); // +0x14..0x15
     stats.push_str(&encoder::le16(p.spx)); // +0x16..0x17
+    // Client `pet+0x55F` (`007a5010` / `007a3ed0`): `1` = pet thường (tên trắng, xuất chiến được),
+    // `0` = pet nhiệm vụ (tên cam, không thể xuất chiến). DB `PetState.quest == 0` là pet thường.
+    let wire_normal_flag: u8 = if p.quest == 0 { 1 } else { 0 };
     stats.push_str("00"); // +0x18 reserved byte
-    stats.push_str(&format!("{:02X}{:02X}", p.fai as u8, p.quest)); // +0x19 fai, +0x1A quest
+    stats.push_str(&format!("{:02X}{:02X}", p.fai as u8, wire_normal_flag)); // +0x19 fai, +0x1A pet+0x55F
     stats.push_str(&encoder::le16(p.skill_point)); // +0x1B..0x1C
     stats.push_str(&format!("{:02X}", p.name.len())); // +0x1D nameLen
     stats.push_str(&encoder::strhex(&p.name)); // +0x1E.. name

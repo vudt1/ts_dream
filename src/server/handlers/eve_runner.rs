@@ -684,7 +684,7 @@ fn execute_reward_pet(
                 }
             };
             let stat_frame = crate::server::spawn::pet_stat_frame(session, &pet);
-            let pet_quest = pet.quest;
+            let pet_wire_flag: u8 = if pet.quest == 0 { 1 } else { 0 };
             let join_msg = if pet.name.is_empty() {
                 "Võ tướng đã gia nhập đội ngũ!".to_string()
             } else {
@@ -697,7 +697,7 @@ fn execute_reward_pet(
             out.send(crate::server::spawn::sys_msg_frame(&join_msg));
             out.send(stat_frame);
             out.send(NpcTalkCodec::build_pet_appear_hex(
-                session.id, stt, pet_id, pet_quest,
+                session.id, stt, pet_id, pet_wire_flag,
             ));
             crate::server::session::registry_update_if_online(session);
         }

@@ -203,8 +203,8 @@ async fn e2e_12001_tong_nhan_menu_32_grants_pet_14105_npcteam_quest_10027_and_pe
     assert!(
         all_frames
             .iter()
-            .any(|f| f.contains("0F01") && f.ends_with("00")),
-        "Must emit 0F01 pet add frame with quest=0"
+            .any(|f| f.contains("0F01") && f.ends_with("01")),
+        "Must emit 0F01 pet add frame with wire_normal_flag=1"
     );
     assert!(
         !all_results
@@ -1817,8 +1817,8 @@ async fn map_12003_bdy_16024_trades_ticket_31007_for_pet_22028() {
         out2.outgoing
     );
     assert!(
-        out2.outgoing.iter().any(|f| f.frame.contains("0F01") && f.frame.ends_with("00")),
-        "must emit 0F01 pet appear frame with quest=0; got {:?}",
+        out2.outgoing.iter().any(|f| f.frame.contains("0F01") && f.frame.ends_with("01")),
+        "must emit 0F01 pet appear frame with wire_normal_flag=1; got {:?}",
         out2.outgoing
     );
     assert!(

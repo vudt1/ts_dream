@@ -110,7 +110,7 @@ fn pet_stat_record_matches_client_offsets() {
     assert_eq!(le16(r, 0x16), 888, "spx at +0x16");
     assert_eq!(r[0x18], 0, "reserved byte at +0x18");
     assert_eq!(r[0x19], 9, "fai at +0x19");
-    assert_eq!(r[0x1A], 7, "quest at +0x1A");
+    assert_eq!(r[0x1A], 0, "quest!=0 encodes 0 (quest pet) at +0x1A");
     assert_eq!(le16(r, 0x1B), 1234, "skill point at +0x1B");
     assert_eq!(r[0x1D], n as u8, "nameLen at +0x1D");
     assert_eq!(&r[0x1E..0x1E + n], b"Pikachu", "name at +0x1E");
