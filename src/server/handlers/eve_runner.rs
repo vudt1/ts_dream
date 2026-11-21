@@ -616,7 +616,7 @@ fn execute_reward_pet(
     match op {
         PetOp::Grant {
             pet_id,
-            wire_result,
+            wire_result: _,
         } => {
             let pet_id = *pet_id;
             if session.pets.iter().any(|p| p.id == pet_id) {
@@ -628,7 +628,8 @@ fn execute_reward_pet(
                 return;
             };
             let pet = if let Some(npc) = data.npcs.get(&i64::from(pet_id)) {
-                let lv = npc.lv.clamp(1, 200) as u8;
+                // Theo quyết định thiết kế: pet mới nhận qua EVE luôn bắt đầu ở cấp 1.
+                let lv: u8 = 1;
                 let hp_max = if npc.hp > 0 {
                     npc.hp.min(i64::from(u16::MAX)) as u16
                 } else {
@@ -683,10 +684,21 @@ fn execute_reward_pet(
                 }
             };
             let stat_frame = crate::server::spawn::pet_stat_frame(session, &pet);
+            let pet_quest = pet.quest;
+            let join_msg = if pet.name.is_empty() {
+                "Võ tướng đã gia nhập đội ngũ!".to_string()
+            } else {
+                format!(
+                    "Võ tướng {} đã gia nhập đội ngũ!",
+                    crate::encoding::viscii_decode(&pet.name)
+                )
+            };
             session.pets.push(pet);
-            out.send(NpcTalkCodec::build_talk_step_hex(wire_result));
+            out.send(crate::server::spawn::sys_msg_frame(&join_msg));
             out.send(stat_frame);
-            out.send(NpcTalkCodec::build_pet_appear_hex(session.id, stt, pet_id, 1));
+            out.send(NpcTalkCodec::build_pet_appear_hex(
+                session.id, stt, pet_id, pet_quest,
+            ));
             crate::server::session::registry_update_if_online(session);
         }
         PetOp::Revoke {

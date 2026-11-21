@@ -243,10 +243,16 @@ async fn e2e_12001_tong_dung_battle_win_rewards_registry_and_next_packet_safe() 
     let post_frames = drain_rx(&mut rx);
     let results = op14_01_results(&post_frames);
     assert!(
-        results
+        !results
             .iter()
             .any(|&(rt, rc, param, _, _, _)| rt == 0 && rc == 8 && param == 14106),
-        "Win must emit 0x14 01 RewardPet 14106; got results={results:?}"
+        "Win must NOT emit raw 0x14 01 RewardPet 14106 popup; got results={results:?}"
+    );
+    assert!(
+        post_frames
+            .iter()
+            .any(|f| f.starts_with("F444") && f.len() >= 12 && &f[8..12] == "020C"),
+        "Win must emit 020C sys_msg_frame for RewardPet 14106; got frames={post_frames:?}"
     );
     assert!(
         results
@@ -256,16 +262,20 @@ async fn e2e_12001_tong_dung_battle_win_rewards_registry_and_next_packet_safe() 
     );
     assert!(
         post_frames.iter().any(|f| f.contains("0F08"))
-            && post_frames.iter().any(|f| f.contains("0F01")),
-        "Win must emit 0F08 + 0F01 for pet 14106"
+            && post_frames
+                .iter()
+                .any(|f| f.contains("0F01") && f.ends_with("00")),
+        "Win must emit 0F08 + 0F01 (quest=0) for pet 14106"
     );
 
     // Registry must be updated with pet 14106 & Quest 10028
     let reg = registry_get(char_id as u32).expect("player must remain in registry");
     assert_eq!(reg.battle_id, 0, "battle_id must be cleared after battle_ended");
     assert!(
-        reg.pets.iter().any(|p| p.id == 14106),
-        "Registry must contain RewardPet 14106"
+        reg.pets
+            .iter()
+            .any(|p| p.id == 14106 && p.level == 1 && p.quest == 0),
+        "Registry must contain RewardPet 14106 at level 1 (quest=0)"
     );
     assert!(
         reg.quest_tasks.contains_key(&10028)

@@ -189,8 +189,11 @@ async fn e2e_12001_tong_nhan_menu_32_grants_pet_14105_npcteam_quest_10027_and_pe
         "Tống Nhân chain should finish cleanly"
     );
     assert!(
-        conn.session.pets.iter().any(|p| p.id == 14105 && (1..=4).contains(&p.stt)),
-        "Player must receive pet 14105 in active roster 1..=4; pets={:?}",
+        conn.session
+            .pets
+            .iter()
+            .any(|p| p.id == 14105 && (1..=4).contains(&p.stt) && p.level == 1 && p.quest == 0),
+        "Player must receive pet 14105 at level 1 (quest=0) in active roster 1..=4; pets={:?}",
         conn.session.pets
     );
     assert!(
@@ -198,12 +201,22 @@ async fn e2e_12001_tong_nhan_menu_32_grants_pet_14105_npcteam_quest_10027_and_pe
         "Must emit 0F08 pet stat frame"
     );
     assert!(
-        all_frames.iter().any(|f| f.contains("0F01")),
-        "Must emit 0F01 pet add frame"
+        all_frames
+            .iter()
+            .any(|f| f.contains("0F01") && f.ends_with("00")),
+        "Must emit 0F01 pet add frame with quest=0"
     );
     assert!(
-        all_results.iter().any(|&(rt, rc, param, _, _, _)| rt == 0 && rc == 8 && param == 14105),
-        "Must emit 0x14 01 RewardPet frame"
+        !all_results
+            .iter()
+            .any(|&(rt, rc, param, _, _, _)| rt == 0 && rc == 8 && param == 14105),
+        "Must NOT emit raw 0x14 01 RewardPet popup frame"
+    );
+    assert!(
+        all_frames
+            .iter()
+            .any(|f| f.starts_with("F444") && f.len() >= 12 && &f[8..12] == "020C"),
+        "Must emit 020C sys_msg_frame on RewardPet"
     );
     assert!(
         all_results.iter().any(|&(rt, rc, _, _, _, _)| rt == 0 && rc == 3),
@@ -1785,9 +1798,27 @@ async fn map_12003_bdy_16024_trades_ticket_31007_for_pet_22028() {
 
     // 2. Select choice 30 (0x1E) -> consumes 1x #31007 and grants pet #22028
     let out2 = dispatch(&mut conn, &select_menu_frame(30), &data, &service, &env).await;
+    let insufficient_msg = ts_dream::server::spawn::sys_msg_frame("Vật phẩm không đủ, không thể thực hiện.");
     assert!(
-        !out2.outgoing.iter().any(|f| f.frame.starts_with("F444") && f.frame.contains("020C")),
+        !out2.outgoing.iter().any(|f| f.frame == insufficient_msg),
         "must not emit insufficient item error; got {:?}",
+        out2.outgoing
+    );
+    assert!(
+        out2.outgoing.iter().any(|f| f.frame.starts_with("F444") && f.frame.len() >= 12 && &f.frame[8..12] == "020C"),
+        "must emit 020C sys_msg_frame on RewardPet; got {:?}",
+        out2.outgoing
+    );
+    assert!(
+        !op14_01_results(&out2)
+            .iter()
+            .any(|&(rt, rc, _, _, _, _)| rt == 0 && rc == 8),
+        "must NOT emit raw 0x14 01 RewardPet popup; got {:?}",
+        out2.outgoing
+    );
+    assert!(
+        out2.outgoing.iter().any(|f| f.frame.contains("0F01") && f.frame.ends_with("00")),
+        "must emit 0F01 pet appear frame with quest=0; got {:?}",
         out2.outgoing
     );
     assert!(
@@ -1796,8 +1827,11 @@ async fn map_12003_bdy_16024_trades_ticket_31007_for_pet_22028() {
         conn.session.homdo
     );
     assert!(
-        conn.session.pets.iter().any(|p| p.id == 22028 && (1..=4).contains(&p.stt)),
-        "pet 22028 must be granted in active roster; pets={:?}",
+        conn.session
+            .pets
+            .iter()
+            .any(|p| p.id == 22028 && (1..=4).contains(&p.stt) && p.level == 1 && p.quest == 0),
+        "pet 22028 must be granted in active roster at level 1 (quest=0); pets={:?}",
         conn.session.pets
     );
 

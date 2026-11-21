@@ -198,7 +198,13 @@ async fn index(State(s): State<WebState>) -> Response {
     drop(app_guard);
 
     let accounts = match &s.pool {
-        Some(pool) => db::accounts::list(pool).await.unwrap_or_default(),
+        Some(pool) => match db::accounts::list(pool).await {
+            Ok(rows) => rows,
+            Err(e) => {
+                tracing::warn!("failed to list accounts for dashboard: {e}");
+                Vec::new()
+            }
+        },
         None => Vec::new(),
     };
 

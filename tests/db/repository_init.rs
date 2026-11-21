@@ -63,10 +63,25 @@ async fn test_account_creation_and_auth() {
         .await
         .expect("touch login");
 
-    // List accounts
+    // List accounts (including rows whose pass1/pass2 are stored as SQLite BLOB)
+    sqlx::query(
+        "INSERT INTO accounts (playerid, pass1, pass2, issuspended, gmlevel, createdat)
+         VALUES (399999, CAST('1111111111' AS BLOB), CAST('1111111111' AS BLOB), 0, 0, ?)",
+    )
+    .bind(now)
+    .execute(&pool.write)
+    .await
+    .expect("insert blob password account");
+
     let accounts = ts_dream::db::accounts::list(&pool)
         .await
         .expect("list accounts");
+    assert!(
+        accounts
+            .iter()
+            .any(|a| a.player_id == 399999 && a.pass1 == "1111111111"),
+        "BLOB-stored pass1/pass2 row must still decode in db::accounts::list"
+    );
     let acc = accounts
         .iter()
         .find(|a| a.player_id == account_id)

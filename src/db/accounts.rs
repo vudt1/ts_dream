@@ -24,10 +24,12 @@ pub struct AccountRow {
 }
 
 /// List every account, newest first (the dashboard table order).
+/// `CAST(pass1/pass2 AS TEXT)` tolerates legacy/imported rows stored as SQLite `BLOB`.
 pub async fn list(pool: &DbPool) -> Result<Vec<AccountRow>, sqlx::Error> {
     sqlx::query_as::<_, AccountRow>(
-        "SELECT playerid AS player_id, pass1, pass2, issuspended AS is_suspended, gmlevel AS gm_level,
-                 createdat AS created_at, lastlogin_at AS last_login_at, lastloginip AS last_login_ip
+        "SELECT playerid AS player_id, CAST(pass1 AS TEXT) AS pass1, CAST(pass2 AS TEXT) AS pass2,
+                issuspended AS is_suspended, gmlevel AS gm_level,
+                createdat AS created_at, lastlogin_at AS last_login_at, lastloginip AS last_login_ip
          FROM accounts ORDER BY playerid DESC",
     )
     .fetch_all(&pool.read)
@@ -63,7 +65,7 @@ pub fn is_valid_password(pass: &[u8]) -> bool {
 /// Resolve `pass1` for a `player_id` (login gate). Returns `None` when the
 /// account does not exist.
 pub async fn pass1(pool: &DbPool, player_id: i64) -> Result<Option<String>, sqlx::Error> {
-    sqlx::query_as::<_, (String,)>("SELECT pass1 FROM accounts WHERE playerid = ?")
+    sqlx::query_as::<_, (String,)>("SELECT CAST(pass1 AS TEXT) FROM accounts WHERE playerid = ?")
         .bind(player_id)
         .fetch_optional(&pool.read)
         .await
@@ -76,7 +78,9 @@ pub async fn passwords(
     pool: &DbPool,
     player_id: i64,
 ) -> Result<Option<(String, String)>, sqlx::Error> {
-    sqlx::query_as::<_, (String, String)>("SELECT pass1, pass2 FROM accounts WHERE playerid = ?")
+    sqlx::query_as::<_, (String, String)>(
+        "SELECT CAST(pass1 AS TEXT), CAST(pass2 AS TEXT) FROM accounts WHERE playerid = ?",
+    )
         .bind(player_id)
         .fetch_optional(&pool.read)
         .await
