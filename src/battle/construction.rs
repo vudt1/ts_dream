@@ -381,6 +381,7 @@ impl Battle {
             cell.def = pet.def as i64 + pet.def2 as i64;
             cell.agi = pet.agi as i64 + pet.agi2 as i64;
             cell.reborn = pet.reborn as i64;
+            cell.fai = i64::from(pet.fai);
             cell.row = pet_row;
             cell.col = col;
             cell.weapon_id = 0;

@@ -527,6 +527,7 @@ async fn test_combat_job_skills_passives_and_mechanics() {
             attribute: 28,
             round: 0,
             hit_status: 0,
+            ..Default::default()
         }),
     );
     assert!(res_song_cuong.hit);
@@ -544,6 +545,7 @@ async fn test_combat_job_skills_passives_and_mechanics() {
             attribute: 27, // INT-based
             round: 0,
             hit_status: 0,
+            ..Default::default()
         }),
     );
     assert!(res_thien_loi.hit);
@@ -840,6 +842,7 @@ fn test_instigation_status_bonus_mechanics() {
         attribute: 27,
         round: 3,
         hit_status: 1, // Status effect
+        ..Default::default()
     };
 
     let res = ts_dream::battle::combat_formula::calculate_attack(

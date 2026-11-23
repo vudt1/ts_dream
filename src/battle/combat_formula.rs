@@ -24,6 +24,9 @@ pub struct SkillFormulaInput {
     pub attribute: u8,
     pub round: i64,
     pub hit_status: i64,
+    pub skill_id: i64,
+    pub skill_lv: i64,
+    pub sl_danh: i64,
 }
 
 /// Result of one combat-formula attack roll.
@@ -63,7 +66,11 @@ pub fn calculate_attack(
         attribute: 0,
         round: 0,
         hit_status: 0,
+        skill_id: 10_000,
+        skill_lv: 0,
+        sl_danh: 1,
     });
+    let sl = skill.sl_danh.max(1) as f64;
     let base = calculate_base_damage(attacker, skill);
 
     let reduced = base - target.lv - target.def;
@@ -84,7 +91,34 @@ pub fn calculate_attack(
     } else {
         1.0
     };
-    let defend_multiplier = if target.id_skill == 17_001 { 0.5 } else { 1.0 };
+    let defend_multiplier = if target.id_skill == 17_001 { 0.2 } else { 1.0 };
+
+    // C# buff/debuff percentage modifiers (TheBattle.cs:2014-2059, 2420-2456)
+    let mut buff_multiplier = 1.0;
+    if target.type3_id == 11_014 {
+        buff_multiplier *= 1.0 + 0.01 * target.type3_lv as f64;
+    }
+    if attacker.type4_id == 11_002 {
+        buff_multiplier *= (1.0 - 0.01 * attacker.type4_lv as f64).max(0.0);
+    }
+    if attacker.type19_id == 12_025 {
+        buff_multiplier *= 1.0 + (0.02 + 0.05 / sl) * attacker.type19_lv as f64;
+    }
+    if attacker.type4_id == 13_012 {
+        buff_multiplier *= 1.0 + 0.033 * attacker.type4_lv as f64;
+    }
+    if target.type4_id == 13_012 {
+        buff_multiplier *= (1.0 - 0.033 * target.type4_lv as f64).max(0.0);
+    }
+    if target.type15_id == 13_011 {
+        buff_multiplier *= 1.0 + 0.033 * target.type15_lv as f64;
+    }
+    if attacker.type15_id == 13_011 {
+        buff_multiplier *= (1.0 - 0.033 * attacker.type15_lv as f64).max(0.0);
+    }
+    if matches!(attacker.type19_id, 14_053 | 14_040) {
+        buff_multiplier *= 1.0 + (0.1 / sl) * attacker.type19_lv as f64;
+    }
 
     let mut damage = (reduced as f64
         * element_multiplier
@@ -93,9 +127,18 @@ pub fn calculate_attack(
         * thunder_multiplier
         * pvp_multiplier
         * status_multiplier
-        * defend_multiplier)
+        * defend_multiplier
+        * buff_multiplier)
         .round()
         .max(1.0) as i64;
+
+    if skill.sl_danh > 1 {
+        if matches!(skill.skill_id, 12_016..=12_019) {
+            damage = (damage as f64 / (sl * 0.5)).round() as i64 + skill.skill_lv * 50;
+        } else {
+            damage = (damage as f64 / (sl * 0.75)).round() as i64;
+        }
+    }
 
     if target.type19_id == SKILL_ENERGY_CONCENTRATION as i64 {
         damage = (damage * 7) / 10;

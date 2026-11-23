@@ -102,3 +102,19 @@ Grilling session chốt scope:
 - Grilling session 2026-08-28 Q1=B3, Q2=(a) PC parser tham khảo mobile, Q3="PC Skill.Dat", Q4=α, Q5=5.1, Q6=6b→override `unimplemented`, Q7=viết ADR, Q8=(x) gộp, Q9=`combat_formula.rs`.
 - Files affected: `src/battle/mobile_damage.rs`, `src/battle/damage.rs`, `src/battle/runner.rs`, `src/battle/targeting.rs`, `src/protocol/profile.rs`, `src/protocol/mod.rs`, `src/server/dispatcher.rs`, `src/server/handlers/compat.rs`, `src/server/handlers/mod.rs`, `src/data/loaders/skill.rs`, `src/data/loader.rs`, `src/data/tables.rs`, `src/lib.rs`, `CONTEXT.md`.
 - Owner xác nhận: server chỉ dành cho PC, Kotlin `ts_mobile_server/` chỉ là source tham chiếu.
+
+---
+
+## Addendum (2026-11-23) — Tinh chỉnh Buff/Debuff, AoE, Defend & Trung thành Pet từ đối chiếu C#
+
+Qua đối chiếu trực tiếp với `Server-TS-Online-1` (`.scratch/battle-csharp-audit/RESEARCH.md`) và phiên chốt quyết định ngày 2026-11-23:
+
+1. **Giữ nguyên nền tảng `combat_formula.rs`**: Vẫn giữ `combat_formula::calculate_attack` làm pipeline duy nhất và **giữ bảng khắc hệ đối xứng `1.5 / 0.75`**.
+2. **Bổ sung các hệ số C# còn thiếu vào `combat_formula.rs`**:
+   - Tích hợp 7 hệ số buff/debuff theo ID kỹ năng C# (`11014`, `11002`, `12025`, `13012`, `13011`, `14053`, `14040`).
+   - Áp dụng chia sát thương AoE theo số mục tiêu `SLdanh` (`num34 > 1`, mặc định `SLdanh * 0.75`; riêng nhóm kỹ năng Hỏa `12016..=12019` dùng `dmg / (SLdanh * 0.5) + lvSkill * 50`).
+   - Điều chỉnh hệ số phòng thủ `17001` (Defend) từ `0.5x` xuống **`0.2x` (`1/5`)** để tăng giá trị chiến thuật như C#.
+3. **Sửa `damage::get_turn`**: Sửa lỗi đảo nhánh `2` / `3` turn của `GROUP_a` (`13002, 14008, 13003, 13005, 13012`) ở `lv_skill 1..=2` cho khớp C# (`1..=2 => 2`, `3..=5 => 3`).
+4. **Hồi sinh & Trung thành Pet (`_Fai`) cuối trận**:
+   - Pet chết (`hp <= 0`) được hồi `Hp = 1` ở cả 2 phe khi kết thúc trận.
+   - Trong `BattleKind::Normal`, Pet chết của phe công bị trừ `1 Fai`; khi `fai <= 20`, tính xác suất bỏ trốn tuyến tính (từ `50%` tại `fai == 20` tăng lên `100%` tại `fai <= 10`) — nếu bỏ trốn thì xóa Pet khỏi `session.pets` & DB, gửi frame gỡ Pet và `sys_msg_frame`.

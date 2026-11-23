@@ -898,25 +898,22 @@ fn phase2_and_phase3_32_01_precedes_33_01_and_turn_finish_follows() {
         .iter()
         .position(|f| f.len() >= 12 && &f[8..12] == "3201")
         .expect("32 01 action frame must be broadcast");
-    let idx_3301 = broadcasts
+    let has_3301_hp = broadcasts
         .iter()
-        .position(|f| f.len() >= 12 && &f[8..12] == "3301")
-        .expect("33 01 HP update frame must be broadcast");
+        .any(|f| f.len() >= 12 && &f[8..12] == "3301");
     let idx_3202 = broadcasts
         .iter()
         .position(|f| f == &packets::turn_action_finish())
         .expect("32 02 turn_action_finish must be broadcast");
 
     assert!(
-        idx_3201 < idx_3301,
-        "32 01 animation must precede 33 01 HP/SP update (idx_3201={}, idx_3301={})",
-        idx_3201,
-        idx_3301
+        !has_3301_hp,
+        "33 01 must NOT be broadcast for 32 01 HP damage (prevents double-subtraction on client)"
     );
     assert!(
-        idx_3301 < idx_3202,
-        "33 01 HP/SP update must precede 32 02 turn_action_finish (idx_3301={}, idx_3202={})",
-        idx_3301,
+        idx_3201 < idx_3202,
+        "32 01 action must precede 32 02 turn_action_finish (idx_3201={}, idx_3202={})",
+        idx_3201,
         idx_3202
     );
 }

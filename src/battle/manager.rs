@@ -42,6 +42,8 @@ pub trait BattleSink: Send + Sync + 'static {
     /// sink can clear `battle_id` and flush any buffered `08 01` stat frames
     /// before `finish()` emits `Texp`/`Lv`/`05 0A`/reward frames.
     fn battle_finishing(&self, _id: i32) {}
+    /// A dead pet's loyalty dropped low enough to run away at battle end.
+    fn apply_pet_runaway(&self, _owner: i64, _stt: i64) {}
     /// The battle task finished (`PlayerWin`/`PlayerLose`/`PlayerFled`).
     fn battle_ended(&self, id: i32, outcome: Outcome);
 }
@@ -649,6 +651,7 @@ fn dispatch_one(o: &Out, sink: &dyn BattleSink) {
                 y,
             } => sink.apply_respawn(*npc_id, *map_id, *x, *y),
             PetExp { owner, stt, exp } => sink.apply_pet_exp(*owner, *stt, *exp),
+            PetRunaway { owner, stt } => sink.apply_pet_runaway(*owner, *stt),
             Gold { owner, amount } => sink.apply_gold(*owner, *amount),
     }
 }

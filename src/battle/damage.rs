@@ -239,14 +239,10 @@ pub fn calc_combo_exp(base_exp: i64) -> i64 {
 pub fn get_turn(id_skill: i64, lv_skill: i64) -> i64 {
     // GROUP_a: {13002,14008,13003,13005,13012}
     if matches!(id_skill, 13002 | 14008 | 13003 | 13005 | 13012) {
-        return if lv_skill - 1 > 1 {
-            if lv_skill - 3 <= 2 {
-                3
-            } else {
-                2
-            }
-        } else {
-            3
+        return match lv_skill {
+            ..=2 => 2,
+            3..=5 => 3,
+            _ => 2,
         };
     }
     // GROUP_b: {10033,10015,10026,13021,13025,13032,10025,14020,12025,14040,14044,14046,14053}

@@ -190,6 +190,40 @@ fn finish_level_up_emits_frames_in_contract_order() {
 }
 
 #[test]
+fn level_up_accumulates_existing_point_and_skill_point() {
+    let texps = texps_one_level();
+    let mut players = HashMap::new();
+    players.insert(
+        7,
+        PlayerSnapshot {
+            texp: 0,
+            point: 10,
+            skill_point: 5,
+            ..Default::default()
+        },
+    );
+    let (mut battle, npcs, skills, items) = leveling_battle_and_data();
+    let pet_slots = HashMap::new();
+    let data = BattleData::new(
+        &npcs, &skills, &items, &pet_slots, &players, &texps, None, 1, 0,
+    );
+
+    let mut out = Vec::new();
+    battle.finish(&data, 1, false, false, &mut out);
+
+    let db_val = |stat: Stat| -> i64 {
+        out.iter()
+            .find_map(|o| match o {
+                Out::Db(u) if u.target == DbTarget::Player(7) && u.stat == stat => Some(u.value),
+                _ => None,
+            })
+            .expect("missing db update")
+    };
+    assert_eq!(db_val(Stat::Point), 12, "10 existing + 2 per level");
+    assert_eq!(db_val(Stat::SkillPoint), 6, "5 existing + 1 per level");
+}
+
+#[test]
 fn finish_without_level_up_emits_no_levelup_frame() {
     let mut players = HashMap::new();
     players.insert(
@@ -471,7 +505,7 @@ async fn mid_battle_08_01_and_0f_08_are_emitted_immediately() {
         &snapshot,
         BattleCommand {
             row: 2,
-            col: 2,
+            col: 3,
             target_row: 0,
             target_col: 2,
             action: BattleAction::CastSkill {

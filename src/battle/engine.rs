@@ -81,6 +81,7 @@ pub struct WarInfo {
     pub attacked: bool,
     pub random: i64,
     pub exp: i64,
+    pub fai: i64,
     // (Leader quan-su context lives on the `Battle`, not the cell — see
     // `Battle.leader_id_qs`/`leader_qs_int`.)
 

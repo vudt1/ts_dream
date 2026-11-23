@@ -425,6 +425,76 @@ impl BattleSink for BattleSinkImpl {
         }
     }
 
+    fn apply_pet_runaway(&self, owner: i64, stt: i64) {
+        let mut removed_name: Option<String> = None;
+        let mut updated_session: Option<Session> = None;
+        let remove_from_session = |s: &mut Session| -> Option<String> {
+            let pos = s.pets.iter().position(|p| i64::from(p.stt) == stt)?;
+            let name = crate::encoding::viscii_decode(&s.pets[pos].name);
+            let stt_u8 = s.pets[pos].stt;
+            s.pets.remove(pos);
+            if s.active_pet_stt == stt_u8 {
+                s.active_pet_stt = 0;
+            }
+            let lo = u16::from(stt_u8) * 10 + 1;
+            let hi = u16::from(stt_u8) * 10 + 6;
+            s.trangbi
+                .retain(|i| !(lo..=hi).contains(&u16::from(i.slot)));
+            Some(name)
+        };
+
+        if let Some(online) = try_read_online_with_retry(&self.online, 10, std::time::Duration::from_millis(2)) {
+            if let Some(p) = online.get(&owner) {
+                if let Some(mut s) = try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2)) {
+                    removed_name = remove_from_session(&mut s);
+                    if removed_name.is_some() {
+                        crate::server::session::registry_update_if_online(&s);
+                        updated_session = Some(s.clone());
+                    }
+                }
+            }
+        }
+        let mut map = crate::server::session::lock_online_sessions();
+        if let Some(s) = map.get_mut(&(owner as u32)) {
+            if removed_name.is_none() {
+                removed_name = remove_from_session(s);
+            } else {
+                let _ = remove_from_session(s);
+            }
+            if updated_session.is_none() && removed_name.is_some() {
+                updated_session = Some(s.clone());
+            }
+        }
+        drop(map);
+
+        if let Some(name) = removed_name {
+            self.send_to(
+                owner,
+                crate::protocol::codecs::NpcTalkCodec::build_pet_remove_hex(owner as u32, stt as u8),
+            );
+            self.send_to(
+                owner,
+                crate::server::spawn::sys_msg_frame(&format!(
+                    "Sủng vật {name} có độ trung thành quá thấp nên đã bỏ trốn!"
+                )),
+            );
+        }
+        if let Some(session) = updated_session {
+            if let Ok(pool) = self.pool.try_read() {
+                if let Some(pool) = pool.clone() {
+                    tokio::spawn(async move {
+                        crate::db::persist::persist_sessions_transaction(
+                            Some(&pool),
+                            &[&session],
+                            &["pet", "equip"],
+                        )
+                        .await;
+                    });
+                }
+            }
+        }
+    }
+
     fn apply_gold(&self, owner: i64, amount: i64) {
         if amount <= 0 {
             return;
@@ -1174,10 +1244,11 @@ fn apply_db_update(online: &OnlineMap, update: DbUpdate) {
                         match update.stat {
                             Stat::Hp => pet.hp = clamp_u16(update.value),
                             Stat::Sp => pet.sp = clamp_u16(update.value),
+                            Stat::Fai => pet.fai = clamp_u16(update.value),
                             _ => {}
                         }
                     }
-                    if matches!(update.stat, Stat::Hp | Stat::Sp) {
+                    if matches!(update.stat, Stat::Hp | Stat::Sp | Stat::Fai) {
                         if let Some(pet) = s.pets.iter().find(|p| i64::from(p.stt) == stt) {
                             pet_frame = Some(crate::server::spawn::pet_stat_frame(&s, pet));
                         }
@@ -1193,6 +1264,7 @@ fn apply_db_update(online: &OnlineMap, update: DbUpdate) {
                     match update.stat {
                         Stat::Hp => pet.hp = clamp_u16(update.value),
                         Stat::Sp => pet.sp = clamp_u16(update.value),
+                        Stat::Fai => pet.fai = clamp_u16(update.value),
                         _ => {}
                     }
                 }
@@ -2411,6 +2483,8 @@ impl BattleService {
             spx: i64::from(session.spx),
             hpx2: i64::from(session.hpx2),
             spx2: i64::from(session.spx2),
+            point: i64::from(session.point),
+            skill_point: i64::from(session.skill_point),
             god: session.god,
             ghost: session.ghost,
         }

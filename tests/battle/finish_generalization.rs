@@ -328,3 +328,94 @@ fn finish_does_not_duplicate_pet_exp_across_players() {
         "each pet's exp is granted exactly once, to its own owner"
     );
 }
+
+#[test]
+fn pet_runaway_chance_pct_interpolates_from_20_to_10() {
+    use ts_dream::battle::runner::pet_runaway_chance_pct;
+
+    assert_eq!(pet_runaway_chance_pct(25), 0);
+    assert_eq!(pet_runaway_chance_pct(21), 0);
+    assert_eq!(pet_runaway_chance_pct(20), 50);
+    assert_eq!(pet_runaway_chance_pct(15), 75);
+    assert_eq!(pet_runaway_chance_pct(11), 95);
+    assert_eq!(pet_runaway_chance_pct(10), 100);
+    assert_eq!(pet_runaway_chance_pct(0), 100);
+}
+
+#[test]
+fn finish_revives_dead_pets_and_applies_fai_penalty_or_runaway() {
+    use ts_dream::battle::runner::{DbTarget, DbUpdate, Stat};
+    let mut battle = Battle::new(501, 1);
+    let p1 = battle.cell_mut(3, 2).expect("player cell");
+    p1.typ = 2;
+    p1.id = 101;
+    p1.team = 1;
+    p1.hp = 100;
+    p1.hp_max = 100;
+
+    // Team 1 dead pet with high loyalty (fai = 60 -> 59, Hp = 1).
+    let pet_safe = battle.cell_mut(2, 1).expect("team1 pet safe");
+    pet_safe.typ = 4;
+    pet_safe.id = 11001;
+    pet_safe.id_npc_on_map = 1;
+    pet_safe.id_char = 101;
+    pet_safe.team = 1;
+    pet_safe.hp = 0;
+    pet_safe.fai = 60;
+
+    // Team 1 dead pet with very low loyalty (fai = 11 -> 10, 100% runaway).
+    let pet_runaway = battle.cell_mut(2, 3).expect("team1 pet runaway");
+    pet_runaway.typ = 4;
+    pet_runaway.id = 11002;
+    pet_runaway.id_npc_on_map = 2;
+    pet_runaway.id_char = 101;
+    pet_runaway.team = 1;
+    pet_runaway.hp = 0;
+    pet_runaway.fai = 11;
+
+    // Team 2 dead pet (PvP defender): revived to Hp = 1 without Fai penalty.
+    let pet_enemy = battle.cell_mut(1, 2).expect("team2 pet");
+    pet_enemy.typ = 4;
+    pet_enemy.id = 11003;
+    pet_enemy.id_npc_on_map = 1;
+    pet_enemy.id_char = 202;
+    pet_enemy.team = 2;
+    pet_enemy.hp = 0;
+    pet_enemy.fai = 10;
+
+    let npcs = HashMap::new();
+    let skills = HashMap::new();
+    let items = HashMap::new();
+    let pet_slots = HashMap::new();
+    let players = HashMap::new();
+    let texps = Vec::new();
+    let data = BattleData::new(
+        &npcs, &skills, &items, &pet_slots, &players, &texps, None, 0, 0,
+    );
+
+    let mut out = Vec::new();
+    battle.finish(&data, 1, false, false, &mut out);
+
+    assert!(out.contains(&Out::Db(DbUpdate {
+        target: DbTarget::Pet { owner: 101, stt: 1 },
+        stat: Stat::Fai,
+        value: 59,
+    })));
+    assert!(out.contains(&Out::Db(DbUpdate {
+        target: DbTarget::Pet { owner: 101, stt: 1 },
+        stat: Stat::Hp,
+        value: 1,
+    })));
+    assert!(out.contains(&Out::PetRunaway { owner: 101, stt: 2 }));
+    assert!(!out.contains(&Out::Db(DbUpdate {
+        target: DbTarget::Pet { owner: 101, stt: 2 },
+        stat: Stat::Hp,
+        value: 1,
+    })));
+    assert!(out.contains(&Out::Db(DbUpdate {
+        target: DbTarget::Pet { owner: 202, stt: 1 },
+        stat: Stat::Hp,
+        value: 1,
+    })));
+    assert!(!out.contains(&Out::PetRunaway { owner: 202, stt: 1 }));
+}

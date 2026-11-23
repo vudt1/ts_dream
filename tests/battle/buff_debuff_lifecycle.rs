@@ -475,3 +475,98 @@ fn test_turn_countdown_dot_and_auto_dispel_lifecycle() {
     let clear_atk_idx = frames.iter().position(|f| f == &clear_atk).unwrap();
     assert!(purge_idx < clear_def_idx && purge_idx < clear_atk_idx, "purge must precede the HUD clears");
 }
+
+#[test]
+fn test_get_turn_group_a_matches_csharp_parity() {
+    use ts_dream::battle::damage::get_turn;
+
+    for skill_id in [13002, 14008, 13003, 13005, 13012] {
+        assert_eq!(get_turn(skill_id, 1), 2, "skill {skill_id} lv 1");
+        assert_eq!(get_turn(skill_id, 2), 2, "skill {skill_id} lv 2");
+        assert_eq!(get_turn(skill_id, 3), 3, "skill {skill_id} lv 3");
+        assert_eq!(get_turn(skill_id, 5), 3, "skill {skill_id} lv 5");
+        assert_eq!(get_turn(skill_id, 6), 2, "skill {skill_id} lv 6");
+    }
+}
+
+#[test]
+fn test_combat_formula_csharp_buffs_aoe_and_defend_02x() {
+    use ts_dream::battle::combat_formula::{calculate_attack, SkillFormulaInput};
+    use ts_dream::battle::engine::WarInfo;
+    use ts_dream::battle::rng::DotNetRandom;
+
+    let mut attacker = WarInfo::default();
+    attacker.typ = 2;
+    attacker.lv = 50;
+    attacker.atk = 300;
+    attacker.int1 = 300;
+    attacker.agi = 1000; // hit_rate = 99%
+    attacker.thuoctinh = 5;
+
+    let mut target = WarInfo::default();
+    target.typ = 3; // NPC (no 0.5x PvP reduction)
+    target.lv = 20;
+    target.def = 20;
+    target.agi = 10;
+    target.thuoctinh = 5;
+
+    let single_skill = SkillFormulaInput {
+        element: 5,
+        numerical: 120,
+        attribute: 27,
+        round: 0,
+        hit_status: 0,
+        skill_id: 12016,
+        skill_lv: 5,
+        sl_danh: 1,
+    };
+
+    let mut rng_base = DotNetRandom::new(77);
+    let base = calculate_attack(&mut rng_base, &attacker, &target, Some(single_skill));
+    assert!(base.hit);
+
+    // Defend (17001) reduces damage to ~0.2x (1/5).
+    let mut defending_target = target.clone();
+    defending_target.id_skill = 17001;
+    let mut rng_def = DotNetRandom::new(77);
+    let def_res = calculate_attack(&mut rng_def, &attacker, &defending_target, Some(single_skill));
+    assert!(def_res.hit);
+    assert!(
+        def_res.damage <= (base.damage / 4).max(1),
+        "Defend 17001 must reduce damage to ~0.2x (base={}, def={})",
+        base.damage,
+        def_res.damage
+    );
+
+    // Buff 13012 on attacker (+3.3% * lv) increases damage.
+    let mut buffed_attacker = attacker.clone();
+    buffed_attacker.type4_id = 13012;
+    buffed_attacker.type4_lv = 10; // +33%
+    let mut rng_buff = DotNetRandom::new(77);
+    let buff_res = calculate_attack(&mut rng_buff, &buffed_attacker, &target, Some(single_skill));
+    assert!(buff_res.damage > base.damage, "13012 buff must boost damage");
+
+    // AoE division (sl_danh = 4) for non-fire skill reduces per-target damage.
+    let aoe_skill = SkillFormulaInput {
+        skill_id: 14054,
+        sl_danh: 4,
+        ..single_skill
+    };
+    let mut rng_aoe = DotNetRandom::new(77);
+    let aoe_res = calculate_attack(&mut rng_aoe, &attacker, &target, Some(aoe_skill));
+    assert!(aoe_res.damage < base.damage, "AoE sl_danh=4 must split damage");
+
+    // Fire AoE 12016..=12019 adds skill_lv * 50 bonus on top of dmg / (sl * 0.5).
+    let fire_aoe_skill = SkillFormulaInput {
+        skill_id: 12016,
+        skill_lv: 5,
+        sl_danh: 4,
+        ..single_skill
+    };
+    let mut rng_fire = DotNetRandom::new(77);
+    let fire_res = calculate_attack(&mut rng_fire, &attacker, &target, Some(fire_aoe_skill));
+    assert!(
+        fire_res.damage > aoe_res.damage,
+        "12016..=12019 fire AoE must include sl*0.5 + skill_lv*50 bonus"
+    );
+}

@@ -211,6 +211,8 @@ pub struct PlayerSnapshot {
     pub spx: i64,
     pub hpx2: i64,
     pub spx2: i64,
+    pub point: i64,
+    pub skill_point: i64,
     pub god: u32,
     pub ghost: u8,
 }
@@ -275,7 +277,12 @@ pub fn is_combo_eligible_skill(data: &BattleData<'_>, skill_id: i64) -> bool {
     stype == Some(1)
 }
 
-fn binary_skill_input(data: &BattleData<'_>, skill_id: i64) -> Option<SkillFormulaInput> {
+fn binary_skill_input(
+    data: &BattleData<'_>,
+    skill_id: i64,
+    skill_lv: i64,
+    sl_danh: i64,
+) -> Option<SkillFormulaInput> {
     if skill_id == 10_000 {
         return None;
     }
@@ -290,6 +297,9 @@ fn binary_skill_input(data: &BattleData<'_>, skill_id: i64) -> Option<SkillFormu
                 damage::get_turn(skill_id, 1)
             },
             hit_status: i64::from(def.hit_status),
+            skill_id,
+            skill_lv,
+            sl_danh,
         });
     }
     data.skills.get(&skill_id).map(|skill| SkillFormulaInput {
@@ -298,6 +308,9 @@ fn binary_skill_input(data: &BattleData<'_>, skill_id: i64) -> Option<SkillFormu
         attribute: if skill.skill_type == 2 { 27 } else { 28 },
         round: 0,
         hit_status: 0,
+        skill_id,
+        skill_lv,
+        sl_danh,
     })
 }
 
@@ -414,6 +427,8 @@ pub enum Out {
     },
     /// Pet exp grant at battle end.
     PetExp { owner: i64, stt: i64, exp: i64 },
+    /// Dead pet ran away due to low loyalty (`fai <= 20`).
+    PetRunaway { owner: i64, stt: i64 },
     /// PvE gold reward for a defeated NPC.
     Gold { owner: i64, amount: i64 },
 }
@@ -986,8 +1001,10 @@ impl Battle {
         if attacker.type3_id == 0 && attacker.attacked {
             let cost = skill_sp(data, skill);
             if attacker.sp >= cost {
-                self.write_sp_deferred(&attacker, attacker.sp - cost, ts, out);
-                attacker.sp -= cost;
+                if cost > 0 {
+                    self.write_sp_deferred(&attacker, attacker.sp - cost, ts, out);
+                    attacker.sp -= cost;
+                }
             } else {
                 // Not enough SP → basic attack fallback.
                 skill = 10000;
@@ -1663,12 +1680,12 @@ impl Battle {
             *num36 = 0;
             return;
         }
-        let _ = (combo_field, num37, num34, do_manh, skill_tt, atk, int_stat);
+        let _ = (combo_field, num37, do_manh, skill_tt, atk, int_stat);
         let attack = combat_formula::calculate_attack(
             &mut self.rng.random_damage,
             attacker,
             target,
-            binary_skill_input(data, skill),
+            binary_skill_input(data, skill, skill_lv, num34),
         );
         *num36 = attack.damage;
         let is_primary_target = tpos.row == attacker.row_attack && tpos.col == attacker.col_attack;
@@ -1762,7 +1779,7 @@ impl Battle {
     fn apply_reflect(&self, attacker: &mut WarInfo, ts: &mut TurnState, out: &mut Vec<Out>) {
         let dmg = ts.reflect;
         let value = (attacker.hp - dmg).max(0);
-        self.write_hp_deferred(attacker, value, ts, out);
+        self.write_hp_db_only(attacker, value, out);
         attacker.hp -= dmg;
         let text15 = format!(
             "{:02X}{:02X}{}0101{}",
@@ -1803,7 +1820,7 @@ impl Battle {
         num37: &mut f64,
         num34: i64,
         skill: i64,
-        _skill_lv: i64,
+        skill_lv: i64,
         skill_type: i64,
         combo_field: i64,
         do_manh: i64,
@@ -1829,16 +1846,16 @@ impl Battle {
                 &mut self.rng.random_damage,
                 attacker,
                 &rear,
-                binary_skill_input(data, skill),
+                binary_skill_input(data, skill, skill_lv, num34),
             );
             *num36 = attack.damage;
         } else {
-            let _ = (num37, num34, do_manh, skill_tt, int_stat);
+            let _ = (num37, do_manh, skill_tt, int_stat);
             let attack = combat_formula::calculate_attack(
                 &mut self.rng.random_damage,
                 attacker,
                 &rear,
-                binary_skill_input(data, skill),
+                binary_skill_input(data, skill, skill_lv, num34),
             );
             *num36 = attack.damage;
         }
@@ -1899,7 +1916,7 @@ impl Battle {
         num34: i64,
         do_manh: i64,
         skill: i64,
-        _skill_lv: i64,
+        skill_lv: i64,
         skill_tt: i64,
         _lv: i64,
         int_stat: i64,
@@ -1920,12 +1937,12 @@ impl Battle {
             *num36 = 0;
             return;
         }
-        let _ = (num34, do_manh, skill_tt, int_stat);
+        let _ = (do_manh, skill_tt, int_stat);
         let attack = combat_formula::calculate_attack(
             &mut self.rng.random_damage,
             attacker,
             target,
-            binary_skill_input(data, skill),
+            binary_skill_input(data, skill, skill_lv, num34),
         );
         *num36 = attack.damage;
         if matches!(attacker.type15_id, 10016..=10019) {
@@ -2068,10 +2085,10 @@ impl Battle {
                     if attacker.hp + ts.heal > attacker.hp_max {
                         ts.heal = attacker.hp_max - attacker.hp;
                         attacker.hp = attacker.hp_max;
-                        self.write_hp_deferred(attacker, attacker.hp_max, ts, out);
+                        self.write_hp_db_only(attacker, attacker.hp_max, out);
                     } else {
                         attacker.hp += ts.heal;
-                        self.write_hp_deferred(attacker, attacker.hp, ts, out);
+                        self.write_hp_db_only(attacker, attacker.hp, out);
                     }
                     target.type3_id = status_id;
                     target.type3_lv = skill_lv;
@@ -2941,6 +2958,16 @@ impl Battle {
         }
     }
 
+    fn write_hp_db_only(&self, c: &WarInfo, value: i64, out: &mut Vec<Out>) {
+        if !matches!(c.typ, 3 | 7) {
+            out.push(Out::Db(DbUpdate {
+                target: pet_target(c),
+                stat: Stat::Hp,
+                value,
+            }));
+        }
+    }
+
     fn write_hp(&self, c: &WarInfo, value: i64, out: &mut Vec<Out>) {
         self.write_hp_with_buf(c, value, None, out);
     }
@@ -3035,10 +3062,13 @@ impl Battle {
         &self,
         target: &mut WarInfo,
         dmg: i64,
-        ts: &mut TurnState,
+        _ts: &mut TurnState,
         out: &mut Vec<Out>,
     ) {
-        self.write_hp_deferred(target, (target.hp - dmg).max(0), ts, out);
+        // `32 01` already subtracts `dmg` on the client's `TFightField` unit when
+        // the attack animation lands; emitting `33 01` here would overwrite HP
+        // before the animation and cause double-subtraction.
+        self.write_hp_db_only(target, (target.hp - dmg).max(0), out);
         target.hp -= dmg;
         if target.hp <= 0 && dmg >= target.hp_max {
             target.fly_out = true;
@@ -3319,7 +3349,15 @@ impl Battle {
                     let new_sp_max =
                         crate::battle::engine::get_sp_max(cell.reborn, snap.job, new_lv, snap.spx)
                             + snap.spx2;
-                    push_level_up_rewards(player, new_lv, lv_ups, new_hp_max, new_sp_max, out);
+                    push_level_up_rewards(
+                        player,
+                        new_lv,
+                        snap.point + 2 * lv_ups,
+                        snap.skill_point + lv_ups,
+                        new_hp_max,
+                        new_sp_max,
+                        out,
+                    );
                 }
             }
 
@@ -3382,6 +3420,44 @@ impl Battle {
             });
         }
 
+        // Dead pet loyalty penalty / runaway (BattleKind::Normal team 1) & Hp=1 revive (both sides).
+        let dead_pets: Vec<WarInfo> = self
+            .keys
+            .iter()
+            .filter_map(|k| self.list_war.get(k))
+            .filter(|c| c.typ == 4 && c.id > 0 && c.id_char > 0 && c.hp <= 0)
+            .cloned()
+            .collect();
+        for pet in dead_pets {
+            if self.kind.allows_rewards() && pet.team == 1 {
+                let new_fai = (pet.fai - 1).max(0);
+                let chance = pet_runaway_chance_pct(new_fai);
+                if chance > 0 && self.rng.random_0.next_range(1, 101) <= chance {
+                    out.push(Out::PetRunaway {
+                        owner: pet.id_char,
+                        stt: pet.id_npc_on_map,
+                    });
+                    continue;
+                }
+                out.push(Out::Db(DbUpdate {
+                    target: DbTarget::Pet {
+                        owner: pet.id_char,
+                        stt: pet.id_npc_on_map,
+                    },
+                    stat: Stat::Fai,
+                    value: new_fai,
+                }));
+            }
+            out.push(Out::Db(DbUpdate {
+                target: DbTarget::Pet {
+                    owner: pet.id_char,
+                    stt: pet.id_npc_on_map,
+                },
+                stat: Stat::Hp,
+                value: 1,
+            }));
+        }
+
         // Win-path and flee-path map-npc respawn.
         // A defeat (players all dead) does not respawn the npc.
         if won || fled {
@@ -3392,6 +3468,18 @@ impl Battle {
         }
         out.push(Out::Broadcast(packets::battle_exit_move()));
         out.push(Out::Broadcast(packets::battle_exit_talk()));
+    }
+}
+
+/// Linear runaway probability (%) when a dead pet's loyalty `fai <= 20`:
+/// `0%` for `fai > 20`, `50%` at `fai == 20`, scaling linearly to `100%` at `fai <= 10`.
+pub fn pet_runaway_chance_pct(fai: i64) -> i32 {
+    if fai > 20 {
+        0
+    } else if fai <= 10 {
+        100
+    } else {
+        (50 + (20 - fai) * 5) as i32
     }
 }
 
@@ -3411,7 +3499,8 @@ impl Battle {
 fn push_level_up_rewards(
     player: i64,
     new_lv: i64,
-    lv_ups: i64,
+    new_point: i64,
+    new_skill_point: i64,
     new_hp_max: i64,
     new_sp_max: i64,
     out: &mut Vec<Out>,
@@ -3446,12 +3535,12 @@ fn push_level_up_rewards(
     out.push(Out::Db(DbUpdate {
         target,
         stat: Stat::Point,
-        value: 2 * lv_ups,
+        value: new_point,
     }));
     out.push(Out::Db(DbUpdate {
         target,
         stat: Stat::SkillPoint,
-        value: lv_ups,
+        value: new_skill_point,
     }));
 }
 
