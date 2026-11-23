@@ -38,6 +38,7 @@ pub fn compare_step(actual: i32, ops: u8, expected: i32) -> bool {
 
 /// Normalize a `conditionOps` operator for `Data/eve.emg` classes (`cc = 1` BagItem
 /// and `cc = 7, param = 0 | 2` Level/Reborn):
+/// - `1` -> `2` (`Data/eve.emg` encodes `actual < expected`, e.g. `Level < 15` in `12136 eve=2 cond=9`)
 /// - `2` -> `4` (`expected < actual`  <=> `actual > expected`)
 /// - `3` -> `5` (`expected <= actual` <=> `actual >= expected`)
 /// - `4` -> `5` (`Data/eve.emg` encodes `actual >= expected` directly, e.g. `val = 1, 5, 15`)
@@ -45,6 +46,7 @@ pub fn compare_step(actual: i32, ops: u8, expected: i32) -> bool {
 #[must_use]
 fn invert_emg_ops(ops: u8) -> u8 {
     match ops {
+        1 => 2,
         2 => 4,
         3 => 5,
         4 => 5,
@@ -294,13 +296,23 @@ pub fn evaluate(cond: &EveCondition, state: &PlayerEventState) -> bool {
         }
 
         // Scene event completion count; param=0 reads the current eveNo.
-        // Unmapped pStyles (e.g. 2..=6) and param != 0 fail closed.
+        // Narrow exception: (param=1, pStyle=1) reads `completed_eve_counts[1]`
+        // (default 0) so scene gates like 12002->12304 (`ops=6 != 5`) work outside
+        // event triggers, while all other unmapped params/pStyles fail closed.
         12 => {
             let result = match (cond.condition_parameter, p_style) {
                 (0, 0 | 1) => {
                     let value = state
                         .completed_eve_counts
                         .get(&state.current_eve_no)
+                        .copied()
+                        .unwrap_or(0);
+                    compare_step(value, cond.condition_ops, cond.condition_value)
+                }
+                (1, 1) => {
+                    let value = state
+                        .completed_eve_counts
+                        .get(&1)
                         .copied()
                         .unwrap_or(0);
                     compare_step(value, cond.condition_ops, cond.condition_value)

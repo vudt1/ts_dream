@@ -347,4 +347,68 @@ fn test_interact_range_boundary_150px() {
     assert!(EveStateBuilder::is_within_range(0, 0, 9999, 9999)); // origin bypass
 }
 
+#[test]
+fn test_12136_gian_ung_skips_quiz_after_quest_10049_below_lv15() {
+    let data = std::sync::Arc::clone(crate::common::shared_game_data());
+    let mut session = Session::new();
+    session.id = 1001;
+    session.name = b"player".to_vec();
+    session.map_id = 12136;
+    session.level = 5; // < 15
+    session.quest_tasks.insert(10049, (1, 1));
+    let mut rng = DotNetRandom::new(12345);
+
+    let ev = resolve_npc_event(&session, &data, NpcTrigger::ClickNpc(1), &mut rng)
+        .expect("Giản Ung must still resolve to completion greeting");
+    let talk_ids: Vec<u16> = ev
+        .results
+        .iter()
+        .filter(|r| r.result_type == 1)
+        .map(|r| r.result_mean_no)
+        .collect();
+    assert!(
+        talk_ids.contains(&10592) && !talk_ids.contains(&10593),
+        "Level < 15 with Quest 10049 >= 1 must match no=8,9 (10592) instead of re-opening quiz 10593, got: {talk_ids:?}"
+    );
+    assert!(
+        !ev.results.iter().any(|r| r.result_type == 6),
+        "Must not re-open Surface 1 quiz"
+    );
+}
+
+#[test]
+fn test_12002_door_warps_to_12304_with_cc12_param1_pstyle1() {
+    let data = std::sync::Arc::clone(crate::common::shared_game_data());
+    let scene = data.scene_eve_data.get(&12002).expect("12002.eve loaded");
+    let mut session = Session::new();
+    session.id = 1001;
+    session.name = b"player".to_vec();
+    session.map_id = 12002;
+    let mut rng = DotNetRandom::new(12345);
+
+    // Find the door on 12002 that leads to 12304 (via eve_no=3, result_type=2, param=7).
+    let door_id = scene
+        .door_events_by_door
+        .iter()
+        .find_map(|(&did, eves)| eves.contains(&3).then_some(did))
+        .or_else(|| {
+            scene
+                .doors
+                .iter()
+                .find_map(|(&did, d)| d.events.contains(&3).then_some(did))
+        })
+        .expect("Door triggering 12002 eve_no=3 must exist");
+
+    let ev = resolve_npc_event(&session, &data, NpcTrigger::MeetDoor(i32::from(door_id)), &mut rng)
+        .expect("12002 door to 12304 must resolve via cc=12 param=1 p_style=1 (0 != 5)");
+    assert_eq!(ev.eve_no, 3);
+    assert_eq!(ev.results.len(), 1);
+    assert_eq!(ev.results[0].result_type, 2);
+    let dest = scene
+        .scene_infos
+        .get(&ev.results[0].parameter)
+        .map(|si| si.dest_map_id);
+    assert_eq!(dest, Some(12304), "Must warp to map 12304");
+}
+
 
