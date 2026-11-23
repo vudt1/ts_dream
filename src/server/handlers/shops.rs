@@ -41,9 +41,12 @@ pub fn npc_shop_buy_result(code: u8) -> String {
     format!("F44403001B01{:02X}", code)
 }
 
-/// Helper building NPC shop Sell result packet S->C `1B 02 <code>`.
+/// Helper building NPC shop Sell result packet S->C `1B 01 <code>`.
+/// Per `aLogin.exe` (`FUN_007922e6` case 1 vs case 2), `1B 01 <code>` is the
+/// buy/sell result toast (`0` = success), whereas `1B 02` is the Inn Rest
+/// prompt whose 3-byte `1B 02 00` payload triggers "Tiền bạc không đủ".
 pub fn npc_shop_sell_result(code: u8) -> String {
-    format!("F44403001B02{:02X}", code)
+    format!("F44403001B01{:02X}", code)
 }
 
 /// Lookup NPC shop entry by (idtalking, map_id, menu) → (item_id, price).

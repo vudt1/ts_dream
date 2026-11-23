@@ -391,15 +391,16 @@ impl BattleSink for BattleSinkImpl {
     }
 
     fn apply_pet_exp(&self, owner: i64, stt: i64, exp: i64) {
-        // Ticket 07: the client only learns a pet's new EXP from the `0F 08`
-        // record (reader `007a5010`), so build it while the updated session is
-        // still in hand and push it to the owner afterwards.
+        // Ticket 07: the client only learns a pet's new EXP (and level-up) from
+        // the `0F 08` record (reader `007a5010`), so build it while the updated
+        // session is still in hand and push it to the owner afterwards.
+        let texps = &self.data.texps;
         let mut frame: Option<String> = None;
         if let Some(online) = try_read_online_with_retry(&self.online, 10, std::time::Duration::from_millis(2)) {
             if let Some(p) = online.get(&owner) {
                 if let Some(mut s) = try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2)) {
                     if let Some(pet) = s.pets.iter_mut().find(|p| i64::from(p.stt) == stt) {
-                        pet.texp = pet.texp.saturating_add(exp as u32);
+                        grant_pet_exp_and_level_up(pet, texps, exp);
                     }
                     if let Some(pet) = s.pets.iter().find(|p| i64::from(p.stt) == stt) {
                         frame = Some(crate::server::spawn::pet_stat_frame(&s, pet));
@@ -410,7 +411,7 @@ impl BattleSink for BattleSinkImpl {
         let mut map = crate::server::session::lock_online_sessions();
         if let Some(s) = map.get_mut(&(owner as u32)) {
             if let Some(pet) = s.pets.iter_mut().find(|p| i64::from(p.stt) == stt) {
-                pet.texp = pet.texp.saturating_add(exp as u32);
+                grant_pet_exp_and_level_up(pet, texps, exp);
             }
             if frame.is_none() {
                 if let Some(pet) = s.pets.iter().find(|p| i64::from(p.stt) == stt) {
@@ -465,9 +466,6 @@ impl BattleSink for BattleSinkImpl {
                 {
                     if s.battle_id == id {
                         s.battle_id = 0;
-                        for f in s.pending_stat_frames.drain(..) {
-                            let _ = p.frames.try_send(f);
-                        }
                     }
                 }
             }
@@ -591,9 +589,6 @@ impl BattleSink for BattleSinkImpl {
                     s.battle_id = 0;
                     s.last_battle_end_ms = now_ms;
                     s.encounter_steps = 0;
-                    for f in s.pending_stat_frames.drain(..) {
-                        let _ = tx.try_send(f);
-                    }
 
                     if arena_40_challenger == Some(pid as u32) {
                         if let Some(reg) = crate::server::session::registry_get(pid as u32) {
@@ -1161,13 +1156,8 @@ fn apply_db_update(online: &OnlineMap, update: DbUpdate) {
         DbTarget::Player(id) => {
             if let Some(p) = online.get(&id) {
                 if let Some(mut s) = try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2)) {
-                    let frame = apply_player_stat(&mut s, update.stat, update.value);
-                    if let Some(f) = frame {
-                        if s.battle_id > 0 {
-                            s.pending_stat_frames.push(f);
-                        } else {
-                            let _ = p.frames.try_send(f);
-                        }
+                    if let Some(f) = apply_player_stat(&mut s, update.stat, update.value) {
+                        let _ = p.frames.try_send(f);
                     }
                 }
             }
@@ -1179,12 +1169,21 @@ fn apply_db_update(online: &OnlineMap, update: DbUpdate) {
         DbTarget::Pet { owner, stt } => {
             if let Some(p) = online.get(&owner) {
                 if let Some(mut s) = try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2)) {
+                    let mut pet_frame: Option<String> = None;
                     if let Some(pet) = s.pets.iter_mut().find(|p| i64::from(p.stt) == stt) {
                         match update.stat {
                             Stat::Hp => pet.hp = clamp_u16(update.value),
                             Stat::Sp => pet.sp = clamp_u16(update.value),
                             _ => {}
                         }
+                    }
+                    if matches!(update.stat, Stat::Hp | Stat::Sp) {
+                        if let Some(pet) = s.pets.iter().find(|p| i64::from(p.stt) == stt) {
+                            pet_frame = Some(crate::server::spawn::pet_stat_frame(&s, pet));
+                        }
+                    }
+                    if let Some(f) = pet_frame {
+                        let _ = p.frames.try_send(f);
                     }
                 }
             }
@@ -1226,6 +1225,47 @@ fn apply_player_stat(s: &mut Session, stat: Stat, value: i64) -> Option<String> 
 
 fn clamp_u16(v: i64) -> u16 {
     v.clamp(0, 0xFFFF) as u16
+}
+
+fn grant_pet_exp_and_level_up(
+    pet: &mut crate::server::session::PetState,
+    texps: &[crate::data::tables::TexpRow],
+    exp: i64,
+) {
+    if exp <= 0 {
+        return;
+    }
+    pet.texp = pet.texp.saturating_add(exp as u32);
+    let lv_ups = crate::data::texps::texp_get_lv_up(
+        texps,
+        i64::from(pet.level),
+        usize::from(pet.reborn),
+        i64::from(pet.texp),
+    );
+    if lv_ups > 0 {
+        let new_lv = (i64::from(pet.level) + lv_ups).clamp(1, 200) as u8;
+        pet.level = new_lv;
+        pet.skill_point = pet.skill_point.saturating_add(lv_ups as u16);
+        let rb_map = if pet.reborn == 2 { 1 } else { 0 };
+        let new_hp_max = crate::battle::engine::get_hp_max(
+            rb_map,
+            0,
+            i64::from(new_lv),
+            i64::from(pet.hpx),
+        )
+        .clamp(1, i64::from(u16::MAX)) as u16;
+        let new_sp_max = crate::battle::engine::get_sp_max(
+            rb_map,
+            0,
+            i64::from(new_lv),
+            i64::from(pet.spx),
+        )
+        .clamp(1, i64::from(u16::MAX)) as u16;
+        pet.hp_max = new_hp_max;
+        pet.sp_max = new_sp_max;
+        pet.hp = new_hp_max;
+        pet.sp = new_sp_max;
+    }
 }
 
 fn add_pet_to_session(s: &mut Session, npc_id: u16, npc: Option<&crate::data::tables::Npc>) {

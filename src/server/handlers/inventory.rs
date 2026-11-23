@@ -762,6 +762,7 @@ async fn handle_pet_equip(
         out.send(sys_msg_frame("Cấp độ võ tướng chưa đủ để trang bị!"));
         return;
     }
+    let item_count = item.count;
     let equip_slot = pet_equip_slot(pet_stt, equip_pos);
 
     conn.session.homdo.remove(item_pos);
@@ -772,10 +773,12 @@ async fn handle_pet_equip(
     persist::upsert_item(pool, conn.session.id, "homdo", &empty_homdo).await;
 
     // Swap if pet already has an item in this slot
+    let mut swapped_old: Option<InventoryItem> = None;
     if let Some(old_pos) = conn.session.trangbi.iter().position(|i| i.slot == equip_slot) {
         let mut old_item = conn.session.trangbi.remove(old_pos);
         old_item.slot = item_slot;
         persist::upsert_item(pool, conn.session.id, "homdo", &old_item).await;
+        swapped_old = Some(old_item.clone());
         conn.session.homdo.push(old_item);
     }
 
@@ -791,8 +794,14 @@ async fn handle_pet_equip(
         persist::upsert_pet(pool, conn.session.id, &pet_snap).await;
     }
 
-    // TODO(capture): Confirm pet equip reply frame layout against live client capture.
     out.send(format!("F44404001711{:02X}{:02X}", pet_stt, item_slot));
+    out.send(format!("F44404001709{:02X}{:02X}", item_slot, item_count));
+    if let Some(old_item) = &swapped_old {
+        out.send(crate::server::inventory::item_added_frame(old_item));
+    }
+    if let Some(pet) = conn.session.pets.iter().find(|p| p.stt == pet_stt) {
+        out.send(crate::server::spawn::pet_stat_frame(&conn.session, pet));
+    }
 }
 
 async fn handle_pet_unequip(
@@ -857,11 +866,14 @@ async fn handle_pet_unequip(
         persist::upsert_pet(pool, conn.session.id, &pet_snap).await;
     }
 
-    // TODO(capture): Confirm pet unequip reply frame layout against live client capture.
     out.send(format!(
         "F44405001712{:02X}{:02X}{:02X}",
         pet_stt, equip_sub, homdo_slot
     ));
+    out.send(crate::server::inventory::item_added_frame(&item));
+    if let Some(pet) = conn.session.pets.iter().find(|p| p.stt == pet_stt) {
+        out.send(crate::server::spawn::pet_stat_frame(&conn.session, pet));
+    }
 }
 
 async fn handle_battle_item(

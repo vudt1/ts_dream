@@ -498,6 +498,7 @@ async fn handle_pet_skill_upgrade(
         let pet = &conn.session.pets[pet_pos];
         persist::upsert_pet(pool, conn.session.id, pet).await;
         crate::server::session::registry_update_if_online(&conn.session);
+        out.send(crate::server::spawn::pet_stat_frame(&conn.session, pet));
     }
 }
 

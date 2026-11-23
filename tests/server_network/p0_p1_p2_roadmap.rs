@@ -379,7 +379,15 @@ async fn test_p2_skills_and_reborn() {
 
     assert_eq!(conn.session.pets[0].skills[0].1, 2);
     assert_eq!(conn.session.pets[0].skills[1].1, 3);
-    assert_eq!(out1.outgoing.len(), 2, "Both skill upgrades should emit response frames");
+    assert_eq!(
+        out1.outgoing.len(),
+        3,
+        "Both skill upgrades + trailing 0F 08 pet_stat_frame should emit 3 response frames"
+    );
+    assert!(
+        out1.outgoing.iter().any(|f| f.frame.contains("0F08")),
+        "Pet skill upgrade must emit 0F 08 to refresh client pet skill levels"
+    );
 
     // 0x2C sub 2: Addskill4Pet
     let mut out2 = HandleOutcome::default();
@@ -399,7 +407,7 @@ async fn test_p2_skills_and_reborn() {
     let mut ctx3 = test_ctx(&mut conn, &data, &service, &mut out3, 0x1C, 2, &payload_trailing);
     skills::handle_skills(&mut ctx3).await;
     assert_eq!(conn.session.pets[0].skills[0].1, 3);
-    assert_eq!(out3.outgoing.len(), 1);
+    assert_eq!(out3.outgoing.len(), 2);
 
     // Edge case: 0x2C with invalid subcode (e.g. sub 8 or sub 0) should be ignored
     let mut out4 = HandleOutcome::default();

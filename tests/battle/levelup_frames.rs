@@ -368,7 +368,10 @@ async fn battle_level_up_reaches_the_wire_in_order() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn mid_battle_08_01_is_buffered_until_battle_finishes() {
+async fn mid_battle_08_01_and_0f_08_are_emitted_immediately() {
+    use ts_dream::db::modern::model::PetStorageType;
+    use ts_dream::server::session::{lock_online_sessions, PetState, Session};
+
     let mut data = GameData::default();
     data.npcs.insert(
         1002,
@@ -376,7 +379,7 @@ async fn mid_battle_08_01_is_buffered_until_battle_finishes() {
             id: 1002,
             name: b"Tank".to_vec(),
             lv: 5,
-            hp: 500,
+            hp: 5000,
             sp: 100,
             atk: 1,
             def: 1,
@@ -410,6 +413,20 @@ async fn mid_battle_08_01_is_buffered_until_battle_finishes() {
     let mut service = BattleService::new(Arc::new(data));
     service.set_input_timeout(std::time::Duration::from_millis(60));
 
+    let mut pet = PetState::default();
+    pet.stt = 1;
+    pet.storage_type = PetStorageType::Carried;
+    pet.id = 22028;
+    pet.name = b"Pet".to_vec();
+    pet.level = 1;
+    pet.hp = 500;
+    pet.hp_max = 500;
+    pet.sp = 100;
+    pet.sp_max = 100;
+    pet.atk = 100;
+    pet.agi = 900;
+    pet.skills = [(10001, 1), (0, 0), (0, 0), (0, 0)];
+
     let sess = Arc::new(RwLock::new(Session {
         id: 9003,
         map_id: 1,
@@ -421,7 +438,9 @@ async fn mid_battle_08_01_is_buffered_until_battle_finishes() {
         hp_max: 5000,
         sp: 500,
         sp_max: 500,
+        tham_chien: 1,
         skills: vec![(10001, 1)],
+        pets: vec![pet],
         ..Default::default()
     }));
     let mut rx = service.register(9003, sess.clone());
@@ -433,25 +452,36 @@ async fn mid_battle_08_01_is_buffered_until_battle_finishes() {
         assert_ne!(bid, 0);
     }
 
-    // Turn 1: cast SP-consuming skill (10001) on a 500 HP enemy that survives turn 1?
-    // Wait: atk 300 will kill 500 HP in 2 turns if we give enemy 1000 HP or atk 300.
-    // Even simpler: use Flee or Defend? No, CastSkill 10001 with atk=300 on 500 HP enemy:
-    // Let's submit CastSkill 10001 on Turn 1, wait for 32 02 while battle is still running?
-    // Wait: with 500 HP and atk 300, enemy might survive Turn 1 (~300 dmg) and die on Turn 2!
-    let cmd = BattleCommand {
-        row: 3,
-        col: 2,
-        target_row: 0,
-        target_col: 2,
-        action: BattleAction::CastSkill {
-            skill_id: 10001,
-            skill_lv: 1,
-        },
-    };
+    // Turn 1: both player (3,2) and pet (2,2) cast SP-consuming skill 10001.
     let snapshot = sess.read().await.clone();
-    assert!(service.submit_command(&snapshot, cmd));
+    assert!(service.submit_command(
+        &snapshot,
+        BattleCommand {
+            row: 3,
+            col: 2,
+            target_row: 0,
+            target_col: 2,
+            action: BattleAction::CastSkill {
+                skill_id: 10001,
+                skill_lv: 1,
+            },
+        },
+    ));
+    assert!(service.submit_command(
+        &snapshot,
+        BattleCommand {
+            row: 2,
+            col: 2,
+            target_row: 0,
+            target_col: 2,
+            action: BattleAction::CastSkill {
+                skill_id: 10001,
+                skill_lv: 1,
+            },
+        },
+    ));
 
-    // Wait for Turn 1's `32 02` (`turn_action_finish`) to arrive.
+    // Wait for Turn 1's `32 02` (`turn_action_finish`) while battle is still running.
     let turn1_deadline = tokio::time::Instant::now() + std::time::Duration::from_millis(1000);
     let mut mid_battle_frames = Vec::new();
     loop {
@@ -470,18 +500,138 @@ async fn mid_battle_08_01_is_buffered_until_battle_finishes() {
         }
     }
 
-    // If the battle is still running after Turn 1, NO `08 01` frame may have been emitted yet.
-    if sess.read().await.battle_id > 0 {
+    assert!(
+        sess.read().await.battle_id > 0,
+        "battle should still be running after Turn 1"
+    );
+    assert!(
+        mid_battle_frames
+            .iter()
+            .any(|f| f.starts_with("F4440C0008011A")),
+        "08 01 1A (Player SP) must be emitted immediately during Turn 1, got: {:?}",
+        mid_battle_frames
+    );
+    assert!(
+        mid_battle_frames.iter().any(|f| f.contains("0F08")),
+        "0F 08 (Pet stat) must be emitted immediately during Turn 1, got: {:?}",
+        mid_battle_frames
+    );
+
+    // Wait for battle to finish.
+    let end_deadline = tokio::time::Instant::now() + std::time::Duration::from_millis(2000);
+    loop {
+        if sess.read().await.battle_id == 0 {
+            break;
+        }
         assert!(
-            !mid_battle_frames
-                .iter()
-                .any(|f| f.starts_with("F4440C000801")),
-            "08 01 must be buffered while battle_id > 0, got: {:?}",
-            mid_battle_frames
+            tokio::time::Instant::now() <= end_deadline,
+            "battle did not finish in time"
         );
+        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+    }
+    while rx.try_recv().is_ok() {}
+    lock_online_sessions().remove(&9003);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn pet_exp_levels_up_pet_and_emits_updated_0f_08() {
+    use ts_dream::db::modern::model::PetStorageType;
+    use ts_dream::server::session::{lock_online_sessions, PetState, Session};
+
+    let mut data = GameData::default();
+    data.texps = compute_texps();
+    data.npcs.insert(
+        1002,
+        Npc {
+            id: 1002,
+            name: b"Dummy".to_vec(),
+            lv: 1,
+            hp: 10,
+            sp: 10,
+            atk: 1,
+            def: 1,
+            agi: 1,
+            int1: 1,
+            thuoctinh: 1,
+            ..Default::default()
+        },
+    );
+    data.skills.insert(
+        10000,
+        Skill {
+            id: 10000,
+            name: "Tan Cong".to_string(),
+            skill_type: 1,
+            ..Default::default()
+        },
+    );
+
+    let mut service = BattleService::new(Arc::new(data));
+    service.set_input_timeout(std::time::Duration::from_millis(60));
+
+    let mut pet = PetState::default();
+    pet.stt = 1;
+    pet.storage_type = PetStorageType::Carried;
+    pet.id = 22028;
+    pet.name = b"Pet".to_vec();
+    pet.level = 1;
+    pet.hpx = 10;
+    pet.spx = 10;
+    pet.hp = 50;
+    pet.hp_max = 100;
+    pet.sp = 10;
+    pet.sp_max = 60;
+    pet.atk = 500;
+    pet.agi = 1000;
+    pet.texp = 25;
+
+    let sess = Arc::new(RwLock::new(Session {
+        id: 9004,
+        db_character_id: 9004,
+        map_id: 1,
+        id_leader: 9004,
+        level: 1,
+        hp: 100,
+        hp_max: 100,
+        sp: 50,
+        sp_max: 50,
+        agi: 1,
+        tham_chien: 1,
+        pets: vec![pet],
+        ..Default::default()
+    }));
+    let mut rx = service.register(9004, sess.clone());
+    lock_online_sessions().insert(9004, sess.read().await.clone());
+
+    {
+        let mut guard = sess.write().await;
+        let bid = service.start_npc_battle_seeded(&mut guard, 1002, 0, 1, 1, 1);
+        assert_ne!(bid, 0);
     }
 
-    // Wait for battle to finish (Turn 2 auto-attack or timeout finishes the enemy).
+    // Pet (2,2) attacks and kills the 10-HP Lv 1 Dummy, earning 10 EXP (25 -> 35 >= Lv 2).
+    let snapshot = sess.read().await.clone();
+    assert!(service.submit_command(
+        &snapshot,
+        BattleCommand {
+            row: 2,
+            col: 2,
+            target_row: 0,
+            target_col: 2,
+            action: BattleAction::NormalAttack,
+        },
+    ));
+    assert!(service.submit_command(
+        &snapshot,
+        BattleCommand {
+            row: 3,
+            col: 2,
+            target_row: 0,
+            target_col: 2,
+            action: BattleAction::NormalAttack,
+        },
+    ));
+
     let end_deadline = tokio::time::Instant::now() + std::time::Duration::from_millis(2000);
     loop {
         if sess.read().await.battle_id == 0 {
@@ -494,16 +644,31 @@ async fn mid_battle_08_01_is_buffered_until_battle_finishes() {
         tokio::time::sleep(std::time::Duration::from_millis(5)).await;
     }
 
-    let mut post_frames = mid_battle_frames;
+    let mut frames = Vec::new();
     while let Ok(f) = rx.try_recv() {
-        post_frames.push(f);
+        frames.push(f);
     }
-    lock_online_sessions().remove(&9003);
+    lock_online_sessions().remove(&9004);
 
+    let updated = sess.read().await;
+    let p = updated.pets.iter().find(|p| p.stt == 1).unwrap();
     assert!(
-        post_frames
-            .iter()
-            .any(|f| f.starts_with("F4440C0008011A")),
-        "Buffered 08 01 1A (SP) frame must be flushed when battle finishes"
+        p.level >= 2,
+        "Pet level must advance when texp crosses threshold (got lv={}, texp={})",
+        p.level,
+        p.texp
     );
+    assert!(p.texp > 25);
+    assert_eq!(p.hp, p.hp_max);
+    assert_eq!(p.sp, p.sp_max);
+
+    let pet_frame = frames
+        .iter()
+        .rev()
+        .find(|f| f.contains("0F08"))
+        .expect("0F 08 frame must be emitted for pet level up");
+    // +0x07 byte in 0F 08 body (after F444 + len16 + 0F08 = 12 hex chars) is pet level.
+    let body = &pet_frame[12..];
+    let level_byte = u8::from_str_radix(&body[14..16], 16).unwrap();
+    assert_eq!(level_byte, p.level, "0F 08 level byte must match updated pet.level");
 }

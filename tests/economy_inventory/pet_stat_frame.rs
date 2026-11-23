@@ -276,7 +276,7 @@ async fn apply_pet_exp_sends_0f08_to_owner() {
 
     let pet_frame = frames
         .iter()
-        .find(|f| f.starts_with("F444") && &f[8..12] == "0F08")
+        .rfind(|f| f.starts_with("F444") && &f[8..12] == "0F08")
         .expect("owner must receive a 0F 08 pet stat frame");
     let content = content_of(pet_frame);
     assert_eq!(&content[0..2], &[0x0F, 0x08]);

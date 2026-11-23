@@ -473,8 +473,8 @@ async fn test_npc_shop_sell_flow_and_errors() {
     );
 
     assert!(
-        frames.iter().any(|f| f == "F44403001B0200"),
-        "Must send 1B 02 00 on sell success"
+        frames.iter().any(|f| f == "F44403001B0100"),
+        "Must send 1B 01 00 on sell success"
     );
 
     // Case B: Item not found (empty slot)
@@ -495,10 +495,10 @@ async fn test_npc_shop_sell_flow_and_errors() {
         handle_npc_shop(&mut ctx).await;
     }
     let frames_empty: Vec<String> = out_empty.outgoing.into_iter().map(|f| f.frame).collect();
-    let expected_not_found = format!("F44403001B02{:02X}", NPC_SHOP_SELL_ITEM_NOT_FOUND);
+    let expected_not_found = format!("F44403001B01{:02X}", NPC_SHOP_SELL_ITEM_NOT_FOUND);
     assert!(
         frames_empty.iter().any(|f| f == &expected_not_found),
-        "Must return 1B 02 02 when item not found"
+        "Must return 1B 01 02 when item not found"
     );
 
     // Case C: Qty not enough (trying to sell 10 when count is 3)
@@ -519,10 +519,10 @@ async fn test_npc_shop_sell_flow_and_errors() {
         handle_npc_shop(&mut ctx).await;
     }
     let frames_over: Vec<String> = out_over.outgoing.into_iter().map(|f| f.frame).collect();
-    let expected_qty_err = format!("F44403001B02{:02X}", NPC_SHOP_SELL_QTY_NOT_ENOUGH);
+    let expected_qty_err = format!("F44403001B01{:02X}", NPC_SHOP_SELL_QTY_NOT_ENOUGH);
     assert!(
         frames_over.iter().any(|f| f == &expected_qty_err),
-        "Must return 1B 02 03 when qty requested exceeds slot count"
+        "Must return 1B 01 03 when qty requested exceeds slot count"
     );
 
     // Case D: Gold cap reached (revenue would exceed GOLD_CAP 9_999_999)
@@ -544,10 +544,10 @@ async fn test_npc_shop_sell_flow_and_errors() {
         handle_npc_shop(&mut ctx).await;
     }
     let frames_cap: Vec<String> = out_cap.outgoing.into_iter().map(|f| f.frame).collect();
-    let expected_cap_err = format!("F44403001B02{:02X}", NPC_SHOP_SELL_GOLD_FULL_ALT);
+    let expected_cap_err = format!("F44403001B01{:02X}", NPC_SHOP_SELL_GOLD_FULL_ALT);
     assert!(
         frames_cap.iter().any(|f| f == &expected_cap_err),
-        "Must return 1B 02 06 when player gold would exceed GOLD_CAP"
+        "Must return 1B 01 06 when player gold would exceed GOLD_CAP"
     );
 }
 

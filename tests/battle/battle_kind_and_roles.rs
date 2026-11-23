@@ -550,13 +550,12 @@ async fn handle_attack_npc_0b_02_03_decodes_slot_uses_diahinh_112_and_runs_pk_ba
         !frames.iter().any(|f| f.starts_with("F4440C00080124")),
         "no Stat::Texp in PKBattle"
     );
-    assert!(
-        !frames.iter().any(|f| f.len() >= 12 && &f[8..12] == "0F08"),
-        "no 0F 08 PetExp in PKBattle"
-    );
-
     let final_sess = sess.read().await;
     assert_eq!(final_sess.god, 5, "PKBattle must not deduct Stat::God");
+    assert!(
+        final_sess.pets.iter().all(|p| p.texp == 0),
+        "PKBattle must not grant PetExp"
+    );
     lock_online_sessions().remove(&pid);
 }
 

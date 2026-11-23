@@ -890,6 +890,19 @@ fn process_single_domain_effect(
                     session.sp = session.sp_max;
                     out.send(build_stat_update(0x19, i32::from(session.hp)));
                     out.send(build_stat_update(0x1A, i32::from(session.sp)));
+                    let mut healed_stts = Vec::new();
+                    for pet in session.pets.iter_mut() {
+                        if pet.is_carried() && pet.id > 0 {
+                            pet.hp = pet.hp_max;
+                            pet.sp = pet.sp_max;
+                            healed_stts.push(pet.stt);
+                        }
+                    }
+                    for stt in healed_stts {
+                        if let Some(pet) = session.pets.iter().find(|p| p.stt == stt) {
+                            out.send(crate::server::spawn::pet_stat_frame(session, pet));
+                        }
+                    }
                     crate::server::session::registry_update_if_online(session);
                 }
                 NpcServiceOp::BankExchangeOrSpecial => {
