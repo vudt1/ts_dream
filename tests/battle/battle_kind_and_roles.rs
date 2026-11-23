@@ -618,6 +618,10 @@ async fn normal_pve_encounter_and_teamdef_keep_normal_battle_kind_and_rewards_ev
     .await;
     let frames1 = drain_until_battle_ends(&mut rx1).await;
     assert!(
+        frames1.iter().any(|f| f.starts_with("F4441A000B050307")),
+        "Eve encounter must emit typ=7 (WAR_TYPE_TEAMDEF_NPC) so client spawns by npc_id instead of MapNpc[slot]"
+    );
+    assert!(
         frames1.iter().any(|f| f.len() >= 12 && &f[8..12] == "1A01"),
         "Normal Eve encounter must still award gold even when pk == 1"
     );

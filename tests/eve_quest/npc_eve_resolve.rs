@@ -445,4 +445,39 @@ fn test_12001_tientrang_bank_open_and_store_open() {
     );
 }
 
+#[test]
+fn test_12002_doc_du_ac_initial_dialog_before_quest_10004() {
+    let data = std::sync::Arc::clone(crate::common::shared_game_data());
+    let mut rng = DotNetRandom::new(12345);
+
+    // 1. Fresh player: quest 10004 and 10001 untouched -> must match cond 1+2
+    //    (10055, 10114, 11372), NOT cond 4 fallback (10157).
+    let mut session = Session::new();
+    session.id = 1001;
+    session.name = b"player".to_vec();
+    session.map_id = 12002;
+    let ev_fresh = resolve_npc_event(&session, &data, NpcTrigger::ClickNpc(3), &mut rng)
+        .expect("12002 Doc Du Ac (slot 3) must resolve for fresh player");
+    let dialogs_fresh: Vec<u16> = ev_fresh.results.iter().map(|r| r.result_mean_no).collect();
+    assert!(
+        dialogs_fresh.len() == 1 && [10055, 10114, 11372].contains(&dialogs_fresh[0]),
+        "Fresh player must match cond 1+2 (random group 1 of 10055/10114/11372), got: {dialogs_fresh:?}"
+    );
+
+    // 2. After completing quest 10004 (flag=1): must match cond 10 (10157).
+    session.quest_tasks.insert(10004, (0, 1));
+    let ev_after = resolve_npc_event(&session, &data, NpcTrigger::ClickNpc(3), &mut rng)
+        .expect("12002 Doc Du Ac (slot 3) must resolve after quest 10004");
+    let dialogs_after: Vec<u16> = ev_after.results.iter().map(|r| r.result_mean_no).collect();
+    assert_eq!(dialogs_after, vec![10157]);
+
+    // 3. During quest 10001 (step=1): must match cond 3 (dialog 10152 + choice 1).
+    session.quest_tasks.clear();
+    session.quest_tasks.insert(10001, (0, 1));
+    let ev_q10001 = resolve_npc_event(&session, &data, NpcTrigger::ClickNpc(3), &mut rng)
+        .expect("12002 Doc Du Ac (slot 3) must resolve during quest 10001");
+    let means_q10001: Vec<u16> = ev_q10001.results.iter().map(|r| r.result_mean_no).collect();
+    assert_eq!(means_q10001, vec![10152, 1]);
+}
+
 

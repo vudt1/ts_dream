@@ -2002,11 +2002,21 @@ impl BattleService {
         }
 
         // 3. Enemy Formation (`left_enemies` on rows 0..=1, team 2)
+        // Use `WAR_TYPE_TEAMDEF_NPC` (7) instead of `3`: in `FUN_00644294`, `typ=3` ignores
+        // `npc_id` and indexes `MapNpc[id_npc_on_map]` (causing Eve/random fights to render
+        // whatever NPC occupies slot 1..N on the map, e.g. #17005 instead of #14112), whereas
+        // `typ=7` spawns the entity directly by `npc_id`.
         for (idx, enemy) in fight_data.left_enemies.iter().enumerate().take(10) {
             if let Some(npc) = self.data.npcs.get(&i64::from(enemy.npc_id)) {
                 let row = enemy.row();
                 let col = enemy.col();
-                battle.add_npc(npc, (idx + 1) as i64, row, col, 3);
+                battle.add_npc(
+                    npc,
+                    (idx + 1) as i64,
+                    row,
+                    col,
+                    crate::battle::engine::WAR_TYPE_TEAMDEF_NPC,
+                );
             }
         }
 
@@ -2020,7 +2030,13 @@ impl BattleService {
                 };
                 let col = ally.col();
                 if battle.cell(row, col).map(|c| c.id == 0).unwrap_or(false) {
-                    battle.add_npc(npc, (idx + 1) as i64, row, col, 3);
+                    battle.add_npc(
+                        npc,
+                        (idx + 1) as i64,
+                        row,
+                        col,
+                        crate::battle::engine::WAR_TYPE_TEAMDEF_NPC,
+                    );
                 }
             }
         }

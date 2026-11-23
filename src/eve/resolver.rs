@@ -101,9 +101,12 @@ pub fn resolve(
             continue;
         }
 
+        // Only lower-bound / exact quest checks (`==`, `>`, `>=`) indicate
+        // reached quest stage; `<` / `<=` / `!=` (e.g. `step < 1` fallback)
+        // must not outrank `step == 0` or multi-condition chains.
         let step_score = chain
             .iter()
-            .filter(|c| c.condition_class == 2)
+            .filter(|c| c.condition_class == 2 && matches!(c.condition_ops, 0 | 1 | 4 | 5))
             .map(|c| c.condition_value)
             .max()
             .unwrap_or(0);
