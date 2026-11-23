@@ -661,8 +661,8 @@ async fn test_stop_defers_evacuation_during_battle_and_evacuates_after_battle_en
     );
     assert!(cmd_ok, "battle command must be accepted");
 
-    // Wait up to 2s for async battle turn to finish and persist
-    for _ in 0..40 {
+    // Wait up to 5s for async battle turn (1.5s handshake + 1.5s action pacing) to finish and persist
+    for _ in 0..100 {
         if registry_get(7203).is_some_and(|r| r.battle_id == 0) {
             break;
         }

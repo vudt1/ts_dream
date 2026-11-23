@@ -280,7 +280,6 @@ fn phase2_and_phase3_force_state7_precedes_32_01_and_status_follows() {
         })
         .collect();
 
-    let state7_frame = packets::force_state7(3, 2);
     let expected_status = packets::battle_unit_status(
         3,
         1,
@@ -289,25 +288,23 @@ fn phase2_and_phase3_force_state7_precedes_32_01_and_status_follows() {
         packets::stat_modifier_val(10),
     );
 
-    let idx_state7 = broadcasts
+    assert!(
+        !broadcasts.iter().any(|f| f.starts_with("F44404003503")),
+        "35 03 (force_state7) must NOT be emitted before 32 01 (triggers exit-grid animation 00653f18)"
+    );
+
+    let idx_3201 = broadcasts
         .iter()
-        .position(|f| f == &state7_frame)
-        .expect("force_state7 must be broadcast for attacker (3, 2)");
+        .position(|f| f.contains("3201") && f.contains("1A27"))
+        .expect("32 01 action frame for skill 10010 must be broadcast");
 
     let idx_status = broadcasts
         .iter()
         .position(|f| f == &expected_status)
         .expect("battle_unit_status must be broadcast for buff target (3, 1)");
 
-    // The player's 32 01 action frame must sit directly between force_state7 and battle_unit_status
-    let player_3201 = &broadcasts[idx_state7 + 1];
-    assert!(
-        player_3201.contains("3201"),
-        "The frame immediately following force_state7 must be the 32 01 action frame, got: {}",
-        player_3201
-    );
     assert_eq!(
-        idx_state7 + 2,
+        idx_3201 + 1,
         idx_status,
         "battle_unit_status must immediately follow the 32 01 action frame"
     );
@@ -790,7 +787,7 @@ async fn battle_manager_turn_pacing_and_frame_sequence_integration() {
             let frames = sink.frames.lock().unwrap();
             if frames
                 .iter()
-                .any(|(_, f)| f.starts_with("F44404003503")) // force_state7
+                .any(|(_, f)| f.len() >= 12 && &f[8..12] == "3201")
                 && frames.iter().any(|(_, f)| f == &packets::turn_action_finish())
             {
                 break;
@@ -812,11 +809,16 @@ async fn battle_manager_turn_pacing_and_frame_sequence_integration() {
         "opening dialogue 35 06 must be emitted"
     );
 
-    // Validate force_state7 35 03 is emitted
-    let s7_frame = packets::force_state7(3, 2);
+    // Validate 35 03 (force_state7) is NOT emitted, and 32 01 is emitted
     assert!(
-        frame_strings.iter().any(|f| *f == s7_frame.as_str()),
-        "force_state7 35 03 must be emitted"
+        !frame_strings.iter().any(|f| f.starts_with("F44404003503")),
+        "force_state7 35 03 must not be emitted"
+    );
+    assert!(
+        frame_strings
+            .iter()
+            .any(|f| f.len() >= 12 && &f[8..12] == "3201"),
+        "32 01 action frame must be emitted"
     );
 
     // Validate turn_action_finish 32 02 is emitted
@@ -824,5 +826,97 @@ async fn battle_manager_turn_pacing_and_frame_sequence_integration() {
     assert!(
         frame_strings.iter().any(|f| *f == finish_frame.as_str()),
         "turn_action_finish 32 02 must be emitted"
+    );
+}
+
+#[test]
+fn phase2_and_phase3_32_01_precedes_33_01_and_turn_finish_follows() {
+    let npcs = HashMap::new();
+    let mut skills = HashMap::new();
+    skills.insert(
+        10000,
+        Skill {
+            id: 10000,
+            name: "Attack".to_string(),
+            skill_type: 1,
+            sp: 0,
+            delay: 1,
+            ..Default::default()
+        },
+    );
+    let pet_slots = HashMap::new();
+    let players = HashMap::new();
+    let texps = Vec::new();
+    let data = create_test_data(&npcs, &skills, &pet_slots, &players, &texps);
+
+    let mut battle = Battle::new(1, 0);
+    {
+        let c = battle.cell_mut(3, 2).unwrap();
+        c.typ = 2;
+        c.id = 101;
+        c.hp = 1000;
+        c.hp_max = 1000;
+        c.atk = 200;
+        c.agi = 100;
+        c.team = 1;
+    }
+    {
+        let c = battle.cell_mut(0, 2).unwrap();
+        c.typ = 3;
+        c.id = 501;
+        c.hp = 1000;
+        c.hp_max = 1000;
+        c.def = 10;
+        c.agi = 10;
+        c.team = 2;
+    }
+
+    let mut commands = BattleCommands::new();
+    commands.insert(
+        (3, 2),
+        BattleCommand {
+            row: 3,
+            col: 2,
+            target_row: 0,
+            target_col: 2,
+            action: BattleAction::NormalAttack,
+        },
+    );
+
+    let mut out = Vec::new();
+    battle.run_turn(&data, &commands, &mut out);
+
+    let broadcasts: Vec<String> = out
+        .iter()
+        .filter_map(|o| match o {
+            Out::Broadcast(f) => Some(f.clone()),
+            _ => None,
+        })
+        .collect();
+
+    let idx_3201 = broadcasts
+        .iter()
+        .position(|f| f.len() >= 12 && &f[8..12] == "3201")
+        .expect("32 01 action frame must be broadcast");
+    let idx_3301 = broadcasts
+        .iter()
+        .position(|f| f.len() >= 12 && &f[8..12] == "3301")
+        .expect("33 01 HP update frame must be broadcast");
+    let idx_3202 = broadcasts
+        .iter()
+        .position(|f| f == &packets::turn_action_finish())
+        .expect("32 02 turn_action_finish must be broadcast");
+
+    assert!(
+        idx_3201 < idx_3301,
+        "32 01 animation must precede 33 01 HP/SP update (idx_3201={}, idx_3301={})",
+        idx_3201,
+        idx_3301
+    );
+    assert!(
+        idx_3301 < idx_3202,
+        "33 01 HP/SP update must precede 32 02 turn_action_finish (idx_3301={}, idx_3202={})",
+        idx_3301,
+        idx_3202
     );
 }

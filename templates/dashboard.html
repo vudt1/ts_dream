@@ -249,6 +249,7 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                 <div style="font-size: 14px; font-weight: 600; color: var(--text-secondary);">Real-Time Hex Packet & Event Log Stream</div>
                 <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-blue" style="padding: 6px 12px; font-size: 12px;" onclick="exportPackets()">Export Packets</button>
                     <button class="btn btn-purple" style="padding: 6px 12px; font-size: 12px;" onclick="clearLogs()">Clear Console</button>
                 </div>
             </div>
@@ -502,6 +503,38 @@
 
         function clearLogs() {
             document.getElementById('terminal-console').innerHTML = '';
+        }
+
+        function exportPackets() {
+            const lines = [];
+            document.querySelectorAll('#terminal-console .log-line').forEach(row => {
+                const levelEl = row.querySelector('.log-level');
+                if (!levelEl) return;
+                const level = levelEl.textContent.trim().toLowerCase();
+                if (level !== 'c2s' && level !== 's2c') return;
+                const spans = row.querySelectorAll('span');
+                const msgEl = spans[spans.length - 1];
+                const msg = msgEl ? msgEl.textContent.trim() : '';
+                if (msg) {
+                    lines.push(`${level} ${msg}`);
+                }
+            });
+            if (lines.length === 0) {
+                alert('No c2s/s2c packets to export.');
+                return;
+            }
+            const now = new Date();
+            const pad = n => String(n).padStart(2, '0');
+            const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+            const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `sse-packets-${stamp}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
 
         function filterNpcs() {

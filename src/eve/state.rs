@@ -189,9 +189,8 @@ impl EveStateBuilder {
         None
     }
 
-    /// Distance gate between player and target positions (`130 px` Euclidean
-    /// radius, matching the client's own interaction check). A player at origin
-    /// is still initializing and bypasses validation.
+    /// Distance gate between player and target positions (`150 px` Euclidean
+    /// radius). A player at origin is still initializing and bypasses validation.
     pub fn is_within_range(px: i32, py: i32, tx: i32, ty: i32) -> bool {
         if px == 0 && py == 0 {
             return true;
@@ -202,5 +201,5 @@ impl EveStateBuilder {
     }
 }
 
-pub const INTERACT_RADIUS_PX: i64 = 130;
+pub const INTERACT_RADIUS_PX: i64 = 150;
 const MAX_INTERACT_DISTANCE_SQ: i64 = INTERACT_RADIUS_PX * INTERACT_RADIUS_PX;

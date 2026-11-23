@@ -335,4 +335,16 @@ fn test_map_12808_straw_dummy_resolution() {
     }
 }
 
+#[test]
+fn test_interact_range_boundary_150px() {
+    use ts_dream::eve::state::EveStateBuilder;
+
+    assert!(EveStateBuilder::is_within_range(750, 1780, 750, 1780));
+    assert!(EveStateBuilder::is_within_range(750, 1780, 900, 1780)); // 150px exact
+    assert!(EveStateBuilder::is_within_range(750, 1780, 840, 1900)); // sqrt(90^2 + 120^2) = 150px exact
+    assert!(!EveStateBuilder::is_within_range(750, 1780, 901, 1780)); // 151px out of range
+    assert!(!EveStateBuilder::is_within_range(750, 1780, 841, 1900)); // >150px out of range
+    assert!(EveStateBuilder::is_within_range(0, 0, 9999, 9999)); // origin bypass
+}
+
 

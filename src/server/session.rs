@@ -333,6 +333,10 @@ pub struct Session {
     /// Deferred evacuation target map set when a Seasonal Festival is stopped
     /// while this player is mid-battle (`battle_id > 0`).
     pub pending_evacuate_map: Option<u16>,
+    /// Deferred `08 01` map-stat frames buffered while `battle_id > 0` so they
+    /// are not injected mid-battle (which resets client UI/dialogs) and are
+    /// flushed as soon as the battle ends.
+    pub pending_stat_frames: Vec<String>,
     /// Equipped-colour hex string (`_My_Color`), e.g. `"0000000000000000"`.
     pub color: String,
 
@@ -501,6 +505,7 @@ impl Default for Session {
             warp_finish: false,
             talk_type: "NPC".to_string(),
             battle_id: 0,
+            pending_stat_frames: Vec::new(),
             pending_pass: Vec::new(),
             pending_new_char_name: Vec::new(),
             name: Vec::new(),

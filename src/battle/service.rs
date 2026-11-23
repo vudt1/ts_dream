@@ -457,6 +457,23 @@ impl BattleSink for BattleSinkImpl {
         }
     }
 
+    fn battle_finishing(&self, id: i32) {
+        if let Ok(online) = self.online.try_read() {
+            for p in online.values() {
+                if let Some(mut s) =
+                    try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2))
+                {
+                    if s.battle_id == id {
+                        s.battle_id = 0;
+                        for f in s.pending_stat_frames.drain(..) {
+                            let _ = p.frames.try_send(f);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fn battle_ended(&self, id: i32, outcome: Outcome) {
         let now_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -574,6 +591,9 @@ impl BattleSink for BattleSinkImpl {
                     s.battle_id = 0;
                     s.last_battle_end_ms = now_ms;
                     s.encounter_steps = 0;
+                    for f in s.pending_stat_frames.drain(..) {
+                        let _ = tx.try_send(f);
+                    }
 
                     if arena_40_challenger == Some(pid as u32) {
                         if let Some(reg) = crate::server::session::registry_get(pid as u32) {
@@ -1143,7 +1163,11 @@ fn apply_db_update(online: &OnlineMap, update: DbUpdate) {
                 if let Some(mut s) = try_write_session_with_retry(&p.session, 10, std::time::Duration::from_millis(2)) {
                     let frame = apply_player_stat(&mut s, update.stat, update.value);
                     if let Some(f) = frame {
-                        let _ = p.frames.try_send(f);
+                        if s.battle_id > 0 {
+                            s.pending_stat_frames.push(f);
+                        } else {
+                            let _ = p.frames.try_send(f);
+                        }
                     }
                 }
             }
@@ -1290,7 +1314,7 @@ impl BattleService {
             join_cells: Mutex::new(HashMap::new()),
             per_exp: 1,
             next_battle: AtomicI32::new(1),
-            input_timeout: std::time::Duration::from_secs(21),
+            input_timeout: std::time::Duration::from_secs(31),
             events: Arc::new(crate::server::events::EventLifecycleManager::default()),
             festivals,
             active_40_npc,

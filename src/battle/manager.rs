@@ -38,6 +38,10 @@ pub trait BattleSink: Send + Sync + 'static {
     fn apply_pet_exp(&self, owner: i64, stt: i64, exp: i64);
     /// Apply a PvE gold reward. The default is a no-op for test sinks.
     fn apply_gold(&self, _owner: i64, _amount: i64) {}
+    /// Called just before `Battle::finish` when the battle is ending so the
+    /// sink can clear `battle_id` and flush any buffered `08 01` stat frames
+    /// before `finish()` emits `Texp`/`Lv`/`05 0A`/reward frames.
+    fn battle_finishing(&self, _id: i32) {}
     /// The battle task finished (`PlayerWin`/`PlayerLose`/`PlayerFled`).
     fn battle_ended(&self, id: i32, outcome: Outcome);
 }
@@ -156,7 +160,7 @@ impl BattleManager {
             next_id: AtomicI32::new(1),
             // Per-turn input timeout (20 s business-rule countdown; custom timeouts
             // remain available for deterministic tests and special battle modes).
-            default_timeout: std::time::Duration::from_secs(20),
+            default_timeout: std::time::Duration::from_secs(31),
             handshake_timeout: std::time::Duration::from_millis(1500),
         }
     }
@@ -420,10 +424,16 @@ impl BattleManager {
                 let commands = collect_commands(&mut rx, timeout, &battle, &locked_snapshot).await;
                 handle_task.set_locked_cells(HashMap::new());
                 let outcome = battle.run_turn(&data, &commands, &mut out);
-                dispatch(&out, sink.as_ref());
+                let per_action_delay = if timeout < std::time::Duration::from_secs(5) {
+                    std::time::Duration::ZERO
+                } else {
+                    std::time::Duration::from_millis(1500)
+                };
+                dispatch_paced(&out, sink.as_ref(), per_action_delay).await;
                 if outcome != Outcome::Running {
                     let fled = outcome == Outcome::PlayerFled;
                     let won = outcome == Outcome::PlayerWin;
+                    sink.battle_finishing(id);
                     out.clear();
                     battle.finish(&data, per_exp, fled, won, &mut out);
                     dispatch(&out, sink.as_ref());
@@ -431,16 +441,15 @@ impl BattleManager {
                     break;
                 }
 
-                // Step 4: Dynamic Skill Delay Pacing (Ticket 18, ADR 0006)
-                // Sleep clamp(sum(delay) * 100ms, 800ms, 3500ms) after 32 02
-                // so the client can finish playing animations before receiving 34 01 for the next turn.
-                let delay_ms = battle.last_turn_delay_ms();
-                let sleep_dur = if timeout <= std::time::Duration::from_millis(500) {
-                    std::time::Duration::from_millis(delay_ms).min(std::time::Duration::from_millis(20))
+                // Step 4: Brief post-3202 settle delay before opening the next turn (`34 01`).
+                // Individual action animations are already paced inside `dispatch_paced`
+                // before `35 03` / `32 02` can call `FUN_00651824` to clear active FX.
+                let post_finish_ms = if timeout <= std::time::Duration::from_millis(500) {
+                    battle.last_turn_delay_ms().min(20)
                 } else {
-                    std::time::Duration::from_millis(delay_ms)
+                    200
                 };
-                tokio::time::sleep(sleep_dur).await;
+                tokio::time::sleep(std::time::Duration::from_millis(post_finish_ms)).await;
             }
             manager.battles.write().await.remove(&id);
         });
@@ -577,11 +586,42 @@ fn first_living_enemy(battle: &Battle, team: i64) -> Option<(u8, u8)> {
         })
 }
 
-fn dispatch(out: &[Out], sink: &dyn BattleSink) {
-    use Out::*;
+async fn dispatch_paced(
+    out: &[Out],
+    sink: &dyn BattleSink,
+    per_action_delay: std::time::Duration,
+) {
+    let mut saw_action_3201 = false;
     for o in out {
-        match o {
-            Broadcast(f) => sink.broadcast(f.clone()),
+        if saw_action_3201 && !per_action_delay.is_zero() {
+            if let Out::Broadcast(f) = o {
+                let is_next_action_or_finish = (f.len() >= 12 && &f[8..12] == "3201")
+                    || f == "F44402003202";
+                if is_next_action_or_finish {
+                    tokio::time::sleep(per_action_delay).await;
+                    saw_action_3201 = false;
+                }
+            }
+        }
+        dispatch_one(o, sink);
+        if let Out::Broadcast(f) = o {
+            if f.len() >= 12 && &f[8..12] == "3201" {
+                saw_action_3201 = true;
+            }
+        }
+    }
+}
+
+fn dispatch(out: &[Out], sink: &dyn BattleSink) {
+    for o in out {
+        dispatch_one(o, sink);
+    }
+}
+
+fn dispatch_one(o: &Out, sink: &dyn BattleSink) {
+    use Out::*;
+    match o {
+        Broadcast(f) => sink.broadcast(f.clone()),
             ToPlayer(p, f) => sink.send_to(*p, f.clone()),
             MapBroadcast { player, frame } => sink.send_map(*player, frame.clone()),
             Db(u) => sink.apply_db(*u),
@@ -610,7 +650,6 @@ fn dispatch(out: &[Out], sink: &dyn BattleSink) {
             } => sink.apply_respawn(*npc_id, *map_id, *x, *y),
             PetExp { owner, stt, exp } => sink.apply_pet_exp(*owner, *stt, *exp),
             Gold { owner, amount } => sink.apply_gold(*owner, *amount),
-        }
     }
 }
 

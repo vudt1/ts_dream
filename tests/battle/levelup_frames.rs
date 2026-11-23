@@ -366,3 +366,144 @@ async fn battle_level_up_reaches_the_wire_in_order() {
     assert_eq!(value_at(&pipeline[3]), hp_max, "08 01 CD must carry MaxHP");
     assert_eq!(value_at(&pipeline[5]), sp_max, "08 01 CE must carry MaxSP");
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn mid_battle_08_01_is_buffered_until_battle_finishes() {
+    let mut data = GameData::default();
+    data.npcs.insert(
+        1002,
+        Npc {
+            id: 1002,
+            name: b"Tank".to_vec(),
+            lv: 5,
+            hp: 500,
+            sp: 100,
+            atk: 1,
+            def: 1,
+            agi: 1,
+            int1: 1,
+            thuoctinh: 1,
+            ..Default::default()
+        },
+    );
+    data.skills.insert(
+        10000,
+        Skill {
+            id: 10000,
+            name: "Tan Cong".to_string(),
+            skill_type: 1,
+            ..Default::default()
+        },
+    );
+    data.skills.insert(
+        10001,
+        Skill {
+            id: 10001,
+            name: "SP Skill".to_string(),
+            skill_type: 1,
+            sp: 10,
+            delay: 1,
+            ..Default::default()
+        },
+    );
+
+    let mut service = BattleService::new(Arc::new(data));
+    service.set_input_timeout(std::time::Duration::from_millis(60));
+
+    let sess = Arc::new(RwLock::new(Session {
+        id: 9003,
+        map_id: 1,
+        id_leader: 9003,
+        level: 50,
+        atk: 300,
+        agi: 1000,
+        hp: 5000,
+        hp_max: 5000,
+        sp: 500,
+        sp_max: 500,
+        skills: vec![(10001, 1)],
+        ..Default::default()
+    }));
+    let mut rx = service.register(9003, sess.clone());
+    lock_online_sessions().insert(9003, sess.read().await.clone());
+
+    {
+        let mut guard = sess.write().await;
+        let bid = service.start_npc_battle_seeded(&mut guard, 1002, 0, 4, 1, 1);
+        assert_ne!(bid, 0);
+    }
+
+    // Turn 1: cast SP-consuming skill (10001) on a 500 HP enemy that survives turn 1?
+    // Wait: atk 300 will kill 500 HP in 2 turns if we give enemy 1000 HP or atk 300.
+    // Even simpler: use Flee or Defend? No, CastSkill 10001 with atk=300 on 500 HP enemy:
+    // Let's submit CastSkill 10001 on Turn 1, wait for 32 02 while battle is still running?
+    // Wait: with 500 HP and atk 300, enemy might survive Turn 1 (~300 dmg) and die on Turn 2!
+    let cmd = BattleCommand {
+        row: 3,
+        col: 2,
+        target_row: 0,
+        target_col: 2,
+        action: BattleAction::CastSkill {
+            skill_id: 10001,
+            skill_lv: 1,
+        },
+    };
+    let snapshot = sess.read().await.clone();
+    assert!(service.submit_command(&snapshot, cmd));
+
+    // Wait for Turn 1's `32 02` (`turn_action_finish`) to arrive.
+    let turn1_deadline = tokio::time::Instant::now() + std::time::Duration::from_millis(1000);
+    let mut mid_battle_frames = Vec::new();
+    loop {
+        if let Ok(f) = rx.try_recv() {
+            let is_finish = f == packets::turn_action_finish();
+            mid_battle_frames.push(f);
+            if is_finish {
+                break;
+            }
+        } else {
+            assert!(
+                tokio::time::Instant::now() <= turn1_deadline,
+                "timed out waiting for Turn 1 32 02"
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+        }
+    }
+
+    // If the battle is still running after Turn 1, NO `08 01` frame may have been emitted yet.
+    if sess.read().await.battle_id > 0 {
+        assert!(
+            !mid_battle_frames
+                .iter()
+                .any(|f| f.starts_with("F4440C000801")),
+            "08 01 must be buffered while battle_id > 0, got: {:?}",
+            mid_battle_frames
+        );
+    }
+
+    // Wait for battle to finish (Turn 2 auto-attack or timeout finishes the enemy).
+    let end_deadline = tokio::time::Instant::now() + std::time::Duration::from_millis(2000);
+    loop {
+        if sess.read().await.battle_id == 0 {
+            break;
+        }
+        assert!(
+            tokio::time::Instant::now() <= end_deadline,
+            "battle did not finish in time"
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+    }
+
+    let mut post_frames = mid_battle_frames;
+    while let Ok(f) = rx.try_recv() {
+        post_frames.push(f);
+    }
+    lock_online_sessions().remove(&9003);
+
+    assert!(
+        post_frames
+            .iter()
+            .any(|f| f.starts_with("F4440C0008011A")),
+        "Buffered 08 01 1A (SP) frame must be flushed when battle finishes"
+    );
+}

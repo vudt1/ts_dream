@@ -938,12 +938,12 @@ async fn proximity_130_px_and_delayed_meet_door() {
     let service = BattleService::default();
     let env = ServerEnv::none();
 
-    // 1. Out of 130 px range (140 px away) -> 14 01 returns 14 08 EndTalk
+    // 1. Out of 150 px range (160 px away) -> 14 01 returns 14 08 EndTalk
     let mut conn = Conn {
         session: Session {
             id: 9106,
             map_id: 12001,
-            map_x: 640,
+            map_x: 660,
             map_y: 500,
             ..Default::default()
         },
@@ -952,7 +952,7 @@ async fn proximity_130_px_and_delayed_meet_door() {
     let out_npc = dispatch(&mut conn, &click_npc_frame(1), &data, &service, &env).await;
     assert!(
         has_frame_prefix(&out_npc, "F44402001408"),
-        "14 01 at 140 px (> 130 px) must emit 14 08 EndTalk"
+        "14 01 at 160 px (> 150 px) must emit 14 08 EndTalk"
     );
 
     // 2. 14 04 ClickDoor out of range -> 14 08 EndTalk
@@ -960,7 +960,7 @@ async fn proximity_130_px_and_delayed_meet_door() {
     let out_door = dispatch(&mut conn, &click_door, &data, &service, &env).await;
     assert!(
         has_frame_prefix(&out_door, "F44402001408"),
-        "14 04 out of 130 px range must emit 14 08 EndTalk"
+        "14 04 out of 150 px range must emit 14 08 EndTalk"
     );
 
     // 3. 14 08 WarpConfirm out of range -> 14 08 EndTalk
@@ -968,7 +968,7 @@ async fn proximity_130_px_and_delayed_meet_door() {
     let out_warp = dispatch(&mut conn, &warp_confirm, &data, &service, &env).await;
     assert!(
         has_frame_prefix(&out_warp, "F44402001408"),
-        "14 08 out of 130 px range must emit 14 08 EndTalk"
+        "14 08 out of 150 px range must emit 14 08 EndTalk"
     );
 
     // 4. 06 01 walk from (400, 500) to door (900, 500) sets pending_meet_door and does NOT warp immediately

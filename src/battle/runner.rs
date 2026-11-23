@@ -448,6 +448,7 @@ struct TurnState {
     text11: String,
     last_target: (u8, u8),
     status_frames: Vec<String>,
+    stat_frames: Vec<String>,
     total_delay: i64,
 }
 
@@ -539,6 +540,9 @@ impl Battle {
             }
         }
 
+        for stat_frame in std::mem::take(&mut ts.stat_frames) {
+            out.push(Out::Broadcast(stat_frame));
+        }
         out.push(Out::Broadcast(packets::turn_action_finish()));
         self.last_turn_delay_ms = (ts.total_delay * 100).clamp(800, 3500) as u64;
     }
@@ -982,7 +986,7 @@ impl Battle {
         if attacker.type3_id == 0 && attacker.attacked {
             let cost = skill_sp(data, skill);
             if attacker.sp >= cost {
-                self.write_sp(&attacker, attacker.sp - cost, out);
+                self.write_sp_deferred(&attacker, attacker.sp - cost, ts, out);
                 attacker.sp -= cost;
             } else {
                 // Not enough SP → basic attack fallback.
@@ -1360,7 +1364,10 @@ impl Battle {
         if !ts.text9.is_empty() && ts.combo_active == 0 {
             ts.combo_lo = 0;
             ts.combo_hi = 0;
-            out.push(Out::Broadcast(packets::force_state7(row, col)));
+            // Do NOT emit `35 03` (`force_state7`): `FUN_0064cfec` calls
+            // `FUN_00647708(unit, 7)` -> `FUN_00653f18(unit, 1)`, which is the
+            // retreat/ghost-exit animation whose timer at `0x00654146` invokes
+            // `LAB_00644A18` and destroys `TFightField`.
             let action = format!("3201{}", ts.text9);
             let frame = format!(
                 "{}{}{}",
@@ -1373,6 +1380,10 @@ impl Battle {
 
             for status_frame in std::mem::take(&mut ts.status_frames) {
                 out.push(Out::Broadcast(status_frame));
+            }
+
+            for stat_frame in std::mem::take(&mut ts.stat_frames) {
+                out.push(Out::Broadcast(stat_frame));
             }
 
             if !ts.text11.is_empty() {
@@ -1707,7 +1718,7 @@ impl Battle {
                 }
             }
         }
-        self.apply_target_hp(target, *num36, out);
+        self.apply_target_hp(target, *num36, ts, out);
         apply_attack_hp_and_type3(ts, target, hit, adl, *num36, &attack, skill_lv);
 
         // Legacy PC status-debuff skills 13007/13029 retain their packet-specific path.
@@ -1751,7 +1762,7 @@ impl Battle {
     fn apply_reflect(&self, attacker: &mut WarInfo, ts: &mut TurnState, out: &mut Vec<Out>) {
         let dmg = ts.reflect;
         let value = (attacker.hp - dmg).max(0);
-        self.write_hp(attacker, value, out);
+        self.write_hp_deferred(attacker, value, ts, out);
         attacker.hp -= dmg;
         let text15 = format!(
             "{:02X}{:02X}{}0101{}",
@@ -1859,7 +1870,7 @@ impl Battle {
                 hit = miss_status::MISS as i64;
             }
         }
-        self.apply_target_hp(&mut rear, *num36, out);
+        self.apply_target_hp(&mut rear, *num36, ts, out);
         let rr = tpos.row ^ 1;
         let rc = tpos.col;
         ts.text10.push_str(&packets::skilling_int(
@@ -1958,7 +1969,7 @@ impl Battle {
                 hit = miss_status::MISS as i64;
             }
         }
-        self.apply_target_hp(target, *num36, out);
+        self.apply_target_hp(target, *num36, ts, out);
         apply_attack_hp_and_type3(ts, target, hit, adl, *num36, &attack, 1);
         if matches!(target.type4_id, 10015 | 10031 | 13021) && ts.reflect > 0 {
             self.apply_reflect(attacker, ts, out);
@@ -2053,14 +2064,14 @@ impl Battle {
                     let drain = skill_lv * 30;
                     ts.heal += drain;
                     target.sp = (target.sp - drain).max(0);
-                    self.write_sp(target, target.sp, out);
+                    self.write_sp_deferred(target, target.sp, ts, out);
                     if attacker.hp + ts.heal > attacker.hp_max {
                         ts.heal = attacker.hp_max - attacker.hp;
                         attacker.hp = attacker.hp_max;
-                        self.write_hp(attacker, attacker.hp_max, out);
+                        self.write_hp_deferred(attacker, attacker.hp_max, ts, out);
                     } else {
                         attacker.hp += ts.heal;
-                        self.write_hp(attacker, attacker.hp, out);
+                        self.write_hp_deferred(attacker, attacker.hp, ts, out);
                     }
                     target.type3_id = status_id;
                     target.type3_lv = skill_lv;
@@ -2196,10 +2207,10 @@ impl Battle {
             out.push(Out::Broadcast(pkt));
         }
         if outcome.hp_healed > 0 {
-            self.write_hp(target, target.hp, out);
+            self.write_hp_deferred(target, target.hp, ts, out);
         }
         if outcome.sp_restored > 0 {
-            self.write_sp(target, target.sp, out);
+            self.write_sp_deferred(target, target.sp, ts, out);
         }
         ts.text10.push_str(&fragment);
     }
@@ -2228,11 +2239,11 @@ impl Battle {
         }
         if target.sp + amount <= target.sp_max {
             target.sp += amount;
-            self.write_sp(target, target.sp, out);
+            self.write_sp_deferred(target, target.sp, ts, out);
         } else if target.sp + amount > target.sp_max {
             amount = target.sp_max - target.sp;
             target.sp = target.sp_max;
-            self.write_sp(target, target.sp_max, out);
+            self.write_sp_deferred(target, target.sp_max, ts, out);
         } else if target.sp == target.sp_max {
             amount = 0;
         }
@@ -2272,11 +2283,11 @@ impl Battle {
         let mut amount = (heal_base * numerical / 100).max(1);
         if target.hp + amount <= target.hp_max {
             target.hp += amount;
-            self.write_hp(target, target.hp, out);
+            self.write_hp_deferred(target, target.hp, ts, out);
         } else if target.hp + amount > target.hp_max {
             amount = target.hp_max - target.hp;
             target.hp = target.hp_max;
-            self.write_hp(target, target.hp_max, out);
+            self.write_hp_deferred(target, target.hp_max, ts, out);
         } else if target.hp == target.hp_max {
             amount = 0;
         }
@@ -2310,7 +2321,7 @@ impl Battle {
             hit = miss_status::ATTACK;
             adl = attack_status::ATTACK;
             target.hp = amount;
-            self.write_hp(target, amount, out);
+            self.write_hp_deferred(target, amount, ts, out);
         } else {
             amount = 0;
             hit = miss_status::MISS;
@@ -2561,11 +2572,11 @@ impl Battle {
         }
         if target.hp + hp <= target.hp_max {
             target.hp += hp;
-            self.write_hp(target, target.hp, out);
+            self.write_hp_deferred(target, target.hp, ts, out);
         } else if target.hp + hp > target.hp_max {
             hp = target.hp_max - target.hp;
             target.hp = target.hp_max;
-            self.write_hp(target, target.hp_max, out);
+            self.write_hp_deferred(target, target.hp_max, ts, out);
         } else if target.hp == target.hp_max {
             hp = 0;
         }
@@ -2574,11 +2585,11 @@ impl Battle {
         }
         if target.sp + sp <= target.sp_max {
             target.sp += sp;
-            self.write_sp(target, target.sp, out);
+            self.write_sp_deferred(target, target.sp, ts, out);
         } else if target.sp + sp > target.sp_max {
             sp = target.sp_max - target.sp;
             target.sp = target.sp_max;
-            self.write_sp(target, target.sp_max, out);
+            self.write_sp_deferred(target, target.sp_max, ts, out);
         } else if target.sp == target.sp_max {
             sp = 0;
         }
@@ -2808,7 +2819,7 @@ impl Battle {
                 }
                 let matk = attacker.int1.max(1);
                 let holy_dmg = ((matk / 2) + (skill_lv * 40)).max(50);
-                self.apply_target_hp(target, holy_dmg, out);
+                self.apply_target_hp(target, holy_dmg, ts, out);
                 byte_val = troi_byte::HP;
                 dmg = holy_dmg as u16;
             } else {
@@ -2931,6 +2942,26 @@ impl Battle {
     }
 
     fn write_hp(&self, c: &WarInfo, value: i64, out: &mut Vec<Out>) {
+        self.write_hp_with_buf(c, value, None, out);
+    }
+
+    fn write_hp_deferred(
+        &self,
+        c: &WarInfo,
+        value: i64,
+        ts: &mut TurnState,
+        out: &mut Vec<Out>,
+    ) {
+        self.write_hp_with_buf(c, value, Some(&mut ts.stat_frames), out);
+    }
+
+    fn write_hp_with_buf(
+        &self,
+        c: &WarInfo,
+        value: i64,
+        stat_buf: Option<&mut Vec<String>>,
+        out: &mut Vec<Out>,
+    ) {
         if !matches!(c.typ, 3 | 7) {
             out.push(Out::Db(DbUpdate {
                 target: pet_target(c),
@@ -2942,10 +2973,35 @@ impl Battle {
         // unit's HP bar (and triggers the revive effect when `value > 0` on a
         // dead unit). Broadcast for every unit, including NPCs (which never get
         // a DB row). `02_battle_positions.md §2.5`.
-        out.push(Out::Broadcast(packets::set_hp(c.row, c.col, value)));
+        let frame = packets::set_hp(c.row, c.col, value);
+        if let Some(buf) = stat_buf {
+            buf.push(frame);
+        } else {
+            out.push(Out::Broadcast(frame));
+        }
     }
 
     fn write_sp(&self, c: &WarInfo, value: i64, out: &mut Vec<Out>) {
+        self.write_sp_with_buf(c, value, None, out);
+    }
+
+    fn write_sp_deferred(
+        &self,
+        c: &WarInfo,
+        value: i64,
+        ts: &mut TurnState,
+        out: &mut Vec<Out>,
+    ) {
+        self.write_sp_with_buf(c, value, Some(&mut ts.stat_frames), out);
+    }
+
+    fn write_sp_with_buf(
+        &self,
+        c: &WarInfo,
+        value: i64,
+        stat_buf: Option<&mut Vec<String>>,
+        out: &mut Vec<Out>,
+    ) {
         if !matches!(c.typ, 3 | 7) {
             out.push(Out::Db(DbUpdate {
                 target: pet_target(c),
@@ -2954,7 +3010,12 @@ impl Battle {
             }));
         }
         // `33 01` propId `0x1A` — in-battle SP refresh. See `write_hp`.
-        out.push(Out::Broadcast(packets::set_sp(c.row, c.col, value)));
+        let frame = packets::set_sp(c.row, c.col, value);
+        if let Some(buf) = stat_buf {
+            buf.push(frame);
+        } else {
+            out.push(Out::Broadcast(frame));
+        }
     }
 
     /// Áp dụng cơ chế đổ xúc xắc cứu đòn của Sách Động (Instigation):
@@ -2970,8 +3031,14 @@ impl Battle {
         }
     }
 
-    fn apply_target_hp(&self, target: &mut WarInfo, dmg: i64, out: &mut Vec<Out>) {
-        self.write_hp(target, (target.hp - dmg).max(0), out);
+    fn apply_target_hp(
+        &self,
+        target: &mut WarInfo,
+        dmg: i64,
+        ts: &mut TurnState,
+        out: &mut Vec<Out>,
+    ) {
+        self.write_hp_deferred(target, (target.hp - dmg).max(0), ts, out);
         target.hp -= dmg;
         if target.hp <= 0 && dmg >= target.hp_max {
             target.fly_out = true;

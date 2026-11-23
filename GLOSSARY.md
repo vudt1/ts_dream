@@ -493,6 +493,12 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
   - **Quy tắc tỷ lệ & Phạm vi thoát trận**: Tỷ lệ thành công tính theo chênh lệch cấp độ giữa người thực hiện với mục tiêu đối phương và LVTB hai đội, cộng thêm `+20%` khi dùng *Thuật đào tẩu* (`14002`, không bypass 100%). Nếu Đội trưởng (hoặc *Sủng vật* của Đội trưởng, kể cả ở một trong hai phe của trận PvP) chạy trốn thành công thì toàn bộ trận/đội thoát ngay; nếu Thành viên (hoặc *Sủng vật* của Thành viên) chạy trốn thành công thì chỉ riêng Thành viên đó cùng các *Sủng vật* của họ rời lưới chiến trận, các đồng đội còn lại tiếp tục đánh.
 - **Tránh dùng các từ mơ hồ**: *Leave Battle* (chỉ dành cho *ListQS* thoát quan chiến qua `0x0B 01 03`), `14003` (*Thuật mua bán* bị động, không liên quan đến Flee).
 
+### Gói tin `S→C 0x35 0x03` (`force_state7` — Hiệu ứng Bay hồn / Rời lưới trận)
+- **Định nghĩa**: Khung `0x35 sub 0x03 [row: u8][col: u8]` ép đơn vị trên bàn cờ vào animation state `7` (`FUN_0064cfec` → `FUN_00647708(unit, 7)` → `FUN_00653f18(unit, 1)` trong `aLogin.exe`), phát **hiệu ứng người chơi bị bay hồn** (hồn lìa khỏi xác, rời lưới trận) và tự thoát trận (`LAB_00644A18`, giải phóng `TFightField`), đưa nhân vật trở về lại vị trí lưu trữ (`savemap`, `savemap_x`, `savemap_y`) phía client mà không chờ `0x0B 01` / `0x0B 00` từ server.
+- **Ràng buộc (Invariants)**:
+  - **Cấm phát `35 03` trước đòn đánh (`32 01`)** trong `runner.rs` (Bear cũng hoàn toàn không phát `35 03` trong luồng đánh thường). Nếu phát `35 03` trước `32 01`, client sẽ bay hồn rời trận ngay trong lượt đầu trong khi trận đấu phía server vẫn đang chạy (`battle_id > 0`).
+  - Chỉ dùng `35 03` đúng ngữ cảnh rời lưới trận / bay hồn (nếu cần), không nhầm với trạng thái lao lên tấn công.
+
 ### Cửa Bản Đồ (Door) vs Điểm Xuất Hiện (`SceneInfo`) & Dịch Chuyển Cổng (`Talk-Warp 0x14 08`)
 - **Định nghĩa**: Hai thực thể định danh tách biệt trong chuỗi chuyển cảnh của kịch bản Eve (`Data/eve.emg`), kết nối qua sự kiện `NpcEvent` có kết quả chuyển cảnh (`result_type == 2`):
   - **`Door ID` (`Door.id`)**: Định danh cổng đặt trên bản đồ hiện tại (`Section 3`). Khi người chơi chạm (`MeetDoor`), nhấp (`ClickDoor`), hoặc gửi xác nhận dịch chuyển `C→S 0x14 08` (`idtalking`), mã mà Client và `Data/Warps.txt` / `Data/BattleGate.txt` dùng là **`Door ID`**.
