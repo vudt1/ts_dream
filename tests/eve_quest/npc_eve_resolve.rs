@@ -411,4 +411,38 @@ fn test_12002_door_warps_to_12304_with_cc12_param1_pstyle1() {
     assert_eq!(dest, Some(12304), "Must warp to map 12304");
 }
 
+#[test]
+fn test_12001_tientrang_bank_open_and_store_open() {
+    use ts_dream::eve::planner::{plan_results, DomainEffect, NpcServiceOp};
+
+    let data = std::sync::Arc::clone(crate::common::shared_game_data());
+
+    // BankOpen (p_style=2) & BankStoreOpen (p_style=1 on TienTrang 14 09 1F) across loaded eve.emg scenes.
+    let cond_bank = data
+        .scene_eve_data
+        .values()
+        .flat_map(|s| s.npc_events.values())
+        .flat_map(|ev| ev.conditions.iter())
+        .find(|c| c.results.iter().any(|r| r.result_type == 7 && r.result_class == 7 && r.parameter_style == 2))
+        .expect("eve.emg must have BankOpen (rt=7, rc=7, p_style=2)");
+    let cond_store = data
+        .scene_eve_data
+        .values()
+        .flat_map(|s| s.npc_events.values())
+        .flat_map(|ev| ev.conditions.iter())
+        .find(|c| c.results.iter().any(|r| r.result_type == 7 && r.result_class == 7 && r.parameter_style == 1))
+        .expect("eve.emg must have BankStoreOpen (rt=7, rc=7, p_style=1)");
+
+    let effects_bank = plan_results(&cond_bank.results);
+    let effects_store = plan_results(&cond_store.results);
+    assert!(
+        effects_bank.contains(&DomainEffect::NpcService(NpcServiceOp::BankOpen)),
+        "p_style=2 must plan NpcServiceOp::BankOpen, got: {effects_bank:?}"
+    );
+    assert!(
+        effects_store.contains(&DomainEffect::NpcService(NpcServiceOp::BankStoreOpen)),
+        "p_style=1 must plan NpcServiceOp::BankStoreOpen, got: {effects_store:?}"
+    );
+}
+
 

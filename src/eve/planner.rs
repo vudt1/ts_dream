@@ -109,8 +109,8 @@ pub enum PetOp {
 /// Typed NPC service operation parsed from `rt = 7, rc = 7`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NpcServiceOp {
-    BankClose,
     BankOpen,
+    BankStoreOpen,
     InnShop,
     InnHeal,
     BankExchangeOrSpecial,
@@ -207,8 +207,9 @@ pub fn plan_result(result: &EveResult) -> DomainEffect {
         4 => DomainEffect::MoveEntity(result.clone()),
         5 => DomainEffect::PlayMovie(result.clone()),
         7 if result.result_class == 7 => match result.parameter_style {
-            1 => DomainEffect::NpcService(NpcServiceOp::BankClose),
+            1 => DomainEffect::NpcService(NpcServiceOp::BankStoreOpen),
             2 => DomainEffect::NpcService(NpcServiceOp::BankOpen),
+            3 => DomainEffect::NpcService(NpcServiceOp::BankStoreOpen),
             4 => DomainEffect::NpcService(NpcServiceOp::InnShop),
             5 => DomainEffect::NpcService(NpcServiceOp::InnHeal),
             15 => DomainEffect::NpcService(NpcServiceOp::BankExchangeOrSpecial),

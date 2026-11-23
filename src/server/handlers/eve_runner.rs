@@ -871,9 +871,6 @@ fn process_single_domain_effect(
         }
         DomainEffect::NpcService(op) => {
             match op {
-                NpcServiceOp::BankClose => {
-                    tracing::debug!("executed server-side NpcService BankClose");
-                }
                 NpcServiceOp::BankOpen => {
                     out.send("F44403001D0900");
                     out.send(format!(
@@ -881,6 +878,11 @@ fn process_single_domain_effect(
                         encoder::le32(session.bank_gold)
                     ));
                     out.send("F44402001D05");
+                    out.send("F44402001409");
+                }
+                NpcServiceOp::BankStoreOpen => {
+                    out.send("F44402001D06");
+                    out.send("F44402001409");
                 }
                 NpcServiceOp::InnShop => {
                     out.send(crate::server::handlers::shops::open_npc_shop_frame());

@@ -991,6 +991,7 @@ pub async fn handle_storage_transfer(ctx: &mut OpcodeCtx<'_>) {
         ctx.conn.session = old;
         return;
     }
+    registry_update_if_online(&ctx.conn.session);
     match (ctx.opcode, ctx.sub) {
         (crate::protocol::OP_STORAGE, crate::protocol::STORAGE_SUB_WITHDRAW) => {
             for (slot, item) in moved {
@@ -999,18 +1000,21 @@ pub async fn handle_storage_transfer(ctx: &mut OpcodeCtx<'_>) {
                 ctx.out.send(format!("F44404001E05{:02X}{:02X}", slot, item.count));
             }
             ctx.out.send("F44402001732");
+            ctx.out.send(ctx.conn.session.dump_homdo());
         }
         (crate::protocol::OP_STORAGE, crate::protocol::STORAGE_SUB_DEPOSIT) => {
             for (slot, item) in moved {
                 ctx.out.send(format!("F44404001709{:02X}{:02X}", slot, item.count));
                 ctx.out.send(frame("1E02", &storage_entry_no_slot(&item)));
             }
+            ctx.out.send(ctx.conn.session.dump_homdo());
         }
         (crate::protocol::OP_ITEM, crate::protocol::ITEM_SUB_WAREHOUSE_DEPOSIT) => {
             for (slot, item) in moved {
                 ctx.out.send(format!("F44404001709{:02X}{:02X}", slot, item.count));
                 ctx.out.send(frame("1767", &storage_entry(&item)));
             }
+            ctx.out.send(ctx.conn.session.dump_homdo());
         }
         (crate::protocol::OP_ITEM, crate::protocol::ITEM_SUB_WAREHOUSE_WITHDRAW) => {
             for (slot, item) in moved {
@@ -1019,6 +1023,7 @@ pub async fn handle_storage_transfer(ctx: &mut OpcodeCtx<'_>) {
                 ctx.out.send(format!("F44403001768{:02X}", slot));
             }
             ctx.out.send("F44402001732");
+            ctx.out.send(ctx.conn.session.dump_homdo());
         }
         _ => unreachable!(),
     }
@@ -1087,6 +1092,7 @@ pub async fn handle_bank_gold(ctx: &mut OpcodeCtx<'_>) {
         send_bank_ui_unlock(ctx.sub, ctx.out);
         return;
     }
+    registry_update_if_online(&ctx.conn.session);
     let code = if ctx.sub == crate::protocol::BANK_SUB_WITHDRAW { "02" } else { "01" };
     let gold_code = if ctx.sub == crate::protocol::BANK_SUB_WITHDRAW { "01" } else { "02" };
     ctx.out
