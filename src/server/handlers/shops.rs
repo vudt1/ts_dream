@@ -183,7 +183,10 @@ pub fn resolve_npc_shop_item(
 
         if let Some(sid) = surface_id {
             if let Some(surface) = scene.surface_datas.get(&sid) {
-                if let Some(sentence) = surface.sentences.get(&item_index) {
+                // `EveLoader` stores `sentences` 1-based (`i + 1` in `eve.rs:673`),
+                // whereas `C->S 1B 01` sends a 0-based `item_index` (`0, 1, 2, 3`).
+                let sentence_idx = item_index.saturating_add(1);
+                if let Some(sentence) = surface.sentences.get(&sentence_idx) {
                     let item_id = sentence.data_id;
                     let price = data.items.get(&i64::from(item_id)).map(|d| d.price).unwrap_or(0);
                     if price > 0 {

@@ -2913,5 +2913,111 @@ async fn test_item_mall_0x42_normal_player_and_validation() {
     assert!(!out_fail.outgoing.iter().any(|f| f.frame.starts_with("F4440E001706")));
 }
 
+#[tokio::test]
+async fn test_npc_shop_buy_0based_index_maps_to_1based_surface_sentence() {
+    use std::collections::HashMap;
+    use std::sync::Arc;
+    use ts_dream::data::loaders::eve::{EveSentence, EveSurfaceData, SceneEveData};
+    use ts_dream::eve::auto_chain::{EventPhase, EventSession, EventTriggerKind};
+
+    let mut data = GameData::default();
+    data.items.insert(
+        26005,
+        Item {
+            id: 26005,
+            price: 15,
+            ..Default::default()
+        },
+    );
+    data.items.insert(
+        26026,
+        Item {
+            id: 26026,
+            price: 5,
+            ..Default::default()
+        },
+    );
+
+    let mut sentences = HashMap::new();
+    // EveLoader stores sentences 1-based (`i + 1`).
+    sentences.insert(
+        3,
+        EveSentence {
+            data_id: 26005,
+            data_kind: 2,
+            style: 0,
+            can_cut: false,
+        },
+    );
+    sentences.insert(
+        4,
+        EveSentence {
+            data_id: 26026,
+            data_kind: 2,
+            style: 0,
+            can_cut: false,
+        },
+    );
+    let mut surface_datas = HashMap::new();
+    surface_datas.insert(
+        1,
+        EveSurfaceData {
+            id: 1,
+            sentence_count: 4,
+            option_index: 0,
+            option_count: 0,
+            option_mode: 0,
+            sentences,
+        },
+    );
+    let mut scene = SceneEveData::default();
+    scene.surface_datas = surface_datas;
+    data.scene_eve_data.insert(12001, scene);
+
+    let data = Arc::new(data);
+    let service = BattleService::new(data.clone());
+    let mut conn = Conn::default();
+    conn.session.id = 1001;
+    conn.session.map_id = 12001;
+    conn.session.idtalking = 3;
+    conn.session.gold = 100;
+    conn.session.current_event_session = Some(EventSession {
+        map_id: 12001,
+        eve_no: 1,
+        npc_click_id: 3,
+        trigger_kind: EventTriggerKind::ClickNpc,
+        chain_depth: 0,
+        results: Vec::new(),
+        planned_effects: Vec::new(),
+        current_index: 0,
+        phase: EventPhase::AwaitingChoice,
+        last_surface_id: 1,
+        last_choice_code: 0,
+        battle_result: 0,
+        matched_condition_no: 0,
+        last_step_sent_ms: 0,
+    });
+
+    // Client sends 0-based item_index = 3 (4th item in shop -> sentence_idx 4 -> item 26026, price 5).
+    let mut out = HandleOutcome::default();
+    let payload = [0x03, 0x01, 0x00];
+    let mut ctx = OpcodeCtx {
+        conn: &mut conn,
+        data: &data,
+        service: &service,
+        out: &mut out,
+        opcode: 0x1B,
+        sub: 1,
+        payload: &payload,
+        decoded: &[],
+        env: ServerEnv::none(),
+    };
+    handle_npc_shop(&mut ctx).await;
+
+    assert_eq!(conn.session.gold, 95, "must deduct 5 gold for item 26026, not 15 for 26005");
+    assert_eq!(conn.session.homdo.len(), 1);
+    assert_eq!(conn.session.homdo[0].id, 26026);
+}
+
 
 

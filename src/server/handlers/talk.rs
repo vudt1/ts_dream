@@ -17,7 +17,6 @@ use crate::protocol::codecs::npc_talk::{NpcTalkCodec, TalkLockMode};
 use crate::protocol::encoder;
 use crate::server::dispatcher::{HandleOutcome, OpcodeCtx};
 use crate::server::handlers::npc_event::{self, NpcTrigger};
-use crate::server::handlers::stats::build_stat_update;
 use crate::server::session::{Conn, Session};
 
 pub use super::eve_runner::{
@@ -366,6 +365,7 @@ async fn handle_talk_continue(
         return;
     }
     if conn.session.idtalking <= 0 {
+        end_talk(conn, out);
         return;
     }
 
@@ -392,12 +392,16 @@ async fn handle_talk_continue(
     }
 
     if matches!(template, 15002 | 16001 | 16016 | 15118) {
-        handle_inn_menu(conn, data, out, "01");
+        if handle_inn_menu(conn, data, out, "01") && conn.session.db_character_id > 0 {
+            let _ = crate::db::persist::persist_sessions_transaction(pool, &[&conn.session], &[]).await;
+        }
         return;
     }
 
     if template == 16015 {
-        handle_inn_menu(conn, data, out, "02");
+        if handle_inn_menu(conn, data, out, "02") && conn.session.db_character_id > 0 {
+            let _ = crate::db::persist::persist_sessions_transaction(pool, &[&conn.session], &[]).await;
+        }
         return;
     }
 
@@ -413,7 +417,7 @@ async fn handle_talk_continue(
     end_talk(conn, out);
 }
 
-fn handle_inn_menu(conn: &mut Conn, data: &GameData, out: &mut HandleOutcome, item_tag: &str) {
+fn handle_inn_menu(conn: &mut Conn, data: &GameData, out: &mut HandleOutcome, item_tag: &str) -> bool {
     let npc_tag = encoder::le16(conn.session.idtalking as u16);
     match conn.session.select_menu {
         30 => {
@@ -421,13 +425,12 @@ fn handle_inn_menu(conn: &mut Conn, data: &GameData, out: &mut HandleOutcome, it
                 "F44411001401000000010603{}0000000000{}00",
                 npc_tag, item_tag
             ));
+            false
         }
         31 => {
-            conn.session.hp = conn.session.hp_max;
-            conn.session.sp = conn.session.sp_max;
-            out.send(build_stat_update(0x19, conn.session.hp as i32));
-            out.send(build_stat_update(0x1A, conn.session.sp as i32));
+            let healed = crate::server::handlers::eve_runner::execute_inn_heal(&mut conn.session, out);
             end_talk(conn, out);
+            healed
         }
         32 => {
             out.send(crate::server::handlers::shops::open_npc_shop_frame());
@@ -435,6 +438,7 @@ fn handle_inn_menu(conn: &mut Conn, data: &GameData, out: &mut HandleOutcome, it
                 "F44411001401000000010603{}0000000000{}00",
                 npc_tag, item_tag
             ));
+            false
         }
         33 => {
             crate::server::handlers::quest::save_map(&mut conn.session);
@@ -442,8 +446,12 @@ fn handle_inn_menu(conn: &mut Conn, data: &GameData, out: &mut HandleOutcome, it
             let _ = conn.session.add_homdo_item(item);
             out.send(conn.session.dump_homdo());
             end_talk(conn, out);
+            true
         }
-        _ => end_talk(conn, out),
+        _ => {
+            end_talk(conn, out);
+            false
+        }
     }
 }
 
