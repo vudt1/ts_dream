@@ -345,12 +345,9 @@ impl GameData {
         // mainKind 68 / 0x44, unimplemented in `dispatcher.rs`), keyed by
         // client-sent index — not the `(map_id, warpid)` talk-warp lookup in
         // `quest.rs` which reads `data.warps` (from `Warps.txt`, absent).
-        let optional_binary: [(&str, &str); 6] = [
-            // PC `Skill.Dat` is the authoritative source (preferred per ADR
-            // 0002). `Skill_C.dat` is the mobile variant; if PC is absent
-            // and mobile is present, fall back to the mobile parser.
+        let optional_binary: [(&str, &str); 5] = [
+            // PC `Skill.Dat` is the authoritative source (per ADR 0002).
             ("Skill.dat", "skill_pc"),
-            ("Skill_C.dat", "skill"),
             ("eve.emg", "eve"),
             ("Mark.Dat", "mark"),
             ("Compound.Dat", "compound"),
@@ -370,7 +367,6 @@ impl GameData {
                 .map_err(|e| TsError::Data(format!("read {}: {}", path.display(), e)))?;
             match file_name.to_ascii_lowercase().as_str() {
                 "skill.dat" => self.binary_skill_defs = SkillDatLoaderPc::load(&bytes)?,
-                "skill_c.dat" => self.binary_skill_defs = SkillDatLoader::load(&bytes)?,
                 "eve.emg" => {
                     self.scene_eve_data = EveDataLoader::load(&bytes)?;
                     if self.scene_eve_data.is_empty() {

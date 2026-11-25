@@ -93,7 +93,8 @@ impl NpcDef {
 pub struct NpcDatLoader;
 
 impl NpcDatLoader {
-    pub const FIELD_LENGTH: usize = 92;
+    pub const FIELD_LENGTH: usize = 97;
+    pub const FIELD_LENGTH_LEGACY: usize = 92;
 
     #[inline]
     fn dec32(val: u32) -> u32 {
@@ -115,26 +116,33 @@ impl NpcDatLoader {
     }
 
     /// Load all NPC definitions from binary slice of `Npc.dat`.
+    /// Supports both the current 97-byte record layout (10-byte name + 9-byte
+    /// trailing fields) and the legacy 92-byte record layout (14-byte name).
     pub fn load(bytes: &[u8]) -> Result<HashMap<u16, NpcDef>> {
-        if !bytes.len().is_multiple_of(Self::FIELD_LENGTH) {
+        let (record_len, name_cap, b) = if bytes.len().is_multiple_of(Self::FIELD_LENGTH) {
+            (Self::FIELD_LENGTH, 10usize, 11usize)
+        } else if bytes.len().is_multiple_of(Self::FIELD_LENGTH_LEGACY) {
+            (Self::FIELD_LENGTH_LEGACY, 14usize, 15usize)
+        } else {
             return Err(TsError::Data(format!(
-                "Invalid Npc.dat size {} (not multiple of {})",
+                "Invalid Npc.dat size {} (not multiple of {} or {})",
                 bytes.len(),
-                Self::FIELD_LENGTH
+                Self::FIELD_LENGTH,
+                Self::FIELD_LENGTH_LEGACY
             )));
-        }
+        };
 
-        let total_records = bytes.len() / Self::FIELD_LENGTH;
+        let total_records = bytes.len() / record_len;
         let mut result = HashMap::with_capacity(total_records);
 
-        // Record 0 and 1 are dummy in TS Online, start from 1
+        // Record 0 is dummy in TS Online, start from 1
         for i in 1..total_records {
-            let offset = i * Self::FIELD_LENGTH;
-            let chunk = &bytes[offset..offset + Self::FIELD_LENGTH];
+            let offset = i * record_len;
+            let chunk = &bytes[offset..offset + record_len];
 
             let namelen = chunk[0] as usize;
-            let (name_str, name_viscii) = if namelen > 0 && namelen <= 14 {
-                let start = 1 + 14 - namelen;
+            let (name_str, name_viscii) = if namelen > 0 && namelen <= name_cap {
+                let start = 1 + name_cap - namelen;
                 let mut sub = chunk[start..start + namelen].to_vec();
                 sub.reverse();
                 let decoded_str: String = sub
@@ -146,18 +154,18 @@ impl NpcDatLoader {
                 (String::new(), Vec::new())
             };
 
-            let kind = Self::dec8(chunk[15]);
-            let id = Self::dec16(u16::from_le_bytes([chunk[16], chunk[17]]));
+            let kind = Self::dec8(chunk[b]);
+            let id = Self::dec16(u16::from_le_bytes([chunk[b + 1], chunk[b + 2]]));
             if id == 0 {
                 continue;
             }
 
-            let pic_id = Self::dec16(u16::from_le_bytes([chunk[18], chunk[19]]));
-            let mask_id = Self::dec16(u16::from_le_bytes([chunk[20], chunk[21]]));
+            let pic_id = Self::dec16(u16::from_le_bytes([chunk[b + 3], chunk[b + 4]]));
+            let mask_id = Self::dec16(u16::from_le_bytes([chunk[b + 5], chunk[b + 6]]));
 
             let mut color_tints = [0u32; 4];
             for (j, tint) in color_tints.iter_mut().enumerate() {
-                let off = 22 + j * 4;
+                let off = b + 7 + j * 4;
                 *tint = Self::dec32(u32::from_le_bytes([
                     chunk[off],
                     chunk[off + 1],
@@ -166,43 +174,49 @@ impl NpcDatLoader {
                 ]));
             }
 
-            let not_pet = Self::dec8(chunk[38]);
-            let body_kind = Self::dec8(chunk[39]);
-            let weapon_kind = Self::dec8(chunk[40]);
-            let level = Self::dec8(chunk[41]);
+            let not_pet = Self::dec8(chunk[b + 23]);
+            let body_kind = Self::dec8(chunk[b + 24]);
+            let weapon_kind = Self::dec8(chunk[b + 25]);
+            let level = Self::dec8(chunk[b + 26]);
             let hp_base = Self::dec32(u32::from_le_bytes([
-                chunk[42], chunk[43], chunk[44], chunk[45],
+                chunk[b + 27],
+                chunk[b + 28],
+                chunk[b + 29],
+                chunk[b + 30],
             ]));
             let sp_base = Self::dec32(u32::from_le_bytes([
-                chunk[46], chunk[47], chunk[48], chunk[49],
+                chunk[b + 31],
+                chunk[b + 32],
+                chunk[b + 33],
+                chunk[b + 34],
             ]));
 
-            let hpx = Self::dec16(u16::from_le_bytes([chunk[50], chunk[51]]));
-            let spx = Self::dec16(u16::from_le_bytes([chunk[52], chunk[53]]));
-            let intelligence = Self::dec16(u16::from_le_bytes([chunk[54], chunk[55]]));
-            let atk = Self::dec16(u16::from_le_bytes([chunk[56], chunk[57]]));
-            let def = Self::dec16(u16::from_le_bytes([chunk[58], chunk[59]]));
-            let agi = Self::dec16(u16::from_le_bytes([chunk[60], chunk[61]]));
-            let moral = Self::dec8(chunk[62]);
-            let moral_value = Self::dec16(u16::from_le_bytes([chunk[63], chunk[64]]));
-            let element = Self::dec8(chunk[65]);
+            let hpx = Self::dec16(u16::from_le_bytes([chunk[b + 35], chunk[b + 36]]));
+            let spx = Self::dec16(u16::from_le_bytes([chunk[b + 37], chunk[b + 38]]));
+            let intelligence = Self::dec16(u16::from_le_bytes([chunk[b + 39], chunk[b + 40]]));
+            let atk = Self::dec16(u16::from_le_bytes([chunk[b + 41], chunk[b + 42]]));
+            let def = Self::dec16(u16::from_le_bytes([chunk[b + 43], chunk[b + 44]]));
+            let agi = Self::dec16(u16::from_le_bytes([chunk[b + 45], chunk[b + 46]]));
+            let moral = Self::dec8(chunk[b + 47]);
+            let moral_value = Self::dec16(u16::from_le_bytes([chunk[b + 48], chunk[b + 49]]));
+            let element = Self::dec8(chunk[b + 50]);
 
-            let skill1 = Self::dec16(u16::from_le_bytes([chunk[66], chunk[67]]));
-            let skill2 = Self::dec16(u16::from_le_bytes([chunk[68], chunk[69]]));
-            let skill3 = Self::dec16(u16::from_le_bytes([chunk[70], chunk[71]]));
+            let skill1 = Self::dec16(u16::from_le_bytes([chunk[b + 51], chunk[b + 52]]));
+            let skill2 = Self::dec16(u16::from_le_bytes([chunk[b + 53], chunk[b + 54]]));
+            let skill3 = Self::dec16(u16::from_le_bytes([chunk[b + 55], chunk[b + 56]]));
 
-            let drop1 = Self::dec16(u16::from_le_bytes([chunk[72], chunk[73]]));
-            let drop2 = Self::dec16(u16::from_le_bytes([chunk[74], chunk[75]]));
-            let drop3 = Self::dec16(u16::from_le_bytes([chunk[76], chunk[77]]));
-            let drop4 = Self::dec16(u16::from_le_bytes([chunk[78], chunk[79]]));
-            let drop5 = Self::dec16(u16::from_le_bytes([chunk[80], chunk[81]]));
-            let drop6 = Self::dec16(u16::from_le_bytes([chunk[82], chunk[83]]));
+            let drop1 = Self::dec16(u16::from_le_bytes([chunk[b + 57], chunk[b + 58]]));
+            let drop2 = Self::dec16(u16::from_le_bytes([chunk[b + 59], chunk[b + 60]]));
+            let drop3 = Self::dec16(u16::from_le_bytes([chunk[b + 61], chunk[b + 62]]));
+            let drop4 = Self::dec16(u16::from_le_bytes([chunk[b + 63], chunk[b + 64]]));
+            let drop5 = Self::dec16(u16::from_le_bytes([chunk[b + 65], chunk[b + 66]]));
+            let drop6 = Self::dec16(u16::from_le_bytes([chunk[b + 67], chunk[b + 68]]));
 
-            let _unk1 = Self::dec8(chunk[84]);
-            let skill4 = Self::dec16(u16::from_le_bytes([chunk[85], chunk[86]]));
-            let turn = Self::dec8(chunk[87]);
-            let _unk2 = Self::dec16(u16::from_le_bytes([chunk[88], chunk[89]]));
-            let _unk3 = Self::dec16(u16::from_le_bytes([chunk[90], chunk[91]]));
+            let _unk1 = Self::dec8(chunk[b + 69]);
+            let skill4 = Self::dec16(u16::from_le_bytes([chunk[b + 70], chunk[b + 71]]));
+            let turn = Self::dec8(chunk[b + 72]);
+            let _unk2 = Self::dec16(u16::from_le_bytes([chunk[b + 73], chunk[b + 74]]));
+            let _unk3 = Self::dec16(u16::from_le_bytes([chunk[b + 75], chunk[b + 76]]));
 
             let garble = encoding::compute_garble(&name_str);
 

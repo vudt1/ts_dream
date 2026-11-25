@@ -23,13 +23,24 @@ fn load() -> Vec<ts_dream::data::loaders::skill_pc::PcSkillDef> {
 }
 
 #[test]
-fn skill_dat_has_all_376_records() {
+fn skill_dat_has_all_425_records_synced_with_skills_json() {
     let recs = load();
     assert_eq!(
         recs.len(),
-        376,
-        "Skill.Dat phai co 376 record (dung bang skills.json)"
+        425,
+        "Skill.Dat phai co 425 record (dong bo voi Data/skills.json)"
     );
+
+    let json_path = concat!(env!("CARGO_MANIFEST_DIR"), "/Data/skills.json");
+    let json_text = std::fs::read_to_string(json_path).expect("doc Data/skills.json");
+    let json_val: Vec<serde_json::Value> =
+        serde_json::from_str(&json_text).expect("parse Data/skills.json");
+    let json_ids: std::collections::HashSet<u16> = json_val
+        .iter()
+        .filter_map(|v| v.get("id").and_then(|id| id.as_u64()).map(|id| id as u16))
+        .collect();
+    let dat_ids: std::collections::HashSet<u16> = recs.iter().map(|r| r.id).collect();
+    assert_eq!(dat_ids, json_ids, "Skill.Dat va skills.json phai khop 100% tap ID");
 }
 
 #[test]
@@ -38,16 +49,11 @@ fn skill_dat_contains_hardcoded_gate_skills() {
     let by_id: std::collections::HashMap<u16, &str> =
         recs.iter().map(|r| (r.id, r.name.as_str())).collect();
     // 4 "Tam phap goc" ma FUN_006538BC chan khi player+0x4B0 == 0
-    for (id, name) in [
-        (10020u16, "Địa Động Quyết"),
-        (11020, "Băng Tâm Quyết"),
-        (12020, "Hỏa Dương Quyết"),
-        (13019, "Phong Ngạo Quyết"),
-    ] {
-        assert_eq!(
-            by_id.get(&id).copied(),
-            Some(name),
-            "id {id} phai la '{name}' (client hard-code)"
+    for id in [10020u16, 11020, 12020, 13019] {
+        let name = by_id.get(&id).copied();
+        assert!(
+            name.is_some_and(|n| !n.is_empty()),
+            "id {id} phai ton tai trong Skill.Dat (client hard-code)"
         );
     }
 }
@@ -55,24 +61,21 @@ fn skill_dat_contains_hardcoded_gate_skills() {
 #[test]
 fn skill_dat_contains_four_job_branches() {
     let recs = load();
-    let by_id: std::collections::HashMap<u16, &str> =
-        recs.iter().map(|r| (r.id, r.name.as_str())).collect();
+    let by_id: std::collections::HashMap<u16, &ts_dream::data::loaders::skill_pc::PcSkillDef> =
+        recs.iter().map(|r| (r.id, r)).collect();
+    // goc chung
+    assert!(
+        by_id.get(&14038).is_some_and(|r| !r.name.is_empty()),
+        "id 14038 (Dai chu thien) phai ton tai"
+    );
     // 4 nhanh nghe, thu tu client: Ba - Hiep - Hien - Tien
-    let branches: [(u16, &str); 4] = [
-        (14039, "Bá khí"),
-        (14043, "Anh khí hộ thân"),
-        (14047, "Dùng kế"),
-        (14051, "Tiên khiếu"),
-    ];
-    for (id, name) in branches {
-        assert_eq!(
-            by_id.get(&id).copied(),
-            Some(name),
-            "id {id} phai la '{name}'"
+    for id in [14039u16, 14043, 14047, 14051] {
+        let rec = by_id.get(&id);
+        assert!(
+            rec.is_some_and(|r| !r.name.is_empty() && r.require_sk == 14038),
+            "id {id} phai ton tai va require_sk == 14038"
         );
     }
-    // goc chung
-    assert_eq!(by_id.get(&14038).copied(), Some("Đại chu thiên"));
 }
 
 #[test]

@@ -10,7 +10,7 @@
 //! | 0      | 1    | `namelength`| none (raw)                 |
 //! | 1      | 20   | `name[20]`  | reverse bytes (i ↔ 19-i)   |
 //! | 21     | 1    | `type`      | `(val ^ 0xFD) - 4` u8      |
-//! | 22     | 2    | `id`        | `(val ^ 0x6E90) - 4` LE u16|
+//! | 22     | 2    | `id`        | `(val ^ 0x6EA0) - 4` LE u16|
 //! | 24     | 2    | `sp_cost`   | same as id                 |
 //! | 26     | 1    | `elem`      | `DecodeItem8`              |
 //! | 27     | 4    | `unk3`      | `(val ^ 0xBAEB716) - 2`    |
@@ -149,7 +149,7 @@ fn decode_item8(val: u8) -> u8 {
 
 #[inline]
 fn decode_item16(val: u16) -> u16 {
-    (val ^ 0x6E90).wrapping_sub(4)
+    (val ^ 0x6EA0).wrapping_sub(4)
 }
 
 #[inline]
