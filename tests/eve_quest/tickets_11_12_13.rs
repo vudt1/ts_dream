@@ -486,10 +486,11 @@ fn ticket12_eve_emg_parses_dest_map_id_for_all_10336_rt2_warps() {
             }
         }
     }
-    assert_eq!(total_rt2, 10_336, "expected 10,336 rt=2 results in eve.emg");
+    assert_eq!(total_rt2, 9_653, "expected 9,653 rt=2 results in eve.emg (TTTD)");
     assert_eq!(
-        resolved, 10_336,
-        "all 10,336 rt=2 results must resolve via EveSceneInfo"
+        resolved, 9_653,
+        "all 9,653 rt=2 results must resolve via EveSceneInfo"
+
     );
 }
 

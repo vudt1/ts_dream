@@ -275,9 +275,11 @@ fn parse_record(rec: &[u8]) -> Result<PcSkillDef> {
 /// - `type_` (1 byte) → `kind`
 /// - `sp_cost` → `require_sp`
 /// - `elem` → `element`
-/// - `unk3` (u32) → `numerical` (raw; semantics differ from `Skill_C.dat` `numerical`)
-/// - `skill_type` → `attribute` (best-effort — PC semantics for this byte
-///   aren't fully verified, though it aligns with the `Skill_C.dat` `attribute` byte)
+/// - `grade` → `numerical` base (`100 + (grade.saturating_sub(1)) * 15`); PC `unk3` is
+///   a constant `0x7069ab` (`7_367_083`) in `Skill.Dat`, not a damage percentage
+/// - `skill_type` → `attribute` (`1`=physical, `2`=magic, `3`=CC, `4`=buff, etc.;
+///   `runner.rs` dispatches `skill_type` directly from `def.attribute`, and
+///   `binary_skill_input` translates `2 → 27` (`ATTRIBUTE_INT`) for `combat_formula`)
 /// - `round` is pinned to 0 — the PC layout has no round field; see `round:` below
 /// - `delay` → `spend_second`
 /// - `state` → (unused) PC `state` is the client's visual sprite animation ID
@@ -301,7 +303,7 @@ pub fn pc_to_binary(pc: &PcSkillDef) -> BinarySkillDef {
         kind: pc.type_,
         require_sp: pc.sp_cost,
         element: pc.elem,
-        numerical: pc.unk3,
+        numerical: 100 + u32::from(pc.grade.saturating_sub(1)) * 15,
         attribute: pc.skill_type,
         level: 0,
         fight_way: pc.nb_target,

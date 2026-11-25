@@ -94,3 +94,18 @@ fn skill_dat_require_sk_forest_has_no_orphan() {
         }
     }
 }
+
+#[test]
+fn pc_to_binary_ignores_unk3_and_scales_numerical_by_grade() {
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/Data/Skill.Dat");
+    let bytes = std::fs::read(path).expect("doc Data/Skill.Dat");
+    let (binary, _pc) = SkillDatLoaderPc::load_with_pc(&bytes).expect("parse Skill.Dat");
+
+    let s10001 = binary.get(&10001).expect("skill 10001");
+    assert_eq!(s10001.numerical, 100, "grade=1 base numerical must be 100");
+    assert_eq!(s10001.attribute, 2, "skill_type=2 must be preserved on BinarySkillDef.attribute");
+
+    let s10008 = binary.get(&10008).expect("skill 10008");
+    assert_eq!(s10008.numerical, 160, "grade=5 base numerical must be 100 + 4*15 = 160");
+    assert_eq!(s10008.attribute, 2);
+}

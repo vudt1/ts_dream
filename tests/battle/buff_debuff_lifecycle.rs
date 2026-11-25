@@ -164,6 +164,19 @@ fn test_skill_round_table_parity() {
         ..Default::default()
     };
     assert_eq!(pc_to_binary(&pc_mirror).round, 0);
+
+    // Regression: PC Skill.Dat `unk3` (7_367_083) must never inflate `numerical`;
+    // instead `grade=1` -> 100, `grade=5` -> 160, and `skill_type=2` -> INT (27).
+    let pc_atk_magic = PcSkillDef {
+        id: 10001,
+        unk3: 7_367_083,
+        grade: 1,
+        skill_type: 2,
+        ..Default::default()
+    };
+    let bin_magic = pc_to_binary(&pc_atk_magic);
+    assert_eq!(bin_magic.numerical, 100);
+    assert_eq!(bin_magic.attribute, 2);
 }
 
 // ---------------------------------------------------------------------------

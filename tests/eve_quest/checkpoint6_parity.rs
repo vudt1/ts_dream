@@ -246,7 +246,7 @@ fn test_mark_dat_loader_decodes_records() {
     let quest_marks = MarkDatLoader::load(&bytes).expect("MarkDatLoader::load");
 
     // Expect exactly 2,394 quest records loaded
-    assert_eq!(quest_marks.len(), 2394, "Mark.Dat must contain 2,394 quests");
+    assert_eq!(quest_marks.len(), 2262, "Mark.Dat must contain 2,262 quests (TTTD)");
 
     // Verify known decrypted quest mark mappings
     assert_eq!(quest_marks.get(&10001), Some(&0));
@@ -519,7 +519,7 @@ fn test_real_data_trac_quan_npc_flow() {
     let data = crate::common::shared_game_data();
 
     // Verify Mark.Dat loaded in production GameData
-    assert_eq!(data.quest_marks.len(), 2394);
+    assert_eq!(data.quest_marks.len(), 2262);
 
     // Verify Scene 10817 (Trác Quận newbie)
     let scene = data

@@ -541,3 +541,20 @@ Tài liệu này lưu trữ **Từ vựng chung (Ubiquitous Language)** và các
 - **Ràng buộc (Invariants)**:
   - Không giả định `0x17 0x39` nhận duy nhất `1` byte `1..=74`: nhiều nhánh (như `0x2B`, `0x33`, `0x34`, `0x35`, `0x39`, `0x43`, `0x44`, `0x46`) bắt buộc có `payload[2]` (`sub3`) và các nhánh phi-lễ-hội (`0x07`, `0x2D..0x32`, `0x36..0x38`, `0x40`, `0x41`) không thuộc phân hệ lễ hội.
 - **Tránh dùng các từ mơ hồ**: *74 mã thông báo lễ hội* (đánh đồng toàn bộ `0x17 0x39` là lễ hội), *kênh thời tiết tuyết rơi* (hiệu ứng tuyết do `SceneSet.Dat` / `mapId` / `QuestStep` quyết định cục bộ, không qua `0x17 0x39`).
+
+### Đồng bộ Sủng vật ngoài trận (`S→C 0x0F 0x08` vs `0x08 0x02 0x04` `PetUpdateData`)
+- **Định nghĩa**: Hai cơ chế cập nhật trạng thái Sủng vật (Pet HUD) xuống client `aLogin.exe`:
+  - **`0x0F 0x08` (`pet_stat_frame`)**: Khung bản ghi `TPet` đầy đủ (HP, SP, EXP, Level, điểm trung thành *Fai*, chỉ số, kỹ năng), là **kênh đồng bộ chuẩn hiện tại** của server cho mọi biến động Pet HUD (trong/ngoài trận, lên cấp, trang bị, nâng kỹ năng).
+  - **`0x08 0x02 0x04` (`PetUpdateData`)**: Khung cập nhật delta `15` byte theo từng thuộc tính đơn lẻ (`HP`, `SP`, `Fai`, v.v.) gắn với ô `stt` của Sủng vật (được `Server-TS-Online-1` dùng trong C#).
+- **Ràng buộc (Invariants)**:
+  - Server chuẩn hóa dùng `0x0F 0x08` làm nguồn đồng bộ Pet HUD duy nhất; chỉ cân nhắc dùng `0x08 0x02 0x04` khi cần tối ưu băng thông cho các cập nhật thuộc tính đơn lẻ (`HP`/`SP`/`Fai`) về sau.
+- **Tránh dùng các từ mơ hồ**: Coi `0x08 0x02 0x04` là bắt buộc để hiển thị Pet HUD, hoặc nhầm lẫn `33 01` (thanh máu `TFightField` trong trận) với `0x0F 0x08` (Pet HUD góc trên phải).
+
+### Loại Thực Thể NPC Trong Trận (`0x0B 0x05 0x03`: `typ = 3` vs `typ = 7`)
+- **Định nghĩa**: Byte `typ` (`local_e`) trong khung `S→C 0x0B 0x05 0x03` quyết định cách client `aLogin.exe` (`FUN_00644294`) tạo hình ảnh và thực thể NPC trên lưới trận chiến:
+  - **`typ = 3` (`WAR_TYPE_HOSTILE_NPC`) — Map-Instance Combat**: Client **bỏ qua `npc_id`** (`local_14`) và lấy `id_npc_on_map` (`local_22`) để tra trực tiếp `gvar_007DA6DC[id_npc_on_map]` (instance NPC đang đứng sẵn trên bản đồ hiện tại). Chỉ thích hợp khi người chơi đánh trực tiếp một NPC thực thể đang hiện diện trên map (`start_npc_battle_seeded`), nơi cần gắn kết 1-1 và đồng bộ trạng thái ẩn/hiện/respawn đúng slot NPC trên bản đồ.
+  - **`typ = 7` (`WAR_TYPE_TEAMDEF_NPC`) — Data-Driven Combat**: Client gọi `FUN_00646a34(..., local_14, ...)` để spawn thực thể trực tiếp theo **`npc_id`** (`local_14`), không phụ thuộc vào danh sách NPC đang đứng trên map. Bắt buộc dùng cho mọi trận sinh đội hình từ dữ liệu (`Eve FightData`, `Random Encounter`, `TeamDef`, boss/wave sự kiện không gắn slot map cố định).
+- **Ràng buộc (Invariants)**:
+  - Không truyền `typ = 3` kèm `id_npc_on_map` tự tăng giả lập (`1..N`) cho các trận Eve `FightData` hoặc gặp quái ngẫu nhiên (`start_encounter_battle`): client sẽ hiển thị nhầm NPC đứng ở slot `1..N` trên bản đồ (ví dụ hiển thị Vệ Binh `#17005` thay vì Đốc Du Ác `#14112` tại map `12002`).
+  - Mọi phân biệt phía server (như cho phép bắt tướng ở `is_capturable_npc_target`) xử lý bình đẳng cả `WAR_TYPE_HOSTILE_NPC` (`3`) và `WAR_TYPE_TEAMDEF_NPC` (`7`).
+- **Tránh dùng các từ mơ hồ**: Coi `typ = 3` là loại mặc định cho mọi NPC địch trong trận, hoặc cho rằng client luôn đọc `npc_id` ở byte `1..4` của bản ghi `0B 05 03`.

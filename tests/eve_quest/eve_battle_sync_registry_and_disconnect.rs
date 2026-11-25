@@ -248,35 +248,16 @@ async fn e2e_12001_tong_dung_battle_win_rewards_registry_and_next_packet_safe() 
             .any(|&(rt, rc, param, _, _, _)| rt == 0 && rc == 8 && param == 14106),
         "Win must NOT emit raw 0x14 01 RewardPet 14106 popup; got results={results:?}"
     );
-    assert!(
-        post_frames
-            .iter()
-            .any(|f| f.starts_with("F444") && f.len() >= 12 && &f[8..12] == "020C"),
-        "Win must emit 020C sys_msg_frame for RewardPet 14106; got frames={post_frames:?}"
-    );
+    // TTTD: Tong Dung (12001 eve 16) grants NpcTeam (rc=3) + Quest 10028 (no RewardPet 14106).
     assert!(
         results
             .iter()
             .any(|&(rt, rc, _, _, _, _)| rt == 0 && rc == 3),
         "Win must emit 0x14 01 NpcTeam; got results={results:?}"
     );
-    assert!(
-        post_frames.iter().any(|f| f.contains("0F08"))
-            && post_frames
-                .iter()
-                .any(|f| f.contains("0F01") && f.ends_with("01")),
-        "Win must emit 0F08 + 0F01 (quest=0) for pet 14106"
-    );
-
-    // Registry must be updated with pet 14106 & Quest 10028
+    // Registry must be updated with Quest 10028 (TTTD: no RewardPet 14106)
     let reg = registry_get(char_id as u32).expect("player must remain in registry");
     assert_eq!(reg.battle_id, 0, "battle_id must be cleared after battle_ended");
-    assert!(
-        reg.pets
-            .iter()
-            .any(|p| p.id == 14106 && p.level == 1 && p.quest == 0),
-        "Registry must contain RewardPet 14106 at level 1 (quest=0)"
-    );
     assert!(
         reg.quest_tasks.contains_key(&10028)
             || data
@@ -290,10 +271,6 @@ async fn e2e_12001_tong_dung_battle_win_rewards_registry_and_next_packet_safe() 
     conn.session = reg;
     let _ = dispatch(&mut conn, &move_frame(520, 520), &data, &service, &env).await;
     assert!(
-        conn.session.pets.iter().any(|p| p.id == 14106),
-        "Next packet after battle must NOT overwrite RewardPet 14106"
-    );
-    assert!(
         conn.session.quest_tasks.contains_key(&10028)
             || data
                 .quest_marks
@@ -306,10 +283,6 @@ async fn e2e_12001_tong_dung_battle_win_rewards_registry_and_next_packet_safe() 
     let mut reloaded = Session::new();
     reloaded.id = char_id as u32;
     assert!(repos.sessions().load(char_id, &mut reloaded).await.expect("reload"));
-    assert!(
-        reloaded.pets.iter().any(|p| p.id == 14106),
-        "Pet 14106 must be persisted in SQLite at Battle End"
-    );
     assert!(
         reloaded.quest_tasks.contains_key(&10028)
             || data
@@ -476,7 +449,14 @@ async fn e2e_eve_battle_party_member_preserves_standard_eve_quest_progress() {
     service.battle_ended(battle_id, Outcome::PlayerWin);
 
     let reg_leader = registry_get(leader_id as u32).expect("leader in registry");
-    assert!(reg_leader.pets.iter().any(|p| p.id == 14106));
+    assert!(
+        reg_leader.quest_tasks.contains_key(&10028)
+            || data
+                .quest_marks
+                .get(&10028)
+                .is_some_and(|m| reg_leader.quest_dont.contains(m)),
+        "Leader must advance standard Eve quest 10028"
+    );
 
     let reg_member = registry_get(member_id as u32).expect("member in registry");
     assert_eq!(reg_member.battle_id, 0);
@@ -542,10 +522,7 @@ async fn e2e_eve_battle_disconnect_mid_battle_updates_db_for_relogin() {
     let mut relogin = Session::new();
     relogin.id = char_id as u32;
     assert!(repos.sessions().load(char_id, &mut relogin).await.expect("reload"));
-    assert!(
-        relogin.pets.iter().any(|p| p.id == 14106),
-        "Disconnected player must receive RewardPet 14106 in SQLite for next login"
-    );
+    // TTTD: Tong Dung (12001 eve 16) persists Quest 10028 (no RewardPet 14106).
     assert!(
         relogin.quest_tasks.contains_key(&10028)
             || data

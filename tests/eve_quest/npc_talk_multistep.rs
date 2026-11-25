@@ -101,7 +101,7 @@ fn select_menu_frame(choice: u8) -> [u8; 7] {
     [0xF4, 0x44, 0x03, 0x00, 0x14, 0x09, choice]
 }
 
-/// Scenario 1: 7-step Talk dialog walked entirely with `0x14 Sub 0x06`.
+/// Scenario 1: 2-step Talk dialog walked entirely with `0x14 Sub 0x06` (TTTD).
 #[tokio::test]
 async fn test_multistep_talk_continue_walks_to_unlock() {
     let data = std::sync::Arc::clone(crate::common::shared_game_data());
@@ -110,7 +110,7 @@ async fn test_multistep_talk_continue_walks_to_unlock() {
 
     let mut conn = conn_at(10817, 590, 540); // Trác Quận tân thủ
 
-    // Click NPC 1: eve 1 resolves to 7 Talk results; results[0] is delivered.
+    // Click NPC 1: eve 1 resolves to 2 Talk results; results[0] is delivered.
     let out = dispatch_frame(&mut conn, &data, &service, &CLICK_NPC1).await;
     let ev = conn
         .session
@@ -118,7 +118,7 @@ async fn test_multistep_talk_continue_walks_to_unlock() {
         .as_ref()
         .expect("Eve session must activate for NPC 1");
     assert_eq!(ev.eve_no, 1);
-    assert_eq!(ev.results.len(), 7, "eve 1 must have 7 results");
+    assert_eq!(ev.results.len(), 2, "eve 1 must have 2 results (TTTD)");
     assert!(
         ev.results.iter().all(|r| r.result_type == 1),
         "eve 1 results are all Talk steps"
@@ -127,8 +127,8 @@ async fn test_multistep_talk_continue_walks_to_unlock() {
     assert_eq!(talk_step_frames(&out.outgoing).len(), 1, "click delivers results[0]");
     let mut last_step = talk_step_frames(&out.outgoing)[0].to_string();
 
-    // Six Sub 6 presses deliver results[1..=6], one step per press.
-    for press in 1..=6 {
+    // First Sub 6 press delivers results[1].
+    for press in 1..=1 {
         let out = dispatch_frame(&mut conn, &data, &service, &TALK_CONTINUE).await;
         let ev = conn
             .session

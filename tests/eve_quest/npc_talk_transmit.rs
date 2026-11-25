@@ -70,11 +70,11 @@ async fn test_click_npc_emits_lock_then_first_talk_step() {
     assert!(open_idx < lock_idx, "0602 must precede lock frame");
     assert!(lock_idx < step_idx, "lock frame must precede talk step");
 
-    // Talk step must carry mean_no 10364 (0x287C -> LE `7C28`).
+    // Talk step must carry mean_no 52340 (0xCC74 -> LE `74CC`) in TTTD.
     let step_frame = &outcome.outgoing[step_idx].frame;
     assert!(
-        step_frame.contains("7C28"),
-        "talk step must embed mean_no 10364 (LE 7C28), got {step_frame}"
+        step_frame.contains("74CC"),
+        "talk step must embed mean_no 52340 (LE 74CC), got {step_frame}"
     );
 }
 

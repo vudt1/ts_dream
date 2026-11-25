@@ -897,13 +897,21 @@ fn process_single_domain_effect(
             StepOutcome::Continue
         }
         DomainEffect::NpcAction(res) => {
-            // rt=9 is 100% server-side; never sent raw via S->C 0x14.
+            // rt=9, rc=3: MapNpc pose/action (`0x16 0x06 <slot: u16 LE> <pose: u8>`,
+            // verified in `jumptable_0x78A9B6_cases.c:4192-4215` -> `MapNpc[slot]+0x34c`);
+            // never sent raw via S->C 0x14 01.
+            if res.result_class == 3 && res.parameter > 0 && (1..=0xFF).contains(&res.result_value)
+            {
+                let slot_le = crate::protocol::encoder::le16(res.parameter);
+                let pose = res.result_value as u8;
+                out.send(format!("F44405001606{slot_le}{pose:02X}"));
+            }
             tracing::debug!(
                 rc = res.result_class,
                 param = res.parameter,
                 p_style = res.parameter_style,
                 val = res.result_value,
-                "executed server-side NpcAction (rt=9)"
+                "executed NpcAction (rt=9)"
             );
             StepOutcome::Continue
         }

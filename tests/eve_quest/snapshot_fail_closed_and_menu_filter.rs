@@ -144,26 +144,26 @@ fn test_snapshot_full_hydration_pets_mark_dat_bit_flags_and_role_counts() {
 
 #[test]
 fn test_fail_closed_evaluator_rejects_unknown_ops_classes_and_zero_fallthrough() {
-    let data = std::sync::Arc::clone(crate::common::shared_game_data());
     let mut state = PlayerEventState::default();
     state.follow_npc_ids.insert(15417);
     state.battle_result = 0;
 
-    // 1. Real Data/eve.emg 55100.eve eve=5 cond=14 has condition_ops = 142 (cc=9, val=15417)
-    let scene_55100 = data
-        .scene_eve_data
-        .get(&55100)
-        .expect("55100.eve must be loaded");
-    let eve5 = scene_55100.npc_events.get(&5).expect("eve=5 in 55100.eve");
-    let cond14 = eve5
-        .conditions
-        .iter()
-        .find(|c| c.condition_no == 14)
-        .expect("cond_no=14 in 55100.eve eve=5");
-    assert_eq!(cond14.condition_ops, 142);
+    // 1. Unknown condition_ops=142 (e.g. cc=9, val=15417) must fail-closed even when NPC 15417 is carried
+    let cond14 = EveCondition {
+        condition_no: 14,
+        condition_class: 9,
+        condition_parameter: 0,
+        condition_parameter_style: 0,
+        condition_ops: 142,
+        condition_value: 15417,
+        and_num: 1,
+        condition_sub_item: 0,
+        to_result: 14,
+        results: vec![],
+    };
     assert!(
-        !evaluate(cond14, &state),
-        "condition_ops=142 at 55100.eve eve=5 cond=14 must fail-closed even when NPC 15417 is carried"
+        !evaluate(&cond14, &state),
+        "condition_ops=142 (cc=9) must fail-closed even when NPC 15417 is carried"
     );
     assert!(!compare_step(0, 142, 0), "compare_step unknown ops must return false");
 

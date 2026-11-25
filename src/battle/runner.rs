@@ -286,11 +286,12 @@ fn binary_skill_input(
     if skill_id == 10_000 {
         return None;
     }
+    let skill_lv_bonus = (skill_lv.max(1) - 1) * 5;
     if let Some(def) = binary_skill_def(data, skill_id) {
         return Some(SkillFormulaInput {
             element: def.element,
-            numerical: i64::from(def.numerical),
-            attribute: def.attribute,
+            numerical: i64::from(def.numerical) + skill_lv_bonus,
+            attribute: if def.attribute == 2 { 27 } else { 28 },
             round: if def.round > 0 {
                 i64::from(def.round)
             } else {
@@ -304,7 +305,7 @@ fn binary_skill_input(
     }
     data.skills.get(&skill_id).map(|skill| SkillFormulaInput {
         element: skill.thuoctinh.clamp(0, u8::MAX as i64) as u8,
-        numerical: 100,
+        numerical: 100 + skill_lv_bonus,
         attribute: if skill.skill_type == 2 { 27 } else { 28 },
         round: 0,
         hit_status: 0,
@@ -883,7 +884,7 @@ impl Battle {
 
     /// NPC auto-action: random enemy cell + `GetRandomSkillNPC`.
     fn auto_npc(&mut self, data: &BattleData, c: &mut WarInfo) {
-        let row = if damage::randomize_with_percent(&mut self.rng.random_0, 2, 3, 50) == 2 {
+        let mut row = if damage::randomize_with_percent(&mut self.rng.random_0, 2, 3, 50) == 2 {
             2u8
         } else {
             3u8
@@ -895,6 +896,22 @@ impl Battle {
                 if cell.hp > 0 {
                     alive.push(col);
                 }
+            }
+        }
+        // If the chosen row (e.g. pet row 2) has no living targets, fall back to
+        // the other player-side row so the NPC does not target an empty cell and
+        // silently lose its action.
+        if alive.is_empty() {
+            let fallback_row = row ^ 1;
+            for &col in &cols {
+                if let Some(cell) = self.cell(fallback_row, col as u8) {
+                    if cell.hp > 0 {
+                        alive.push(col);
+                    }
+                }
+            }
+            if !alive.is_empty() {
+                row = fallback_row;
             }
         }
         let col = if alive.is_empty() {

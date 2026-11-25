@@ -16,20 +16,20 @@ fn test_gamedata_load_full_eve_emg_and_indices() {
 
     assert_eq!(
         data.scene_eve_data.len(),
-        3897,
-        "Expected 3,897 non-empty scenes from Data/eve.emg"
+        3679,
+        "Expected 3,679 non-empty scenes from Data/eve.emg (TTTD)"
     );
     assert!(
         data.talks.is_empty(),
         "Legacy Quests/*.ini must not be loaded when eve.emg is Single Source of Truth"
     );
 
-    // 12001 must have 9 scripted fights
+    // 12001 must have 4 scripted fights (TTTD)
     let s12001 = data.scene_eve_data.get(&12001).expect("12001 must exist");
     assert_eq!(
         s12001.fight_datas.len(),
-        9,
-        "Scene 12001 must have 9 fight_datas"
+        4,
+        "Scene 12001 must have 4 fight_datas (TTTD)"
     );
 
     // Previously dropped scenes 10951 and 10954 must be present with their fights

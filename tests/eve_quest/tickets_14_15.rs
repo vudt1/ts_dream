@@ -951,8 +951,8 @@ fn ticket14_real_eve_emg_use_mode_2_and_and_chain_tail_results() {
     }
 
     assert!(use_mode_2_groups >= 9, "expected >= 9 use_mode==2 groups, got {use_mode_2_groups}");
-    assert_eq!(and_chains_with_tail_results, 15, "expected 15 AND chains with tail results in eve.emg");
-    assert_eq!(tail_nodes_with_results, 29, "expected 29 tail nodes with results in eve.emg");
+    assert_eq!(and_chains_with_tail_results, 0, "TTTD eve.emg has 0 AND chains with tail results");
+    assert_eq!(tail_nodes_with_results, 0, "TTTD eve.emg has 0 tail nodes with results");
 }
 
 #[tokio::test]
@@ -1041,7 +1041,7 @@ async fn ticket15_real_mark_dat_multistep_quests_do_not_mark_dont_at_step1() {
     let mark_bytes = std::fs::read(data_dir.join("Mark.dat")).expect("read Data/Mark.dat");
     let quest_marks = MarkDatLoader::load(&mark_bytes).expect("parse Data/Mark.dat");
 
-    let target_quests = [10012u16, 11443, 11863, 12325, 12358, 12377, 12406];
+    let target_quests = [10012u16, 11443, 11863, 10004, 10005, 10006, 10007];
     let mut data = GameData::default();
     data.quest_marks = quest_marks;
 

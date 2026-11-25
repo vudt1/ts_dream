@@ -204,6 +204,15 @@ impl EveAutoChainEngine {
                     *filter,
                 )?;
 
+                // Preserve `battle_result` when chaining into the post-battle `cc=8`
+                // handler so Guard #3 (`detect_re_battle`) still blocks re-opening
+                // interactive/battle chains (`rt=3|6`) once the `cc=8` step finishes.
+                let propagated_battle_result = if filter.is_some() {
+                    completed.battle_result
+                } else {
+                    0
+                };
+
                 let candidate = EventSession {
                     map_id: completed.map_id,
                     eve_no: i32::from(event_data.eve_no),
@@ -216,7 +225,7 @@ impl EveAutoChainEngine {
                     phase: EventPhase::Executing,
                     last_surface_id: -1,
                     last_choice_code: -1,
-                    battle_result: 0,
+                    battle_result: propagated_battle_result,
                     matched_condition_no: planned.matched_condition_no,
                     last_step_sent_ms: 0,
                 };

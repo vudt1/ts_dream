@@ -51,11 +51,11 @@ fn test_resolve_npc_eve_trac_quan_newbie() {
     assert_eq!(ev.eve_no, 1);
     assert_eq!(ev.npc_click_id, 1);
     assert_eq!(ev.trigger_kind, ts_dream::eve::EventTriggerKind::ClickNpc); // 1 = ClickNpc
-    assert_eq!(ev.results.len(), 7, "NPC 1 has 7 results");
+    assert_eq!(ev.results.len(), 2, "NPC 1 has 2 results (TTTD)");
 
-    // Check first result: Talk (result_type = 1), mean_no = 10364
+    // Check first result: Talk (result_type = 1), mean_no = 52340
     assert_eq!(ev.results[0].result_type, 1);
-    assert_eq!(ev.results[0].result_mean_no, 10364);
+    assert_eq!(ev.results[0].result_mean_no, 52340);
 
     // Test Click NPC 4 (NPC chuyển cảnh, template 15009)
     let ev_door_npc = resolve_npc_event(
@@ -67,9 +67,9 @@ fn test_resolve_npc_eve_trac_quan_newbie() {
     assert!(ev_door_npc.is_some(), "Eve event for NPC 4 must be resolved");
     let ev4 = ev_door_npc.unwrap();
     assert_eq!(ev4.eve_no, 4);
-    assert_eq!(ev4.results.len(), 7);
+    assert_eq!(ev4.results.len(), 4);
     // Last result is Door (type = 2)
-    assert_eq!(ev4.results[6].result_type, 2);
+    assert_eq!(ev4.results[3].result_type, 2);
 
     // Test Click NPC 3 (Yêu cầu có item 32012)
     // Khi chưa có item, resolve phải trả về None
@@ -151,7 +151,7 @@ async fn test_dispatch_click_npc_bridges_to_eve_session() {
     assert_eq!(active_ev.map_id, 10817);
     assert_eq!(active_ev.eve_no, 1);
     assert_eq!(active_ev.npc_click_id, 1);
-    assert_eq!(active_ev.results.len(), 7);
+    assert_eq!(active_ev.results.len(), 2);
 
     // Verify dialog open frame was sent: F44402000602
     assert!(
@@ -311,7 +311,7 @@ async fn test_dispatch_click_npc_bridges_to_eve_session() {
 fn test_map_12808_straw_dummy_resolution() {
     let data = std::sync::Arc::clone(crate::common::shared_game_data());
     let scene = data.scene_eve_data.get(&12808).expect("Scene 12808 must be loaded from eve.emg");
-    assert_eq!(scene.npcs.len(), 15, "Map 12808 should contain 15 NPCs");
+    assert_eq!(scene.npcs.len(), 12, "Map 12808 should contain 12 NPCs (TTTD)");
     assert!(scene.fight_datas.len() >= 6, "Map 12808 should contain at least 6 FightData entries");
 
     let mut session = Session::new();
@@ -478,6 +478,97 @@ fn test_12002_doc_du_ac_initial_dialog_before_quest_10004() {
         .expect("12002 Doc Du Ac (slot 3) must resolve during quest 10001");
     let means_q10001: Vec<u16> = ev_q10001.results.iter().map(|r| r.result_mean_no).collect();
     assert_eq!(means_q10001, vec![10152, 1]);
+}
+
+#[test]
+fn test_12002_doc_du_ac_post_battle_cc8_does_not_loop_back_to_cond3() {
+    use ts_dream::eve::auto_chain::{AutoChainResult, EventPhase, EventSession, EventTriggerKind};
+    use ts_dream::server::handlers::npc_event::auto_chain_after;
+
+    let data = std::sync::Arc::clone(crate::common::shared_game_data());
+    let mut rng = DotNetRandom::new(12345);
+    let mut session = Session::new();
+    session.id = 1001;
+    session.name = b"player".to_vec();
+    session.map_id = 12002;
+    session.quest_tasks.insert(10001, (0, 2));
+
+    // Step 1: cond 5 (StartBattle) finishes with battle_result = 1 (Win) -> must chain to cond 6 (cc=8).
+    let completed_battle = EventSession {
+        map_id: 12002,
+        eve_no: 5,
+        npc_click_id: 3,
+        trigger_kind: EventTriggerKind::ClickNpc,
+        chain_depth: 0,
+        results: vec![],
+        planned_effects: vec![],
+        current_index: 0,
+        phase: EventPhase::Completed,
+        last_surface_id: -1,
+        last_choice_code: -1,
+        battle_result: 1,
+        matched_condition_no: 5,
+        last_step_sent_ms: 0,
+    };
+
+    let cond6 = match auto_chain_after(&completed_battle, &session, &data, &mut rng) {
+        AutoChainResult::Chained(ev) => ev,
+        AutoChainResult::NoMatch => panic!("Win after cond 5 must chain to cc=8 cond 6"),
+    };
+    assert_eq!(cond6.matched_condition_no, 6);
+    assert_eq!(
+        cond6.battle_result, 1,
+        "Post-battle cc=8 chain must preserve battle_result so Guard #3 blocks re-opening cond 3"
+    );
+
+    // Step 2: cond 6 advances quest 10001 to step 3 and finishes -> must NOT chain back to cond 3 (rt=6).
+    session.quest_tasks.insert(10001, (0, 3));
+    let next = auto_chain_after(&cond6, &session, &data, &mut rng);
+    assert!(
+        matches!(next, AutoChainResult::NoMatch),
+        "After cc=8 post-battle handler finishes, must NOT loop back to cond 3 (10152 + choice 1); got: {next:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_12002_npc_action_rt9_emits_16_06_pose_frame() {
+    use ts_dream::eve::auto_chain::{EventPhase, EventSession, EventTriggerKind};
+    use ts_dream::eve::planner::plan_results;
+    use ts_dream::server::dispatcher::HandleOutcome;
+    use ts_dream::server::handlers::talk::execute_event_step_with_pool;
+
+    let data = std::sync::Arc::clone(crate::common::shared_game_data());
+    let scene = data.scene_eve_data.get(&12002).expect("12002 loaded");
+    let ev5 = scene.npc_events.get(&5).expect("12002 eve 5");
+    let cond6 = ev5.conditions.iter().find(|c| c.condition_no == 6).expect("cond 6");
+
+    let mut session = Session::new();
+    session.id = 1001;
+    session.map_id = 12002;
+    session.current_event_session = Some(EventSession {
+        map_id: 12002,
+        eve_no: 5,
+        npc_click_id: 3,
+        trigger_kind: EventTriggerKind::ClickNpc,
+        chain_depth: 1,
+        results: cond6.results.clone(),
+        planned_effects: plan_results(&cond6.results),
+        current_index: 0,
+        phase: EventPhase::Executing,
+        last_surface_id: -1,
+        last_choice_code: -1,
+        battle_result: 1,
+        matched_condition_no: 6,
+        last_step_sent_ms: 0,
+    });
+
+    let mut out = HandleOutcome::default();
+    execute_event_step_with_pool(&mut session, &data, None, &mut out).await;
+    assert!(
+        out.outgoing.iter().any(|f| f.frame == "F4440500160603001A"),
+        "rt=9 rc=3 param=3 val=26 must emit 16 06 pose frame F4440500160603001A; got: {:?}",
+        out.outgoing
+    );
 }
 
 

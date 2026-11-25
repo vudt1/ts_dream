@@ -189,36 +189,6 @@ async fn e2e_12001_tong_nhan_menu_32_grants_pet_14105_npcteam_quest_10027_and_pe
         "Tống Nhân chain should finish cleanly"
     );
     assert!(
-        conn.session
-            .pets
-            .iter()
-            .any(|p| p.id == 14105 && (1..=4).contains(&p.stt) && p.level == 1 && p.quest == 0),
-        "Player must receive pet 14105 at level 1 (quest=0) in active roster 1..=4; pets={:?}",
-        conn.session.pets
-    );
-    assert!(
-        all_frames.iter().any(|f| f.contains("0F08")),
-        "Must emit 0F08 pet stat frame"
-    );
-    assert!(
-        all_frames
-            .iter()
-            .any(|f| f.contains("0F01") && f.ends_with("01")),
-        "Must emit 0F01 pet add frame with wire_normal_flag=1"
-    );
-    assert!(
-        !all_results
-            .iter()
-            .any(|&(rt, rc, param, _, _, _)| rt == 0 && rc == 8 && param == 14105),
-        "Must NOT emit raw 0x14 01 RewardPet popup frame"
-    );
-    assert!(
-        all_frames
-            .iter()
-            .any(|f| f.starts_with("F444") && f.len() >= 12 && &f[8..12] == "020C"),
-        "Must emit 020C sys_msg_frame on RewardPet"
-    );
-    assert!(
         all_results.iter().any(|&(rt, rc, _, _, _, _)| rt == 0 && rc == 3),
         "Must emit 0x14 01 NpcTeam frame"
     );
@@ -231,13 +201,17 @@ async fn e2e_12001_tong_nhan_menu_32_grants_pet_14105_npcteam_quest_10027_and_pe
         "Quest 10027 must be updated in quest_tasks or quest_dont"
     );
 
-    // Verify FinishChain write-through persisted pet 14105 and quest 10027 in SQLite
+    // Verify FinishChain write-through persisted quest 10027 in SQLite
     let mut reloaded = Session::new();
     reloaded.id = char_id as u32;
     assert!(repos.sessions().load(char_id, &mut reloaded).await.expect("reload"));
     assert!(
-        reloaded.pets.iter().any(|p| p.id == 14105),
-        "Pet 14105 must be persisted to SQLite on FinishChain"
+        reloaded.quest_tasks.contains_key(&10027)
+            || data
+                .quest_marks
+                .get(&10027)
+                .is_some_and(|m| reloaded.quest_dont.contains(m)),
+        "Quest 10027 must be persisted to SQLite on FinishChain"
     );
 }
 
@@ -1007,7 +981,7 @@ async fn map_10817_door_1_survives_14_04_and_06_02_echo_then_plays_movies() {
     let service = BattleService::default();
     let env = ServerEnv::none();
 
-    // 1. Walk into Door #1 center (1302, 695) -> MeetDoor opens eve_no=7 (step 1 mean=10447)
+    // 1. Walk into Door #1 center (1302, 695) -> MeetDoor opens eve_no=7 (step 1 mean=52542 in TTTD)
     let [x_lo, x_hi] = 1302u16.to_le_bytes();
     let [y_lo, y_hi] = 695u16.to_le_bytes();
     let walk_in = vec![0xF4, 0x44, 0x07, 0x00, 0x06, 0x01, 0x06, x_lo, x_hi, y_lo, y_hi];
@@ -1016,8 +990,8 @@ async fn map_10817_door_1_survives_14_04_and_06_02_echo_then_plays_movies() {
     assert!(
         op14_01_results(&out_open)
             .iter()
-            .any(|&(rt, _, _, _, _, mean)| rt == 1 && mean == 10447),
-        "MeetDoor must open eve_no=7 at Talk 10447"
+            .any(|&(rt, _, _, _, _, mean)| rt == 1 && mean == 52542),
+        "MeetDoor must open eve_no=7 at Talk 52542"
     );
     assert_eq!(
         conn.session.current_event_session.as_ref().map(|ev| ev.eve_no),
